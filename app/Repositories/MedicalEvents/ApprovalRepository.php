@@ -38,6 +38,8 @@ class ApprovalRepository extends BaseRepository
         return $plan->approvals()->with(['grantedTo', 'ehealthLinks.job'])
             ->whereHas('grantedTo', fn ($query) => $query->whereValue($employeeUuid))
             ->whereAccessLevel($accessLevel)
+            ->whereDoesntHave('ehealthLinks', fn ($links) => $links->whereStatus('PROCESSED')
+                ->whereHas('job', fn ($jobs) => $jobs->where('request_data->operation', 'cancel')))
             ->where(function ($query): void {
                 $query->whereIn('status', [ApprovalStatus::ACTIVE->value, ApprovalStatus::APPROVED->value, ApprovalStatus::PENDING->value, ApprovalStatus::NEW->value])
                     ->orWhereHas('ehealthLinks', fn ($links) => $links->whereStatus(\App\Enums\JobStatus::PENDING->value));
@@ -76,8 +78,84 @@ class ApprovalRepository extends BaseRepository
     public function creationLinkFor(Approval $approval): ?EhealthLink
     {
         return $approval->ehealthLinks()->with('job')->whereHas('job', fn ($query) => $query
-            ->where(fn ($operation) => $operation->whereNull('request_data->operation')->orWhere('request_data->operation', '!=', 'resendSms')))
+            ->whereNull('request_data->operation'))
             ->latest('id')->first();
+    }
+
+    public function cancellationLinkFor(Approval $approval): ?EhealthLink
+    {
+        return $approval->ehealthLinks()->with('job')->whereHas('job', fn ($query) => $query
+            ->where('request_data->operation', 'cancel'))->latest('id')->first();
+    }
+
+    /** Reserve before sending: concurrent clicks and ambiguous transport failures must not resubmit. */
+    public function beginCarePlanCancellation(\App\Models\CarePlan $plan, string $approvalUuid): EhealthLink
+    {
+        return $this->storageTransaction(function () use ($plan, $approvalUuid): EhealthLink {
+            $approval = $plan->approvals()->whereUuid($approvalUuid)->lockForUpdate()->firstOrFail();
+            $existing = $this->cancellationLinkFor($approval);
+            if ($existing !== null && $existing->status !== 'FAILED') {
+                return $existing;
+            }
+            $link = $this->attachEhealthLink($approval, ['href' => null]);
+            $link->job()->update(['request_data' => [
+                'operation' => 'cancel',
+                'patientUuid' => $plan->person->uuid,
+                'approvalUuid' => $approvalUuid,
+            ]]);
+
+            return $link->load('linkable', 'job');
+        });
+    }
+
+    /** Only a confirmed cancellation may change the permission; failure belongs to the operation. */
+    public function finishCarePlanCancellation(EhealthLink $link, array $result): void
+    {
+        $this->storageTransaction(function () use ($link, $result): void {
+            $approval = Approval::whereKey($link->linkable_id)->lockForUpdate()->firstOrFail();
+            $link = $approval->ehealthLinks()->whereKey($link->id)->with('job')->lockForUpdate()->firstOrFail();
+            $request = $link->job->request_data;
+            if (($request['operation'] ?? null) !== 'cancel'
+                || !$approval->approvable instanceof \App\Models\CarePlan
+                || $approval->approvable->person->uuid !== ($request['patientUuid'] ?? null)
+                || $approval->uuid !== ($request['approvalUuid'] ?? null)) {
+                throw new \RuntimeException(__('care-plan.approval_result_unavailable'));
+            }
+            if ($link->status === 'PROCESSED') {
+                return;
+            }
+            $processed = strtolower((string) ($result['status'] ?? '')) === 'processed'
+                && (int) ($result['status_code'] ?? 0) === 201;
+            if ($processed) {
+                $data = \App\Classes\eHealth\Api\Approval::validateResourceData($result);
+                if ($data['id'] !== $approval->uuid
+                    || (isset($data['status']) && ApprovalStatus::resolve($data['status']) !== ApprovalStatus::INACTIVE)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['approval' => __('care-plan.approval_result_unavailable')]);
+                }
+                // Cancel responses may retain is_verified=true and omit status entirely.
+                $data['status'] = ApprovalStatus::INACTIVE->value;
+                $this->sync($data, $approval->approvable, $approval);
+            }
+            $status = $processed ? 'PROCESSED' : 'FAILED';
+            $link->job()->update(['status' => $status, 'response_data' => $result]);
+            $link->update(['status' => $status, 'error' => $processed ? null : ($result['error'] ?? ['message' => __('care-plan.approval_cancel_error')])]);
+        });
+    }
+
+    public function carePlanCancellationState(\App\Models\CarePlan $plan, string $approvalUuid, int $linkId): array
+    {
+        $approval = $this->carePlanApproval($plan, $approvalUuid);
+        $link = $approval->ehealthLinks()->whereKey($linkId)->with('job')->firstOrFail();
+        if (data_get($link->job->request_data, 'operation') !== 'cancel') {
+            throw new \RuntimeException(__('care-plan.approval_result_unavailable'));
+        }
+
+        $status = strtolower($link->status);
+        if (!in_array($status, ['processed', 'failed'], true) && ($link->href === null || $link->error !== null)) {
+            $status = 'unknown';
+        }
+
+        return ['status' => $status, 'linkId' => $link->id];
     }
 
     public function carePlanApproval(\App\Models\CarePlan $plan, string $approvalUuid): Approval
@@ -163,8 +241,13 @@ class ApprovalRepository extends BaseRepository
         return $plan->approvals()->withAllRelations()->with('ehealthLinks.job')->latest('id')->get()
             ->map(function (Approval $approval): array {
                 $row = $approval->toArray();
-                $link = $approval->ehealthLinks->sortByDesc('id')->first();
+                $link = $approval->ehealthLinks->filter(fn ($candidate) => data_get($candidate->job?->request_data, 'operation') === null)->sortByDesc('id')->first();
                 $row['requestPending'] = $link !== null && !in_array($link->status, [\App\Enums\JobStatus::PROCESSED->value, \App\Enums\JobStatus::FAILED->value], true);
+                $cancel = $approval->ehealthLinks->filter(fn ($candidate) => data_get($candidate->job?->request_data, 'operation') === 'cancel')->sortByDesc('id')->first();
+                $row['cancellationPending'] = $cancel !== null && !in_array($cancel->status, ['PROCESSED', 'FAILED'], true);
+                $row['cancellationConfirmed'] = $cancel?->status === 'PROCESSED';
+                $row['cancellationLinkId'] = $row['cancellationPending'] ? $cancel->id : null;
+                $row['cancellationUnknown'] = $row['cancellationPending'] && ($cancel->href === null || $cancel->error !== null);
 
                 return $row;
             })->all();
@@ -178,27 +261,32 @@ class ApprovalRepository extends BaseRepository
 
     public function storePatientResponse(string $patientUuid, string $approvalUuid, array $data, string $confirmedStatus): void
     {
-        $approval = Approval::whereUuid($approvalUuid)->whereHasMorph(
-            'approvable',
-            [\App\Models\CarePlan::class],
-            fn ($query) => $query->whereHas('person', fn ($person) => $person->whereUuid($patientUuid))
-        )->with('approvable')->firstOrFail();
-        if (isset($data['id']) && $data['id'] !== $approvalUuid) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['approval' => __('care-plan.approval_result_unavailable')]);
-        }
-        if ($confirmedStatus === ApprovalStatus::ACTIVE->value && array_key_exists('is_verified', $data) && $data['is_verified'] !== true) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['approval' => __('care-plan.approval_verify_error')]);
-        }
-        if (isset($data['id'], $data['is_verified'])) {
-            $this->sync($data, $approval->approvable, $approval);
-        } else {
-            $changes = ['status' => $confirmedStatus];
-            if ($confirmedStatus === ApprovalStatus::ACTIVE->value) {
-                $changes['isVerified'] = true;
+        $this->storageTransaction(function () use ($patientUuid, $approvalUuid, $data, $confirmedStatus): void {
+            $approval = Approval::whereUuid($approvalUuid)->whereHasMorph(
+                'approvable',
+                [\App\Models\CarePlan::class],
+                fn ($query) => $query->whereHas('person', fn ($person) => $person->whereUuid($patientUuid))
+            )->with('approvable')->lockForUpdate()->firstOrFail();
+            if (isset($data['id']) && $data['id'] !== $approvalUuid) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['approval' => __('care-plan.approval_result_unavailable')]);
             }
-            // These server-owned fields are explicit; camelCase keys are not in this model's $fillable.
-            $approval->forceFill($changes)->save();
-        }
+            if ($confirmedStatus === ApprovalStatus::ACTIVE->value && array_key_exists('is_verified', $data) && $data['is_verified'] !== true) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['approval' => __('care-plan.approval_verify_error')]);
+            }
+            if ($confirmedStatus === ApprovalStatus::ACTIVE->value && ($cancel = $this->cancellationLinkFor($approval)) !== null && $cancel->status !== 'FAILED') {
+                throw new \RuntimeException(__('care-plan.approval_cancel_processing'));
+            }
+            if (isset($data['id'], $data['is_verified'])) {
+                $this->sync($data, $approval->approvable, $approval);
+            } else {
+                $changes = ['status' => $confirmedStatus];
+                if ($confirmedStatus === ApprovalStatus::ACTIVE->value) {
+                    $changes['isVerified'] = true;
+                }
+                // These server-owned fields are explicit; camelCase keys are not in this model's $fillable.
+                $approval->forceFill($changes)->save();
+            }
+        });
     }
     protected const int SMS_CODE_ALIVE_MINUTES = 14;
 
@@ -385,23 +473,28 @@ class ApprovalRepository extends BaseRepository
                 // Resolve created_by → Identifier FK
                 $createdByValue = $approvalData['created_by']['identifier']['value'] ?? null;
 
-                Approval::updateOrCreate(
-                    ['uuid' => $approvalData['id']],
-                    [
-                        'approvable_type' => get_class($entity),
-                        'approvable_id' => $entity->id,
-                        'granted_to_id' => $this->resolveIdentifier($grantedToValue)?->id,
-                        'granted_to_type' => $grantedToCode,
-                        'reason_id' => $this->resolveIdentifier($reasonValue)?->id,
-                        'created_by_id' => $this->resolveIdentifier($createdByValue)?->id,
-                        'status' => ApprovalStatus::resolve($approvalData['status'] ?? null) === ApprovalStatus::INACTIVE
-                            ? ApprovalStatus::INACTIVE->value
-                            : (!empty($approvalData['is_verified']) ? ApprovalStatus::ACTIVE->value : ApprovalStatus::PENDING->value),
-                        'access_level' => $approvalData['access_level'] ?? 'read',
-                        'is_verified' => (bool) ($approvalData['is_verified'] ?? false),
-                        'expires_at' => $approvalData['expires_at'] ?? null,
-                    ]
-                );
+                $this->storageTransaction(function () use ($entity, $approvalData, $grantedToValue, $grantedToCode, $reasonValue, $createdByValue): void {
+                    $existing = Approval::whereUuid($approvalData['id'])->lockForUpdate()->first();
+                    $cancelled = $existing !== null && $existing->ehealthLinks()->whereStatus('PROCESSED')
+                        ->whereHas('job', fn ($query) => $query->where('request_data->operation', 'cancel'))->exists();
+                    Approval::updateOrCreate(
+                        ['uuid' => $approvalData['id']],
+                        [
+                            'approvable_type' => get_class($entity),
+                            'approvable_id' => $entity->id,
+                            'granted_to_id' => $this->resolveIdentifier($grantedToValue)?->id,
+                            'granted_to_type' => $grantedToCode,
+                            'reason_id' => $this->resolveIdentifier($reasonValue)?->id,
+                            'created_by_id' => $this->resolveIdentifier($createdByValue)?->id,
+                            'status' => $cancelled || ApprovalStatus::resolve($approvalData['status'] ?? null) === ApprovalStatus::INACTIVE
+                                ? ApprovalStatus::INACTIVE->value
+                                : (!empty($approvalData['is_verified']) ? ApprovalStatus::ACTIVE->value : ApprovalStatus::PENDING->value),
+                            'access_level' => $approvalData['access_level'] ?? 'read',
+                            'is_verified' => (bool) ($approvalData['is_verified'] ?? false),
+                            'expires_at' => $approvalData['expires_at'] ?? null,
+                        ]
+                    );
+                });
             }
 
             $inactiveQuery = Approval::where('approvable_type', get_class($entity))
@@ -637,6 +730,7 @@ class ApprovalRepository extends BaseRepository
                 )
                 ->withAllRelations()
                 ->with('grantedResourceIdentifiers.type.coding')
+                ->lockForUpdate()
                 ->first();
 
             $createdBy = $this->syncIdentifier($existing, $modelData['created_by'] ?? null, 'createdBy');
@@ -670,6 +764,12 @@ class ApprovalRepository extends BaseRepository
                 'is_verified' => $modelData['is_verified'] ?? false,
                 'expires_at' => isset($modelData['expires_at']) ? convertToLocalTimezone($modelData['expires_at']) : $existing?->expiresAt,
             ];
+
+            // An older creation/verification response cannot undo a confirmed cancellation.
+            if ($existing !== null && $existing->ehealthLinks()->whereStatus('PROCESSED')
+                ->whereHas('job', fn ($query) => $query->where('request_data->operation', 'cancel'))->exists()) {
+                $approvalData['status'] = ApprovalStatus::INACTIVE->value;
+            }
 
             if ($existing) {
                 $existing->update($approvalData);

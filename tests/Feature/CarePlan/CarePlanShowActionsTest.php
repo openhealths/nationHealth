@@ -861,8 +861,80 @@ class CarePlanShowActionsTest extends TestCase
         ]);
     }
 
+    public function test_cancellation_without_scope_has_no_api_database_or_queue_side_effects(): void
+    {
+        $this->actingAs($this->user);
+        $plan = $this->makeSignedNewPlan();
+        $this->grantApproval($plan, $this->employee, ApprovalStatus::ACTIVE->value);
+        $approval = $plan->approvals()->firstOrFail();
+        \Illuminate\Support\Facades\Bus::fake();
+        $this->mock(\App\Classes\eHealth\Api\Approval::class)->shouldNotReceive('cancelApproval');
+        $before = \App\Models\EhealthLink::count();
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $plan])
+            ->call('cancelApproval', $approval->uuid)
+            ->assertSee(__('care-plan.approval_cancel_forbidden'));
+
+        $this->assertSame('active', $approval->fresh()->status);
+        $this->assertSame($before, \App\Models\EhealthLink::count());
+        \Illuminate\Support\Facades\Bus::assertNothingBatched();
+    }
+
+    public function test_cancellation_poll_shows_success_once_only_after_confirmation(): void
+    {
+        $this->actingAs($this->user);
+        $this->grantMedicalEventAbilities($this->user, ['approval:cancel']);
+        session()->put(config('ehealth.api.oauth.bearer_token'), 'test-token');
+        $plan = $this->makeSignedNewPlan();
+        $this->grantApproval($plan, $this->employee, ApprovalStatus::ACTIVE->value);
+        $approval = $plan->approvals()->firstOrFail();
+        $repository = \App\Repositories\MedicalEvents\Repository::approval();
+        $link = $repository->beginCarePlanCancellation($plan, $approval->uuid);
+        $repository->trackRequest($link, '/jobs/cancel-job', ['status' => 'pending']);
+        $component = Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $plan]);
+        $component->assertSet('cancellationLinks', [$approval->uuid => $link->id])
+            ->call('checkCancellationStatus')->assertDontSee(__('care-plan.approval_cancelled'));
+        $this->assertSame('active', $approval->fresh()->status);
+
+        $repository->finishCarePlanCancellation($link, ['status' => 'processed', 'status_code' => 201,
+            'response_data' => ['id' => $approval->uuid, 'is_verified' => true]]);
+        $component->call('checkCancellationStatus')->assertSet('cancellationLinks', [])
+            ->assertSee(__('care-plan.approval_cancelled'))
+            ->assertSeeHtml('top-6 right-2')
+            ->assertDispatched('care-plan-approvals-changed')
+            ->assertNotDispatched('flashMessage')
+            ->assertNotDispatched('flash-message')
+            ->call('checkCancellationStatus')->assertDontSee(__('care-plan.approval_cancelled'));
+        $this->assertSame('inactive', $approval->fresh()->status);
+    }
+
+    public function test_recreation_waits_for_async_cancellation_before_creating_a_replacement(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        $this->actingAs($this->user);
+        $this->grantMedicalEventAbilities($this->user, ['approval:cancel']);
+        session()->put(config('ehealth.api.oauth.bearer_token'), 'test-token');
+        $plan = $this->makeSignedNewPlan();
+        $this->grantApproval($plan, $this->employee, ApprovalStatus::PENDING->value);
+        $approval = $plan->approvals()->firstOrFail();
+        $repository = \App\Repositories\MedicalEvents\Repository::approval();
+        $link = $repository->beginCarePlanCancellation($plan, $approval->uuid);
+        $repository->trackRequest($link, '/jobs/cancel-job', ['status' => 'pending']);
+        $service = $this->mock(\App\Services\MedicalEvents\CarePlanApprovalService::class)->makePartial();
+        $service->shouldNotReceive('create');
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $plan])
+            ->call('recreateApproval', $approval->uuid)
+            ->assertSet('recreateAfterCancellation', $approval->uuid)
+            ->assertSee(__('care-plan.approval_cancel_processing'))
+            ->assertDontSee(__('care-plan.approval_cancelled'));
+        $this->assertSame(1, $plan->approvals()->count());
+    }
+
     public function test_terminal_plan_can_revoke_an_existing_approval_but_cannot_grant_a_new_one(): void
     {
+        $this->grantMedicalEventAbilities($this->user, ['approval:cancel']);
+        session()->put(config('ehealth.api.oauth.bearer_token'), 'test-token');
         $this->actingAs($this->user);
         $plan = $this->makeSignedNewPlan();
         $plan->update(['status' => 'completed']);
@@ -873,7 +945,10 @@ class CarePlanShowActionsTest extends TestCase
         $service = $this->mock(\App\Services\MedicalEvents\CarePlanApprovalService::class)->makePartial();
         $service->shouldReceive('skipsPatientOtp')->andReturn(false);
         $service->shouldReceive('syncForCarePlan')->andReturnNull();
-        $service->shouldReceive('deactivate')->once()->with($this->person->uuid, $approvalUuid)->andReturn($response);
+        $service->shouldReceive('requestCancellation')->once()->with(
+            Mockery::on(fn (CarePlan $candidate) => $candidate->id === $plan->id),
+            $approvalUuid, $this->legalEntity, $this->user, 'test-token'
+        )->andReturn(['status' => 'processed', 'linkId' => 1]);
         Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $plan->fresh()])
             ->assertSet('isReadOnly', true)->assertSeeHtml('wire:click="cancelApproval')
             ->call('cancelApproval', $approvalUuid)->assertSee(__('care-plan.approval_cancelled'))

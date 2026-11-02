@@ -560,6 +560,187 @@ class CarePlanApprovalServiceTest extends TestCase
         return $api;
     }
 
+    public function test_sync_cancellation_stays_inactive_after_an_older_creation_result(): void
+    {
+        [$plan, $legalEntity, $user, $approval] = $this->cancellationContext();
+        $data = ['id' => $approval->uuid, 'is_verified' => true];
+        $this->cancellationApi($plan, $approval, 201, ['data' => $data]);
+        $result = app(CarePlanApprovalService::class)->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token');
+        $this->assertSame('processed', $result['status']);
+        $this->assertSame('inactive', $approval->fresh()->status);
+        $this->assertTrue($approval->fresh()->getAttribute('is_verified'));
+
+        $repository = \App\Repositories\MedicalEvents\Repository::approval();
+        $oldLink = $repository->attachEhealthLink($approval, ['href' => '/jobs/old-create']);
+        $employeeUuid = (string) Str::uuid();
+        $identifier = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $employeeUuid]);
+        $approval->update(['granted_to_id' => $identifier->id]);
+        $this->assertNull($repository->reusableForCarePlan($plan, $employeeUuid, 'write'));
+        $repository->completeCarePlanRequest($oldLink, $data + ['status' => 'active']);
+        $this->assertSame('inactive', $approval->fresh()->status);
+        $again = app(CarePlanApprovalService::class)->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token');
+        $this->assertSame($result, $again);
+    }
+
+    public function test_async_cancellation_does_not_revoke_until_the_remote_job_completes(): void
+    {
+        Bus::fake();
+        [$plan, $legalEntity, $user, $approval] = $this->cancellationContext();
+        $this->cancellationApi($plan, $approval, 202, ['data' => ['status' => 'pending', 'links' => [['href' => '/Jobs/remote-job']]]]);
+        $service = app(CarePlanApprovalService::class);
+        $result = $service->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token');
+        $this->assertSame('pending', $result['status']);
+        $this->assertSame('active', $approval->fresh()->status);
+        $this->assertSame($result, $service->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token'));
+        Bus::assertBatchCount(2);
+        $link = EhealthLink::findOrFail($result['linkId']);
+        $this->assertNull(\App\Repositories\MedicalEvents\Repository::approval()->creationLinkFor($approval));
+        $worker = new \App\Jobs\RemoteEHealthLinksProcessing($link, $legalEntity, standalone: true);
+        $this->assertSame('job:read', (new \ReflectionMethod($worker, 'requiredScope'))->invoke($worker));
+        $payload = ['status' => 'processed', 'status_code' => 201, 'response_data' => ['id' => $approval->uuid, 'is_verified' => true]];
+        $response = new EHealthResponse(new \GuzzleHttp\Psr7\Response(200), fn () => $payload);
+        (new \ReflectionMethod($worker, 'processResponse'))->invoke($worker, $response);
+        $this->assertSame('inactive', $approval->fresh()->status);
+        $this->assertSame('PROCESSED', $link->fresh()->status);
+        // Duplicate delivery and a later queue failure cannot undo confirmed cancellation.
+        (new \ReflectionMethod($worker, 'processResponse'))->invoke($worker, $response);
+        $worker->failed(new \RuntimeException('late failure'));
+        $this->assertSame('PROCESSED', $link->fresh()->status);
+        $this->assertNull($link->fresh()->error);
+    }
+
+    public function test_failed_cancellation_job_preserves_the_existing_permission(): void
+    {
+        [$plan, $legalEntity, , $approval] = $this->cancellationContext();
+        $repository = \App\Repositories\MedicalEvents\Repository::approval();
+        $link = $repository->beginCarePlanCancellation($plan, $approval->uuid);
+        $worker = new \App\Jobs\RemoteEHealthLinksProcessing($link, $legalEntity, standalone: true);
+        $response = new EHealthResponse(new \GuzzleHttp\Psr7\Response(200), fn () => ['status' => 'failed', 'status_code' => 403]);
+        (new \ReflectionMethod($worker, 'processResponse'))->invoke($worker, $response);
+        $this->assertSame('active', $approval->fresh()->status);
+        $this->assertSame('FAILED', $link->fresh()->status);
+    }
+
+    public function test_cancellation_timeout_is_not_retried_as_a_second_mutation(): void
+    {
+        [$plan, $legalEntity, $user, $approval] = $this->cancellationContext();
+        $api = Mockery::mock(ApprovalApi::class);
+        $api->shouldReceive('withToken')->andReturnSelf();
+        $api->shouldReceive('cancelApproval')->once()->andThrow(new \App\Exceptions\EHealth\EHealthConnectionException('timeout'));
+        $this->instance(ApprovalApi::class, $api);
+        $service = app(CarePlanApprovalService::class);
+        try {
+            $service->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token');
+            $this->fail('The transport failure must propagate.');
+        } catch (\App\Exceptions\EHealth\EHealthConnectionException) {
+            $this->assertSame('active', $approval->fresh()->status);
+        }
+        $this->assertSame('unknown', $service->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token')['status']);
+        $this->assertSame(1, $approval->ehealthLinks()->count());
+    }
+
+    public function test_cancellation_rejects_a_result_for_another_approval(): void
+    {
+        [$plan, , , $approval] = $this->cancellationContext();
+        $repository = \App\Repositories\MedicalEvents\Repository::approval();
+        $link = $repository->beginCarePlanCancellation($plan, $approval->uuid);
+        try {
+            $repository->finishCarePlanCancellation($link, ['status' => 'processed', 'status_code' => 201,
+                'response_data' => ['id' => (string) Str::uuid(), 'is_verified' => true]]);
+            $this->fail('Mismatched identity must be rejected.');
+        } catch (\Illuminate\Validation\ValidationException) {
+            $this->assertSame('active', $approval->fresh()->status);
+            $this->assertSame('PENDING', $link->fresh()->status);
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('cancellationErrors')]
+    public function test_cancellation_http_errors_preserve_access_and_do_not_queue(int $status, string $operationStatus): void
+    {
+        Bus::fake();
+        [$plan, $legalEntity, $user, $approval] = $this->cancellationContext();
+        $this->cancellationApi($plan, $approval, $status, ['error' => ['message' => 'Rejected']]);
+        try {
+            app(CarePlanApprovalService::class)->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token');
+            $this->fail('HTTP failure must propagate.');
+        } catch (\App\Exceptions\EHealth\EHealthResponseException $exception) {
+            $this->assertSame($status, $exception->getCode());
+        }
+        $this->assertSame('active', $approval->fresh()->status);
+        $this->assertSame($operationStatus, $approval->ehealthLinks()->sole()->status);
+        Bus::assertNothingBatched();
+    }
+
+    public static function cancellationErrors(): array
+    {
+        return [[403, 'FAILED'], [404, 'FAILED'], [422, 'FAILED'], [503, 'PENDING']];
+    }
+
+    public function test_polling_failure_can_resume_the_same_job_without_cancelling_again(): void
+    {
+        Bus::fake();
+        [$plan, $legalEntity, $user, $approval] = $this->cancellationContext();
+        $this->cancellationApi($plan, $approval, 202, ['data' => ['links' => [['href' => '/api/jobs/remote-job']]]]);
+        $service = app(CarePlanApprovalService::class);
+        $result = $service->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token');
+        $link = EhealthLink::findOrFail($result['linkId']);
+        (new \App\Jobs\RemoteEHealthLinksProcessing($link, $legalEntity, standalone: true))->failed(new \RuntimeException('polling timeout'));
+        $state = \App\Repositories\MedicalEvents\Repository::approval()->carePlanCancellationState($plan, $approval->uuid, $link->id);
+        $this->assertSame('unknown', $state['status']);
+        $this->assertSame('active', $approval->fresh()->status);
+        $this->assertSame($result, $service->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token'));
+        $this->assertNull($link->fresh()->error);
+        $this->assertSame('/api/jobs/remote-job', $link->fresh()->href);
+        Bus::assertBatchCount(2);
+    }
+
+    public function test_cancel_receipt_without_a_job_link_remains_unknown(): void
+    {
+        Bus::fake();
+        [$plan, $legalEntity, $user, $approval] = $this->cancellationContext();
+        $this->cancellationApi($plan, $approval, 202, ['data' => ['status' => 'pending']]);
+        $service = app(CarePlanApprovalService::class);
+        try {
+            $service->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token');
+            $this->fail('A missing job receipt is not success.');
+        } catch (\RuntimeException) {
+            $this->assertSame('active', $approval->fresh()->status);
+        }
+        $this->assertSame('unknown', $service->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token')['status']);
+        Bus::assertNothingBatched();
+    }
+
+    public function test_cancellation_cannot_resolve_an_approval_from_another_plan(): void
+    {
+        [$plan, $legalEntity, $user] = $this->cancellationContext();
+        $this->mock(ApprovalApi::class)->shouldNotReceive('cancelApproval');
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        app(CarePlanApprovalService::class)->requestCancellation($plan, (string) Str::uuid(), $legalEntity, $user, 'test-token');
+    }
+
+    private function cancellationContext(): array
+    {
+        [$plan, $legalEntity, $user] = $this->makeCarePlanContext();
+        $this->instance('legalEntity', $legalEntity);
+        $this->grantMedicalEventAbilities($user, ['approval:cancel', 'job:read']);
+        $this->actingAs($user);
+        $approval = $plan->approvals()->create(['uuid' => (string) Str::uuid(), 'status' => 'active', 'is_verified' => true, 'access_level' => 'write']);
+
+        return [$plan, $legalEntity, $user, $approval];
+    }
+
+    private function cancellationApi(CarePlan $plan, Approval $approval, int $status, array $body): void
+    {
+        $method = new \ReflectionMethod(ApprovalApi::class, 'validateCancellation');
+        $response = new EHealthResponse(new \GuzzleHttp\Psr7\Response($status, [], json_encode($body)),
+            fn (EHealthResponse $response): array => $method->invoke(new ApprovalApi(), $response));
+        $api = Mockery::mock(ApprovalApi::class);
+        $api->shouldReceive('withToken')->with('test-token')->andReturnSelf();
+        $api->shouldReceive('cancelApproval')->once()->with($plan->person->uuid, $approval->uuid)->andReturn($response);
+        $api->shouldNotReceive('verify');
+        $this->instance(ApprovalApi::class, $api);
+    }
+
     /**
      * @return array{0: CarePlan, 1: LegalEntity, 2: User}
      */

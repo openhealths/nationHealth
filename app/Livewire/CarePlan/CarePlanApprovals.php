@@ -43,6 +43,12 @@ class CarePlanApprovals extends Component
     public array $approvals = [];
 
     #[Locked]
+    public array $cancellationLinks = [];
+
+    #[Locked]
+    public ?string $recreateAfterCancellation = null;
+
+    #[Locked]
     public ?string $errorMessage = null;
 
     #[Locked]
@@ -122,6 +128,11 @@ class CarePlanApprovals extends Component
             $carePlan = $this->currentCarePlan();
             $this->skipsPatientOtp = app(CarePlanApprovalService::class)->skipsPatientOtp($carePlan);
             $this->approvals = \App\Repositories\MedicalEvents\Repository::approval()->localForCarePlan($carePlan);
+            foreach ($this->approvals as $approval) {
+                if ($approval['cancellationPending'] && !$approval['cancellationUnknown']) {
+                    $this->cancellationLinks[$approval['uuid']] = $approval['cancellationLinkId'];
+                }
+            }
         } catch (Exception $e) {
             if (!$notifyErrors) {
                 throw $e;
@@ -318,16 +329,14 @@ class CarePlanApprovals extends Component
 
         try {
             app(MedicalRequestOwnership::class)->approvalForCarePlan($this->currentCarePlan(), $oldApprovalUuid);
-            $this->loadAuthMethods();
-            try {
-                app(CarePlanApprovalService::class)
-                    ->deactivate($this->patientUuid, $oldApprovalUuid);
-            } catch (EHealthResponseException $e) {
-                // Only an absent approval can be safely replaced without deactivation.
-                if ($e->getCode() !== 404) {
-                    throw $e;
+            if (!$this->requestCancellation($oldApprovalUuid)) {
+                if (isset($this->cancellationLinks[$oldApprovalUuid])) {
+                    $this->recreateAfterCancellation = $oldApprovalUuid;
                 }
+
+                return;
             }
+            $this->loadAuthMethods();
 
             $carePlan = $this->currentCarePlan();
             $oldApproval = $carePlan->approvals()->with('grantedTo')->where('uuid', $oldApprovalUuid)->first();
@@ -483,13 +492,10 @@ class CarePlanApprovals extends Component
 
     public function cancelApproval(string $approvalUuid): void
     {
-        $this->authorize('manage', $this->currentCarePlan());
-
         try {
-            app(MedicalRequestOwnership::class)
-                ->approvalForCarePlan($this->currentCarePlan(), $approvalUuid);
-            app(CarePlanApprovalService::class)
-                ->deactivate($this->patientUuid, $approvalUuid);
+            if (!$this->requestCancellation($approvalUuid)) {
+                return;
+            }
             Session::flash('success', __('care-plan.approval_cancelled'));
             $this->fetchApprovals();
             $this->dispatch('care-plan-approvals-changed');
@@ -497,6 +503,70 @@ class CarePlanApprovals extends Component
             Log::error('CarePlanApprovals: failed to cancel: ' . $e->getMessage());
             Session::flash('error', __('care-plan.approval_cancel_error'));
         }
+    }
+
+    protected function requestCancellation(string $approvalUuid): bool
+    {
+        $plan = $this->currentCarePlan();
+        if (Auth::user()->cannot('cancelApproval', $plan)) {
+            Session::flash('error', __('care-plan.approval_cancel_forbidden'));
+
+            return false;
+        }
+        app(MedicalRequestOwnership::class)->approvalForCarePlan($plan, $approvalUuid);
+        $token = Session::get(config('ehealth.api.oauth.bearer_token'));
+        if (!$token || !legalEntity()) {
+            Session::flash('error', __('care-plan.sync_session_expired'));
+
+            return false;
+        }
+        $result = app(CarePlanApprovalService::class)->requestCancellation($plan, $approvalUuid, legalEntity(), Auth::user(), $token);
+        if ($result['status'] === 'processed') {
+            return true;
+        }
+        if ($result['status'] === 'pending') {
+            $this->cancellationLinks[$approvalUuid] = $result['linkId'];
+            Session::flash('info', __('care-plan.approval_cancel_processing'));
+        } else {
+            Session::flash('warning', __('care-plan.approval_cancel_unconfirmed'));
+        }
+        $this->fetchApprovals();
+
+        return false;
+    }
+
+    public function checkCancellationStatus(): void
+    {
+        $plan = $this->currentCarePlan();
+        if (Auth::user()->cannot('cancelApproval', $plan)) {
+            $this->cancellationLinks = [];
+            $this->recreateAfterCancellation = null;
+            Session::flash('error', __('care-plan.approval_cancel_forbidden'));
+
+            return;
+        }
+        foreach ($this->cancellationLinks as $approvalUuid => $linkId) {
+            $state = \App\Repositories\MedicalEvents\Repository::approval()->carePlanCancellationState($plan, $approvalUuid, $linkId);
+            if (in_array($state['status'], ['pending', 'processing'], true)) {
+                continue;
+            }
+            unset($this->cancellationLinks[$approvalUuid]);
+            $recreate = $this->recreateAfterCancellation === $approvalUuid;
+            if ($recreate) {
+                $this->recreateAfterCancellation = null;
+            }
+            if ($state['status'] === 'processed') {
+                Session::flash('success', __('care-plan.approval_cancelled'));
+                $this->dispatch('care-plan-approvals-changed');
+                if ($recreate) {
+                    $this->recreateApproval($approvalUuid);
+                }
+            } else {
+                Session::flash($state['status'] === 'unknown' ? 'warning' : 'error',
+                    __($state['status'] === 'unknown' ? 'care-plan.approval_cancel_unconfirmed' : 'care-plan.approval_cancel_error'));
+            }
+        }
+        $this->fetchApprovals();
     }
 
     public function render()

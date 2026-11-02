@@ -151,10 +151,13 @@ class CarePlanApprovalService
         try {
             $existing = $repository->reusableForCarePlan($carePlan, $employeeUuid, $accessLevel);
             if ($existing !== null) {
+                if (($cancel = $repository->cancellationLinkFor($existing)) !== null && $cancel->status !== 'FAILED') {
+                    throw new RuntimeException(__('care-plan.approval_cancel_processing'));
+                }
                 if ($existing->getAttribute('is_verified') && ApprovalStatus::resolve($existing->status)?->isGranted()) {
                     return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Granted, $existing->uuid);
                 }
-                $existingLink = $existing->ehealthLinks->filter(fn ($candidate): bool => data_get($candidate->job?->request_data, 'operation') !== 'resendSms')->sortByDesc('id')->first();
+                $existingLink = $repository->creationLinkFor($existing);
                 if ($confirmWithoutOtp && ($existingLink === null || $existingLink->status === 'PROCESSED')) {
                     $this->confirmWithoutOtp($patientUuid, $existing->uuid, $bearerToken);
 
@@ -292,14 +295,60 @@ class CarePlanApprovalService
         return $this->verify($patientUuid, $approvalId, null, $bearerToken);
     }
 
-    public function deactivate(string $patientUuid, string $approvalId): EHealthResponse
+    /** @return array{status: string, linkId: int} */
+    public function requestCancellation(CarePlan $plan, string $approvalId, LegalEntity $legalEntity, User $user, string $bearerToken): array
     {
-        $response = $this->requireSuccessfulResponse(EHealth::approval()->verify($patientUuid, $approvalId, [
-            'status' => 'inactive',
-        ]));
-        Repository::approval()->storePatientResponse($patientUuid, $approvalId, $response->validate(), ApprovalStatus::INACTIVE->value);
+        if ($bearerToken === '' || $plan->legalEntityId !== $legalEntity->id || $user->cannot('cancelApproval', $plan)) {
+            throw new RuntimeException(__('care-plan.approval_cancel_error'));
+        }
+        $repository = Repository::approval();
+        $link = $repository->beginCarePlanCancellation($plan, $approvalId);
+        if (!$link->wasRecentlyCreated && $link->status === 'PROCESSED') {
+            return ['status' => 'processed', 'linkId' => $link->id];
+        }
+        try {
+            if ($link->wasRecentlyCreated) {
+                $response = $this->requireSuccessfulResponse(EHealth::approval()->withToken($bearerToken)
+                    ->cancelApproval($plan->person->uuid, $approvalId));
+                $data = $response->validate();
+                if ($response->status() === 201) {
+                    $result = ['status' => 'processed', 'status_code' => 201, 'response_data' => $data];
+                    $link->job()->update(['response_data' => $result]);
+                    $repository->finishCarePlanCancellation($link, $result);
 
-        return $response;
+                    return ['status' => 'processed', 'linkId' => $link->id];
+                }
+                $href = collect($data['links'] ?? [])->first(fn (array $candidate): bool =>
+                    preg_match('~/(?:api/)?jobs/[^/?#]+$~i', (string) ($candidate['href'] ?? '')) === 1)['href'] ?? null;
+                if (!$href) {
+                    throw new RuntimeException(__('care-plan.approval_cancel_unconfirmed'));
+                }
+                $repository->trackRequest($link, $href, $data);
+            } elseif ($link->href === null && data_get($link->job->response_data, 'status_code') === 201) {
+                $repository->finishCarePlanCancellation($link, $link->job->response_data);
+
+                return ['status' => 'processed', 'linkId' => $link->id];
+            } elseif ($link->href === null) {
+                return ['status' => 'unknown', 'linkId' => $link->id];
+            }
+            // Retrying a saved receipt only polls the original remote job; it never repeats cancellation.
+            $link->update(['error' => null]);
+            Bus::batch([new RemoteEHealthLinksProcessing($link, $legalEntity, standalone: true)])
+                ->withOption('legal_entity_id', $legalEntity->id)
+                ->withOption('token', Crypt::encryptString($bearerToken))
+                ->withOption('user', $user)
+                ->name(RemoteEHealthLinksProcessing::BATCH_NAME)->onQueue('sync')->dispatch();
+
+            return ['status' => 'pending', 'linkId' => $link->id];
+        } catch (\Throwable $exception) {
+            if ($exception instanceof \App\Exceptions\EHealth\EHealthValidationException
+                || ($exception instanceof EHealthResponseException && in_array($exception->getCode(), [400, 401, 403, 404, 409, 422, 429], true))) {
+                $repository->finishCarePlanCancellation($link, ['status' => 'failed']);
+            } else {
+                $link->update(['error' => ['message' => __('care-plan.approval_cancel_unconfirmed')]]);
+            }
+            throw $exception;
+        }
     }
 
     /** Transport exceptions propagate to the UI; a non-success response cannot grant access. */

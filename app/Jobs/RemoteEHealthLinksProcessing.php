@@ -344,6 +344,16 @@ class RemoteEHealthLinksProcessing extends EHealthJob
             return;
         }
 
+        if ($this->eHealthLink->linkable instanceof Approval && data_get($this->eHealthLink->job->request_data, 'operation') === 'cancel') {
+            if ($status === 'failed' || ($status === 'processed' && (int) $statusCode === 201)) {
+                Repository::approval()->finishCarePlanCancellation($this->eHealthLink, $responseData + ['status_code' => $statusCode]);
+            } else {
+                throw new \RuntimeException(__('care-plan.approval_cancel_unconfirmed'));
+            }
+
+            return;
+        }
+
         if ($this->eHealthLink->linkable instanceof Approval && data_get($this->eHealthLink->job->request_data, 'operation') === 'resendSms') {
             if ($status !== 'processed' || !in_array((int) $statusCode, [200, 201, 204], true)) {
                 $responseData['status'] = 'failed';
@@ -417,6 +427,13 @@ class RemoteEHealthLinksProcessing extends EHealthJob
     /** Finish a failed SMS resend so the modal does not keep waiting for an exhausted job. */
     public function failed(?Throwable $exception): void
     {
+        if (data_get($this->eHealthLink->job?->request_data, 'operation') === 'cancel') {
+            // Exhausted polling is not proof that the remote cancellation failed.
+            $this->eHealthLink->newQuery()->whereKey($this->eHealthLink->id)->where('status', '!=', 'PROCESSED')
+                ->update(['error' => ['message' => __('care-plan.approval_cancel_unconfirmed')]]);
+
+            return;
+        }
         if (data_get($this->eHealthLink->job?->request_data, 'operation') === 'resendSms') {
             Repository::approval()->finishCarePlanSmsResend($this->eHealthLink, ['status' => 'failed']);
             $approval = $this->eHealthLink->linkable;
@@ -501,6 +518,9 @@ class RemoteEHealthLinksProcessing extends EHealthJob
 
     protected function requiredScope(): string
     {
+        if (data_get($this->eHealthLink->job?->request_data, 'operation') === 'cancel') {
+            return 'job:read';
+        }
         if ($this->eHealthLink->linkable instanceof ServiceRequestRequest) {
             return $this->eHealthLink->job->request_data['requiredScope'] ?? 'service_request:write';
         }

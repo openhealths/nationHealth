@@ -1,11 +1,14 @@
 <div
     @if (!$skipsPatientOtp) wire:init="loadAuthMethods" @endif
-    data-livewire-background-actions="checkApprovalJobStatus checkSmsResendStatus event:refreshApprovals"
+    data-livewire-background-actions="checkApprovalJobStatus checkSmsResendStatus checkCancellationStatus event:refreshApprovals"
 >
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
     @if ($isPolling)
         <div wire:poll.2s="checkApprovalJobStatus" class="hidden"></div>
+    @endif
+    @if ($cancellationLinks !== [])
+        <div wire:poll.2s="checkCancellationStatus" class="hidden"></div>
     @endif
 
     {{-- Fieldset 1: List of Approvals --}}
@@ -58,7 +61,21 @@
                                 {{ isset($approval['createdAt']) || isset($approval['created_at']) ? \Carbon\Carbon::parse($approval['createdAt'] ?? $approval['created_at'])->format('d.m.Y H:i') : '-' }}
                             </td>
                             <td class="index-table-td-actions text-right">
-                                @if ($approval['requestPending'] ?? false)
+                                @if ($approval['cancellationPending'] ?? false)
+                                    <span class="text-xs text-gray-500">
+                                        {{ __($approval['cancellationUnknown'] ? 'care-plan.approval_cancel_unconfirmed' : 'care-plan.approval_cancel_processing') }}
+                                    </span>
+                                    @if ($approval['cancellationUnknown'])
+                                        <button
+                                            type="button"
+                                            wire:click="cancelApproval('{{ $approval['uuid'] }}')"
+                                            wire:loading.attr="disabled"
+                                            class="button-minor"
+                                        >
+                                            {{ __('care-plan.submission_check') }}
+                                        </button>
+                                    @endif
+                                @elseif ($approval['requestPending'] ?? false)
                                     <button
                                         type="button"
                                         wire:click="resumeApprovalRequest('{{ $approval['uuid'] }}')"
@@ -76,6 +93,15 @@
                                         class="p-1 text-red-500 hover:text-red-700"
                                     >
                                         @icon('close-outline', 'w-4 h-4')
+                                    </button>
+                                @elseif (($approval['cancellationConfirmed'] ?? false) && $approvalStatus === \App\Enums\Person\ApprovalStatus::INACTIVE && !$isReadOnly)
+                                    <button
+                                        type="button"
+                                        wire:click="recreateApproval('{{ $approval['uuid'] }}')"
+                                        wire:loading.attr="disabled"
+                                        class="button-secondary"
+                                    >
+                                        {{ __('care-plan.recreate_approval') }}
                                     </button>
                                 @elseif ($approvalStatus?->isAwaitingPatient())
                                     <div class="flex items-center justify-end gap-2">

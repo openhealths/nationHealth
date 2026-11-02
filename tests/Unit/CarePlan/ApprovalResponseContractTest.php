@@ -25,15 +25,28 @@ class ApprovalResponseContractTest extends TestCase
         app(CarePlanApprovalService::class)->confirmWithoutOtp('patient', 'approval');
     }
 
-    public function test_deactivation_rejects_a_non_success_response(): void
+    public function test_cancellation_rejects_a_non_success_response(): void
     {
         $api = Mockery::mock(Approval::class);
-        $api->shouldReceive('verify')->once()->with('patient', 'approval', ['status' => 'inactive'])
+        $api->shouldReceive('withToken')->andReturnSelf();
+        $api->shouldReceive('cancelApproval')->once()->with('patient', 'approval')
             ->andReturn(new EHealthResponse(new Response(503)));
         $this->instance(Approval::class, $api);
+        $user = Mockery::mock(\App\Models\User::class);
+        $user->shouldReceive('cannot')->with('cancelApproval', Mockery::type(\App\Models\CarePlan::class))->andReturn(false);
+        $plan = new \App\Models\CarePlan(['legal_entity_id' => 1]);
+        $plan->setRelation('person', (new \App\Models\Person\Person())->forceFill(['uuid' => 'patient']));
+        $legalEntity = new \App\Models\LegalEntity();
+        $legalEntity->id = 1;
+        $link = Mockery::mock(\App\Models\EhealthLink::class)->makePartial();
+        $link->wasRecentlyCreated = true;
+        $link->shouldReceive('update')->once();
+        $repository = $this->mock(\App\Repositories\MedicalEvents\ApprovalRepository::class);
+        $repository->shouldReceive('beginCarePlanCancellation')->once()->andReturn($link);
+        $repository->shouldNotReceive('finishCarePlanCancellation');
 
         $this->expectException(EHealthResponseException::class);
-        app(CarePlanApprovalService::class)->deactivate('patient', 'approval');
+        app(CarePlanApprovalService::class)->requestCancellation($plan, 'approval', $legalEntity, $user, 'test-token');
     }
 
     public function test_patient_approval_url_and_filters_are_preserved(): void

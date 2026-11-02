@@ -51,6 +51,16 @@ class CarePlanPolicy
         return Response::allow();
     }
 
+    public function cancelApproval(User $user, CarePlan $carePlan): Response
+    {
+        $permission = $this->manage($user, $carePlan);
+        if ($permission->denied() || $user->cannot('approval:cancel')) {
+            return Response::deny(__('care-plan.approval_cancel_forbidden'));
+        }
+
+        return Response::allow();
+    }
+
     /** A plan's registration does not itself grant patient access for prescribing. */
     public function manageActivities(User $user, CarePlan $carePlan): Response
     {
