@@ -133,12 +133,12 @@ class EHealthValidationExceptionCarePlanMessageTest extends TestCase
         $translated = $exception->getTranslatedMessage();
 
         $this->assertStringContainsString(
-            __('errors.ehealth.messages.failed_to_save_signed_content'),
+            __('errors.ehealth.messages.signed_content_save_failed'),
             $formatted
         );
         $this->assertStringNotContainsString('Failed to save signed content', $formatted);
         $this->assertStringContainsString(
-            __('errors.ehealth.messages.failed_to_save_signed_content'),
+            __('errors.ehealth.messages.signed_content_save_failed'),
             $translated
         );
         $this->assertStringNotContainsString('Failed to save signed content', $translated);

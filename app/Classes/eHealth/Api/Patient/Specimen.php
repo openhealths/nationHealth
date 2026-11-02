@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\MedicalEventsErrorTranslator;
 use App\Classes\eHealth\ValidationRuleBuilder;
+use App\Contracts\ApiErrorTranslator;
 use App\Enums\Specimen\Status;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
@@ -163,6 +165,16 @@ class Specimen extends PatientApiBase
     public function cancel(string $patientId, string $specimenId, array $payload): PromiseInterface|EHealthResponse
     {
         return $this->patch(self::URL . "/$patientId/specimens/$specimenId/actions/cancel", $payload);
+    }
+
+    /**
+     * Get the translator of the errors the medical events resources return.
+     *
+     * @return ApiErrorTranslator
+     */
+    protected function errorTranslator(): ApiErrorTranslator
+    {
+        return new MedicalEventsErrorTranslator();
     }
 
     /**

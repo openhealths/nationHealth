@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\MedicalEventsErrorTranslator;
 use App\Classes\eHealth\ValidationRuleBuilder;
+use App\Contracts\ApiErrorTranslator;
 use App\Enums\Device\Status;
 use App\Enums\Equipment\Type as DeviceNameType;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -115,6 +117,16 @@ class Device extends PatientApiBase
         $this->setValidator($this->validateDevice(...));
 
         return $this->get(self::URL . "/$patientId/summary/devices/$deviceId");
+    }
+
+    /**
+     * Get the translator of the errors the medical events resources return.
+     *
+     * @return ApiErrorTranslator
+     */
+    protected function errorTranslator(): ApiErrorTranslator
+    {
+        return new MedicalEventsErrorTranslator();
     }
 
     /**
