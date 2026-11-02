@@ -21,7 +21,6 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\Person\Person as PersonModel;
 use App\Models\Preperson;
 use App\Rules\InDictionary;
-use App\Rules\TaxId;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -600,7 +599,7 @@ class Person extends Request
             '*.phones' => ['nullable', 'array'],
             '*.phones.*.number' => ['required', 'regex:/^\+[0-9]{11,12}$/'],
             '*.phones.*.type' => ['required', new InDictionary('PHONE_TYPE')],
-            '*.tax_id' => ['nullable', new TaxId()]
+            '*.tax_id' => ['nullable', 'digits:10']
         ]);
 
         if ($validator->fails()) {

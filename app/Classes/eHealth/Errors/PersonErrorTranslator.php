@@ -26,6 +26,7 @@ final class PersonErrorTranslator extends BaseErrorTranslator
             'Must contain required item' => __('patients.api_errors.required_item_missing'),
             'Person can have only new passport NATIONAL_ID or old PASSPORT' => __('patients.api_errors.national_id_or_passport_only'),
             'Person not found' => __('patients.api_errors.person_not_found'),
+            'Such person exists. Update this person' => __('patients.api_errors.person_already_exists'),
             'Incorrect person age for such an action' => __('patients.api_errors.person_age_not_allowed'),
             'Person that logged in, person that is changed and person that sign should be the same' => __('patients.api_errors.logged_changed_signed_person_mismatch'),
             'The phone number is not verified' => __('patients.api_errors.phone_number_not_verified'),
