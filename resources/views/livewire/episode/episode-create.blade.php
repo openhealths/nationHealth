@@ -164,9 +164,9 @@
                     <button
                         type="button"
                         wire:click="cancel"
-                        class="button-primary-outline-red flex-1 rounded-lg py-2.5 text-center text-sm"
+                        class="button-minor me-2 flex-1 justify-center rounded-lg py-2.5 text-center text-sm"
                     >
-                        {{ __('forms.delete') }}
+                        {{ __('forms.back') }}
                     </button>
 
                     <button
