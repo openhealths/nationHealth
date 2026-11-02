@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run PHPUnit suites owned for:
-# Employee · Party · Care Plan · Care Plan Activity · ePrescription · Service Request · Device Request
+# Employee · Party · Care Plan · Care Plan Activity · ePrescription · Service Request · Device Request · Healthcare Service
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -55,7 +55,6 @@ DOMAIN_PATHS=(
   tests/Feature/CarePlanActivityPayloadTest.php
   tests/Feature/Encounter/EncounterDocumentPagesTest.php
   tests/Feature/Encounter/EncounterTransferDivisionLookupTest.php
-  tests/Feature/Livewire/CarePlan
   tests/Feature/MedicationRequest
   tests/Feature/DeviceRequest
   tests/Feature/MedicationRequestTest.php
@@ -73,6 +72,8 @@ DOMAIN_PATHS=(
   tests/Feature/Person/PatientCarePlanRegistryUatTest.php
   tests/Feature/Services/MedicalEvents/MedicationRequestLifecycleServiceTest.php
   tests/Feature/Services/MedicalEvents/MedicationRequestFhirStorageTest.php
+  tests/Feature/HealthcareService
+  tests/Feature/EmployeeRole
 )
 
 # Composition is a later module in the review stack; run its regressions once that slice is present.

@@ -8,7 +8,9 @@ use App\Models\User;
 use App\Casts\EHealthDateCast;
 use App\Models\Employee\Employee;
 use App\Traits\SyncsMorphManyRelations;
+use Database\Factories\Relations\PartyFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Employee\EmployeeRequest;
 use Eloquence\Behaviours\HasCamelCasing;
@@ -18,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Party extends Model
 {
+    /** @use HasFactory<PartyFactory> */
+    use HasFactory;
     use HasCamelCasing;
     use SyncsMorphManyRelations;
 

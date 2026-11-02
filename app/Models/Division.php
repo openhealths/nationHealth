@@ -11,6 +11,8 @@ use App\Models\Employee\Employee;
 use App\Models\Relations\Address;
 use App\Casts\Division\WorkingHours;
 use Illuminate\Database\Eloquent\Model;
+use Database\Factories\DivisionFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\Employee\EmployeeRequest;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Builder;
@@ -25,6 +27,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  */
 class Division extends Model
 {
+    /** @use HasFactory<DivisionFactory> */
+    use HasFactory;
     use HasCamelCasing;
 
     public const string WORKING_TIME_DAY_OFF = '-1';

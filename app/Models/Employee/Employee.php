@@ -11,6 +11,8 @@ use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Models\Declaration;
 use App\Casts\EHealthDateCast;
+use Database\Factories\Employee\EmployeeFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\Relations\Education;
 use App\Models\Relations\Speciality;
 use App\Models\Relations\Qualification;
@@ -25,6 +27,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Employee extends BaseEmployee
 {
+    /** @use HasFactory<EmployeeFactory> */
+    use HasFactory;
+
     protected $table = 'employees';
 
     /**

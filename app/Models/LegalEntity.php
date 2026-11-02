@@ -12,6 +12,8 @@ use App\Models\Relations\Address;
 use App\Models\Employee\Employee;
 use App\Casts\LegalEntityArchiveCast;
 use Illuminate\Database\Eloquent\Model;
+use Database\Factories\LegalEntityFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\Employee\EmployeeRequest;
 use Eloquence\Behaviours\HasCamelCasing;
 use App\Models\Contracts\ContractRequest;
@@ -27,6 +29,8 @@ use Override;
 
 class LegalEntity extends Model
 {
+    /** @use HasFactory<LegalEntityFactory> */
+    use HasFactory;
     use HasCamelCasing;
 
     public const string TYPE_MSP = 'MSP';

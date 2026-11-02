@@ -6,16 +6,20 @@ namespace App\Models;
 
 use App\Enums\HealthcareService\Status;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
+use Database\Factories\HealthcareServiceFactory;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 class HealthcareService extends Model
 {
+    /** @use HasFactory<HealthcareServiceFactory> */
+    use HasFactory;
     use HasCamelCasing;
 
     protected $fillable = [
@@ -69,9 +73,9 @@ class HealthcareService extends Model
                             $end = Carbon::parse($item['during']['end'])->setTimezone(config('app.timezone'));
 
                             $item['during'] = [
-                                'startDate' => $start->format('d.m.Y'),
+                                'startDate' => $start->format(config('app.date_format')),
                                 'startTime' => $start->format('H:i'),
-                                'endDate' => $end->format('d.m.Y'),
+                                'endDate' => $end->format(config('app.date_format')),
                                 'endTime' => $end->format('H:i')
                             ];
                         }
