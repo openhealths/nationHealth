@@ -6,8 +6,32 @@ Conventions for contributors. Link to a specific rule from code review when need
 
 - View file names: `kebab-case` (e.g. `add-confidant-person.blade.php`).
 - Language keys: `snake_case`.
+- Use camelCase for PHP variables, properties, and Eloquent attribute access (e.g. `$link->linkableType`).
+  Ensure the model supports camelCase access with `HasCamelCasing`; keep database column names and external payload keys
+  in their required format. If an attribute name collides with a relationship or scope, use an explicit
+  `getAttribute('snake_case')` read.
 - Acronyms inside identifiers are treated as a single word — capitalize only the first letter:
   `Uuid`, `Id`, `Url`, `Html`. Write `legalEntityUuid` (not `legalEntityUUID`), `clientId` (not `clientID`).
+
+## Repositories
+
+Keep reusable database lookup and selection logic in repositories or model scopes.
+Livewire components and their traits should delegate these lookups to the repository.
+Repositories should return results and reasons for refusal; the calling component or trait
+forms user-facing feedback and flashes it to the session. Do not flash messages from repositories.
+When a lookup must return a model, declare that model as its return type and throw a dedicated
+exception for an unavailable result instead of returning an array containing a nullable model
+and an error. Catch that exception in the calling component or trait to show the refusal reason.
+Keep refusal message construction in the dedicated exception: define error types
+as class constants, pass the type and any message context to the constructor, and select the
+translated message with `match`. The constructor may delegate default message selection to
+an instance method for readability. Allow an optional custom message to override the default.
+Default to a general message when the error type is omitted or unrecognized, and allow
+a custom message without specifying a type.
+Instantiate exceptions with `new`; do not add static factory methods.
+Keep additional error details limited to the types supplied by actual callers; do not add
+support for underlying exceptions unless a caller passes them.
+Keep database lookups and state checks in the repository.
 
 ## Livewire
 
@@ -19,6 +43,16 @@ message, and return before side effects. Do not use `$this->authorize(...)`:
 an authorization exception replaces the component's normal error feedback.
 Do not remove authorization or duplicate policy rules in the component to avoid
 the exception. Follow this convention when adding or changing authorization.
+
+For approval employee selection, require an active linked employee in the current legal entity
+whose own role is available in the current login and grants `approval:create`.
+Combined token scopes do not grant that ability to every employee type.
+Keep this selection separate from `activeDoctorEmployee()` and explain it at the approval call site.
+Keep `syncPersonData` independent of approval creation: it also controls reading data with an
+existing verified approval and the visibility of patient card sections.
+Check approval creation permission only when a new approval is needed, before selecting its
+employee or fetching authentication methods. Only an authorized creator with a missing employee
+record should see a request to sync employees; a missing creation role must result in a denial.
 
 Public properties of a Livewire component must be **primitive types only** (`string`,`int`, `bool`, `float`, `array`) 
 — and enums are allowed. Do **not** type a public property as an Eloquent model.
@@ -50,6 +84,10 @@ Preserve the existing filtering and persistence rules.
 For LegalEntity optional sections, do not restore data discarded by `filterUnprovidedFields()` from the raw eHealth response; update values and visibility from the saved data instead.
 Keep form state updates in the form object; keep API calls, persistence, and
 authorization in the component.
+Before repeating asynchronous creation, check for a pending request for the same entity
+and recipient, including records without a remote UUID or expiry. Show a translated waiting
+message while it is pending and allow a new request after failure. Disabling a button only
+during a Livewire request does not prevent duplicates while background processing continues.
 
 ## Blade + Alpine.js
 

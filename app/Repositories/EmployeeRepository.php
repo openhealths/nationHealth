@@ -11,6 +11,8 @@ use App\Models\LegalEntity;
 use App\Models\User;
 use App\Models\Relations\Party;
 use App\Models\Employee\Employee;
+use App\Models\MedicalEvents\Sql\Approval;
+use App\Exceptions\MedicalEvents\ApprovalVerificationException;
 use Illuminate\Support\Facades\DB;
 use App\Enums\Employee\RequestStatus;
 use App\Models\Employee\EmployeeRequest;
@@ -27,6 +29,36 @@ readonly class EmployeeRepository
     public function activeForLegalEntity(User $user, LegalEntity $legalEntity, array $employeeTypes): ?Employee
     {
         return $user->employees()->whereLegalEntityId($legalEntity->id)->active()->whereIn('employee_type', $employeeTypes)->first();
+    }
+
+    /**
+     * Select an active employee linked to the user in the given legal entity for approval creation.
+     *
+     * Requires an eHealth UUID and an available login role granting `approval:create`,
+     * as checked by the `createForEmployee` policy. Prefers DOCTOR, then SPECIALIST,
+     * then other eligible types; employees of the same priority are ordered by ID.
+     *
+     * @param  User  $user  The user whose linked employees are searched.
+     * @param  LegalEntity  $legalEntity  The legal entity in which the approval is created.
+     * @return Employee The first eligible employee.
+     * @throws ApprovalVerificationException If no eligible employee is found.
+     */
+    public function forApproval(User $user, LegalEntity $legalEntity): Employee
+    {
+        $employee = $user->employees()
+            ->whereLegalEntityId($legalEntity->id)
+            ->active()
+            ->whereNotNull('uuid')
+            ->orderByRaw("CASE employee_type WHEN 'DOCTOR' THEN 0 WHEN 'SPECIALIST' THEN 1 ELSE 2 END")
+            ->orderBy('employees.id')
+            ->get()
+            ->first(static fn (Employee $employee): bool => $user->can('createForEmployee', [Approval::class, $employee]));
+
+        if ($employee === null) {
+            throw new ApprovalVerificationException(ApprovalVerificationException::EMPLOYEE_UNAVAILABLE);
+        }
+
+        return $employee;
     }
 
     /**

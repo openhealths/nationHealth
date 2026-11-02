@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EhealthLink extends Model
 {
+    use HasCamelCasing;
+
     protected $fillable = [
         'linkable_type',
         'linkable_id',
