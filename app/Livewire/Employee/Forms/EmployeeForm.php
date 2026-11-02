@@ -82,6 +82,8 @@ class EmployeeForm extends Form
 
         // Specific logic for EmployeeCreate
         if ($component instanceof EmployeeCreate) {
+            // Creation must not trust a client-supplied party ID to bypass the TaxId check.
+            $this->existingPartyId = null;
             $partyRules['party.email'][] = new UniqueEmailInLegalEntity();
         }
 

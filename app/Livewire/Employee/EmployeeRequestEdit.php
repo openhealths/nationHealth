@@ -58,6 +58,14 @@ class EmployeeRequestEdit extends AbstractEmployeeFormManager
 
     protected function handleDraftPersistence(): EmployeeRequest
     {
+        $isAdditionalPosition = !$this->employeeRequest->employeeId
+            && $this->employeeRequest->partyId
+            && Repository::employee()->hasPartyInLegalEntity($this->employeeRequest->partyId, legalEntity()->id);
+
+        if ($isAdditionalPosition) {
+            $selectedUser = $this->resolvePositionEmailUser($this->employeeRequest->party);
+        }
+
         $preparedData = $this->form->getPreparedData();
         $nestedDataForRevision = $this->mapRevisionData($preparedData);
 
@@ -87,6 +95,10 @@ class EmployeeRequestEdit extends AbstractEmployeeFormManager
 
         // If it's a DRAFT -> Update existing
         $requestAttributes = Arr::only($preparedData, ['position', 'employee_type', 'start_date', 'end_date', 'division_id', 'email']);
+        if ($isAdditionalPosition) {
+            $requestAttributes['user_id'] = $selectedUser?->id;
+        }
+
         $this->employeeRequest->fill($requestAttributes)->save();
 
         if ($this->employeeRequest->revision) {
