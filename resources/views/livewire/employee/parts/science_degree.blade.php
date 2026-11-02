@@ -210,7 +210,7 @@
                                         required
                                     >
                                         <option value="">{{ __('forms.select_level') }}</option>
-                                        @foreach ($this->dictionaries['SCIENCE_DEGREE'] as $degreeValue => $degreeDescription)
+                                        @foreach ($this->scienceDegreeOptions as $degreeValue => $degreeDescription)
                                             <option value="{{ $degreeValue }}">{{ $degreeDescription }}</option>
                                         @endforeach
                                     </select>

@@ -1,7 +1,7 @@
-@props(['modelPath', 'dictionaryName', 'options' => null, 'optionsWatch' => null, 'alpineWatch' => null])
+@props(['modelPath', 'dictionaryName', 'options' => null])
 
 <div
-    x-data="selectComponent('{{ $dictionaryName }}', '{{ $modelPath }}', {{ $options ? '() => ('.$options.')' : 'null' }}, @js($optionsWatch), @js($alpineWatch))"
+    x-data="selectComponent('{{ $dictionaryName }}', '{{ $modelPath }}', {{ $options ? '() => ('.$options.')' : 'null' }})"
     x-modelable="selected"
     x-model="{{ $modelPath }}"
     @click.away="hideOptions"
@@ -68,7 +68,7 @@
 </div>
 
 <script>
-    function selectComponent(dictionaryKey, modelPath, optionsSource = null, optionsWatch = null, alpineWatch = null) {
+    function selectComponent(dictionaryKey, modelPath, optionsSource = null) {
         return {
             search: '',
             selected: '',
@@ -126,28 +126,7 @@
                     if (optionsSource) {
                         this.setExplicitOptions(optionsSource());
 
-                        if (optionsWatch) {
-                            this.$wire.$watch(optionsWatch, (newValue, oldValue) => {
-                                this.setExplicitOptions(optionsSource());
-                                if (
-                                    oldValue !== undefined &&
-                                    newValue !== oldValue &&
-                                    !this.optionsMap.has(this.selected)
-                                ) {
-                                    this.selected = '';
-                                    this.search = '';
-                                }
-                            });
-                        }
-
-                        if (alpineWatch) {
-                            const watchPaths = Array.isArray(alpineWatch) ? alpineWatch : [alpineWatch];
-                            watchPaths.forEach((watchPath) => {
-                                this.$watch(watchPath, () => {
-                                    this.setExplicitOptions(optionsSource());
-                                });
-                            });
-                        }
+                        this.$watch(optionsSource, (options) => this.setExplicitOptions(options));
                     } else if (dictionaryKey === 'eHealth/LOINC/observation_codes') {
                         const allowedCodes = this.$wire.observationLoincCodeMap?.laboratory;
                         if (allowedCodes !== undefined) {

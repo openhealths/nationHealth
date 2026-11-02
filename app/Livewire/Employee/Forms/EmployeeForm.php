@@ -36,6 +36,15 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class EmployeeForm extends Form
 {
+    public const array ROLE_DICTIONARIES = [
+        'POSITION' => 'position',
+        'SPECIALITY_TYPE' => 'speciality_type',
+        'SPECIALITY_LEVEL' => 'speciality_level',
+        'EDUCATION_DEGREE' => 'education_degree',
+        'QUALIFICATION_TYPE' => 'qualification_type',
+        'SPEC_QUALIFICATION_TYPE' => 'speciality_qualification_type',
+    ];
+
     public string $position = '';
 
     /** Free-text position for HR / ADMIN / RECEPTIONIST. Other types always use the dictionary. */
@@ -132,7 +141,7 @@ class EmployeeForm extends Form
 
         return [
             'position' => $positionRules,
-            'employeeType' => ['required', 'string', Rule::in(array_keys(dictionary()->employees()->employeeTypes(legalEntity()?->type?->name ?? '')))],
+            'employeeType' => ['required', 'string', Rule::in(array_keys($this->employeeTypes()))],
             'startDate' => ['required', new DateFormat()],
             'endDate' => [
                 'nullable',
@@ -218,7 +227,7 @@ class EmployeeForm extends Form
         return [
             'party.workingExperience.integer' => __('validation.custom.party.working_experience_integer'),
             'party.email.ascii' => __('validation.custom.party.email_must_be_latin'),
-            'party.workingExperience.gt' => __('validation.custom.party.working_experience_gt'),
+            'party.workingExperience.min' => __('validation.custom.party.working_experience_min'),
             'documents.*.type.in' => __('validation.custom.employee.document_type_not_allowed'),
             'documents.min' => __('validation.custom.identity_document_required'),
         ];
@@ -238,7 +247,7 @@ class EmployeeForm extends Form
             'party.taxId' => ['required', 'string', new TaxId()],
             'party.noTaxId' => ['boolean'],
             'party.email' => ['required', 'present', 'email', 'ascii', new UniqueEmailInLegalEntity($this->existingPartyId)],
-            'party.workingExperience' => ['nullable', 'integer', 'gt:0'],
+            'party.workingExperience' => ['nullable', 'integer', 'min:0'],
             'party.aboutMyself' => ['nullable', 'present', 'string'],
         ];
     }
@@ -396,12 +405,53 @@ class EmployeeForm extends Form
         $this->divisionId = null;
     }
 
+    public function activeOptions(string $dictionaryName): array
+    {
+        $dictionaries = dictionary()->basics();
+
+        return $dictionaries->contains('name', $dictionaryName)
+            ? $dictionaries->byName($dictionaryName)->asCodeDescription()->all()
+            : [];
+    }
+
+    public function employeeTypes(): array
+    {
+        $allowed = config('ehealth.legal_entity_employee_types.'.(legalEntity()?->type?->name ?? ''), []);
+
+        return array_intersect_key($this->activeOptions('EMPLOYEE_TYPE'), array_flip($allowed));
+    }
+
+    public function optionsForEmployeeType(string $employeeType, string $dictionaryName): array
+    {
+        $options = $this->activeOptions($dictionaryName);
+        $configKey = self::ROLE_DICTIONARIES[$dictionaryName] ?? null;
+
+        if ($configKey === null) {
+            return $options;
+        }
+
+        $allowed = config('ehealth.employee_type.'.$employeeType.'.'.$configKey, []);
+
+        return array_intersect_key($options, array_flip($allowed));
+    }
+
+    public function optionsByEmployeeType(string $dictionaryName): array
+    {
+        $options = [];
+
+        foreach (array_keys($this->employeeTypes()) as $employeeType) {
+            $options[$employeeType] = $this->optionsForEmployeeType($employeeType, $dictionaryName);
+        }
+
+        return $options;
+    }
+
     /**
      * @return list<string>
      */
     protected function dictionaryKeys(string $dictionaryName): array
     {
-        return array_keys(dictionary()->employees()->activeOptions($dictionaryName));
+        return array_keys($this->activeOptions($dictionaryName));
     }
 
     /**
@@ -409,7 +459,7 @@ class EmployeeForm extends Form
      */
     protected function allowedValuesForEmployeeType(string $dictionaryName): array
     {
-        return array_keys(dictionary()->employees()->optionsForEmployeeType($this->employeeType, $dictionaryName));
+        return array_keys($this->optionsForEmployeeType($this->employeeType, $dictionaryName));
     }
 
     protected function specialityDictionaryRule(string $dictionaryName): Closure

@@ -63,17 +63,23 @@ abstract class EmployeeComponent extends Component
      */
     protected function getDictionary(): void
     {
-        $catalogue = dictionary()->employees();
+        $catalogue = dictionary()->basics();
         $this->dictionaries = [];
         $missingDictionaries = false;
         foreach ($this->dictionaryNames ?? [] as $name) {
-            $this->dictionaries[$name] = $catalogue->activeOptions($name);
+            $this->dictionaries[$name] = $this->form->activeOptions($name);
             $missingDictionaries = $missingDictionaries || !$catalogue->contains('name', $name);
         }
 
-        $labelNames = array_merge(array_keys($catalogue::ROLE_DICTIONARIES), ['SCIENCE_DEGREE']);
-        $this->dictionaries = array_replace($this->dictionaries, $catalogue->labels($labelNames));
-        $this->dictionaries['EMPLOYEE_TYPE'] = $catalogue->employeeTypes(legalEntity()?->type?->name ?? '');
+        $labelNames = array_intersect(
+            array_merge(array_keys(Form::ROLE_DICTIONARIES), ['SCIENCE_DEGREE']),
+            $catalogue->pluck('name')->all()
+        );
+        $this->dictionaries = array_replace(
+            $this->dictionaries,
+            $catalogue->getMultipleFormatted($labelNames, onlyActive: false)->toArray()
+        );
+        $this->dictionaries['EMPLOYEE_TYPE'] = $this->form->employeeTypes();
         $this->filterEmployeeDocumentTypes();
 
         if ($missingDictionaries) {
@@ -84,61 +90,61 @@ abstract class EmployeeComponent extends Component
     #[Computed]
     public function employeeTypePosition(): array
     {
-        return dictionary()->employees()->optionsByEmployeeType(legalEntity()?->type?->name ?? '', 'POSITION');
+        return $this->form->optionsByEmployeeType('POSITION');
     }
 
     #[Computed]
     public function employeeTypeSpecialities(): array
     {
-        return dictionary()->employees()->optionsByEmployeeType(legalEntity()?->type?->name ?? '', 'SPECIALITY_TYPE');
+        return $this->form->optionsByEmployeeType('SPECIALITY_TYPE');
     }
 
     #[Computed]
     public function employeeTypeLevels(): array
     {
-        return dictionary()->employees()->optionsByEmployeeType(legalEntity()?->type?->name ?? '', 'SPECIALITY_LEVEL');
+        return $this->form->optionsByEmployeeType('SPECIALITY_LEVEL');
     }
 
     #[Computed]
     public function employeeTypeDegrees(): array
     {
-        return dictionary()->employees()->optionsByEmployeeType(legalEntity()?->type?->name ?? '', 'EDUCATION_DEGREE');
+        return $this->form->optionsByEmployeeType('EDUCATION_DEGREE');
     }
 
     #[Computed]
     public function employeeTypeQualifications(): array
     {
-        return dictionary()->employees()->optionsByEmployeeType(legalEntity()?->type?->name ?? '', 'QUALIFICATION_TYPE');
+        return $this->form->optionsByEmployeeType('QUALIFICATION_TYPE');
     }
 
     #[Computed]
     public function employeeTypeSpecQualifications(): array
     {
-        return dictionary()->employees()->optionsByEmployeeType(legalEntity()?->type?->name ?? '', 'SPEC_QUALIFICATION_TYPE');
+        return $this->form->optionsByEmployeeType('SPEC_QUALIFICATION_TYPE');
     }
 
     #[Computed]
     public function activeSpecialities(): array
     {
-        return dictionary()->employees()->activeOptions('SPECIALITY_TYPE');
+        return $this->form->activeOptions('SPECIALITY_TYPE');
     }
 
     #[Computed]
     public function activeSpecialityLevels(): array
     {
-        return dictionary()->employees()->activeOptions('SPECIALITY_LEVEL');
+        return $this->form->activeOptions('SPECIALITY_LEVEL');
     }
 
     #[Computed]
     public function activeSpecQualifications(): array
     {
-        return dictionary()->employees()->activeOptions('SPEC_QUALIFICATION_TYPE');
+        return $this->form->activeOptions('SPEC_QUALIFICATION_TYPE');
     }
 
     #[Computed]
     public function scienceDegreeOptions(): array
     {
-        return dictionary()->employees()->activeOptions('SCIENCE_DEGREE');
+        return $this->form->activeOptions('SCIENCE_DEGREE');
     }
 
     /**

@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace Tests\Concerns;
 
-use App\Services\Dictionary\Collections\EmployeeDictionaryCollection;
+use App\Services\Dictionary\Collections\BasicDictionaryCollection;
+use App\Livewire\Employee\Forms\EmployeeForm;
 use App\Services\Dictionary\DictionaryManager;
 use Illuminate\Support\Facades\Http;
 use Mockery;
 
 trait FakesEmployeeDictionaries
 {
-    protected function fakeEmployeeDictionaries(array $dictionaries = []): EmployeeDictionaryCollection
+    protected function fakeEmployeeDictionaries(array $dictionaries = []): BasicDictionaryCollection
     {
         Http::preventStrayRequests();
         $values = [];
 
-        foreach (EmployeeDictionaryCollection::ROLE_DICTIONARIES as $name => $configKey) {
+        foreach (EmployeeForm::ROLE_DICTIONARIES as $name => $configKey) {
             $codes = [];
             foreach (config('ehealth.employee_type') as $settings) {
                 $codes = array_merge($codes, $settings[$configKey] ?? []);
@@ -40,9 +41,8 @@ trait FakesEmployeeDictionaries
                 fn ($label, $code) => ['code' => $code, 'description' => $label, 'is_active' => true]
             )->values()->all()];
         }
-        $catalogue = new EmployeeDictionaryCollection($items);
+        $catalogue = new BasicDictionaryCollection($items);
         $manager = Mockery::mock(DictionaryManager::class)->makePartial();
-        $manager->shouldReceive('employees')->andReturn($catalogue);
         $manager->shouldReceive('basics')->andReturn($catalogue);
         $this->instance(DictionaryManager::class, $manager);
 

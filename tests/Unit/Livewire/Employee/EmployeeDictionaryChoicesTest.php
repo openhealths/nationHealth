@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services\Dictionary;
+namespace Tests\Unit\Livewire\Employee;
 
 use App\Livewire\Employee\EmployeeComponent;
 use App\Livewire\Employee\Forms\EmployeeForm;
 use App\Models\LegalEntity;
 use App\Models\LegalEntityType;
-use App\Services\Dictionary\Collections\EmployeeDictionaryCollection;
+use App\Services\Dictionary\Collections\BasicDictionaryCollection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Blade;
 use Livewire\Component;
@@ -18,14 +18,14 @@ use ReflectionMethod;
 use Tests\Concerns\FakesEmployeeDictionaries;
 use Tests\TestCase;
 
-class EmployeeDictionaryCollectionTest extends TestCase
+class EmployeeDictionaryChoicesTest extends TestCase
 {
     use FakesEmployeeDictionaries;
 
     public function test_choices_intersect_the_mapping_with_active_codes_and_labels_keep_retired_codes(): void
     {
         config(['ehealth.employee_type.SPECIALIST.speciality_type' => ['THERAPIST', 'RETIRED', 'MISSING']]);
-        $catalogue = new EmployeeDictionaryCollection([[
+        $catalogue = new BasicDictionaryCollection([[
             'name' => 'SPECIALITY_TYPE',
             'values' => [
                 ['code' => 'THERAPIST', 'description' => 'Терапія', 'is_active' => true],
@@ -34,31 +34,40 @@ class EmployeeDictionaryCollectionTest extends TestCase
             ],
         ]]);
 
-        $this->assertSame(['THERAPIST' => 'Терапія'], $catalogue->optionsForEmployeeType('SPECIALIST', 'SPECIALITY_TYPE'));
-        $this->assertSame('Історична спеціальність', $catalogue->labels(['SPECIALITY_TYPE'])['SPECIALITY_TYPE']['RETIRED']);
-        $this->assertSame([], $catalogue->optionsForEmployeeType('UNKNOWN', 'SPECIALITY_TYPE'));
-        $this->assertSame([], $catalogue->activeOptions('MISSING_DICTIONARY'));
+        $manager = \Mockery::mock(\App\Services\Dictionary\DictionaryManager::class);
+        $manager->shouldReceive('basics')->andReturn($catalogue);
+        $this->instance(\App\Services\Dictionary\DictionaryManager::class, $manager);
+        $form = $this->form();
+        $this->assertSame(['THERAPIST' => 'Терапія'], $form->optionsForEmployeeType('SPECIALIST', 'SPECIALITY_TYPE'));
+        $this->assertSame('Історична спеціальність', $catalogue->getMultipleFormatted(['SPECIALITY_TYPE'], onlyActive: false)['SPECIALITY_TYPE']['RETIRED']);
+        $this->assertSame([], $form->optionsForEmployeeType('UNKNOWN', 'SPECIALITY_TYPE'));
+        $this->assertSame([], $form->activeOptions('MISSING_DICTIONARY'));
     }
 
     public function test_legal_entity_type_filters_roles_before_professional_options_are_built(): void
     {
-        $catalogue = $this->fakeEmployeeDictionaries();
-        $options = $catalogue->optionsByEmployeeType('OUTPATIENT', 'SPECIALITY_TYPE');
+        $this->fakeEmployeeDictionaries();
+        $legalEntity = new LegalEntity();
+        $legalEntity->setRelation('type', new LegalEntityType(['name' => 'OUTPATIENT']));
+        $this->instance('legalEntity', $legalEntity);
+        $form = $this->form();
+        $options = $form->optionsByEmployeeType('SPECIALITY_TYPE');
         $this->assertArrayHasKey('SPECIALIST', $options);
         $this->assertArrayHasKey('ASSISTANT', $options);
         $this->assertArrayNotHasKey('DOCTOR', $options);
         $this->assertArrayNotHasKey('PHARMACIST', $options);
-        $this->assertSame([], $catalogue->employeeTypes('UNKNOWN'));
+        $legalEntity->type->name = 'UNKNOWN';
+        $this->assertSame([], $form->employeeTypes());
     }
 
     public function test_a_retired_dictionary_has_labels_but_no_selectable_values(): void
     {
-        $catalogue = new EmployeeDictionaryCollection([[
+        $catalogue = new BasicDictionaryCollection([[
             'name' => 'SCIENCE_DEGREE', 'is_active' => false,
             'values' => [['code' => 'PHD', 'description' => 'PhD', 'is_active' => true]],
         ]]);
-        $this->assertSame([], $catalogue->activeOptions('SCIENCE_DEGREE'));
-        $this->assertSame(['PHD' => 'PhD'], $catalogue->labels(['SCIENCE_DEGREE'])['SCIENCE_DEGREE']);
+        $this->assertSame([], $catalogue->byName('SCIENCE_DEGREE')->asCodeDescription()->all());
+        $this->assertSame(['PHD' => 'PhD'], $catalogue->getMultipleFormatted(['SCIENCE_DEGREE'], onlyActive: false)['SCIENCE_DEGREE']->all());
     }
 
     public function test_updated_mapping_covers_published_specialities_for_each_medical_role(): void
@@ -139,12 +148,11 @@ class EmployeeDictionaryCollectionTest extends TestCase
         $component->set('dictionaries.EMPLOYEE_TYPE.FORGED', 'Forged');
     }
 
-    public function test_select_component_renders_an_explicit_options_provider_and_watch_path(): void
+    public function test_select_component_renders_a_single_reactive_options_provider(): void
     {
-        $html = Blade::render('<x-select2 dictionary-name="SPECIALITY_TYPE" model-path="modalSpeciality.speciality" options="choices[employeeType] ?? {}" options-watch="form.employeeType" id="speciality" />');
+        $html = Blade::render('<x-select2 dictionary-name="SPECIALITY_TYPE" model-path="modalSpeciality.speciality" options="choices[employeeType] ?? {}" id="speciality" />');
 
         $this->assertStringContainsString('choices[employeeType] ?? {}', $html);
-        $this->assertStringContainsString('form.employeeType', $html);
         $this->assertStringNotContainsString('options-watch=', $html);
         $this->assertStringContainsString('id="speciality"', $html);
     }
@@ -152,9 +160,10 @@ class EmployeeDictionaryCollectionTest extends TestCase
     public function test_missing_cache_renders_empty_choices_and_flashes_an_error_without_opening_validation(): void
     {
         $manager = \Mockery::mock(\App\Services\Dictionary\DictionaryManager::class);
-        $manager->shouldReceive('employees')->andReturn(new EmployeeDictionaryCollection());
+        $manager->shouldReceive('basics')->andReturn(new BasicDictionaryCollection());
         $this->instance(\App\Services\Dictionary\DictionaryManager::class, $manager);
         $component = new EmployeeDictionaryStateProbe();
+        $component->form = new EmployeeForm($component, 'form');
         $component->loadDictionaries();
 
         $this->assertSame([], $component->dictionaries['SPECIALITY_TYPE']);
@@ -166,6 +175,27 @@ class EmployeeDictionaryCollectionTest extends TestCase
         $this->assertTrue(Validator::make(['doctor' => ['specialities' => [['speciality' => 'THERAPIST']]]], [
             'doctor.specialities.*.speciality' => $rules['doctor.specialities.*.speciality'],
         ])->fails());
+    }
+
+    public function test_science_degree_select_and_validation_offer_only_active_codes_but_keep_historical_labels(): void
+    {
+        $catalogue = $this->fakeEmployeeDictionaries();
+        $dictionary = $catalogue->firstWhere('name', 'SCIENCE_DEGREE');
+        $dictionary['values'][] = ['code' => 'RETIRED', 'description' => 'Історичний ступінь', 'is_active' => false];
+        $catalogue->transform(fn (array $item): array => $item['name'] === 'SCIENCE_DEGREE' ? $dictionary : $item);
+        $component = Livewire::test(EmployeeScienceDegreeStateProbe::class);
+        $this->assertSame('Історичний ступінь', $component->get('dictionaries')['SCIENCE_DEGREE']['RETIRED']);
+        $html = $component->html();
+        preg_match('/<select[^>]*id="scienceDegreeDegree"[^>]*>(.*?)<\/select>/s', $html, $matches);
+        $this->assertArrayHasKey(1, $matches);
+        $this->assertStringContainsString('value="PHD"', $matches[1]);
+        $this->assertStringNotContainsString('value="RETIRED"', $matches[1]);
+        $rules = (new ReflectionMethod(EmployeeForm::class, 'doctorRules'))->invoke($component->instance()->form);
+        foreach (['PHD' => true, 'RETIRED' => false] as $degree => $valid) {
+            $this->assertSame($valid, Validator::make(['doctor' => ['scienceDegree' => ['degree' => $degree]]], [
+                'doctor.scienceDegree.degree' => $rules['doctor.scienceDegree.degree'],
+            ])->passes());
+        }
     }
 
     private function form(): EmployeeForm
@@ -189,5 +219,18 @@ class EmployeeDictionaryStateProbe extends EmployeeComponent
     public function render(): string
     {
         return '<div></div>';
+    }
+}
+
+class EmployeeScienceDegreeStateProbe extends EmployeeComponent
+{
+    public function mount(): void
+    {
+        $this->loadDictionaries();
+    }
+
+    public function render(): \Illuminate\View\View
+    {
+        return view('livewire.employee.parts.science_degree');
     }
 }

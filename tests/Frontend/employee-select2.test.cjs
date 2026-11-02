@@ -8,14 +8,12 @@ const source = readFileSync(resolve(__dirname, '../../resources/views/components
 const context = vm.createContext({ Map });
 vm.runInContext(source.match(/<script>([\s\S]*?)<\/script>/)[1], context);
 
-function selector(optionsSource = null, optionsWatch = null, alpineWatch = null) {
+function selector(optionsSource = null) {
     const watchers = new Map();
     const control = context.selectComponent(
         'SPECIALITY_TYPE',
         'modalSpeciality.speciality',
         optionsSource,
-        optionsWatch,
-        alpineWatch,
     );
     control.$wire = {
         dictionaries: { SPECIALITY_TYPE: { THERAPIST: 'Терапія', NURSING: 'Сестринська справа', RETIRED: 'Історична назва' } },
@@ -34,7 +32,7 @@ test('a general speciality selector works without an employee form', () => {
 });
 
 test('an explicit employee restriction keeps an existing unavailable value on open', () => {
-    const { control } = selector(() => ({ THERAPIST: 'Терапія' }), 'form.employeeType');
+    const { control } = selector(() => ({ THERAPIST: 'Терапія' }));
     control.selected = 'NURSING';
     control.initializeOptions();
     assert.equal(control.options.length, 1);
@@ -50,15 +48,14 @@ test('a missing historical label displays its code without erasing the value', (
     assert.equal(control.search, 'UNKNOWN_HISTORICAL_CODE');
 });
 
-test('a real role change clears an incompatible modal choice', () => {
+test('reactive options refresh when the calling form changes its restrictions', () => {
     let choices = { THERAPIST: 'Терапія' };
-    const { control, watchers } = selector(() => choices, 'form.employeeType');
-    control.selected = 'THERAPIST';
+    const provider = () => choices;
+    const { control, watchers } = selector(provider);
     control.initializeOptions();
     choices = { NURSING: 'Сестринська справа' };
-    watchers.get('form.employeeType')('ASSISTANT', 'SPECIALIST');
-    assert.equal(control.selected, '');
-    assert.equal(control.search, '');
+    watchers.get(provider)(choices);
+    assert.equal(control.optionsMap.has('THERAPIST'), false);
     assert.equal(control.optionsMap.has('NURSING'), true);
 });
 
@@ -78,17 +75,14 @@ test('alpine watcher refreshes explicit options when primary flag changes withou
     let isPrimary = false;
     const roleChoices = { THERAPIST: 'Терапія' };
     const allActiveChoices = { THERAPIST: 'Терапія', NURSING: 'Сестринська справа' };
-    const { control, watchers } = selector(
-        () => (isPrimary ? roleChoices : allActiveChoices),
-        'form.employeeType',
-        'modalSpeciality.specialityOfficio',
-    );
+    const provider = () => (isPrimary ? roleChoices : allActiveChoices);
+    const { control, watchers } = selector(provider);
     control.initializeOptions();
     assert.equal(control.optionsMap.has('NURSING'), true);
 
     isPrimary = true;
     control.selected = 'RETIRED';
-    watchers.get('modalSpeciality.specialityOfficio')(true, false);
+    watchers.get(provider)(provider());
     assert.equal(control.optionsMap.has('NURSING'), false);
     assert.equal(control.optionsMap.has('THERAPIST'), true);
     assert.equal(control.selected, 'RETIRED');

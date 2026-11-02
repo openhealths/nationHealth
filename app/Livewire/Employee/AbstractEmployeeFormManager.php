@@ -736,8 +736,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             }
         }
 
-        // If it is the Owner (new or existing) and the length of service is empty/zero -> put 1.
-        if ($isOwnerContext && empty($this->form->party['workingExperience'])) {
+        if ($isOwnerContext && in_array($this->form->party['workingExperience'] ?? null, [null, ''], true)) {
             $this->form->party['workingExperience'] = 1;
         }
     }

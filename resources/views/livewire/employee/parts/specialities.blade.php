@@ -151,6 +151,7 @@
                 const initial = $wire.get('form.doctor.specialities');
                 specialities = Array.isArray(initial) ? JSON.parse(JSON.stringify(initial)) : [];
             })();
+            $watch('employeeType', () => handlePrimaryToggle());
             $watch('specialities', (val) => {
                 $wire.set('form.doctor.specialities', Array.isArray(val) ? JSON.parse(JSON.stringify(val)) : [], false);
             });
@@ -366,8 +367,6 @@
                                             modelPath="modalSpeciality.speciality"
                                             dictionaryName="SPECIALITY_TYPE"
                                             options="availableSpecialities()"
-                                            options-watch="form.employeeType"
-                                            alpine-watch="modalSpeciality.specialityOfficio"
                                             id="specialitySpeciality"
                                             x-effect="if (! openModal) hideOptions();"
                                         />

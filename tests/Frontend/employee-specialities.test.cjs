@@ -124,3 +124,24 @@ test('modal exposes full active dictionaries for additional qualifications and r
     assert.equal(component.modalSpeciality.level, '');
     assert.equal(component.modalSpeciality.qualificationType, '');
 });
+
+test('changing employee type clears incompatible primary fields in the calling form', () => {
+    const component = editor([]);
+    component.employeeType = 'SPECIALIST';
+    component.employeeTypeSpecialities = {
+        SPECIALIST: { THERAPIST: 'Терапія' },
+        ASSISTANT: { NURSING: 'Сестринська справа' },
+    };
+    component.employeeTypeLevels = { ASSISTANT: { SECOND: 'Друга категорія' } };
+    component.employeeTypeSpecQualifications = { ASSISTANT: { AWARDING: 'Присвоєння' } };
+    component.modalSpeciality = {
+        speciality: 'THERAPIST', specialityOfficio: true, level: 'SECOND', qualificationType: 'AWARDING',
+    };
+
+    component.employeeType = 'ASSISTANT';
+    component.handlePrimaryToggle();
+    assert.equal(component.modalSpeciality.speciality, '');
+    assert.equal(component.modalSpeciality.level, 'SECOND');
+    assert.equal(component.modalSpeciality.qualificationType, 'AWARDING');
+    assert.deepEqual(Object.keys(component.availableSpecialities()), ['NURSING']);
+});
