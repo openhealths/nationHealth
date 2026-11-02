@@ -8,7 +8,7 @@ use App\Services\Dictionary\Dictionaries\BasicDictionary;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Seed the basic eHealth dictionary cache so Livewire employee/party screens
+ * Seed the basic eHealth dictionary cache so Livewire employee/party/healthcare service screens
  * can render without calling the (currently dead) preprod dictionary API.
  */
 trait MocksBasicDictionaries
@@ -24,6 +24,9 @@ trait MocksBasicDictionaries
             'SETTLEMENT_TYPE' => ['CITY' => 'Місто', 'VILLAGE' => 'Село'],
             'SPECIALITY_TYPE' => ['FAMILY_DOCTOR' => 'Сімейний лікар', 'THERAPIST' => 'Терапевт'],
             'DIVISION_TYPE' => ['CLINIC' => 'Клініка'],
+            'HEALTHCARE_SERVICE_CATEGORIES' => ['MSP' => 'Медичні послуги', 'PHARMACY_DRUGS' => 'Відпуск лікарських засобів'],
+            'PROVIDING_CONDITION' => ['OUTPATIENT' => 'Амбулаторні умови'],
+            'HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES' => ['SALE' => 'Продаж'],
             'SPECIALITY_LEVEL' => ['FIRST' => 'Перша'],
             'GENDER' => ['MALE' => 'Чоловік', 'FEMALE' => 'Жінка'],
             'AUTHENTICATION_METHOD' => [

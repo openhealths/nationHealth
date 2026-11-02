@@ -6,12 +6,16 @@ namespace App\Models;
 
 use App\Enums\License\Type;
 use App\Casts\EHealthDateCast;
+use Database\Factories\LicenseFactory;
 use Eloquence\Behaviours\HasCamelCasing;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
 class License extends Model
 {
+    /** @use HasFactory<LicenseFactory> */
+    use HasFactory;
     use HasCamelCasing;
 
     protected $fillable = [

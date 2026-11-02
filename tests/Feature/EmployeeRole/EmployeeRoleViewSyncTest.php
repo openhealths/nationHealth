@@ -7,14 +7,7 @@ namespace Tests\Feature\EmployeeRole;
 use App\Classes\eHealth\Api\EmployeeRole as EmployeeRoleApi;
 use App\Enums\EmployeeRole\Status;
 use App\Livewire\EmployeeRole\EmployeeRoleView;
-use App\Models\Division;
-use App\Models\Employee\Employee;
 use App\Models\EmployeeRole;
-use App\Models\HealthcareService;
-use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
-use App\Models\Relations\Party;
-use Carbon\CarbonImmutable;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
@@ -46,32 +39,6 @@ class EmployeeRoleViewSyncTest extends TestCase
      * @var Request[]
      */
     private array $sentRequests = [];
-
-    /**
-     * Create the locally stored role that the tests synchronize.
-     *
-     * @return void
-     */
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->employeeRole = $this->createActiveEmployeeRole();
-    }
-
-    /**
-     * Build the schema the way a fresh installation does: install migrations hold the full current schema, update
-     * migrations are only for upgrading existing databases.
-     *
-     * @return array
-     */
-    protected function migrateFreshUsing(): array
-    {
-        return [
-            '--path' => database_path('migrations/install'),
-            '--realpath' => true
-        ];
-    }
 
     /**
      * A role deactivated in eHealth becomes inactive locally after sync.
@@ -138,6 +105,36 @@ class EmployeeRoleViewSyncTest extends TestCase
         $this->assertRoleUnchanged();
         $this->assertNull(session('success'));
         $this->assertSame(__('messages.database_error'), session('error'));
+    }
+
+    /**
+     * Create the locally stored role that the tests synchronize.
+     *
+     * @return void
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->employeeRole = EmployeeRole::factory()->create([
+            'status' => Status::ACTIVE,
+            'is_active' => true,
+            'end_date' => null
+        ]);
+    }
+
+    /**
+     * Build the schema the way a fresh installation does: install migrations hold the full current schema, update
+     * migrations are only for upgrading existing databases.
+     *
+     * @return array
+     */
+    protected function migrateFreshUsing(): array
+    {
+        return [
+            '--path' => database_path('migrations/install'),
+            '--realpath' => true
+        ];
     }
 
     /**
@@ -214,67 +211,5 @@ class EmployeeRoleViewSyncTest extends TestCase
             'updated_at' => '2026-10-20T10:00:00.000000Z',
             'updated_by' => $this->faker->uuid()
         ], $overrides);
-    }
-
-    /**
-     * Store an active employee role together with the records it belongs to.
-     *
-     * @return EmployeeRole
-     */
-    private function createActiveEmployeeRole(): EmployeeRole
-    {
-        $legalEntity = LegalEntity::create(['uuid' => $this->faker->uuid(), 'status' => 'ACTIVE']);
-
-        $division = Division::create([
-            'uuid' => $this->faker->uuid(),
-            'name' => $this->faker->company(),
-            'type' => 'CLINIC',
-            'status' => 'ACTIVE',
-            'email' => $this->faker->safeEmail(),
-            'mountain_group' => false,
-            'legal_entity_id' => $legalEntity->id
-        ]);
-
-        $party = Party::create([
-            'uuid' => $this->faker->uuid(),
-            'first_name' => $this->faker->firstName(),
-            'last_name' => $this->faker->lastName()
-        ]);
-
-        $employee = Employee::create([
-            'uuid' => $this->faker->uuid(),
-            'employee_type' => 'DOCTOR',
-            'position' => 'P1',
-            'start_date' => '2026-01-01',
-            'status' => 'APPROVED',
-            'is_active' => true,
-            'legal_entity_id' => $legalEntity->id,
-            'division_id' => $division->id,
-            'party_id' => $party->id
-        ]);
-
-        $healthcareService = HealthcareService::create([
-            'uuid' => $this->faker->uuid(),
-            'division_id' => $division->id,
-            'legal_entity_id' => $legalEntity->id,
-            'category_id' => CodeableConcept::create()->id,
-            'speciality_type' => 'THERAPIST',
-            'providing_condition' => 'OUTPATIENT',
-            'status' => 'ACTIVE',
-            'is_active' => true
-        ]);
-
-        return EmployeeRole::create([
-            'uuid' => $this->faker->uuid(),
-            'employee_id' => $employee->id,
-            'healthcare_service_id' => $healthcareService->id,
-            'start_date' => CarbonImmutable::parse('2026-01-01'),
-            'status' => Status::ACTIVE,
-            'is_active' => true,
-            'ehealth_inserted_at' => CarbonImmutable::parse('2026-01-01'),
-            'ehealth_inserted_by' => $this->faker->uuid(),
-            'ehealth_updated_at' => CarbonImmutable::parse('2026-01-01'),
-            'ehealth_updated_by' => $this->faker->uuid()
-        ]);
     }
 }

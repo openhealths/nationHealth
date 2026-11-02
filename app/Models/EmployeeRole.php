@@ -7,14 +7,18 @@ namespace App\Models;
 use App\Casts\EHealthTimestampCast;
 use App\Enums\EmployeeRole\Status;
 use App\Models\Employee\Employee;
+use Database\Factories\EmployeeRoleFactory;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EmployeeRole extends Model
 {
+    /** @use HasFactory<EmployeeRoleFactory> */
+    use HasFactory;
     use HasCamelCasing;
 
     protected $fillable = [

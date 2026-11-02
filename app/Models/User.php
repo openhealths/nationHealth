@@ -21,7 +21,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\Traits\HasRoles;
+use Database\Factories\UserFactory;
 use Eloquence\Behaviours\HasCamelCasing;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\Employee\EmployeeRequest;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,6 +39,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
+    /** @use HasFactory<UserFactory> */
+    use HasFactory;
     use Notifiable,
         HasCamelCasing,
         HasRoles {
