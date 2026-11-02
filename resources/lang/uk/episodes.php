@@ -29,7 +29,6 @@ return [
     'create_title' => 'Створення епізоду',
     'doctor' => 'Лікар',
     'attending_doctor' => 'Лікуючий лікар',
-    'cancel_changes' => 'Відмінити',
     'save_changes' => 'Зберегти зміни',
     'send_to_ehealth' => 'Відправити в ЕСОЗ',
     'delete_draft' => 'Видалити чернетку',
