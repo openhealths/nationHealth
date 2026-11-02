@@ -14,3 +14,10 @@ Read `docs/CODE_STYLE.md` before editing code and follow its conventions.
   outside the task's scope are not a reason to repeat the pattern.
 - Treat reviewer feedback as a repository convention when it applies generally;
   update these instructions or the linked style guide so later tasks see it.
+
+## Focused changes
+
+Prefer the smallest complete fix. Reuse existing behavior and keep domain logic
+at its call site. Avoid unrelated cleanup, new abstractions, and changes to shared
+components unless the task requires them. Before finishing, compare the full PR
+diff against its base and remove incidental refactoring.

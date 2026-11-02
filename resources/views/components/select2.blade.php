@@ -221,7 +221,10 @@
 
                     // Restore display text if selected was set before optionsMap was built
                     if (this.selected && !this.search) {
-                        this.showSelectedValue();
+                        const opt = this.optionsMap.get(this.selected);
+                        if (opt) {
+                            this.search = this.getDisplayText(opt);
+                        }
                     }
 
                     this.initialized = true;
@@ -244,16 +247,13 @@
             setExplicitOptions(rawData) {
                 this.options = Object.entries(rawData ?? {}).map(([value, label]) => this.makeOption(value, label));
                 this.buildOptionsMap();
-                this.showSelectedValue();
+                if (this.selected) {
+                    const label = rawData?.[this.selected]
+                        ?? this.$wire.dictionaries?.[dictionaryKey]?.[this.selected]
+                        ?? this.selected;
+                    this.search = this.getDisplayText(this.makeOption(this.selected, label));
+                }
                 this.filterOptions();
-            },
-
-            showSelectedValue() {
-                if (!this.selected) return;
-
-                const option = this.optionsMap.get(this.selected);
-                const label = this.$wire.dictionaries?.[dictionaryKey]?.[this.selected] ?? this.selected;
-                this.search = this.getDisplayText(option ?? this.makeOption(this.selected, label));
             },
 
             buildOptionsMap() {
@@ -378,7 +378,11 @@
                         return;
                     }
 
-                    this.showSelectedValue();
+                    const opt = this.optionsMap.get(value);
+
+                    if (opt) {
+                        this.search = this.getDisplayText(opt);
+                    }
                 });
             },
         };

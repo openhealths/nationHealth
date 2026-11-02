@@ -88,3 +88,14 @@ test('alpine watcher refreshes explicit options when primary flag changes withou
     assert.equal(control.selected, 'RETIRED');
     assert.equal(control.search, 'Історична назва');
 });
+
+test('a general selector keeps its original behavior for an unavailable code', () => {
+    const { control, watchers } = selector();
+    control.watchSelected();
+    control.selected = 'UNKNOWN';
+    control.initializeOptions();
+    assert.equal(control.search, '');
+    watchers.get('selected')('UNKNOWN');
+    assert.equal(control.search, '');
+    assert.equal(control.selected, 'UNKNOWN');
+});
