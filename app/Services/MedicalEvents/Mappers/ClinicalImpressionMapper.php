@@ -194,6 +194,13 @@ class ClinicalImpressionMapper implements FhirMapperContract
         ];
     }
 
+    /**
+     * Build references to the supporting records. The record search marks episodes as 'episode',
+     * a clinical impression references them as 'episode_of_care'.
+     *
+     * @param  array  $data
+     * @return array
+     */
     private function buildSupportingInfo(array $data): array
     {
         if (empty($data['supportingInfo'])) {
@@ -203,7 +210,7 @@ class ClinicalImpressionMapper implements FhirMapperContract
         return collect($data['supportingInfo'])
             ->map(
                 fn (array $info) => FhirResource::make()
-                    ->coding('eHealth/resources', $info['type'])
+                    ->coding('eHealth/resources', $info['type'] === 'episode' ? 'episode_of_care' : $info['type'])
                     ->toIdentifier($info['uuid'])
             )
             ->values()
