@@ -15,6 +15,11 @@ use Illuminate\Support\Facades\Log;
  */
 class EmployeeRequestMatcher
 {
+    public static function remoteDivisionUuid(array $employee): ?string
+    {
+        return $employee['division']['uuid'] ?? $employee['division_id'] ?? null;
+    }
+
     /**
      * Remote Create Employee Request statuses that mean "not decided yet".
      */
@@ -45,7 +50,6 @@ class EmployeeRequestMatcher
     /**
      * Pick APPROVED employee from an eHealth list for this request.
      * Match: position + employee_type + start_date (same day when both set) + division when set.
-     * Fuzzy fallback: sole candidate for the filtered list.
      *
      * @param  list<array<string, mixed>>  $employeesList
      * @return array<string, mixed>|null
@@ -56,15 +60,21 @@ class EmployeeRequestMatcher
             return null;
         }
 
-        $divisionUuid = $request->division?->uuid;
+        $divisionUuid = $request->division?->uuid ?? $request->divisionUuid;
         $employeeType = $request->employeeType;
         $targetPosition = $request->position;
         $targetStartDate = $request->startDate;
+        $employeeUuid = $request->employee?->uuid ?? data_get($request->revision?->data, 'employee_uuid');
+        $matches = [];
 
         foreach ($employeesList as $remoteEmp) {
             if (!isset($remoteEmp['uuid'])) {
                 Log::warning('[EmployeeRequestMatcher] Skipping remote employee record without uuid.');
 
+                continue;
+            }
+
+            if (filled($employeeUuid) && $remoteEmp['uuid'] !== $employeeUuid) {
                 continue;
             }
 
@@ -76,27 +86,14 @@ class EmployeeRequestMatcher
                 $dateMatch = self::datesMatchSameDay($targetStartDate, $remoteEmp['start_date']);
             }
 
-            $divisionMatch = true;
-            if ($divisionUuid) {
-                $divisionMatch = ($remoteEmp['division_id'] ?? null) === $divisionUuid;
-            }
+            $divisionMatch = filled($employeeUuid) || self::remoteDivisionUuid($remoteEmp) === $divisionUuid;
 
             if ($posMatch && $typeMatch && $dateMatch && $divisionMatch) {
-                Log::info('[EmployeeRequestMatcher] Found MATCHING Employee UUID: ' . $remoteEmp['uuid']);
-
-                return $remoteEmp;
+                $matches[] = $remoteEmp;
             }
         }
 
-        if (count($employeesList) === 1 && isset($employeesList[0]['uuid'])) {
-            Log::warning(
-                '[EmployeeRequestMatcher] Fuzzy match: taking the only found employee for this Tax ID.'
-            );
-
-            return $employeesList[0];
-        }
-
-        return null;
+        return count($matches) === 1 ? $matches[0] : null;
     }
 
     /**
@@ -112,7 +109,7 @@ class EmployeeRequestMatcher
         Log::info("[EmployeeRequestMatcher] Searching eHealth for Employee by TaxID: {$taxId}");
 
         try {
-            $divisionUuid = $request->division?->uuid;
+            $divisionUuid = $request->division?->uuid ?? $request->divisionUuid;
             $employeeType = $request->employeeType;
 
             $params = [
@@ -130,7 +127,7 @@ class EmployeeRequestMatcher
                 $params['employee_type'] = $employeeType;
             }
 
-            $employeesList = EHealth::employee()->getMany($params)->validate();
+            $employeesList = EHealth::employee()->getMany($params, withIdentity: true)->validate();
 
             if (empty($employeesList)) {
                 Log::warning(

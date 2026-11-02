@@ -13,6 +13,14 @@ use Tests\TestCase;
 
 class EmployeePrimarySpecialityValidationTest extends TestCase
 {
+    use \Tests\Concerns\FakesEmployeeDictionaries;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->fakeEmployeeDictionaries();
+    }
+
     #[Test]
     public function rejects_more_than_one_primary_speciality(): void
     {
@@ -107,5 +115,130 @@ class EmployeePrimarySpecialityValidationTest extends TestCase
             'рівно одну спеціальність',
             $validator->errors()->first('doctor.specialities')
         );
+    }
+
+    #[Test]
+    public function allows_active_cross_role_additional_speciality_but_rejects_it_as_primary(): void
+    {
+        $component = new class extends Component
+        {
+            public array $dictionaries = [
+                'GENDER' => ['MALE' => 'Чоловік'],
+                'PHONE_TYPE' => ['MOBILE' => 'Мобільний'],
+                'POSITION' => ['P1' => 'Лікар'],
+            ];
+
+            public function render()
+            {
+                return '';
+            }
+        };
+
+        $form = new EmployeeForm($component, 'form');
+        $form->employeeType = 'DOCTOR';
+
+        $rules = (new ReflectionMethod(EmployeeForm::class, 'doctorRules'))->invoke($form);
+        $specialityRules = array_filter(
+            $rules,
+            static fn (string $key): bool => str_starts_with($key, 'doctor.specialities'),
+            ARRAY_FILTER_USE_KEY
+        );
+
+        $validPayload = [
+            'doctor' => [
+                'specialities' => [
+                    [
+                        'speciality' => 'THERAPIST',
+                        'specialityOfficio' => true,
+                        'level' => 'SECOND',
+                        'qualificationType' => 'AWARDING',
+                        'attestationName' => 'МОЗ',
+                        'attestationDate' => '2024-01-01',
+                        'validToDate' => null,
+                        'certificateNumber' => 'DOC-001',
+                    ],
+                    [
+                        'speciality' => 'NURSING',
+                        'specialityOfficio' => false,
+                        'level' => 'SECOND',
+                        'qualificationType' => 'AWARDING',
+                        'attestationName' => 'МОЗ',
+                        'attestationDate' => '2023-05-10',
+                        'validToDate' => null,
+                        'certificateNumber' => 'NURSE-002',
+                    ],
+                ],
+            ],
+        ];
+
+        $this->assertTrue(Validator::make($validPayload, $specialityRules, [], $form->validationAttributes())->passes());
+
+        $invalidPrimaryPayload = $validPayload;
+        $invalidPrimaryPayload['doctor']['specialities'] = [
+            array_replace($validPayload['doctor']['specialities'][1], ['specialityOfficio' => true]),
+        ];
+
+        $invalidValidator = Validator::make(
+            $invalidPrimaryPayload,
+            $specialityRules,
+            [],
+            $form->validationAttributes()
+        );
+
+        $this->assertTrue($invalidValidator->fails());
+        $this->assertArrayHasKey('doctor.specialities.0.speciality', $invalidValidator->errors()->toArray());
+    }
+
+    #[Test]
+    public function translates_doctor_specialities_validation_attributes_in_ukrainian(): void
+    {
+        app()->setLocale('uk');
+
+        $component = new class extends Component
+        {
+            public array $dictionaries = [];
+
+            public function render()
+            {
+                return '';
+            }
+        };
+
+        $form = new EmployeeForm($component, 'form');
+        $form->employeeType = 'DOCTOR';
+
+        $rules = (new ReflectionMethod(EmployeeForm::class, 'doctorRules'))->invoke($form);
+        $specialityRules = array_filter(
+            $rules,
+            static fn (string $key): bool => str_starts_with($key, 'doctor.specialities'),
+            ARRAY_FILTER_USE_KEY
+        );
+
+        $validator = Validator::make(
+            [
+                'doctor' => [
+                    'specialities' => [
+                        [
+                            'speciality' => '',
+                            'specialityOfficio' => true,
+                            'level' => 'SECOND',
+                            'qualificationType' => 'AWARDING',
+                            'attestationName' => 'МОЗ',
+                            'attestationDate' => '2024-01-01',
+                            'validToDate' => null,
+                            'certificateNumber' => 'DOC-001',
+                        ],
+                    ],
+                ],
+            ],
+            $specialityRules,
+            [],
+            $form->validationAttributes()
+        );
+
+        $this->assertTrue($validator->fails());
+        $message = $validator->errors()->first('doctor.specialities.0.speciality');
+        $this->assertStringNotContainsString('doctor.specialities.0.speciality', $message);
+        $this->assertStringContainsString(__('forms.speciality'), $message);
     }
 }

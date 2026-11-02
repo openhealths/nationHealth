@@ -50,6 +50,19 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     protected ?BaseEmployee $employee = null;
 
     /**
+     * Only server-loaded employees may supply retained certificate values.
+     * A request revision is user-editable and is never an authoritative source.
+     */
+    public function originalEmployeeSpecialities(): array
+    {
+        return Repository::employee()->originalSpecialities(
+            $this->employee ?? $this->employeeRequest,
+            legalEntity()?->id,
+            $this->form->employeeType
+        );
+    }
+
+    /**
      * blocking only first_name, last_name, date_of_birth, tax_id
      */
     public bool $isPartyDataPartiallyLocked = false;
