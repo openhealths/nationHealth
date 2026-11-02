@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\MedicalEventsErrorTranslator;
 use App\Classes\eHealth\ValidationRuleBuilder;
+use App\Contracts\ApiErrorTranslator;
 use App\Enums\Episode\Status;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
@@ -151,6 +153,16 @@ class Episode extends PatientApiBase
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
 
         return $this->get(self::URL . "/$patientId/summary/episodes", $mergedQuery);
+    }
+
+    /**
+     * Get the translator of the errors the medical events resources return.
+     *
+     * @return ApiErrorTranslator
+     */
+    protected function errorTranslator(): ApiErrorTranslator
+    {
+        return new MedicalEventsErrorTranslator();
     }
 
     /**

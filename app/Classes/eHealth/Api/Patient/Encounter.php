@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\MedicalEventsErrorTranslator;
 use App\Classes\eHealth\ValidationRuleBuilder;
+use App\Contracts\ApiErrorTranslator;
 use App\Enums\Person\EncounterStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -128,6 +130,16 @@ class Encounter extends PatientApiBase
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
 
         return $this->get(self::URL . "/$patientId/encounters", $mergedQuery);
+    }
+
+    /**
+     * Get the translator of the errors the medical events resources return.
+     *
+     * @return ApiErrorTranslator
+     */
+    protected function errorTranslator(): ApiErrorTranslator
+    {
+        return new MedicalEventsErrorTranslator();
     }
 
     /**

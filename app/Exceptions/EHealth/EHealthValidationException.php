@@ -457,7 +457,6 @@ class EHealthValidationException extends EHealthException
             'Care plan has unfinished activities' => 'care_plan_has_unfinished_activities',
             'Confidant Person relationship does not belong to this person' => 'confidant_relationship_not_of_person',
             'Limit of confidant persons with this person is exhausted' => 'confidant_persons_limit_exhausted',
-            'client_id refers to legal entity that is not active' => 'legal_entity_not_active',
         ];
         if (isset($exactMessages[$message])) {
             return __('errors.ehealth.messages.'.$exactMessages[$message]);
@@ -539,16 +538,15 @@ class EHealthValidationException extends EHealthException
 
     /**
      * Name a payload field the way our forms do, e.g. '$.person.documents[0].issued_at' is looked up as
-     * 'person.documents.*.issuedAt' among the validation attributes. Falls back to the entry itself.
+     * 'person.documents.*.issuedAt' among the validation attributes. Otherwise name it part by part up to the first
+     * part without a name, e.g. '$.clinical_impressions.[0].supporting_info.[1].identifier' reads
+     * 'Клінічна оцінка №1 → Підтверджуюча інформація №2'. Falls back to the entry itself.
      *
      * @param  string  $entry
      * @return string
      */
     protected function translateEntry(string $entry): string
     {
-        if (in_array($entry, ['$.encounter.identifier.value', 'encounter.identifier.value'], true)) {
-            return __('care-plan.encounter');
-        }
         if (in_array($entry, ['$.detail.quantity.value', 'detail.quantity.value', '$.quantity.value', 'quantity.value'], true)) {
             return __('care-plan.ehealth_fields.quantity_value');
         }
@@ -565,7 +563,34 @@ class EHealthValidationException extends EHealthException
 
         $attribute = Arr::get(__('validation.attributes'), $key);
 
-        return is_string($attribute) ? $attribute : $entry;
+        if (is_string($attribute)) {
+            return $attribute;
+        }
+
+        preg_match_all('/\[(\d+)]|(\w+)/', $entry, $parts, PREG_SET_ORDER);
+
+        $partNames = __('medical-events.api_fields');
+        $names = [];
+
+        foreach ($parts as $part) {
+            if (!isset($part[2])) {
+                if ($names !== []) {
+                    $names[array_key_last($names)] .= ' №' . ((int) $part[1] + 1);
+                }
+
+                continue;
+            }
+
+            $name = Arr::get($partNames, $part[2]);
+
+            if (!is_string($name)) {
+                break;
+            }
+
+            $names[] = $name;
+        }
+
+        return $names !== [] ? implode(' → ', $names) : $entry;
     }
 
     /**

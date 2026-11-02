@@ -296,7 +296,6 @@ return [
         'birth_certificate_number_invalid' => 'Недопустимий номер свідоцтва про народження',
         'confidant_person_required_for_children' => "Для дітей обов'язкове вказання законного представника",
         'otp_verification_failed' => 'Помилка під час виконання онлайн верифікації',
-        'signed_content_save_failed' => 'Помилка при збереженні підписаних даних',
         'birth_date_invalid' => 'Недопустима дата народження',
         'one_authentication_method_allowed' => 'Повинен бути лише один метод аутентифікації',
         'required_item_missing' => 'Повинна містити необхідний параметр',
