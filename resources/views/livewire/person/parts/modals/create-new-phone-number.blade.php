@@ -9,7 +9,7 @@
                 type="tel"
                 placeholder=" "
                 class="peer input @error('form.phoneNumber') input-error @enderror"
-                value="{{ $form->phoneNumber }}"
+                :value="$wire.form.phoneNumber"
                 readonly
             />
             <label class="label">{{ __('forms.phone') }}</label>
