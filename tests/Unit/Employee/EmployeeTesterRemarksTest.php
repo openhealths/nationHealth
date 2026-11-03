@@ -22,6 +22,8 @@ use Tests\TestCase;
 
 class EmployeeTesterRemarksTest extends TestCase
 {
+    use \Tests\Concerns\FakesEmployeeDictionaries;
+
     #[Test]
     public function position_label_uses_dictionary_and_falls_back_to_free_text(): void
     {
@@ -58,6 +60,7 @@ class EmployeeTesterRemarksTest extends TestCase
     #[Test]
     public function hr_accepts_dictionary_or_free_text_and_doctor_accepts_only_dictionary(): void
     {
+        $this->fakeEmployeeDictionaries();
         $legalEntity = new LegalEntity();
         $legalEntity->id = 1;
         app()->instance('legalEntity', $legalEntity);

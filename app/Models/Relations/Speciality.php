@@ -34,6 +34,7 @@ class Speciality extends Model
     ];
 
     protected $casts = [
+        'speciality_officio' => 'boolean',
         'attestation_date' => EHealthDateCast::class,
         'valid_to_date' => EHealthDateCast::class,
     ];

@@ -246,7 +246,7 @@ return [
         'party' => [
             'working_experience_required' => "Вкажіть досвід роботи — це обов'язкове поле для відправки в eSOZ.",
             'working_experience_integer' => 'Досвід роботи має бути цілим числом років.',
-            'working_experience_gt' => 'Досвід роботи має бути більше 0 років.',
+            'working_experience_min' => 'Досвід роботи не може бути меншим за 0 років.',
             'email_must_be_latin' => 'Електронна адреса має бути латиницею, наприклад name@example.com.',
         ],
 

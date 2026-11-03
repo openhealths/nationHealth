@@ -4,77 +4,154 @@
         id="section-doctor-specialities"
         :disabled="$wire.isPositionDataLocked ?? false"
         x-data="{
-                  specialities: [],
-                  employeeType: $wire.entangle('form.employeeType'),
-                  employeeTypeSpecialities: @js($this->employeeTypeSpecialities),
-                  employeeTypeLevels: @js($this->employeeTypeLevels),
-                  employeeTypeSpecQualifications: @js($this->employeeTypeSpecQualifications),
-                  openModal: false,
-                  modalSpeciality: new Speciality(),
-                  newSpeciality: false,
-                  item: null,
-                  primaryConflict: false,
-                  specDict: @js($this->dictionaries['SPECIALITY_TYPE']),
-                  levelDict: @js($this->dictionaries['SPECIALITY_LEVEL']),
-                  qualTypeDict: @js($this->dictionaries['QUALIFICATION_TYPE']),
+            specialities: [],
+            employeeType: $wire.entangle('form.employeeType'),
+            employeeTypeSpecialities: @js($this->employeeTypeSpecialities),
+            employeeTypeLevels: @js($this->employeeTypeLevels),
+            employeeTypeSpecQualifications: @js($this->employeeTypeSpecQualifications),
+            activeSpecialities: @js($this->activeSpecialities),
+            activeSpecialityLevels: @js($this->activeSpecialityLevels),
+            activeSpecQualifications: @js($this->activeSpecQualifications),
+            openModal: false,
+            modalSpeciality: new Speciality(),
+            newSpeciality: false,
+            item: null,
+            primaryConflict: false,
+            additionalSpecialitiesOpen: false,
+            specDict: @js($this->dictionaries['SPECIALITY_TYPE']),
+            levelDict: @js($this->dictionaries['SPECIALITY_LEVEL']),
+            specQualDict: @js($this->dictionaries['SPEC_QUALIFICATION_TYPE']),
 
-                  isModalValid() {
-                      return this.modalSpeciality.speciality
-                          && this.modalSpeciality.attestationName
-                          && this.modalSpeciality.level
-                          && this.modalSpeciality.qualificationType
-                          && this.modalSpeciality.attestationDate
-                          && this.modalSpeciality.certificateNumber;
-                  },
+            currentEmployeeType() {
+                return this.$wire?.form?.employeeType ?? this.employeeType;
+            },
 
-                  hasOtherPrimary(excludeIndex = null) {
-                      return (this.specialities || []).some((speciality, index) => {
-                          if (excludeIndex !== null && index === excludeIndex) {
-                              return false;
-                          }
+            availableSpecialities() {
+                if (! this.isPrimary(this.modalSpeciality)) {
+                    return this.activeSpecialities;
+                }
 
-                          return !!(speciality.specialityOfficio || speciality.speciality_officio);
-                      });
-                  },
+                return this.employeeTypeSpecialities[this.currentEmployeeType()] ?? {};
+            },
 
-                  canMarkAsPrimary() {
-                      return ! this.hasOtherPrimary(this.newSpeciality ? null : this.item);
-                  },
+            availableLevels() {
+                if (! this.isPrimary(this.modalSpeciality)) {
+                    return this.activeSpecialityLevels;
+                }
 
-                  openAddSpecialityModal() {
-                      if (this.newSpeciality !== true) {
-                          this.primaryConflict = false;
-                          this.newSpeciality = true;
-                          this.modalSpeciality = new Speciality();
-                          if (this.hasOtherPrimary()) {
-                              this.modalSpeciality.specialityOfficio = false;
-                              this.primaryConflict = true;
-                          }
-                      }
-                      this.openModal = true;
-                  },
+                return this.employeeTypeLevels[this.currentEmployeeType()] ?? {};
+            },
 
-                  saveSpeciality() {
-                      this.primaryConflict = false;
-                      if (this.modalSpeciality.specialityOfficio && ! this.canMarkAsPrimary()) {
-                          this.primaryConflict = true;
-                          return;
-                      }
+            availableSpecQualifications() {
+                if (! this.isPrimary(this.modalSpeciality)) {
+                    return this.activeSpecQualifications;
+                }
 
-                      if (this.newSpeciality) {
-                          this.specialities.push({ ...this.modalSpeciality });
-                      } else {
-                          this.specialities[this.item] = { ...this.modalSpeciality };
-                      }
-                      this.openModal = false;
-                      this.newSpeciality = null;
-                  },
-              }"
+                return this.employeeTypeSpecQualifications[this.currentEmployeeType()] ?? {};
+            },
+
+            isLegacySpeciality() {
+                return Boolean(
+                    this.modalSpeciality.speciality
+                        && ! this.availableSpecialities()[this.modalSpeciality.speciality]
+                );
+            },
+
+            handlePrimaryToggle() {
+                this.primaryConflict = this.modalSpeciality.specialityOfficio && ! this.canMarkAsPrimary();
+
+                if (! this.isPrimary(this.modalSpeciality)) {
+                    return;
+                }
+
+                if (this.modalSpeciality.speciality && ! this.availableSpecialities()[this.modalSpeciality.speciality]) {
+                    this.modalSpeciality.speciality = '';
+                }
+
+                if (this.modalSpeciality.level && ! this.availableLevels()[this.modalSpeciality.level]) {
+                    this.modalSpeciality.level = '';
+                }
+
+                if (
+                    this.modalSpeciality.qualificationType
+                    && ! this.availableSpecQualifications()[this.modalSpeciality.qualificationType]
+                ) {
+                    this.modalSpeciality.qualificationType = '';
+                }
+            },
+
+            isModalValid() {
+                return this.modalSpeciality.speciality
+                    && this.modalSpeciality.attestationName
+                    && this.modalSpeciality.level
+                    && this.modalSpeciality.qualificationType
+                    && this.modalSpeciality.attestationDate
+                    && this.modalSpeciality.certificateNumber;
+            },
+
+            isPrimary(speciality) {
+                const value = speciality.specialityOfficio ?? speciality.speciality_officio;
+                return value === true || value === 1 || value === '1';
+            },
+
+            specialityEntries(primary) {
+                return this.specialities
+                    .map((speciality, index) => ({ speciality, index }))
+                    .filter(({ speciality }) => this.isPrimary(speciality) === primary);
+            },
+
+            hasOtherPrimary(excludeIndex = null) {
+                return (this.specialities || []).some((speciality, index) => {
+                    if (excludeIndex !== null && index === excludeIndex) {
+                        return false;
+                    }
+
+                    return this.isPrimary(speciality);
+                });
+            },
+
+            canMarkAsPrimary() {
+                return ! this.hasOtherPrimary(this.newSpeciality ? null : this.item);
+            },
+
+            openAddSpecialityModal() {
+                if (this.newSpeciality !== true) {
+                    this.primaryConflict = false;
+                    this.newSpeciality = true;
+                    this.modalSpeciality = new Speciality();
+                    if (this.hasOtherPrimary()) {
+                        this.modalSpeciality.specialityOfficio = false;
+                        this.primaryConflict = true;
+                    }
+                }
+                this.openModal = true;
+            },
+
+            saveSpeciality() {
+                this.primaryConflict = false;
+                if (this.modalSpeciality.specialityOfficio && ! this.canMarkAsPrimary()) {
+                    this.primaryConflict = true;
+                    return;
+                }
+
+                if (this.newSpeciality) {
+                    this.specialities.push({ ...this.modalSpeciality });
+                } else {
+                    this.specialities[this.item] = { ...this.modalSpeciality };
+                }
+                if (! this.isPrimary(this.modalSpeciality)) {
+                    this.additionalSpecialitiesOpen = true;
+                }
+                this.openModal = false;
+                this.newSpeciality = null;
+            }
+        }"
         x-init="
             (() => {
                 const initial = $wire.get('form.doctor.specialities');
                 specialities = Array.isArray(initial) ? JSON.parse(JSON.stringify(initial)) : [];
             })();
+            $watch('employeeType', () => handlePrimaryToggle());
             $watch('specialities', (val) => {
                 $wire.set('form.doctor.specialities', Array.isArray(val) ? JSON.parse(JSON.stringify(val)) : [], false);
             });
@@ -88,105 +165,137 @@
             <p class="text-error -mt-2 mb-4">{{ $message }}</p>
         @enderror
 
-        <table class="table-input w-full">
-            <thead class="thead-input">
-                <tr>
-                    <th class="th-input">{{ __('forms.speciality') }}</th>
-                    <th class="th-input">{{ __('forms.issued_by') }}</th>
-                    <th class="th-input">{{ __('forms.speciality_level') }}</th>
-                    <th class="th-input">{{ __('forms.speciality_officio') }}</th>
-                    <th class="th-input">{{ __('forms.certificate_number') }}</th>
-                    <th class="th-input">{{ __('forms.attestation_date') }}</th>
-                    <th class="th-input">{{ __('forms.valid_until') }}</th>
-                    <th class="th-input">{{ __('forms.actions') }}</th>
-                </tr>
-            </thead>
-            <tbody>
-                <template x-for="(speciality, index) in specialities" :key="index">
+        <p class="text-error mb-4" x-cloak x-show="specialityEntries(true).length > 1">
+            {{ __('employees.multiple_position_specialities') }}
+        </p>
+
+        @foreach ([true, false] as $primaryGroup)
+            @if ($primaryGroup)
+                <h3 class="mb-3 font-semibold">{{ __('employees.position_speciality') }}</h3>
+                <p class="mb-3 text-sm text-gray-500" x-show="specialityEntries(true).length === 0">
+                    {{ __('employees.no_position_speciality') }}
+                </p>
+            @else
+                <details
+                    class="mt-6"
+                    :open="additionalSpecialitiesOpen"
+                    @toggle="additionalSpecialitiesOpen = $el.open"
+                    x-show="specialityEntries(false).length > 0"
+                    x-cloak
+                >
+                    <summary class="mb-3 cursor-pointer font-semibold">
+                        {{ __('employees.additional_person_specialities') }} (<span
+                            x-text="specialityEntries(false).length"
+                        ></span
+                        >)
+                    </summary>
+                    <p class="mb-3 text-sm text-gray-500">{{ __('employees.shared_specialities_notice') }}</p>
+            @endif
+
+            <table class="table-input w-full" data-speciality-group="{{ $primaryGroup ? 'position' : 'person' }}">
+                <thead class="thead-input">
                     <tr>
-                        <td class="td-input" x-text="specDict[speciality.speciality]"></td>
-                        <td class="td-input" x-text="speciality.attestationName"></td>
-                        <td class="td-input" x-text="levelDict[speciality.level]"></td>
-                        <td class="td-input text-left">
-                            <template x-if="speciality.specialityOfficio">
-                                <svg class="h-6 w-6 text-green-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 11.917 9.724 16.5 19 7.5" />
-                                </svg>
-                            </template>
-                            <template x-if="! speciality.specialityOfficio">
-                                <svg class="h-6 w-6 text-red-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6" />
-                                </svg>
-                            </template>
-                        </td>
-                        <td class="td-input" x-text="speciality.certificateNumber"></td>
-                        <td class="td-input" x-text="speciality.attestationDate"></td>
-                        <td class="td-input" x-text="speciality.validToDate"></td>
-                        <td class="td-input">
-                            <div
-                                x-data="{ openDropdown: false }"
-                                @keydown.escape.prevent.stop="openDropdown = false"
-                                @focusin.window="! $refs.panel.contains($event.target) && (openDropdown = false)"
-                                x-id="['dropdown-button']"
-                                class="relative"
-                            >
-                                <button
-                                    x-ref="button"
-                                    @click="openDropdown = ! openDropdown"
-                                    :aria-expanded="openDropdown"
-                                    :aria-controls="$id('dropdown-button')"
-                                    type="button"
-                                    class="cursor-pointer"
-                                    x-show="! speciality.specialityOfficio || ! ($wire.isPositionDataLocked ?? false)"
-                                >
-                                    <svg class="svg-hover-action h-6 w-6 text-gray-800 dark:text-gray-200" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-                                        <path stroke="currentColor" stroke-linecap="square" stroke-linejoin="round" stroke-width="2" d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"></path>
-                                    </svg>
-                                </button>
-
-                                <div
-                                    x-ref="panel"
-                                    x-show="openDropdown"
-                                    x-transition.origin.top.left
-                                    @click.outside="openDropdown = false"
-                                    :id="$id('dropdown-button')"
-                                    class="dropdown-panel absolute"
-                                    style="left: -120%; display: none"
-                                >
-                                    <button
-                                        type="button"
-                                        @click.prevent="
-                                            openModal = true;
-                                            if (newSpeciality !== false || item !== index) {
-                                                item = index;
-                                                modalSpeciality = new Speciality(speciality);
-                                                newSpeciality = false;
-                                                primaryConflict = false;
-                                            }
-                                            openDropdown = false;
-                                        "
-                                        class="dropdown-button"
-                                    >
-                                        {{ __('forms.edit') }}
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        @click.prevent="
-                                            specialities.splice(index, 1);
-                                            openDropdown = false;
-                                        "
-                                        class="dropdown-button dropdown-delete"
-                                    >
-                                        {{ __('forms.delete') }}
-                                    </button>
-                                </div>
-                            </div>
-                        </td>
+                        <th class="th-input">{{ __('forms.speciality') }}</th>
+                        <th class="th-input">{{ __('forms.issued_by') }}</th>
+                        <th class="th-input">{{ __('forms.speciality_level') }}</th>
+                        <th class="th-input">{{ __('forms.speciality_officio') }}</th>
+                        <th class="th-input">{{ __('forms.certificate_number') }}</th>
+                        <th class="th-input">{{ __('forms.attestation_date') }}</th>
+                        <th class="th-input">{{ __('forms.valid_until') }}</th>
+                        <th class="th-input">{{ __('forms.actions') }}</th>
                     </tr>
-                </template>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    <template x-for="{ speciality, index } in specialityEntries(@js($primaryGroup))" :key="index">
+                        <tr>
+                            <td class="td-input" x-text="specDict[speciality.speciality] ?? speciality.speciality"></td>
+                            <td class="td-input" x-text="speciality.attestationName"></td>
+                            <td class="td-input" x-text="levelDict[speciality.level] ?? speciality.level"></td>
+                            <td class="td-input text-left">
+                                <template x-if="isPrimary(speciality)">
+                                    <svg class="h-6 w-6 text-green-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 11.917 9.724 16.5 19 7.5" />
+                                    </svg>
+                                </template>
+                                <template x-if="! isPrimary(speciality)">
+                                    <svg class="h-6 w-6 text-red-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6" />
+                                    </svg>
+                                </template>
+                            </td>
+                            <td class="td-input" x-text="speciality.certificateNumber"></td>
+                            <td class="td-input" x-text="speciality.attestationDate"></td>
+                            <td class="td-input" x-text="speciality.validToDate"></td>
+                            <td class="td-input">
+                                <div
+                                    x-data="{ openDropdown: false }"
+                                    @keydown.escape.prevent.stop="openDropdown = false"
+                                    @focusin.window="! $refs.panel.contains($event.target) && (openDropdown = false)"
+                                    x-id="['dropdown-button']"
+                                    class="relative"
+                                >
+                                    <button
+                                        x-ref="button"
+                                        @click="openDropdown = ! openDropdown"
+                                        :aria-expanded="openDropdown"
+                                        :aria-controls="$id('dropdown-button')"
+                                        type="button"
+                                        class="cursor-pointer"
+                                        x-show="! speciality.specialityOfficio || ! ($wire.isPositionDataLocked ?? false)"
+                                    >
+                                        <svg class="svg-hover-action h-6 w-6 text-gray-800 dark:text-gray-200" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                                            <path stroke="currentColor" stroke-linecap="square" stroke-linejoin="round" stroke-width="2" d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"></path>
+                                        </svg>
+                                    </button>
+
+                                    <div
+                                        x-ref="panel"
+                                        x-show="openDropdown"
+                                        x-transition.origin.top.left
+                                        @click.outside="openDropdown = false"
+                                        :id="$id('dropdown-button')"
+                                        class="dropdown-panel absolute"
+                                        style="left: -120%; display: none"
+                                    >
+                                        <button
+                                            type="button"
+                                            @click.prevent="
+                                                openModal = true;
+                                                if (newSpeciality !== false || item !== index) {
+                                                    item = index;
+                                                    modalSpeciality = new Speciality(speciality);
+                                                    newSpeciality = false;
+                                                    primaryConflict = false;
+                                                }
+                                                openDropdown = false;
+                                            "
+                                            class="dropdown-button"
+                                        >
+                                            {{ __('forms.edit') }}
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            @click.prevent="
+                                                specialities.splice(index, 1);
+                                                openDropdown = false;
+                                            "
+                                            class="dropdown-button dropdown-delete"
+                                        >
+                                            {{ __('forms.delete') }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+
+            @if (!$primaryGroup)
+                </details>
+            @endif
+        @endforeach
 
         <div>
             <button type="button" @click.prevent="openAddSpecialityModal()" class="item-add my-5">
@@ -257,9 +366,16 @@
                                         <x-select2
                                             modelPath="modalSpeciality.speciality"
                                             dictionaryName="SPECIALITY_TYPE"
+                                            options="availableSpecialities()"
                                             id="specialitySpeciality"
                                             x-effect="if (! openModal) hideOptions();"
                                         />
+                                        <p
+                                            x-show="isLegacySpeciality()"
+                                            class="mt-2 text-sm text-amber-700 dark:text-amber-300"
+                                        >
+                                            {{ __('employees.legacy_speciality_notice') }}
+                                        </p>
                                     </div>
 
                                     <div class="flex flex-col justify-end">
@@ -274,10 +390,7 @@
                                                 type="checkbox"
                                                 x-model="modalSpeciality.specialityOfficio"
                                                 :disabled="! canMarkAsPrimary() && ! modalSpeciality.specialityOfficio"
-                                                @change="
-                                                    primaryConflict =
-                                                        modalSpeciality.specialityOfficio && ! canMarkAsPrimary()
-                                                "
+                                                @change="handlePrimaryToggle()"
                                                 class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-blue-500"
                                             />
                                             <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ __('forms.speciality_officio') }}</span>
@@ -323,13 +436,21 @@
                                             required
                                         >
                                             <option value="">{{ __('forms.select_level') }}</option>
-                                            <template x-if="employeeType && employeeTypeLevels[employeeType]">
-                                                <template
-                                                    x-for="(levelName, levelKey) in employeeTypeLevels[employeeType]"
-                                                    :key="levelKey"
-                                                >
-                                                    <option :value="levelKey" x-text="levelName"></option>
-                                                </template>
+                                            <template
+                                                x-if="
+                                                    modalSpeciality.level && ! availableLevels()[modalSpeciality.level]
+                                                "
+                                            >
+                                                <option
+                                                    :value="modalSpeciality.level"
+                                                    x-text="levelDict[modalSpeciality.level] ?? modalSpeciality.level"
+                                                ></option>
+                                            </template>
+                                            <template
+                                                x-for="(levelName, levelKey) in availableLevels()"
+                                                :key="levelKey"
+                                            >
+                                                <option :value="levelKey" x-text="levelName"></option>
                                             </template>
                                         </select>
                                     </div>
@@ -345,16 +466,25 @@
                                             required
                                         >
                                             <option value="">{{ __('forms.select_qualification_type') }}</option>
-                                            <template x-if="employeeType && employeeTypeSpecQualifications[employeeType]">
-                                                <template
-                                                    x-for="
-                                                        (qualName, qualKey) in
-                                                        employeeTypeSpecQualifications[employeeType]
+                                            <template
+                                                x-if="
+                                                    modalSpeciality.qualificationType &&
+                                                    ! availableSpecQualifications()[modalSpeciality.qualificationType]
+                                                "
+                                            >
+                                                <option
+                                                    :value="modalSpeciality.qualificationType"
+                                                    x-text="
+                                                        specQualDict[modalSpeciality.qualificationType] ??
+                                                        modalSpeciality.qualificationType
                                                     "
-                                                    :key="qualKey"
-                                                >
-                                                    <option :value="qualKey" x-text="qualName"></option>
-                                                </template>
+                                                ></option>
+                                            </template>
+                                            <template
+                                                x-for="(qualName, qualKey) in availableSpecQualifications()"
+                                                :key="qualKey"
+                                            >
+                                                <option :value="qualKey" x-text="qualName"></option>
                                             </template>
                                         </select>
                                     </div>
@@ -444,7 +574,11 @@
         validToDate = '';
 
         constructor(obj = null) {
-            if (obj) Object.assign(this, obj);
+            if (obj) {
+                Object.assign(this, obj);
+                const officio = obj.specialityOfficio ?? obj.speciality_officio ?? false;
+                this.specialityOfficio = officio === true || officio === 1 || officio === '1';
+            }
         }
     };
 </script>

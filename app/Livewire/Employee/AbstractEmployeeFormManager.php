@@ -50,6 +50,19 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     protected ?BaseEmployee $employee = null;
 
     /**
+     * Only server-loaded employees may supply retained certificate values.
+     * A request revision is user-editable and is never an authoritative source.
+     */
+    public function originalEmployeeSpecialities(): array
+    {
+        return Repository::employee()->originalSpecialities(
+            $this->employee ?? $this->employeeRequest,
+            legalEntity()?->id,
+            $this->form->employeeType
+        );
+    }
+
+    /**
      * blocking only first_name, last_name, date_of_birth, tax_id
      */
     public bool $isPartyDataPartiallyLocked = false;
@@ -723,8 +736,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             }
         }
 
-        // If it is the Owner (new or existing) and the length of service is empty/zero -> put 1.
-        if ($isOwnerContext && empty($this->form->party['workingExperience'])) {
+        if ($isOwnerContext && in_array($this->form->party['workingExperience'] ?? null, [null, ''], true)) {
             $this->form->party['workingExperience'] = 1;
         }
     }

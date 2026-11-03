@@ -63,7 +63,7 @@ class EmployeePharmacistSpecialityQualificationsTest extends TestCase
             $blade
         );
         $this->assertStringContainsString(
-            'employeeTypeSpecQualifications[employeeType]',
+            'employeeTypeSpecQualifications[this.currentEmployeeType()]',
             $blade
         );
     }

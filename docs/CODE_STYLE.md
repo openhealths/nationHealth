@@ -256,3 +256,17 @@ than `app(SomeRepository::class)`. Use `App\Repositories\Repository` for general
 repositories and `App\Repositories\MedicalEvents\Repository` for medical events;
 alias one import when a file needs both. Keep container resolution inside these
 entry points so test bindings continue to work.
+
+## Dictionary choices
+
+Keep domain rules (such as employee role mappings) in the domain form, rather
+than adding a dictionary collection over an existing data source. UI choices and
+server validation must use the same form method. Keep computed option lists out
+of public Livewire state.
+
+Use `dictionary()->basics()->byName()` for active choices. Resolve historical
+labels separately with `getMultipleFormatted($names, onlyActive: false)`; do not
+use label dictionaries as selectable options.
+
+For shared Blade components, prefer a single reactive options provider over
+separate watcher props. Keep domain-specific reactions in the calling form.
