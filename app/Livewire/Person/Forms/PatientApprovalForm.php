@@ -6,7 +6,7 @@ namespace App\Livewire\Person\Forms;
 
 use App\Core\BaseForm;
 use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\Person\Person;
 use App\Services\MedicalEvents\PatientApprovalService;
 use Illuminate\Support\Str;
@@ -20,12 +20,6 @@ class PatientApprovalForm extends BaseForm
         'encounter',
         'procedure',
         'care_plan',
-    ];
-
-    private const array CHILD_TYPES = [
-        'encounter',
-        'diagnostic_report',
-        'procedure',
     ];
 
     public function validateSelection(Person $person, array $data): array
@@ -138,7 +132,7 @@ class PatientApprovalForm extends BaseForm
         $type = $data['childType'];
         $uuid = $data['childUuid'];
 
-        if (!in_array($type, self::CHILD_TYPES, true)) {
+        if (!isset(PatientApprovalService::CHILD_MODELS[$type])) {
             throw ValidationException::withMessages([
                 'childType' => __('approval.create.invalid_record_type'),
             ]);
@@ -150,12 +144,16 @@ class PatientApprovalForm extends BaseForm
             ]);
         }
 
-        $model = PatientApprovalService::RESOURCE_MODELS[$type];
+        $model = PatientApprovalService::CHILD_MODELS[$type];
+        $query = $model::query()->where('uuid', $uuid);
 
-        $record = $model::query()
-            ->where('person_id', $person->id)
-            ->where('uuid', $uuid)
-            ->first();
+        if ($type === 'activity') {
+            $query->whereHas('carePlan', static fn ($query) => $query->where('person_id', $person->id));
+        } else {
+            $query->where('person_id', $person->id);
+        }
+
+        $record = $query->first();
 
         if ($record === null) {
             throw ValidationException::withMessages([
@@ -163,17 +161,44 @@ class PatientApprovalForm extends BaseForm
             ]);
         }
 
-        if (!PatientApprovalService::approvalStatusAllowed($type, $record->getRawOriginal('status'))) {
+        if (
+            !PatientApprovalService::approvalStatusAllowed($type, $record->getRawOriginal('status'))
+            || ($type === 'condition' && $record->getRawOriginal('verification_status') === 'entered_in_error')
+        ) {
             throw ValidationException::withMessages([
                 'childUuid' => __('approval.create.invalid_record_status'),
             ]);
         }
 
-        if ($type === 'encounter') {
-            $contextUuid = $record->episode?->value;
-        } else {
-            $contextUuid = null;
-            $encounterUuid = $record->encounter?->value;
+        $contextType = 'episode_of_care';
+        $contextUuid = match ($type) {
+            'activity' => $record->carePlan?->uuid,
+            'encounter' => $record->episode?->value,
+            default => null,
+        };
+
+        if ($type === 'activity') {
+            $contextType = 'care_plan';
+        }
+
+        if ($type === 'observation' && $record->diagnosticReport?->value) {
+            $report = DiagnosticReport::query()
+                ->where('person_id', $person->id)
+                ->where('uuid', $record->diagnosticReport->value)
+                ->where('status', 'final')
+                ->first();
+
+            if ($report !== null) {
+                $contextType = 'diagnostic_report';
+                $contextUuid = $report->uuid;
+            }
+        }
+
+        if ($contextUuid === null && !in_array($type, ['activity', 'encounter'], true)) {
+            $encounterUuid = match ($type) {
+                'diagnostic_report', 'procedure', 'clinical_impression' => $record->encounter?->value,
+                'condition', 'observation', 'immunization', 'device' => $record->context?->value,
+            };
 
             if ($encounterUuid) {
                 $encounter = Encounter::query()
@@ -185,7 +210,9 @@ class PatientApprovalForm extends BaseForm
                 $contextUuid = $encounter?->episode?->value;
             }
 
-            $contextUuid ??= $record->originEpisode?->value;
+            if (in_array($type, ['diagnostic_report', 'procedure'], true)) {
+                $contextUuid ??= $record->originEpisode?->value;
+            }
         }
 
         if (!$contextUuid) {
@@ -198,6 +225,7 @@ class PatientApprovalForm extends BaseForm
             'mode' => 'child',
             'child_type' => $type,
             'child_uuid' => $record->uuid,
+            'context_type' => $contextType,
             'context_uuid' => $contextUuid,
             'access_level' => 'read',
             'grant_to_legal_entity' => false,
@@ -214,27 +242,22 @@ class PatientApprovalForm extends BaseForm
             ]);
         }
 
-        $record = ServiceRequestRequest::query()
-            ->where('person_id', $person->id)
-            ->where('uuid', $uuid)
-            ->first();
-
-        if ($record === null) {
-            throw ValidationException::withMessages([
-                'resourceIds' => __('approval.create.select_referral'),
-            ]);
-        }
-
         try {
-            $hasResources = app(PatientApprovalService::class)
-                ->referralHasPermittedResources($person, $record->uuid);
+            $referral = app(PatientApprovalService::class)
+                ->referralDetails($person, $uuid);
         } catch (Throwable) {
             throw ValidationException::withMessages([
                 'resourceIds' => __('approval.create.referral_check_failed'),
             ]);
         }
 
-        if (!$hasResources) {
+        if (($referral['status'] ?? null) !== 'active') {
+            throw ValidationException::withMessages([
+                'resourceIds' => __('approval.create.referral_not_active'),
+            ]);
+        }
+
+        if (empty($referral['permitted_resources'])) {
             throw ValidationException::withMessages([
                 'resourceIds' => __('approval.create.referral_no_resources'),
             ]);
@@ -242,7 +265,7 @@ class PatientApprovalForm extends BaseForm
 
         return [
             'mode' => 'service_request',
-            'service_request_uuid' => $record->uuid,
+            'service_request_uuid' => $uuid,
             'access_level' => 'read',
             'grant_to_legal_entity' => $data['grantToLegalEntity'],
         ];

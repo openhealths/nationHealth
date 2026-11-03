@@ -5,21 +5,16 @@ declare(strict_types=1);
 namespace App\Livewire\Person\Records;
 
 use App\Classes\eHealth\EHealth;
+use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Enums\Person\AuthenticationMethod;
-use App\Enums\Specimen\Status as SpecimenStatus;
-use App\Models\Icd10;
 use App\Enums\Status;
 use App\Enums\User\Role;
-use App\Models\CarePlan;
+use App\Models\Icd10;
 use App\Models\MedicalEvents\Sql\Approval;
-use App\Models\MedicalEvents\Sql\DiagnosticReport;
-use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Episode;
-use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
-use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Employee\Employee;
 use App\Services\MedicalEvents\Fhir;
@@ -29,7 +24,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -51,7 +45,7 @@ class PatientApproval extends Component
     public PatientApprovalForm $form;
 
     #[Locked]
-    public array $referralAvailability = [];
+    public array $remoteReferrals = [];
 
     public string $childType = 'encounter';
     public string $childUuid = '';
@@ -67,6 +61,8 @@ class PatientApproval extends Component
     public string $selectedAuthUuid = '';
     public bool $leafletConfirmed = false;
     public string $verificationCode = '';
+
+    #[Locked]
     public bool $smsResent = false;
 
     #[Locked]
@@ -143,6 +139,43 @@ class PatientApproval extends Component
     public function closePreview(): void
     {
         $this->reset('previewSection', 'previewRows');
+    }
+
+    public function showReferralDetails(string $uuid): void
+    {
+        if ($this->mode !== 'service_request') {
+            return;
+        }
+
+        $referral = ServiceRequestRequest::query()
+            ->where('person_id', $this->personId)
+            ->where('uuid', $uuid)
+            ->first();
+
+        if ($referral === null && !isset($this->remoteReferrals[$uuid])) {
+            return;
+        }
+
+        try {
+            $referralData = app(PatientApprovalService::class)
+                ->referralDetails($this->person(), $uuid);
+            $resources = $referralData['permitted_resources'] ?? [];
+
+            $this->previewRows = collect($resources)
+                ->map(static fn (array $resource): array => [
+                    'code' => data_get($resource, 'identifier.type.coding.0.code'),
+                    'name' => data_get($resource, 'identifier.value'),
+                ])
+                ->all();
+
+            $this->previewTitle = __('approval.create.referral_prefix').' '.(
+                $referral?->requestNumber ?? $this->remoteReferrals[$uuid]['requisition']
+            );
+            $this->previewSection = 'referral';
+            $this->previewCodingSystem = 'all';
+        } catch (Throwable) {
+            $this->addError('resourceIds', __('approval.create.referral_check_failed'));
+        }
     }
 
     private function forbiddenGroupRows(string $section, array $details): array
@@ -263,19 +296,19 @@ class PatientApproval extends Component
 
         $this->closePreview();
         $this->resetValidation();
-        $this->referralAvailability = [];
+        $this->remoteReferrals = [];
         $this->accessLevel = $this->mode === 'resource' && in_array($this->resourceType, ['encounter', 'procedure'], true) ? 'write' : 'read';
 
         if ($this->mode === 'service_request') {
-            $this->loadReferralAvailability();
+            $this->loadReferrals();
         }
     }
 
-    private function loadReferralAvailability(): void // це існує до моменту додавання permitted_resources в ЕН
+    private function loadReferrals(): void
     {
         try {
-            $this->referralAvailability = app(PatientApprovalService::class)
-                ->referralAvailability($this->person());
+            $this->remoteReferrals = app(PatientApprovalService::class)
+                ->patientReferrals($this->person());
         } catch (Throwable) {
             $this->addError('resourceIds', __('approval.create.referral_check_failed'));
         }
@@ -300,35 +333,44 @@ class PatientApproval extends Component
             return;
         }
 
-        $type = $this->recordType();
+        if ($this->mode === 'service_request') {
+            if (!array_key_exists($uuid, $this->remoteReferrals)) {
+                return;
+            }
 
-        if (!isset(PatientApprovalService::RESOURCE_MODELS[$type])) {
+            if (!$this->remoteReferrals[$uuid]['selectable']) {
+                $this->addError('resourceIds', __('approval.create.referral_no_resources'));
+
+                return;
+            }
+
+            $this->resourceIds = ($this->resourceIds[0] ?? null) === $uuid ? [] : [$uuid];
+            $this->resetValidation();
+
             return;
         }
 
-        $record = PatientApprovalService::RESOURCE_MODELS[$type]::query()
-            ->where('person_id', $this->personId)
-            ->where('uuid', $uuid)
-            ->first();
+        $type = $this->recordType();
+        $query = $this->recordsQuery();
+
+        if ($query === null) {
+            return;
+        }
+
+        $record = $query->where('uuid', $uuid)->first();
 
         if ($record === null) {
             return;
         }
 
-        if ($this->mode !== 'service_request' && !PatientApprovalService::approvalStatusAllowed($type, $record->getRawOriginal('status'))) {
+        if ($this->mode !== 'service_request' && (
+            !PatientApprovalService::approvalStatusAllowed($type, $record->getRawOriginal('status'))
+                || ($this->mode === 'child' && $type === 'condition' && $record->getRawOriginal('verification_status') === 'entered_in_error')
+        )
+        ) {
             $this->addError(
                 $this->mode === 'child' ? 'childUuid' : 'resourceIds',
                 $type === 'specimen' ? __('approval.create.specimen_not_available') : __('approval.create.invalid_record_status')
-            );
-
-            return;
-        }
-
-        // !($this->referralAvailability[$uuid] ?? false) переробити після появи permitted_resources в ЕН
-        if ($this->mode === 'service_request' && ($this->resourceIds[0] ?? null) !== $uuid && !($this->referralAvailability[$uuid] ?? false)) {
-            $this->addError(
-                'resourceIds',
-                array_key_exists($uuid, $this->referralAvailability) ? __('approval.create.referral_no_resources') : __('approval.create.referral_check_failed')
             );
 
             return;
@@ -342,10 +384,6 @@ class PatientApproval extends Component
             case 'child':
                 $this->childUuid = $this->childUuid === $uuid ? '' : $uuid;
                 break;
-
-            case 'service_request':
-                $this->resourceIds = ($this->resourceIds[0] ?? null) === $uuid ? [] : [$uuid];
-                break;
         }
 
         $this->resetValidation();
@@ -354,18 +392,25 @@ class PatientApproval extends Component
     #[Computed]
     public function availableRecords(): array
     {
-        $type = $this->recordType();
+        if ($this->mode === 'service_request') {
+            return $this->remoteReferralOptions();
+        }
 
-        if (!isset(PatientApprovalService::RESOURCE_MODELS[$type])) {
+        $type = $this->recordType();
+        $query = $this->recordsQuery();
+
+        if ($query === null) {
             return [];
         }
 
-        $query = PatientApprovalService::RESOURCE_MODELS[$type]::query()
-            ->where('person_id', $this->personId)
-            ->whereNotNull('uuid');
+        $query->whereNotNull('uuid');
 
         if (isset(PatientApprovalService::ALLOWED_STATUSES[$type])) {
             $query->whereIn('status', PatientApprovalService::ALLOWED_STATUSES[$type]);
+        }
+
+        if ($this->mode === 'child' && $type === 'condition') {
+            $query->where('verification_status', '!=', 'entered_in_error');
         }
 
         $this->applySearchFilter($query, $type);
@@ -391,7 +436,8 @@ class PatientApproval extends Component
 
         $matchingCodes = in_array($type, ['encounter', 'specimen'], true)
             ? collect($this->recordTypeNames)
-                ->filter(static fn (string $name, string $code): bool =>
+                ->filter(
+                    static fn (string $name, string $code): bool =>
                     str_contains(mb_strtolower($name), mb_strtolower($search)) || str_contains(mb_strtolower($code), mb_strtolower($search))
                 )
                 ->keys()
@@ -413,6 +459,34 @@ class PatientApproval extends Component
                             ->orWhereLike('value', $like)
                             ->orWhereHas('type.coding', static fn (Builder $coding) => $coding->whereLike('code', $like));
                     });
+                    break;
+
+                case 'condition':
+                case 'observation':
+                case 'clinical_impression':
+                    $query->orWhereHas('code', static function (Builder $code) use ($like): void {
+                        $code->whereLike('text', $like)
+                            ->orWhereHas('coding', static fn (Builder $coding) => $coding->whereLike('code', $like));
+                    });
+                    break;
+
+                case 'immunization':
+                    $query->orWhereHas('vaccineCode', static function (Builder $code) use ($like): void {
+                        $code->whereLike('text', $like)
+                            ->orWhereHas('coding', static fn (Builder $coding) => $coding->whereLike('code', $like));
+                    });
+                    break;
+
+                case 'device':
+                    $query->orWhereHas('type', static function (Builder $type) use ($like): void {
+                        $type->whereLike('text', $like)
+                            ->orWhereHas('coding', static fn (Builder $coding) => $coding->whereLike('code', $like));
+                    });
+                    break;
+
+                case 'activity':
+                    $query->orWhereLike('description', $like)
+                        ->orWhereLike('kind', $like);
                     break;
 
                 case 'encounter':
@@ -443,6 +517,12 @@ class PatientApproval extends Component
     #[Computed]
     public function selectedRecords(): array
     {
+        if ($this->mode === 'service_request') {
+            $uuid = $this->resourceIds[0] ?? null;
+
+            return $uuid !== null && isset($this->remoteReferrals[$uuid]) ? [$this->remoteReferralOption($this->remoteReferrals[$uuid])] : [];
+        }
+
         $type = $this->recordType();
 
         $ids = match ($this->mode) {
@@ -452,19 +532,20 @@ class PatientApproval extends Component
             default => [],
         };
 
-        if ($ids === [] || !isset(PatientApprovalService::RESOURCE_MODELS[$type])) {
+        $query = $this->recordsQuery();
+
+        if ($ids === [] || $query === null) {
             return [];
         }
 
-        return PatientApprovalService::RESOURCE_MODELS[$type]::query()
-            ->where('person_id', $this->personId)
+        return $query
             ->whereIn('uuid', $ids)
             ->with($this->recordRelations($type))
             ->get()
             ->map(fn ($record): array => $this->recordOption($record, $type))
             ->all();
     }
-    
+
     private function recordType(): string
     {
         return match ($this->mode) {
@@ -472,6 +553,21 @@ class PatientApproval extends Component
             'service_request' => 'service_request',
             default => $this->resourceType,
         };
+    }
+
+    private function recordsQuery(): ?Builder
+    {
+        $type = $this->recordType();
+
+        $model = $this->mode === 'child' ? PatientApprovalService::CHILD_MODELS[$type] ?? null : PatientApprovalService::RESOURCE_MODELS[$type] ?? null;
+
+        if ($model === null) {
+            return null;
+        }
+
+        $query = $model::query();
+
+        return $this->mode === 'child' && $type === 'activity' ? $query->whereHas('carePlan', fn (Builder $plan) => $plan->where('person_id', $this->personId)) : $query->where('person_id', $this->personId);
     }
 
     private function recordRelations(string $type): array
@@ -482,6 +578,13 @@ class PatientApproval extends Component
             'encounter' => ['type.coding', 'period'],
             'procedure' => ['code', 'performedPeriod'],
             'specimen' => ['type.coding', 'collection.collectedPeriod'],
+            'service_request' => ['category.coding'],
+            'condition' => ['code.coding', 'context'],
+            'observation' => ['code.coding', 'context', 'diagnosticReport'],
+            'activity' => ['carePlan'],
+            'clinical_impression' => ['code.coding', 'encounter'],
+            'immunization' => ['vaccineCode.coding', 'context'],
+            'device' => ['type.coding', 'context'],
             default => [],
         };
     }
@@ -507,6 +610,10 @@ class PatientApproval extends Component
     private function recordOption($record, string $type): array
     {
         $name = match ($type) {
+            'condition', 'observation', 'clinical_impression' => $record->code?->text ?: $record->code?->coding?->first()?->code,
+            'activity' => $record->description,
+            'immunization' => $record->vaccineCode?->text ?: $record->vaccineCode?->coding?->first()?->code,
+            'device' => $record->type?->text ?: $record->type?->coding?->first()?->code,
             'episode_of_care' => $record->name,
             'diagnostic_report', 'procedure' => $record->code?->displayValue ?: $record->code?->value,
             'encounter', 'specimen' => $this->recordTypeNames[$record->type?->coding?->first()?->code] ?? $record->type?->text ?? $record->type?->coding?->first()?->code,
@@ -536,14 +643,60 @@ class PatientApproval extends Component
             ])->filter()->map(fn ($date) => formatDisplayDate($date))->implode(' — '),
             'specimen' => formatDisplayDate($record->collection?->collectedDateTime ?? $record->collection?->collectedPeriod?->start ?? $record->receivedTime ?? $record->ehealthInsertedAt),
             'service_request' => formatDisplayDate($record->startedAt),
+            'condition' => formatDisplayDate($record->assertedDate ?? $record->onsetDate),
+            'observation' => formatDisplayDate($record->effectiveDateTime ?? $record->issued),
+            'activity' => formatDisplayDate($record->scheduledPeriodStart),
+            'clinical_impression' => formatDisplayDate($record->effectiveDateTime),
+            'immunization' => formatDisplayDate($record->date),
+            'device' => formatDisplayDate($record->ehealthInsertedAt),
         };
+
+        $service = $type === 'service_request' ? dictionary()->services()->flattened()->firstWhere('id', $record->serviceId) : null;
 
         return [
             'uuid' => $record->uuid,
             'name' => $name ?: __('approval.create.'.$type),
             'date' => $date,
-            'selectable' => $type !== 'service_request' || ($this->referralAvailability[$record->uuid] ?? false),
-            'availability_known' => $type !== 'service_request' || array_key_exists($record->uuid, $this->referralAvailability),
+            'status' => $type === 'service_request' ? $record->status : null,
+            'processing_status' => $type === 'service_request' ? $record->programProcessingStatus : null,
+            'category' => $type === 'service_request' ? $record->category?->coding?->first()?->code : null,
+            'service_code' => $service['code'] ?? null,
+            'service_name' => $service['name'] ?? null,
+            'selectable' => $type !== 'service_request' || ($this->remoteReferrals[$record->uuid]['selectable'] ?? false),
+            'availability_known' => $type !== 'service_request' || array_key_exists($record->uuid, $this->remoteReferrals),
+        ];
+    }
+
+    private function remoteReferralOptions(): array
+    {
+        $search = mb_strtolower(trim($this->search));
+
+        return collect($this->remoteReferrals)
+            ->filter(static function (array $referral) use ($search): bool {
+                return $search === '' || str_contains(mb_strtolower($referral['requisition']), $search) || str_contains(mb_strtolower($referral['id']), $search);
+            })
+            ->sortByDesc(static fn (array $referral): bool => $referral['status'] === 'active')
+            ->take(5)
+            ->map(fn (array $referral): array => $this->remoteReferralOption($referral))
+            ->values()
+            ->all();
+    }
+
+    private function remoteReferralOption(array $referral): array
+    {
+        $service = $referral['service_id'] ? dictionary()->services()->flattened()->firstWhere('id', $referral['service_id']) : null;
+
+        return [
+            'uuid' => $referral['id'],
+            'name' => $referral['requisition'],
+            'date' => $referral['authored_on'] ? formatDisplayDate($referral['authored_on']) : '',
+            'status' => $referral['status'],
+            'processing_status' => $referral['program_processing_status'],
+            'category' => $referral['category'],
+            'service_code' => $service['code'] ?? null,
+            'service_name' => $service['name'] ?? null,
+            'selectable' => $referral['selectable'],
+            'availability_known' => true,
         ];
     }
 
@@ -611,6 +764,24 @@ class PatientApproval extends Component
             ]);
         }
 
+        if ($this->mode === 'person' && $method['type'] === AuthenticationMethod::THIRD_PERSON->value) {
+            try {
+                $authMethods = EHealth::person()
+                    ->getAuthMethods($method['value'])
+                    ->validate();
+            } catch (EHealthException|EHealthConnectionException $exception) {
+                $exception->handle('Error when checking confidant authentication methods');
+
+                return;
+            }
+
+            if (!Person::hasActiveOtpAuthenticationMethod($authMethods)) {
+                throw ValidationException::withMessages([
+                    'selectedAuthUuid' => __('approval.create.confidant_requires_otp'),
+                ]);
+            }
+        }
+
         if ($method['type'] === 'OFFLINE' && !$this->leafletConfirmed) {
             throw ValidationException::withMessages([
                 'leafletConfirmed' => __('approval.create.leaflet_required'),
@@ -635,7 +806,7 @@ class PatientApproval extends Component
             );
 
             $this->selectedAuthType = $method['type'];
-            $this->smsPhone = $method['phone_number'] ?? null;
+            $this->smsPhone = $method['phoneNumber'] ?? null;
             $this->approvalId = $result['approval_id'];
             $this->linkId = $result['link_id'];
             $this->reset('smsResent', 'smsResendAvailableAt');
@@ -644,6 +815,16 @@ class PatientApproval extends Component
             if ($this->step === 'confirming') {
                 $this->continueAfterCreation();
             }
+        } catch (EHealthValidationException|EHealthResponseException|EHealthConnectionException) {
+            $this->open = false;
+            $this->step = 'form';
+
+            Session::flash('error', __('approval.create.create_ehealth_failed'));
+
+            $this->redirectRoute('persons.patient-data', [
+                legalEntity(),
+                'person' => $this->personId,
+            ]);
         } catch (Throwable) {
             $this->addError('approvalCreation', __('approval.create.create_failed'));
         }
@@ -681,8 +862,24 @@ class PatientApproval extends Component
     {
         $wasVerifying = $this->step === 'verifying';
         $this->linkId = null;
-        $this->step = $wasVerifying ? ($this->selectedAuthType === 'OFFLINE' ? 'confirming' : 'code') : 'form';
-        $this->addError($this->mode === 'service_request' && !$wasVerifying ? 'resourceIds' : 'approvalCreation', $message);
+
+        if (!$wasVerifying) {
+            $this->approvalId = null;
+            $this->step = 'form';
+            $this->open = false;
+
+            Session::flash('error', __('approval.create.create_ehealth_failed'));
+
+            $this->redirectRoute('persons.patient-data', [
+                legalEntity(),
+                'person' => $this->personId,
+            ]);
+
+            return;
+        }
+
+        $this->step = $this->selectedAuthType === 'OFFLINE' ? 'confirming' : 'code';
+        $this->addError('approvalCreation', $message);
     }
 
     private function handlePollSuccess(array $status): void
@@ -774,7 +971,7 @@ class PatientApproval extends Component
             $this->addError('verificationCode', __('approval.create.verify_processing_failed'));
         }
     }
-    
+
     public function resendSms(): void
     {
         if (Auth::user()->cannot('create', Approval::class)) {
@@ -793,7 +990,8 @@ class PatientApproval extends Component
             $this->smsResent = true;
         } catch (ValidationException $exception) {
             $this->addError('smsResend', $exception->errors()['smsResend'][0] ?? __('approval.create.resend_failed'));
-        } catch (EHealthValidationException|EHealthResponseException $exception) {
+        } catch (EHealthValidationException|EHealthResponseException|EHealthConnectionException $exception) {
+            $this->smsResent = true;
             $this->addError('smsResend', __('approval.create.resend_failed'));
         } catch (Throwable $exception) {
             $this->addError('smsResend', __('approval.create.resend_failed'));
@@ -812,7 +1010,10 @@ class PatientApproval extends Component
 
         Session::flash('success', __('approval.create.verified'));
 
-        $this->dispatch('patient-approvals-changed');
+        $this->redirectRoute('persons.patient-data', [
+            legalEntity(),
+            'person' => $this->personId,
+        ]);
     }
 
     private function person(): Person

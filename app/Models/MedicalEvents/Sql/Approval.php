@@ -43,13 +43,11 @@ class Approval extends Model
         'access_level',
         'is_verified',
         'expires_at',
-        'sms_resent_at',
     ];
 
     protected $casts = [
         'is_verified' => 'boolean',
         'expires_at' => 'datetime',
-        'sms_resent_at' => 'datetime',
     ];
 
     /**

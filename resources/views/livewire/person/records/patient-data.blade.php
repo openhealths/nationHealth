@@ -104,11 +104,11 @@
                 </div>
             </div>
 
-            @livewire(
-                'person.records.patient-approval',
-                ['personId' => $personId],
-                key('patient-approval-'.$personId)
-            )
+            <livewire:person.records.patient-approval
+                :person-id="$personId"
+                :key="'patient-approval-'.$personId"
+                @approval-message="$refresh"
+            />
 
             <button
                 type="button"
@@ -120,6 +120,8 @@
             </button>
         </div>
     </x-slot>
+
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
     @php
         $patientAddresses = collect($form->person['addresses'] ?? []);
