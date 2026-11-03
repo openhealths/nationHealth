@@ -143,18 +143,15 @@
               }
           }"
     x-effect="
-        if (
+        document.body.classList.toggle(
+            'overflow-hidden',
             showConfidantPersonDrawer ||
-            showDeactivateConfidantPersonDrawer ||
-            showDocumentDrawer ||
-            showAuthDrawer ||
-            showSignatureDrawer ||
-            showTerminateModal
-        ) {
-            document.body.classList.add('overflow-hidden');
-        } else {
-            document.body.classList.remove('overflow-hidden');
-        }
+                showDeactivateConfidantPersonDrawer ||
+                showDocumentDrawer ||
+                showAuthDrawer ||
+                showSignatureDrawer ||
+                showTerminateModal,
+        )
     "
 >
     <legend class="legend flex items-baseline gap-2">

@@ -127,4 +127,26 @@ return [
         'to_be_resigned' => 'Потребує переукладання',
         'resigned' => 'Переукладена'
     ],
+
+    'api_errors' => [
+        'third_person_authentication_required' => 'Для цього пацієнта потрібен метод автентифікації через законного представника',
+        'document_issuing_country_not_allowed' => 'Заявку на декларацію не можна створити для пацієнта з документом, виданим у країні :issuing_country',
+        'birth_certificate_required' => 'Пацієнту віком до :years років заявку на декларацію можна створити лише після додавання свідоцтва про народження',
+        'several_active_declarations' => 'Пацієнт має більше однієї активної декларації',
+        'not_active' => 'Декларація не активна',
+        'not_found' => 'Декларацію не знайдено',
+        'cannot_be_empty' => 'Не може бути порожнім',
+        'request_not_approved' => 'Заявка на декларацію має бути підтверджена лікарем',
+        'request_number_not_generated' => 'Не вдалося сформувати номер заявки на декларацію',
+        'speciality_age_mismatch' => 'Лікар цієї спеціальності не може обслуговувати пацієнтів такого віку',
+        'invalid_employee_status' => 'Недопустимий статус працівника',
+        'invalid_person' => 'Недопустимий пацієнт',
+        'legal_entity_not_verified' => 'Юридична особа не верифікована НСЗУ',
+        'patient_signature_required' => 'Необхідно отримати підпис пацієнта під декларацією',
+        'phone_number_missing' => 'Не вказано номер телефону',
+        'person_already_exists' => 'Така особа вже існує',
+        'parent_declaration_of_another_person' => 'Попередня декларація належить іншому пацієнту',
+        'legal_entities_not_in_reorganization' => 'Заклад попередньої декларації і поточний заклад не перебувають у процесі реорганізації',
+        'parent_declaration_employee_mismatch' => 'Лікар попередньої декларації не збігається з поточним лікарем'
+    ]
 ];

@@ -557,7 +557,7 @@ class DeclarationIndex extends Component
             $exception->handle('Error while syncing declaration requests');
 
             return;
-        } catch (Exception $exception) {
+        } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while syncing declaration requests');
 
             return;

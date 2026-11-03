@@ -15,15 +15,12 @@ use App\Models\Declaration;
 use App\Models\Person\Person;
 use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
-use Spatie\Permission\Models\Role;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Queue\SerializesModels;
 use App\Classes\eHealth\EHealthResponse;
 use App\Traits\BatchLegalEntityQueries;
 use GuzzleHttp\Promise\PromiseInterface;
-use App\Models\Relations\ConfidantPerson;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
 use App\Enums\Declaration\Status as DeclarationStatus;
@@ -115,13 +112,15 @@ class DeclarationDetailsSync extends EHealthJob
 
         echo "Person synced: " . $person['id'] . PHP_EOL;
 
-        if (!empty($confidantPerson) && ConfidantPerson::where('person_id', $this->declaration->person_id)->doesntExist()) {
+        if (!empty($confidantPerson)) {
             $confidantPerson['person_id'] = $this->declaration->person->id;
 
             Repository::confidantPerson()->addConfidantPerson($confidantPerson);
 
             echo "Confidant Person for this person has been synced: " . PHP_EOL;
         }
+
+        $validatedData['is_active'] = $validatedData['status'] === DeclarationStatus::ACTIVE->value;
 
         foreach ($validatedData as $key => $value) {
             if (isset($orig[$key]) && $orig[$key] === $value) {
@@ -175,26 +174,5 @@ class DeclarationDetailsSync extends EHealthJob
         return $this->standalone || !$nextEntity
             ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
             : $nextEntity;
-    }
-
-    /**
-     * Determine which authentication guards define the given role.
-     * Checks only the 'web' and 'ehealth' guards.
-     * Queries Spatie\Permission\Models\Role by name and guard_name.
-     * Returns an empty collection if the role is not defined for any of the checked guards.
-     *
-     * @param  string  $role  The role name to check across guards.
-     * @return Collection<int, string> Collection of guard names that have this role defined.
-     */
-    protected function getGuardsForRole(string $role): Collection
-    {
-        $guards = collect(['web', 'ehealth']);
-
-        return $guards->filter(
-            fn ($guard) =>
-                Role::where('name', $role)
-                    ->where('guard_name', $guard)
-                    ->exists()
-        );
     }
 }

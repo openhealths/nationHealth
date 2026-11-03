@@ -6,6 +6,8 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\DeclarationErrorTranslator;
+use App\Contracts\ApiErrorTranslator;
 use App\Enums\Declaration\Status;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -128,7 +130,7 @@ class DeclarationRequest extends Request
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
-    public function getMany(string $url = self::URL, $query = null): PromiseInterface|EHealthResponse
+    public function getMany($query = null): PromiseInterface|EHealthResponse
     {
         $this->setValidator($this->validateMany(...));
 
@@ -139,7 +141,7 @@ class DeclarationRequest extends Request
             $query ?? []
         );
 
-        return parent::get($url, $mergedQuery);
+        return parent::get(self::URL, $mergedQuery);
     }
 
     /**
@@ -155,6 +157,16 @@ class DeclarationRequest extends Request
         $this->setValidator($this->validateOne(...));
 
         return parent::get(self::URL . "/$uuid", $query);
+    }
+
+    /**
+     * Get the translator of the errors the declaration request resource returns.
+     *
+     * @return ApiErrorTranslator
+     */
+    protected function errorTranslator(): ApiErrorTranslator
+    {
+        return new DeclarationErrorTranslator();
     }
 
     /**

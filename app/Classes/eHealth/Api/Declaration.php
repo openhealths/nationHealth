@@ -7,6 +7,8 @@ namespace App\Classes\eHealth\Api;
 use App\Core\Arr;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\DeclarationErrorTranslator;
+use App\Contracts\ApiErrorTranslator;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -59,7 +61,7 @@ class Declaration extends Request
      * Receive detailed information about person Declaration by declaration ID.
      *
      * @param  string  $uuid  Request identifier
-     * @param  $query  Optional query parameters
+     * @param  $query
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
@@ -67,7 +69,17 @@ class Declaration extends Request
     {
         $this->setValidator($this->validateOne(...));
 
-        return parent::get(self::URL . "/$uuid", $query);
+        return $this->get(self::URL . "/$uuid", $query);
+    }
+
+    /**
+     * Get the translator of the errors the declaration resource returns.
+     *
+     * @return ApiErrorTranslator
+     */
+    protected function errorTranslator(): ApiErrorTranslator
+    {
+        return new DeclarationErrorTranslator();
     }
 
     /**

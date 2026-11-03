@@ -17,27 +17,22 @@ use Illuminate\Support\Collection;
 
 class ConfidantPersonRepository
 {
+    /**
+     * Link the confidant persons listed in the declaration to the subject person.
+     * The declaration data has no identifier of a confidant, so only a person already recorded here is linked;
+     * one that is not is left to the confidant person relationships sync. A person is matched by name and birth
+     * date together with the tax ID, or, when there is none, the UNZR or an identity document number.
+     *
+     * @param  array  $data
+     * @return void
+     */
     public function addConfidantPerson(array $data): void
     {
         $personId = Arr::pull($data, 'person_id');
 
-        $personsData = [];
-
-        foreach ($data as $key => $value) {
-            $personsData[] = ['person' => $value];
-        }
-
-        foreach ($personsData as $data) {
-            $personData = $data['person'];
-
-            // $preferredWayCommunication = Arr::pull($personData, 'preferred_way_communication', null);
-            $documentsPerson = Arr::pull($personData, 'documents_person', null);
-            $documentsRelationship = Arr::pull($personData, 'documents_relationship', null);
-            $phones = Arr::pull($personData, 'phones', []);
+        foreach ($data as $personData) {
+            $documentsRelationship = Arr::pull($personData, 'documents_relationship');
             $names = Arr::pull($personData, 'names', []);
-            // $relationType = Arr::pull($personData, 'relation_type', null);
-
-            unset($personData['relation_type'], $personData['preferred_way_communication']);
 
             if (empty($names)) {
                 $names = [[
@@ -48,8 +43,6 @@ class ConfidantPersonRepository
                 ]];
             }
 
-            unset($personData['first_name'], $personData['last_name'], $personData['second_name']);
-
             $primaryName = collect($names)->firstWhere('language', 'uk') ?? ($names[0] ?? []);
 
             $query = Person::whereHas('names', static function (Builder $query) use ($primaryName): void {
@@ -58,35 +51,35 @@ class ConfidantPersonRepository
                     ->where('last_name', $primaryName['last_name'] ?? null);
             })->where('birth_date', $personData['birth_date']);
 
+            $documentNumbers = array_filter(array_column($personData['documents_person'] ?? [], 'number'));
+
             if (!empty($personData['tax_id'])) {
                 $query->where('tax_id', $personData['tax_id']);
+            } elseif (!empty($personData['unzr']) || $documentNumbers !== []) {
+                // Without a tax ID a namesake born on the same day is told apart by the UNZR or an identity document
+                $query->where(static function (Builder $query) use ($personData, $documentNumbers): void {
+                    if (!empty($personData['unzr'])) {
+                        $query->where('unzr', $personData['unzr']);
+                    }
+
+                    if ($documentNumbers !== []) {
+                        $query->orWhereHas(
+                            'documents',
+                            static fn (Builder $query): Builder => $query->whereIn('number', $documentNumbers)
+                        );
+                    }
+                });
             }
 
             $person = $query->first();
 
-            if (empty($person)) {
-                $person = Person::forceCreate($personData);
-
-                $person->names()->createMany($names);
-
-                Repository::declarationRequest()->syncRelatedData(
-                    $person,
-                    'documents',
-                    $documentsPerson,
-                    Document::class
-                );
-
-                if (!empty($phones)) {
-                    Repository::declarationRequest()->syncRelatedData($person, 'phones', $phones, Phone::class);
-                }
+            if ($person === null) {
+                continue;
             }
 
             $confidantPerson = ConfidantPerson::updateOrCreate(
-                ['person_id' => $person->id],
-                [
-                    'subject_person_id' => $personId,
-                    'sync_status' => JobStatus::PARTIAL->value
-                ]
+                ['person_id' => $person->id, 'subject_person_id' => $personId],
+                ['sync_status' => JobStatus::PARTIAL->value]
             );
 
             if (!empty($documentsRelationship)) {

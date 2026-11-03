@@ -173,7 +173,7 @@ class DeclarationRequestRepository
      * @param  array  $personData
      * @return bool
      */
-    protected function syncPersonNames(Person $person, array $personData): bool
+    public function syncPersonNames(Person $person, array $personData): bool
     {
         $incoming = [
             'language' => 'uk',
