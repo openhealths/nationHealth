@@ -27,6 +27,7 @@ use GuzzleHttp\Psr7\Response as PsrResponse;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -160,6 +161,19 @@ class OwnerReplacementSessionTest extends TestCase
         $this->assertDatabaseMissing('sessions', ['id' => $sessionId]);
         $this->assertFalse(app(TokenStorage::class)->hasBearerToken());
         Event::assertDispatched(LegalEntityCreate::class, fn ($event) => $event->authenticatedUser->is($oldUser) && $event->owner->is($newUser));
+
+        $this->withoutVite();
+        $loginPage = <<<'BLADE'
+            @extends('layouts.guest')
+            @section('content')
+                <livewire:components.x-message />
+            @endsection
+            BLADE;
+        $html = Blade::render($loginPage);
+
+        $this->assertSame(1, substr_count($html, e(__('forms.replace_successful'))));
+        $this->assertFalse(session()->has('success'));
+        $this->assertStringNotContainsString(e(__('forms.replace_successful')), Blade::render($loginPage));
     }
 
     private function fixture(string $scenario): array

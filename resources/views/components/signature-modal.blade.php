@@ -153,14 +153,16 @@
                                 {{-- Password --}}
                                 <div>
                                     <label for="password" class="default-label">{{ __('forms.password') }} *</label>
-                                    <input
-                                        type="password"
-                                        wire:model="form.password"
-                                        class="default-input"
-                                        id="password"
-                                        name="password"
-                                        autocomplete="current-password"
-                                    />
+                                    <x-password-field>
+                                        <input
+                                            type="password"
+                                            wire:model="form.password"
+                                            class="default-input"
+                                            id="password"
+                                            name="password"
+                                            autocomplete="current-password"
+                                        />
+                                    </x-password-field>
 
                                     @error('form.password')
                                     <p class="text-error">{{ $message }}</p>

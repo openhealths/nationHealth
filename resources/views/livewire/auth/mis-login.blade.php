@@ -50,26 +50,28 @@
                     x-show="!isFirstLogin"
                     x-cloak
                 >
-                    <input
-                        wire:model="password"
-                        :required="!isFirstLogin"
-                        type="password"
-                        placeholder=" "
-                        autocomplete="off"
-                        id="password"
-                        aria-describedby="@error('password') passwordErrorHelp @enderror"
-                        class="input @error('password') input-error border-red-500 focus:border-red-500 @enderror peer"
-                    />
+                    <x-password-field>
+                        <input
+                            wire:model="password"
+                            :required="!isFirstLogin"
+                            type="password"
+                            placeholder=" "
+                            autocomplete="off"
+                            id="password"
+                            aria-describedby="@error('password') passwordErrorHelp @enderror"
+                            class="input @error('password') input-error border-red-500 focus:border-red-500 @enderror peer"
+                        />
 
-                    @error('password')
-                        <p id="passwordErrorHelp" class="text-error">
-                            {{ $message }}
-                        </p>
-                    @enderror
+                        @error('password')
+                            <p id="passwordErrorHelp" class="text-error">
+                                {{ $message }}
+                            </p>
+                        @enderror
 
-                    <label for="password" class="label z-10">
-                        {{ __('forms.password') }}
-                    </label>
+                        <label for="password" class="label z-10">
+                            {{ __('forms.password') }}
+                        </label>
+                    </x-password-field>
                 </div>
 
                 <div class="flex items-center justify-end mt-4">

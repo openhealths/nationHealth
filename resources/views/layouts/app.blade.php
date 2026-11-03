@@ -50,7 +50,7 @@
             @stack('modals')
             @stack('scripts')
 
-            @livewire('components.flash-message')
+            @livewire('components.x-message', ['listenAsync' => true])
 
             @vite(['resources/js/index.js', 'resources/js/app.js'])
 
