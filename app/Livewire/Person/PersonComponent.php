@@ -779,7 +779,7 @@ class PersonComponent extends Component
         }
 
         try {
-            if (!$this->approvePersonRequest(['verification_code' => $validated['verificationCode']])) {
+            if (!$this->approvePersonRequest(['verification_code' => (int) $validated['verificationCode']])) {
                 return;
             }
 

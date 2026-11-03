@@ -201,6 +201,10 @@ class EmployeeRequestProcessor
                 $employee = Employee::find($request->employeeId);
             }
 
+            if ($employee && !Repository::employee()->requestMatchesEmployee($request, $employee)) {
+                throw new \RuntimeException('Cannot apply employee request to a different employee or position.');
+            }
+
             $isNew = false;
             if (!$employee) {
                 $isNew = true;
@@ -265,9 +269,15 @@ class EmployeeRequestProcessor
             }
 
             // 9. Update Details (Party, Documents, Phones...)
+            $partyData = $mappedLocalData['party'];
+            if (!$isNew && $employee->partyId) {
+                // A revision UUID may predate a confirmed canonical-party relink.
+                unset($partyData['uuid']);
+            }
+
             Repository::employee()->updateDetails(
                 $employee,
-                $mappedLocalData['party'],
+                $partyData,
                 $mappedLocalData['documents'],
                 $mappedLocalData['phones'],
                 $mappedLocalData['educations'] ?? null,

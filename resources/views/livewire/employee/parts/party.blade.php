@@ -98,7 +98,7 @@
                     type="number"
                     id="workingExperience"
                     name="workingExperience"
-                    min="1"
+                    min="0"
                     step="1"
                     placeholder=" "
                     class="peer input text-gray-500 @error('form.party.workingExperience') input-error @enderror"

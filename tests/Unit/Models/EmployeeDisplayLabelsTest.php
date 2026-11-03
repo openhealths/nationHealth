@@ -33,12 +33,24 @@ class EmployeeDisplayLabelsTest extends TestCase
         Cache::forever(BasicDictionary::KEY.':fresh', true);
         $employee = new Employee(['position' => 'P6', 'employee_type' => 'DOCTOR']);
         $employee->setRelation('specialities', new Collection([
-            new Speciality(['speciality' => 'FAMILY_DOCTOR']),
-            new Speciality(['speciality' => 'OBSTETRICS_AND_GYNECOLOGY']),
-            new Speciality(['speciality' => 'UNKNOWN_CODE']),
+            new Speciality(['speciality' => 'FAMILY_DOCTOR', 'speciality_officio' => true]),
+            new Speciality(['speciality' => 'OBSTETRICS_AND_GYNECOLOGY', 'speciality_officio' => false]),
+            new Speciality(['speciality' => 'UNKNOWN_CODE', 'speciality_officio' => true]),
         ]));
 
         $this->assertSame('Лікар-акушер-гінеколог', $employee->positionLabel());
-        $this->assertSame(['Загальна практика — сімейна медицина', 'Акушерство та гінекологія'], $employee->specialityLabels());
+        $this->assertSame(['Загальна практика — сімейна медицина'], $employee->specialityLabels());
+        $this->assertCount(3, $employee->specialities);
+    }
+
+    public function test_additional_person_qualifications_are_not_used_as_position_labels_when_no_primary_exists(): void
+    {
+        $employee = new Employee();
+        $employee->setRelation('specialities', new Collection([
+            new Speciality(['speciality' => 'NURSING', 'speciality_officio' => false]),
+        ]));
+
+        $this->assertSame([], $employee->specialityLabels());
+        $this->assertCount(1, $employee->specialities);
     }
 }

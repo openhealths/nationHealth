@@ -46,4 +46,22 @@ class BasicDictionaryCollectionTest extends TestCase
 
         $basics->byName('eHealth/MEDICATION_REQUEST_REJECT_REASON');
     }
+    #[Test]
+    public function formatted_labels_include_retired_values_only_when_explicitly_requested(): void
+    {
+        $basics = new BasicDictionaryCollection([[
+            'name' => 'SCIENCE_DEGREE',
+            'values' => [
+                ['code' => 'PHD', 'description' => 'PhD', 'is_active' => true],
+                ['code' => 'RETIRED', 'description' => 'Історичний ступінь', 'is_active' => false],
+            ],
+        ]]);
+
+        $this->assertSame(['PHD' => 'PhD'], $basics->getMultipleFormatted(['SCIENCE_DEGREE'])->toArray()['SCIENCE_DEGREE']);
+        $this->assertSame(
+            ['PHD' => 'PhD', 'RETIRED' => 'Історичний ступінь'],
+            $basics->getMultipleFormatted(['SCIENCE_DEGREE'], onlyActive: false)->toArray()['SCIENCE_DEGREE']
+        );
+    }
+
 }

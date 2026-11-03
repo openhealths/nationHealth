@@ -27,12 +27,13 @@ class Employee extends EHealthRequest
      *
      * @param  array  $filters  An associative array of query parameters to filter the results.
      * @param  int  $page  The page number to fetch.
+     * @param  bool  $withIdentity  Retain division and tax identity for request matching, not bulk persistence.
      * @return PromiseInterface|EHealthResponse The EHealthResponse object containing the validated and transformed data.
      * @throws EHealthConnectionException
      */
-    public function getMany(array $filters, int $page = 1): PromiseInterface|EHealthResponse
+    public function getMany(array $filters, int $page = 1, bool $withIdentity = false): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateMany(...));
+        $this->setValidator(fn (EHealthResponse $response): array => $this->validateMany($response, $withIdentity));
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge(
@@ -83,14 +84,14 @@ class Employee extends EHealthRequest
      * @param  EHealthResponse  $response  The response from the eHealth API.
      * @return array The validated and transformed data.
      */
-    protected function validateMany(EHealthResponse $response): array
+    protected function validateMany(EHealthResponse $response, bool $withIdentity = false): array
     {
         $transformedData = [];
         foreach ($response->getData() as $item) {
             $transformedData[] = self::replaceEHealthPropNames($item);
         }
 
-        $validator = Validator::make($transformedData, [
+        $rules = [
             '*' => 'required|array',
             '*.uuid' => 'required|uuid',
             '*.status' => 'required|string',
@@ -113,7 +114,18 @@ class Employee extends EHealthRequest
             '*.doctor.specialities.*.attestation_name' => 'required_with:*.doctor|string',
             '*.doctor.specialities.*.certificate_number' => 'required_with:*.doctor|string',
             '*.doctor.specialities.*.level' => 'string',
-        ]);
+        ];
+
+        if ($withIdentity) {
+            $rules += [
+                '*.division' => 'sometimes|nullable|array',
+                '*.division.uuid' => 'sometimes|uuid',
+                '*.division_id' => 'sometimes|nullable|uuid',
+                '*.party.tax_id' => 'sometimes|nullable|string',
+            ];
+        }
+
+        $validator = Validator::make($transformedData, $rules);
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error(

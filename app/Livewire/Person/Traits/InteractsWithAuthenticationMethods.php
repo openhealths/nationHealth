@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Person\Traits;
 
 use App\Classes\eHealth\EHealth;
-use App\Core\Arr;
 use App\Enums\Person\AuthenticationMethod;
 use App\Enums\Person\AuthenticationMethodAction;
 use App\Enums\Person\AuthStep;
@@ -424,7 +423,7 @@ trait InteractsWithAuthenticationMethods
         }
 
         try {
-            EHealth::verification()->complete($this->form->phoneNumber, $validated);
+            EHealth::verification()->complete($this->form->phoneNumber, ['code' => (int) $validated['code']]);
             $this->authStep = AuthStep::COMPLETE_VERIFICATION;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when complete OTP verification request');
@@ -451,7 +450,7 @@ trait InteractsWithAuthenticationMethods
 
         $validated = Validator::make(
             ['newPhoneNumber' => $phoneNumber],
-            ['newPhoneNumber' => 'required', new PhoneNumber()]
+            ['newPhoneNumber' => ['required', new PhoneNumber()]]
         )->validate();
 
         try {
@@ -486,7 +485,11 @@ trait InteractsWithAuthenticationMethods
         $validated = $this->validate(['verificationCode' => ['required', 'digits:4']]);
 
         try {
-            EHealth::person()->approveAuthMethod($this->uuid, $this->requestId, Arr::toSnakeCase($validated));
+            EHealth::person()->approveAuthMethod(
+                $this->uuid,
+                $this->requestId,
+                ['verification_code' => (int) $validated['verificationCode']]
+            );
 
             try {
                 $person = Person::whereUuid($this->uuid)->firstOrFail();
@@ -627,7 +630,11 @@ trait InteractsWithAuthenticationMethods
                 EHealth::person()->approveAuthMethod($this->uuid, $this->requestId);
             } else {
                 $validated = $this->validate(['verificationCode' => ['required', 'digits:4']]);
-                EHealth::person()->approveAuthMethod($this->uuid, $this->requestId, Arr::toSnakeCase($validated));
+                EHealth::person()->approveAuthMethod(
+                    $this->uuid,
+                    $this->requestId,
+                    ['verification_code' => (int) $validated['verificationCode']]
+                );
             }
 
             try {
@@ -737,7 +744,11 @@ trait InteractsWithAuthenticationMethods
         }
 
         try {
-            EHealth::person()->approveAuthMethod($this->uuid, $this->requestId, Arr::toSnakeCase($validated));
+            EHealth::person()->approveAuthMethod(
+                $this->uuid,
+                $this->requestId,
+                ['verification_code' => (int) $validated['verificationCode']]
+            );
 
             try {
                 AuthenticationMethodModel::whereUuid($this->selectedAuthMethodUuid)->delete();
@@ -768,7 +779,11 @@ trait InteractsWithAuthenticationMethods
         $validated = $this->validate(['verificationCode' => ['required', 'digits:4']]);
 
         try {
-            EHealth::person()->approveAuthMethod($this->uuid, $this->requestId, Arr::toSnakeCase($validated));
+            EHealth::person()->approveAuthMethod(
+                $this->uuid,
+                $this->requestId,
+                ['verification_code' => (int) $validated['verificationCode']]
+            );
 
             $forCreate = [
                 'type' => AuthenticationMethod::THIRD_PERSON,

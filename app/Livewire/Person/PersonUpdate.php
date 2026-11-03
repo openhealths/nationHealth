@@ -57,7 +57,7 @@ class PersonUpdate extends PersonComponent
      *
      * @var int
      */
-    public int $code;
+    public string $code = '';
 
     /**
      * Phone number that person will be used instead of old one.
@@ -69,9 +69,9 @@ class PersonUpdate extends PersonComponent
     /**
      * Code for approving phone number.
      *
-     * @var int
+     * @var string
      */
-    public int $verificationCode;
+    public string $verificationCode = '';
 
     /**
      * ID that needed for approving auth method.
@@ -100,7 +100,7 @@ class PersonUpdate extends PersonComponent
      *
      * @var string
      */
-    public string $alias;
+    public string $alias = '';
 
     public string $confidantPersonRelationshipRequestId;
 

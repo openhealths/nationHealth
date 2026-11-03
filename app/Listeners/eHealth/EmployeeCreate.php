@@ -35,7 +35,7 @@ class EmployeeCreate
     {
         $user = $event->user;
 
-        $employeeRequests = EmployeeRequest::with('revision')
+        $employeeRequests = EmployeeRequest::with(['revision', 'employee', 'division'])
             ->where('email', $user->email)
             // Same email can exist across legal entities — never mix foreign LE revisions into this login.
             ->where('legal_entity_id', $event->legalEntity->id)
@@ -371,7 +371,8 @@ class EmployeeCreate
                     [
                         'legal_entity_id' => $legalEntityUuid,
                         'tax_id' => $taxId,
-                    ]
+                    ],
+                    withIdentity: true
                 )->validate();
             } catch (Throwable $e) {
                 Log::error('[EmployeeCreate] Failed to fetch employees from eHealth.', [
@@ -420,9 +421,23 @@ class EmployeeCreate
                 )
             )
             ->where('position', $employee['position'])
-            ->where('employee_type', $employee['employee_type']);
+            ->where('employee_type', $employee['employee_type'])
+            ->filter(function (EmployeeRequest $request) use ($employee): bool {
+                $employeeUuid = data_get($request->revision?->data, 'employee_uuid');
+                if (filled($employeeUuid) && $employeeUuid !== ($employee['uuid'] ?? null)) {
+                    return false;
+                }
 
-        return $candidates
+                if (!$request->employeeId && blank($employeeUuid)
+                    && ($request->division?->uuid ?? $request->divisionUuid) !== EmployeeRequestMatcher::remoteDivisionUuid($employee)) {
+                    return false;
+                }
+
+                return !$request->employeeId
+                    || Repository::employee()->employeeForRequest($request)?->uuid === ($employee['uuid'] ?? null);
+            });
+
+        $matches = $candidates
             ->filter(function (EmployeeRequest $employeeRequest) use ($employee) {
                 $party = $employeeRequest->revision->data['party'];
                 $namesMatch = $party['first_name'] === $employee['party']['first_name']
@@ -487,8 +502,11 @@ class EmployeeCreate
 
                 return $namesMatch && $datesMatch;
             })
-            // Prefer the newest matching request when several exist for the same employee.
-            ->sortByDesc(fn (EmployeeRequest $request) => [$request->created_at?->timestamp ?? 0, $request->id])
-            ->first();
+            ->sortByDesc(fn (EmployeeRequest $request) => [$request->created_at?->timestamp ?? 0, $request->id]);
+
+        $linked = $matches->first(fn (EmployeeRequest $request): bool => filled($request->employeeId)
+            || filled(data_get($request->revision?->data, 'employee_uuid')));
+
+        return $linked ?? ($matches->count() === 1 ? $matches->first() : null);
     }
 }

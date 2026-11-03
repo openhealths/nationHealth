@@ -10,6 +10,7 @@ use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
 use App\Repositories\Repository;
 use Illuminate\View\View;
+use Illuminate\Validation\ValidationException;
 
 #[AllowDynamicProperties]
 class EmployeeRequestEdit extends AbstractEmployeeFormManager
@@ -58,6 +59,10 @@ class EmployeeRequestEdit extends AbstractEmployeeFormManager
 
     protected function handleDraftPersistence(): EmployeeRequest
     {
+        if ($this->employeeRequest->employeeId && !Repository::employee()->employeeForRequest($this->employeeRequest)) {
+            throw ValidationException::withMessages(['employeeRequestId' => __('employees.request_employee_mismatch')]);
+        }
+
         $isAdditionalPosition = !$this->employeeRequest->employeeId
             && $this->employeeRequest->partyId
             && Repository::employee()->hasPartyInLegalEntity($this->employeeRequest->partyId, legalEntity()->id);

@@ -85,7 +85,7 @@ class PersonForm extends BaseForm
 
     public ?string $authorizeWith = null;
 
-    public int $verificationCode;
+    public string $verificationCode = '';
 
     public array $uploadedDocuments = [];
 

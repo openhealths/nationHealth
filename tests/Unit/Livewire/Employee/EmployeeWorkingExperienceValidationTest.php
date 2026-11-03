@@ -40,20 +40,20 @@ class EmployeeWorkingExperienceValidationTest extends TestCase
         $this->assertFalse($validator->fails());
     }
 
-    public function test_working_experience_rejects_zero(): void
+    public function test_working_experience_accepts_zero(): void
     {
         $validator = Validator::make(
             ['party' => ['workingExperience' => 0]],
             $this->workingExperienceRules()
         );
 
-        $this->assertTrue($validator->fails());
+        $this->assertFalse($validator->fails());
     }
 
     public function test_working_experience_rejects_negative_values(): void
     {
         $validator = Validator::make(
-            ['party' => ['workingExperience' => -3]],
+            ['party' => ['workingExperience' => -1]],
             $this->workingExperienceRules()
         );
 

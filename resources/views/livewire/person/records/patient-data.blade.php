@@ -104,11 +104,11 @@
                 </div>
             </div>
 
-            @livewire(
-                'person.records.patient-approval',
-                ['personId' => $personId],
-                key('patient-approval-'.$personId)
-            )
+            <livewire:person.records.patient-approval
+                :person-id="$personId"
+                :key="'patient-approval-'.$personId"
+                @approval-message="$refresh"
+            />
 
             <button
                 type="button"
@@ -120,6 +120,8 @@
             </button>
         </div>
     </x-slot>
+
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
     @php
         $patientAddresses = collect($form->person['addresses'] ?? []);
@@ -289,7 +291,9 @@
                                     type="button"
                                     class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800"
                                     style="margin: 0 !important"
-                                    wire:click.once="syncPersonDataFromEHealth()"
+                                    wire:click="syncPersonDataFromEHealth()"
+                                    wire:loading.attr="disabled"
+                                    wire:target="syncPersonDataFromEHealth"
                                 >
                                     @icon('refresh', 'w-4 h-4')
                                     <span>{{ $isSyncing ? __('forms.sync_retry') : __('patients.sync_personal_data') }}</span>
@@ -574,7 +578,9 @@
                                         type="button"
                                         class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800"
                                         style="margin: 0 !important"
-                                        wire:click.once="syncPersonDataFromEHealth()"
+                                        wire:click="syncPersonDataFromEHealth()"
+                                        wire:loading.attr="disabled"
+                                        wire:target="syncPersonDataFromEHealth"
                                     >
                                         @icon('refresh', 'w-4 h-4')
                                         <span>{{ $isSyncing ? __('forms.sync_retry') : __('patients.sync_personal_data') }}</span>
@@ -691,7 +697,9 @@
                                         type="button"
                                         class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800"
                                         style="margin: 0 !important"
-                                        wire:click.once="syncPersonDataFromEHealth()"
+                                        wire:click="syncPersonDataFromEHealth()"
+                                        wire:loading.attr="disabled"
+                                        wire:target="syncPersonDataFromEHealth"
                                     >
                                         @icon('refresh', 'w-4 h-4')
                                         <span>{{ $isSyncing ? __('forms.sync_retry') : __('patients.sync_personal_data') }}</span>

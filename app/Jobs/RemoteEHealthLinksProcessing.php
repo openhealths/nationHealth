@@ -358,7 +358,7 @@ class RemoteEHealthLinksProcessing extends EHealthJob
         }
 
         if ($status === 'processed' && in_array((int) $statusCode, [200, 201], true)) {
-            if ($this->eHealthLink->linkable_type === Approval::class) {
+            if ($this->eHealthLink->linkableType === Approval::class) {
                 $approvalData = \App\Classes\eHealth\Api\Approval::validateResourceData($responseData);
                 Repository::approval()->completeCarePlanRequest($this->eHealthLink, $approvalData);
                 $approval = $this->eHealthLink->fresh()->linkable;
@@ -381,7 +381,7 @@ class RemoteEHealthLinksProcessing extends EHealthJob
 
             return;
         } elseif (strtolower($status) === strtolower(JobStatus::FAILED->value)) {
-            if ($this->eHealthLink->linkable_type === Approval::class) {
+            if ($this->eHealthLink->linkableType === Approval::class) {
                 $this->eHealthLink->linkable->update(['status' => JobStatus::FAILED->value]);
             }
 
@@ -403,6 +403,14 @@ class RemoteEHealthLinksProcessing extends EHealthJob
         }
 
         // Send notification to the user about the failed request but job will not be retried, so we don't need to release it back to the queue
+        if ($this->eHealthLink->linkableType === Approval::class) {
+            $message = __('patients.errors.approval_not_created').' '.(new EHealthValidationException($responseData))->getFormattedMessage();
+
+            $this->user->notify(new RemoteEHealthLinksNotification($message, 'error'));
+
+            return;
+        }
+
         $this->user->notify(new RemoteEHealthLinksNotification(__('EhealthLink: система eHealth відхилила запит'), (string)$statusCode));
     }
 

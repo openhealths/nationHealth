@@ -1,42 +1,42 @@
 @use('App\Enums\Person\AuthStep')
 
-<div>
-    <div x-data="{
-        timer: 60,
-        init() {
-            setInterval(() => { if(this.timer > 0) this.timer-- }, 1000)
-        },
-        resetTimer() {
-            if(this.timer === 0) {
-                this.timer = 60;
-                $wire.resendCode();
-            }
-        }
-    }"
+<div x-init="$wire.set('form.verificationCode', '', false)">
+    <div
+        x-data="{
+            timer: 60,
+            init() {
+                setInterval(() => {
+                    if (this.timer > 0) this.timer--;
+                }, 1000);
+            },
+            resetTimer() {
+                if (this.timer === 0) {
+                    this.timer = 60;
+                    $wire.resendCode();
+                }
+            },
+        }"
     >
         <legend class="legend mt-6">{{ __('forms.confirmation_code_from_SMS') }}</legend>
 
         <div class="form-row-3 mt-4">
             <div class="form-group group">
-                <input type="text"
-                       wire:model="form.verificationCode"
-                       inputmode="numeric"
-                       name="verificationCode"
-                       id="verificationCode"
-                       class="peer input"
-                       placeholder=" "
-                       autocomplete="off"
+                <input
+                    type="text"
+                    wire:model="form.verificationCode"
+                    inputmode="numeric"
+                    name="verificationCode"
+                    id="verificationCode"
+                    class="peer input"
+                    placeholder=" "
+                    autocomplete="off"
+                    maxlength="4"
+                    x-mask="9999"
                 />
-                <label for="verificationCode" class="label">
-                    {{ __('patients.code_sms') }}
-                </label>
+                <label for="verificationCode" class="label"> {{ __('patients.code_sms') }} </label>
             </div>
 
-            <button type="button"
-                    @click="resetTimer()"
-                    :disabled="timer > 0"
-                    class="button-minor"
-            >
+            <button type="button" @click="resetTimer()" :disabled="timer > 0" class="button-minor">
                 @icon('mail', 'w-4 h-4 mr-2')
                 <span>{{ __('forms.send_again') }}</span>
                 <template x-if="timer > 0">

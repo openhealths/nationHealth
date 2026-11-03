@@ -78,8 +78,11 @@ class PatientApprovalService
         return !isset(self::ALLOWED_STATUSES[$type]) || in_array($status, self::ALLOWED_STATUSES[$type], true);
     }
 
-    // прибрати після додавання permitted_resources в ЕН
-    /** @return array<string, bool> */
+    /**
+     * Returns patient referrals from eHealth, indexed by their UUID, with availability for approval.
+     *
+     * @return array<string, array<string, mixed>>
+     */
     public function patientReferrals(Person $person): array
     {
         $referrals = [];
@@ -130,19 +133,16 @@ class PatientApprovalService
             ->toArray();
     }
 
-    //повністю видалити/замінити після додавання permitted_resources в ЕН
-    public function referralHasPermittedResources(Person $person, string $uuid, bool $requireActive = false): array
+    /**
+     * Returns referral details from eHealth, including its permitted resources.
+     *
+     * @return array<string, mixed>
+     */
+    public function referralDetails(Person $person, string $uuid): array
     {
-        $response = EHealth::serviceRequest()->getById($person->uuid, $uuid);
-        $referral = $response->getData();
-
-        if ($requireActive && ($referral['status'] ?? null) !== 'active') {
-            throw ValidationException::withMessages([
-                'resourceIds' => __('approval.create.referral_not_active'),
-            ]);
-        }
-
-        return $referral['permitted_resources'] ?? [];
+        return EHealth::serviceRequest()
+            ->getById($person->uuid, $uuid)
+            ->getData();
     }
 
     /** @return array{approval_id: ?string, link_id: ?int} */
@@ -358,48 +358,16 @@ class PatientApprovalService
             ]);
         }
 
-        if ($approval->smsResentAt !== null) {
-            throw ValidationException::withMessages([
-                'smsResend' => __('approval.create.resend_limit'),
-            ]);
-        }
-
         if (now()->timestamp < $this->smsResendTimestamp($approval)) {
             throw ValidationException::withMessages([
                 'smsResend' => __('approval.create.resend_too_early'),
             ]);
         }
 
-        $reservedAt = now()->startOfSecond();
+        $response = EHealth::approval()->resendSms($person->uuid, $approvalId);
 
-        $reserved = Approval::query()
-            ->whereKey($approval->id)
-            ->where('is_verified', false)
-            ->whereNull('sms_resent_at')
-            ->where('updated_at', '<=', $reservedAt->copy()->subMinute())
-            ->toBase()
-            ->update([
-                'sms_resent_at' => $reservedAt,
-            ]);
-
-        if ($reserved !== 1) {
-            throw ValidationException::withMessages([
-                'smsResend' => __('approval.create.resend_failed'),
-            ]);
-        }
-
-        try {
-            EHealth::approval()->resendSms($person->uuid, $approvalId);
-        } catch (EHealthValidationException|EHealthResponseException) {
-            Approval::query()
-                ->whereKey($approval->id)
-                ->where('sms_resent_at', $reservedAt)
-                ->toBase()
-                ->update(['sms_resent_at' => null]);
-
-            throw ValidationException::withMessages([
-                'smsResend' => __('approval.create.resend_failed'),
-            ]);
+        if (!$response->successful()) {
+            throw new EHealthResponseException($response);
         }
     }
 }

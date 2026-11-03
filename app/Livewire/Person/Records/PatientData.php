@@ -13,7 +13,6 @@ use App\Enums\Status;
 use App\Traits\FormTrait;
 use App\Traits\HasApproval;
 use App\Models\Person\Person;
-use App\Models\Relations\ConfidantPerson;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Computed;
@@ -22,15 +21,17 @@ use App\Classes\eHealth\EHealth;
 use App\Repositories\Repository;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Contracts\View\View;
+use App\Enums\Person\ApprovalStatus;
 use Illuminate\Support\Facades\Http;
-use App\Traits\BatchLegalEntityQueries;
 use Illuminate\Support\Facades\Session;
+use App\Models\Relations\ConfidantPerson;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Enums\Person\AuthenticationMethod;
 use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Validation\ValidationException;
 use App\Livewire\Person\Forms\PersonForm as Form;
 use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\MedicalEvents\ApprovalVerificationException;
 use App\Repositories\MedicalEvents\Repository as MERepository;
 use App\Livewire\Person\Traits\InteractsWithAuthenticationMethods;
 use App\Livewire\Person\Traits\InteractsWithEmergencyContact;
@@ -43,7 +44,6 @@ class PatientData extends BasePatientComponent
     use InteractsWithEmergencyContact;
     use ManagesConfidantPersonRelationships;
     use WithFileUploads;
-    use BatchLegalEntityQueries;
     use HasApproval;
 
     public Form $form;
@@ -88,11 +88,11 @@ class PatientData extends BasePatientComponent
 
     public ?string $phoneNumber = null;
 
-    public int $code;
+    public string $code = '';
 
     public string $newPhoneNumber;
 
-    public int $verificationCode;
+    public string $verificationCode = '';
 
     public string $requestId;
 
@@ -100,7 +100,7 @@ class PatientData extends BasePatientComponent
 
     public string $selectedAuthMethodType = '';
 
-    public string $alias;
+    public string $alias = '';
 
     public string $confidantPersonId;
 
@@ -248,14 +248,12 @@ class PatientData extends BasePatientComponent
     /**
      * Initiate or resume the person data synchronisation flow with eHealth.
      *
-     * **When a sync is already in progress** ({@see $isSyncing} is `true` and an
-     * {@see not Status::EXPIRED and is verified - approval exists), the method inspects the approval state:
-     * - Expired approval → marks it {@see Status::EXPIRED} and flashes an error.
-     * - Alive but unverified → re-sends the OTP if the SMS window has closed, then
-     *   re-opens the confirmation modal.
-     * - Alive and verified → proceeds immediately to {@see syncPersonDataAfterGetApproval()}.
+     * Reuses an unexpired approval for this patient and the current doctor:
+     * - Active and verified → proceeds immediately to {@see syncPersonDataAfterGetApproval()}.
+     * - Awaiting verification → re-opens confirmation and re-sends the OTP if its window has closed.
+     * - Creation still pending without a UUID → waits without sending another request.
      *
-     * **When no sync is in progress**, a new approval is created via using the best available authentication method
+     * When no suitable approval exists, a new approval is created using the best available authentication method
      * (OTP → THIRD_PERSON → OFFLINE). On success, {@see $isSyncing} is set to `true`,
      * persisted, and the confirmation modal is opened so the user can enter the OTP.
      *
@@ -271,37 +269,57 @@ class PatientData extends BasePatientComponent
 
         $person = Person::find($this->personId);
 
-        // Check if an Approval already exists for the current person and is in the verified and not expired state
+        // If there is a active verified approval for this person, proceed immediately.
+        if (MERepository::approval()->hasVerifiedPersonApproval($person, Auth::user(), legalEntity())) {
+            $this->syncPersonDataAfterGetApproval();
+
+            return;
+        }
+
+        if (Auth::user()->cannot('create', Approval::class)) {
+            Session::flash('error', __('patients.policy.approval'));
+
+            return;
+        }
+
+        try {
+            // A combined token's scopes do not make every employee eligible to create an approval.
+            $employee = Repository::employee()->forApproval(Auth::user(), legalEntity());
+        } catch (ApprovalVerificationException $exception) {
+            Session::flash('error', $exception->getMessage());
+
+            return;
+        }
+
         $existingApprovals = Approval::getByModel($person)
-            ->whereNot('status', Status::EXPIRED->value)
-            ->where('is_verified', true)
+            ->whereHas('grantedTo', fn ($query) => $query->whereValue($employee?->uuid))
             ->whereNotNull('uuid')
-            ->get();
+            ->whereFuture('expires_at');
 
-        // If syncing is already in progress, one needs to check the status of the existing approval.
-        if ($existingApprovals->isNotEmpty()) {
-            // Person could have multiple approvals, but we only care about the alive and verified ones.
-            foreach ($existingApprovals as $existingApproval) {
-                // If approval exists, one needs to check if it's still alive
-                if (!$existingApproval->isAlive($person)->exists()) {
-                    $existingApproval->update(['status' => Status::EXPIRED->value]);
-                    // If it is alive but not verified, one needs to resend the SMS code or/and show the confirmation modal.
-                } elseif (!$existingApproval->isVerified()->exists()) {
-                    // Check if the approval sms code still active (14 min from last Approvals's updated_at)
-                    if (!MERepository::approval()->isSmsCodeAlive($existingApproval)) {
-                        $this->resendApprovalSms($existingApproval);
-                    }
+        // Resume confirmation of the latest unverified approval instead of creating a duplicate.
+        $pendingApproval = $existingApprovals
+            ->whereIn('status', [ApprovalStatus::PENDING->value, ApprovalStatus::NEW->value, ApprovalStatus::ACTIVE->value, ApprovalStatus::APPROVED->value])
+            ->where('is_verified', false)
+            ->latest('id')
+            ->first();
 
-                    $this->showConfirmationUpdateModal = true;
-
-                    return;
-                } else {
-                    // At least if the approval is alive and verified, one can proceed to sync the person data from eHealth.
-                    $this->syncPersonDataAfterGetApproval();
-
-                    return;
-                }
+        if ($pendingApproval) {
+            if (!MERepository::approval()->isSmsCodeAlive($pendingApproval)) {
+                $this->resendApprovalSms($pendingApproval);
             }
+
+            $this->showConfirmationUpdateModal = true;
+
+            return;
+        }
+
+        // The lookup above excludes approvals that have not received a UUID from eHealth yet.
+        // Wait for background creation to finish to avoid duplicate approval requests, jobs, and SMS codes.
+        if (MERepository::approval()->hasPendingCreation($person, $employee?->uuid)) {
+            Session::flash('info', __('patients.errors.approval_creation_pending'));
+            $this->showConfirmationUpdateModal = false;
+
+            return;
         }
 
         if (empty($this->authenticationMethods)) {
@@ -333,8 +351,6 @@ class PatientData extends BasePatientComponent
             return;
         }
 
-        $employee = Auth::user()->activeDoctorEmployee();
-
         $payloadData = [
             'granted_to' => ['value' => $employee->uuid, 'type' => ['coding' => [['code' => 'employee']]]],
             'created_by' => ['value' => $employee->uuid, 'type' => ['coding' => [['code' => 'employee']]]],
@@ -342,10 +358,12 @@ class PatientData extends BasePatientComponent
             'authorize_with' => $authorizeWith
         ];
 
+        Session::forget('error');
+
         try {
             $this->createApproval($person, $payloadData);
         } catch (Throwable $error) {
-            Session::flash('error', __('patients.errors.approval_creation_failed'));
+            Session::flash('error', __('patients.errors.approval_creation_failed').': '.Session::get('error', __('messages.database_error')));
 
             Log::error('Approval creation failed', [
                 'person_uuid' => $person->uuid,
@@ -369,7 +387,7 @@ class PatientData extends BasePatientComponent
      *
      * Resolves the {@see Person} model for the current component by {@see $personId} and
      * delegates to {@see HasApproval::resendApprovalSms()}, which looks up the most recent
-     * {@see Status::APPROVED} approval and re-sends the OTP via eHealth.
+     * approval awaiting confirmation and re-sends the OTP via eHealth.
      *
      * @return void
      */
@@ -395,6 +413,7 @@ class PatientData extends BasePatientComponent
     public function approvePersonalDataUpdate(): void
     {
         $this->showConfirmationUpdateModal = false;
+        Session::forget('error');
 
         try {
             $validated = $this->form->validate($this->form->rulesForApprove());
@@ -408,7 +427,7 @@ class PatientData extends BasePatientComponent
 
         if ($this->verifyApproval($person, $validated['verificationCode'])) {
             $this->syncPersonDataAfterGetApproval();
-        } else {
+        } elseif (!Session::has('error')) {
             Session::flash('error', __('patients.errors.approval_verification_failed'));
         }
     }

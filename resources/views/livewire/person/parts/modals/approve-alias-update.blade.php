@@ -1,6 +1,6 @@
-<div>
-    @use('App\Enums\Person\AuthStep')
+@use('App\Enums\Person\AuthStep')
 
+<div x-init="$wire.set('verificationCode', '', false)">
     <legend class="legend mb-8 text-2xl font-bold">{{ __('patients.update_method_alias') }}</legend>
 
     @nonempty($this->uploadedDocuments)
@@ -11,7 +11,7 @@
 
         @foreach ($this->uploadedDocuments as $key => $document)
             <div class="flex pb-4" wire:key="{{ $key }}">
-                <div class="flex-grow">
+                <div class="grow">
                     <label
                         class="mb-3 block text-sm font-medium text-gray-900 dark:text-white"
                         for="fileInput-{{ $key }}"
@@ -68,6 +68,8 @@
                     class="peer input"
                     placeholder=" "
                     autocomplete="off"
+                    maxlength="4"
+                    x-mask="9999"
                 />
                 <label for="verificationCode" class="label"> {{ __('patients.code_sms') }} </label>
             </div>

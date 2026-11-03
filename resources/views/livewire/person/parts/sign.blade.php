@@ -77,6 +77,7 @@
                     placeholder=" "
                     required
                     maxlength="4"
+                    x-mask="9999"
                     autocomplete="off"
                 />
                 <label for="verificationCode" class="label"> {{ __('forms.confirmation_code_from_SMS') }} </label>

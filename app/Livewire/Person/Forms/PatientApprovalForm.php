@@ -243,17 +243,21 @@ class PatientApprovalForm extends BaseForm
         }
 
         try {
-            $permittedResources = app(PatientApprovalService::class)
-                ->referralHasPermittedResources($person, $uuid, true);
-        } catch (ValidationException $exception) {
-            throw $exception;
+            $referral = app(PatientApprovalService::class)
+                ->referralDetails($person, $uuid);
         } catch (Throwable) {
             throw ValidationException::withMessages([
                 'resourceIds' => __('approval.create.referral_check_failed'),
             ]);
         }
 
-        if ($permittedResources === []) {
+        if (($referral['status'] ?? null) !== 'active') {
+            throw ValidationException::withMessages([
+                'resourceIds' => __('approval.create.referral_not_active'),
+            ]);
+        }
+
+        if (empty($referral['permitted_resources'])) {
             throw ValidationException::withMessages([
                 'resourceIds' => __('approval.create.referral_no_resources'),
             ]);

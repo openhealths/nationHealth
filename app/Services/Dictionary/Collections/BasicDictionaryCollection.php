@@ -29,6 +29,10 @@ class BasicDictionaryCollection extends Collection
             throw new InvalidArgumentException("Dictionary '{$name}' not found");
         }
 
+        if ($onlyActive && !($dictionary['is_active'] ?? true)) {
+            return new self();
+        }
+
         $values = new self($dictionary['values'] ?? []);
 
         return $onlyActive ? $values->onlyActive() : $values;
@@ -39,13 +43,14 @@ class BasicDictionaryCollection extends Collection
      * Retrieves multiple dictionaries and formats them as code-description pairs, filtering out empty dictionaries.
      *
      * @param  array  $names  Array of dictionary names to retrieve
+     * @param  bool  $onlyActive  Keep only values still offered for selection; false resolves stored labels
      * @return Collection
      */
-    public function getMultipleFormatted(array $names): Collection
+    public function getMultipleFormatted(array $names, bool $onlyActive = true): Collection
     {
         return collect($names)
             ->mapWithKeys(fn (string $name) => [
-                $name => $this->byName($name)->asCodeDescription()
+                $name => $this->byName($name, $onlyActive)->asCodeDescription()
             ])
             ->filter(fn (Collection $dictionary) => $dictionary->isNotEmpty());
     }

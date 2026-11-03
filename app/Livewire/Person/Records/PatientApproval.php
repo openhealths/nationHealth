@@ -61,6 +61,8 @@ class PatientApproval extends Component
     public string $selectedAuthUuid = '';
     public bool $leafletConfirmed = false;
     public string $verificationCode = '';
+
+    #[Locked]
     public bool $smsResent = false;
 
     #[Locked]
@@ -155,8 +157,9 @@ class PatientApproval extends Component
         }
 
         try {
-            $resources = app(PatientApprovalService::class)
-                ->referralHasPermittedResources($this->person(), $uuid);
+            $referralData = app(PatientApprovalService::class)
+                ->referralDetails($this->person(), $uuid);
+            $resources = $referralData['permitted_resources'] ?? [];
 
             $this->previewRows = collect($resources)
                 ->map(static fn (array $resource): array => [
@@ -301,7 +304,7 @@ class PatientApproval extends Component
         }
     }
 
-    private function loadReferrals(): void // це існує до моменту додавання permitted_resources в ЕН
+    private function loadReferrals(): void
     {
         try {
             $this->remoteReferrals = app(PatientApprovalService::class)
@@ -812,6 +815,16 @@ class PatientApproval extends Component
             if ($this->step === 'confirming') {
                 $this->continueAfterCreation();
             }
+        } catch (EHealthValidationException|EHealthResponseException|EHealthConnectionException) {
+            $this->open = false;
+            $this->step = 'form';
+
+            Session::flash('error', __('approval.create.create_ehealth_failed'));
+
+            $this->redirectRoute('persons.patient-data', [
+                legalEntity(),
+                'person' => $this->personId,
+            ]);
         } catch (Throwable) {
             $this->addError('approvalCreation', __('approval.create.create_failed'));
         }
@@ -849,8 +862,24 @@ class PatientApproval extends Component
     {
         $wasVerifying = $this->step === 'verifying';
         $this->linkId = null;
-        $this->step = $wasVerifying ? ($this->selectedAuthType === 'OFFLINE' ? 'confirming' : 'code') : 'form';
-        $this->addError($this->mode === 'service_request' && !$wasVerifying ? 'resourceIds' : 'approvalCreation', $message);
+
+        if (!$wasVerifying) {
+            $this->approvalId = null;
+            $this->step = 'form';
+            $this->open = false;
+
+            Session::flash('error', __('approval.create.create_ehealth_failed'));
+
+            $this->redirectRoute('persons.patient-data', [
+                legalEntity(),
+                'person' => $this->personId,
+            ]);
+
+            return;
+        }
+
+        $this->step = $this->selectedAuthType === 'OFFLINE' ? 'confirming' : 'code';
+        $this->addError('approvalCreation', $message);
     }
 
     private function handlePollSuccess(array $status): void
@@ -961,7 +990,8 @@ class PatientApproval extends Component
             $this->smsResent = true;
         } catch (ValidationException $exception) {
             $this->addError('smsResend', $exception->errors()['smsResend'][0] ?? __('approval.create.resend_failed'));
-        } catch (EHealthValidationException|EHealthResponseException $exception) {
+        } catch (EHealthValidationException|EHealthResponseException|EHealthConnectionException $exception) {
+            $this->smsResent = true;
             $this->addError('smsResend', __('approval.create.resend_failed'));
         } catch (Throwable $exception) {
             $this->addError('smsResend', __('approval.create.resend_failed'));
@@ -980,7 +1010,10 @@ class PatientApproval extends Component
 
         Session::flash('success', __('approval.create.verified'));
 
-        $this->dispatch('patient-approvals-changed');
+        $this->redirectRoute('persons.patient-data', [
+            legalEntity(),
+            'person' => $this->personId,
+        ]);
     }
 
     private function person(): Person
