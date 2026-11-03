@@ -117,6 +117,7 @@ return [
     'sections' => 'Розділи взаємодії',
     'device_requests' => 'Е-запити на виріб',
     'open_device_requests' => 'Перейти до е-запитів на виріб',
+    'device_requests_unavailable' => 'Е-запити на виріб доступні лише для пацієнта з документами.',
     'add_prescription' => 'Додати рецепт',
     'add_referral' => 'Додати направлення',
     'add_medical_report' => 'Додати медичний висновок',

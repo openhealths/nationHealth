@@ -426,6 +426,15 @@ class StandaloneRequestSigningTest extends TestCase
             ->assertSee(__('encounters.medical_report_creation_unavailable'));
     }
 
+    public function test_encounter_actions_disable_device_requests_for_preperson_without_route_error(): void
+    {
+        Livewire::test(DeviceEncounterActionsHarness::class, ['personId' => null, 'compositionUrl' => null])
+            ->assertStatus(200)
+            ->assertDontSeeHtml('wire:click="openDeviceRequest"')
+            ->assertSeeHtml('title="'.e(__('encounters.device_requests_unavailable')).'"')
+            ->assertSee(__('encounters.open_device_requests'));
+    }
+
     public function test_device_policy_requires_matching_team_scope_and_active_prescriber(): void
     {
         $model = \App\Models\MedicalEvents\Sql\DeviceRequestRequest::class;

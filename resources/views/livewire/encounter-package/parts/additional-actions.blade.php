@@ -24,7 +24,8 @@
         ],
         'device-requests' => [
             'label' => __('encounters.open_device_requests'),
-            'href' => route('persons.device-requests', ['legalEntity' => legalEntity(), 'person' => $personId]),
+            'unavailable' => __('encounters.device_requests_unavailable'),
+            'href' => $personId !== null ? route('persons.device-requests', ['legalEntity' => legalEntity(), 'person' => $personId]) : null,
             'icon' => 'arrow-right',
         ],
     ];
