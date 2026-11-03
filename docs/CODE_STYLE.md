@@ -33,6 +33,10 @@ Keep additional error details limited to the types supplied by actual callers; d
 support for underlying exceptions unless a caller passes them.
 Keep database lookups and state checks in the repository.
 
+Mass Eloquent updates bypass model attribute casts. Serialize array values for JSON
+columns before a query-level `update()`, or save through a model instance. Preserve
+atomic status guards so delayed jobs cannot overwrite a completed operation.
+
 ## Livewire
 
 ### Authorization

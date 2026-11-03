@@ -430,7 +430,7 @@ class RemoteEHealthLinksProcessing extends EHealthJob
         if (data_get($this->eHealthLink->job?->request_data, 'operation') === 'cancel') {
             // Exhausted polling is not proof that the remote cancellation failed.
             $this->eHealthLink->newQuery()->whereKey($this->eHealthLink->id)->where('status', '!=', 'PROCESSED')
-                ->update(['error' => ['message' => __('care-plan.approval_cancel_unconfirmed')]]);
+                ->update(['error' => json_encode(['message' => __('care-plan.approval_cancel_unconfirmed')], JSON_THROW_ON_ERROR)]);
 
             return;
         }

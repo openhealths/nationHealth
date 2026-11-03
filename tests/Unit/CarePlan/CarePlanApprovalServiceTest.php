@@ -685,9 +685,16 @@ class CarePlanApprovalServiceTest extends TestCase
         $result = $service->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token');
         $link = EhealthLink::findOrFail($result['linkId']);
         (new \App\Jobs\RemoteEHealthLinksProcessing($link, $legalEntity, standalone: true))->failed(new \RuntimeException('polling timeout'));
+        $link->refresh();
+        $this->assertSame(['message' => __('care-plan.approval_cancel_unconfirmed')], $link->error);
+        $this->assertSame('PENDING', $link->status);
+        $this->assertSame('PENDING', $link->job->status);
         $state = \App\Repositories\MedicalEvents\Repository::approval()->carePlanCancellationState($plan, $approval->uuid, $link->id);
         $this->assertSame('unknown', $state['status']);
         $this->assertSame('active', $approval->fresh()->status);
+        $row = \App\Repositories\MedicalEvents\Repository::approval()->localForCarePlan($plan)[0];
+        $this->assertTrue($row['cancellationUnknown']);
+        $this->assertSame($link->id, $row['cancellationLinkId']);
         $this->assertSame($result, $service->requestCancellation($plan, $approval->uuid, $legalEntity, $user, 'test-token'));
         $this->assertNull($link->fresh()->error);
         $this->assertSame('/api/jobs/remote-job', $link->fresh()->href);
