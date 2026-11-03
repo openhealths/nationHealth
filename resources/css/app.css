@@ -190,6 +190,58 @@ input::-webkit-contacts-auto-fill-button {
     right: 0;
 }
 
+.patient-create-form .patient-leaflet-introduction .default-p {
+    margin-inline-start: 0;
+}
+
+.patient-leaflet-document {
+    @apply w-full min-w-0 overflow-x-auto text-gray-900 dark:text-gray-100;
+    overflow-wrap: anywhere;
+}
+
+.patient-leaflet-document table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed;
+}
+
+.patient-leaflet-document :is(th, td) {
+    @apply px-3 py-2 align-top;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+}
+
+.patient-leaflet-document img {
+    max-width: 100% !important;
+    height: auto;
+}
+
+.dark .patient-leaflet-document :is(table, thead, tbody, tfoot, tr, th, td) {
+    color: var(--color-gray-100) !important;
+    background-color: var(--color-gray-800) !important;
+    border-color: var(--color-gray-600) !important;
+}
+
+.dark .patient-leaflet-document tr:nth-child(odd) > :is(th, td) {
+    background-color: var(--color-gray-700) !important;
+}
+
+.dark .patient-leaflet-document :is(p, span, div, li, font, strong, b, h1, h2, h3, h4, h5, h6, a) {
+    color: inherit !important;
+    background-color: transparent !important;
+}
+
+.dark .patient-leaflet-document img {
+    @apply rounded-lg bg-white p-2;
+}
+
+@media (max-width: 639px) {
+    .patient-leaflet-document img {
+        float: none !important;
+        margin-block-end: 1rem;
+    }
+}
+
 .input-select {
     @apply input dark:border-gray-700 dark:focus:border-blue-500 dark:bg-gray-800 pl-1 pr-9 whitespace-nowrap overflow-hidden text-ellipsis cursor-pointer
 }
@@ -254,6 +306,51 @@ input:-webkit-autofill ~ .label {
 
 .default-p {
     @apply ms-2 text-gray-900 dark:text-white;
+}
+
+.form-toggle {
+    @apply inline-flex cursor-pointer items-center;
+}
+
+.form-toggle-input {
+    @apply sr-only;
+}
+
+.form-toggle-track {
+    @apply relative h-5 w-9 shrink-0 rounded-full bg-gray-200 dark:bg-gray-700;
+}
+
+.form-toggle-track::after {
+    content: '';
+    @apply absolute start-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform;
+}
+
+.form-toggle-input:focus + .form-toggle-track {
+    @apply outline-none ring-4 ring-blue-100 dark:ring-blue-900;
+}
+
+.form-toggle-input:checked + .form-toggle-track {
+    @apply bg-blue-700 dark:bg-blue-600;
+}
+
+.form-toggle-input:checked + .form-toggle-track::after {
+    transform: translateX(100%);
+}
+
+.form-toggle-input:checked + .form-toggle-track:dir(rtl)::after {
+    transform: translateX(-100%);
+}
+
+.form-toggle-label {
+    @apply ms-3 select-none text-sm font-medium text-gray-900 dark:text-white;
+}
+
+.form-toggle:has(.form-toggle-input:disabled) {
+    @apply cursor-not-allowed;
+}
+
+.form-toggle-input:disabled ~ :is(.form-toggle-track, .form-toggle-label) {
+    @apply opacity-50;
 }
 
 /* Dropdown panel */

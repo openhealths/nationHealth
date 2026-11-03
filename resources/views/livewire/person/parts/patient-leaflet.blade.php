@@ -6,6 +6,7 @@
 @endphp
 
 <div
+    class="patient-leaflet-introduction"
     x-data="{
         printContent() {
             let printWindow = window.open('https://ehealth.gov.ua/privacy_patient.html', '_blank');
@@ -17,9 +18,12 @@
         <button
             @click="printContent()"
             type="button"
-            class="mb-6 cursor-pointer text-sm font-medium underline dark:text-white"
+            class="button-minor mb-6 max-w-full gap-2"
         >
-            {{ __('patients.print_leaflet_for_patient') }}
+            @icon('printer', 'w-4 h-4 shrink-0')
+            <span>
+                {{ __('patients.print_leaflet_for_patient') }}
+            </span>
         </button>
     </div>
 

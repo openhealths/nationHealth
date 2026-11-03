@@ -33,13 +33,19 @@
                             },
                         }"
                     >
-                        <div class="xl:flex-container mb-4.5 flex flex-col gap-6">{!! $leafletContent !!}</div>
+                        <div class="patient-leaflet-document mb-4.5">
+                            {!! $leafletContent !!}
+                        </div>
 
                         <button
                             @click="printContent()"
-                            class="mb-6 cursor-pointer text-sm font-medium underline dark:text-white"
+                            type="button"
+                            class="button-minor mb-6 max-w-full self-center gap-2"
                         >
-                            {{ __('patients.print_leaflet_for_patient') }}
+                            @icon('printer', 'w-4 h-4 shrink-0')
+                            <span>
+                                {{ __('patients.print_leaflet_for_patient') }}
+                            </span>
                         </button>
 
                         @can('sign', PersonRequest::class)
@@ -59,7 +65,7 @@
                             </div>
                         @endcan
 
-                        <div class="mb-4.5 flex items-center justify-center gap-6 xl:flex-row">
+                        <div class="mb-4.5 flex flex-wrap items-center justify-center gap-6">
                             <button type="button" class="button-danger" wire:click="reject">
                                 {{ __('patients.reject') }}
                             </button>

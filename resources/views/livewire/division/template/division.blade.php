@@ -657,16 +657,17 @@
                                                         <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ $day }}</h3>
                                                     </div>
                                                     <div class="flex items-center gap-8 mb-4">
-                                                        <label class="inline-flex items-center cursor-pointer">
-                                                            <input type="checkbox" class="sr-only peer"
+                                                        <label class="form-toggle">
+                                                            <input
+                                                                type="checkbox"
+                                                                class="form-toggle-input"
                                                                 x-model="show_work"
                                                                 x-on:click="switchWorking('{{ $key }}')"
                                                                 x-bind:disabled="isDisabled"
                                                             >
-                                                            <div
-                                                                class="relative w-11 h-6 bg-gray-200 rounded-full peer peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:bg-gray-700 dark:peer-focus:ring-blue-800 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:w-5 after:h-5 after:transition-all peer-checked:bg-blue-600 dark:peer-checked:bg-blue-600 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full"></div>
+                                                            <div class="form-toggle-track" aria-hidden="true"></div>
                                                             <span
-                                                                class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300"
+                                                                class="form-toggle-label"
                                                                 x-text="show_work ? '{{ __('forms.works') }}' : '{{ __('forms.does_not_work') }}'"
                                                             ></span>
                                                         </label>

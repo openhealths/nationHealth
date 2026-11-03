@@ -49,7 +49,7 @@
                     x-data="{ hasLastName: ! names[0].noLastName }"
                     x-init="$watch('names[0].noLastName', (value) => (hasLastName = ! value))"
                 >
-                    <label class="relative inline-flex cursor-pointer items-center">
+                    <label class="form-toggle">
                         <input
                             type="checkbox"
                             x-model="hasLastName"
@@ -57,10 +57,10 @@
                                 names[0].noLastName = ! hasLastName;
                                 if (! hasLastName) names[0].lastName = '';
                             "
-                            class="peer sr-only"
+                            class="form-toggle-input"
                         />
-                        <div class="peer h-6 w-11 rounded-full bg-gray-200 peer-checked:bg-blue-600 peer-focus:outline-none after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:border-gray-600 dark:bg-gray-700"></div>
-                        <span class="ml-3 text-sm font-semibold text-gray-900 dark:text-gray-300">
+                        <div class="form-toggle-track" aria-hidden="true"></div>
+                        <span class="form-toggle-label">
                             {{ __('patients.has_last_name') }}
                         </span>
                     </label>
@@ -197,12 +197,19 @@
                         type="text"
                         name="unzr"
                         id="unzr"
+                        x-mask="99999999-99999"
+                        inputmode="numeric"
+                        pattern="[0-9]{8}-[0-9]{5}"
+                        aria-describedby="unzr-format"
                         class="input peer @error('form.person.unzr') input-error @enderror"
                         placeholder=" "
                         maxlength="14"
                         autocomplete="off"
                     />
                     <label for="unzr" class="label"> {{ __('patients.unzr') }} </label>
+                    <p id="unzr-format" class="text-note">
+                        {{ __('patients.unzr_format') }}
+                    </p>
                     @error('form.person.unzr')
                         <p class="text-error">{{ $message }}</p>
                     @enderror
@@ -251,7 +258,7 @@
                             x-data="{ hasLastName: ! name.noLastName }"
                             x-init="$watch('name.noLastName', (value) => (hasLastName = ! value))"
                         >
-                            <label class="relative inline-flex cursor-pointer items-center">
+                            <label class="form-toggle">
                                 <input
                                     type="checkbox"
                                     x-model="hasLastName"
@@ -259,10 +266,10 @@
                                         name.noLastName = ! hasLastName;
                                         if (! hasLastName) name.lastName = '';
                                     "
-                                    class="peer sr-only"
+                                    class="form-toggle-input"
                                 />
-                                <div class="peer h-6 w-11 rounded-full bg-gray-200 peer-checked:bg-blue-600 peer-focus:outline-none after:absolute after:top-[2px] after:left-0.5 after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:border-gray-600 dark:bg-gray-700"></div>
-                                <span class="ml-3 text-sm font-semibold text-gray-900 dark:text-gray-300">
+                                <div class="form-toggle-track" aria-hidden="true"></div>
+                                <span class="form-toggle-label">
                                     {{ __('patients.has_last_name') }}
                                 </span>
                             </label>

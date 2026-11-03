@@ -139,10 +139,10 @@
 
                         <div class="mb-8 flex items-center gap-8">
                             {{-- Working or not --}}
-                            <label class="inline-flex cursor-pointer items-center">
+                            <label class="form-toggle">
                                 <input
                                     type="checkbox"
-                                    class="peer sr-only"
+                                    class="form-toggle-input"
                                     x-model="localAvailableTime[{{ $loop->index }}].working"
                                     x-bind:disabled="isDisabled"
                                     @change="if (! localAvailableTime[{{ $loop->index }}].working) {
@@ -151,9 +151,9 @@
                                            localAvailableTime[{{ $loop->index }}].availableEndTime = null;
                                        }"
                                 />
-                                <div class="peer relative h-6 w-11 rounded-full bg-gray-200 peer-checked:bg-blue-600 peer-focus:ring-4 peer-focus:ring-blue-300 peer-focus:outline-none after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full dark:bg-gray-700 dark:peer-checked:bg-blue-600 dark:peer-focus:ring-blue-800"></div>
+                                <div class="form-toggle-track" aria-hidden="true"></div>
                                 <span
-                                    class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300"
+                                    class="form-toggle-label"
                                     x-text="localAvailableTime[{{ $loop->index }}].working ? '{{ __('forms.works') }}' : '{{ __('forms.does_not_work') }}'"
                                 ></span>
                             </label>

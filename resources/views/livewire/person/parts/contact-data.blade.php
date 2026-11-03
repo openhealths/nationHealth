@@ -24,6 +24,8 @@
                         <input
                             x-model="phone.number"
                             x-mask="+999999999999"
+                            @focus="if (!phone.number) phone.number = '+380'"
+                            @blur="if (phone.number === '+380') phone.number = ''"
                             type="tel"
                             name="phoneNumber"
                             :id="'phoneNumber-' + index"
