@@ -902,16 +902,12 @@
                                                 {{ __('conditions.body_sites') }}
                                             </label>
                                             <div class="relative">
-                                                <select
-                                                    x-model="bodySite.code"
-                                                    :id="`conditionBodySite${bsIndex}`"
-                                                    class="input-select w-full appearance-none bg-none"
-                                                >
-                                                    <option value="" selected>{{ __('forms.select') }}</option>
-                                                    @foreach ($this->dictionaries['eHealth/body_sites'] as $key => $bodySiteName)
-                                                        <option value="{{ $key }}">{{ $bodySiteName }}</option>
-                                                    @endforeach
-                                                </select>
+                                                <x-select2
+                                                    modelPath="bodySite.code"
+                                                    dictionaryName="eHealth/body_sites"
+                                                    ::id="`conditionBodySite${bsIndex}`"
+                                                    class="input w-full"
+                                                />
                                                 @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
                                             </div>
                                         </div>

@@ -20,7 +20,7 @@ use Throwable;
 class EpisodeCreate extends BaseEpisodeComponent
 {
     /**
-     * Load the dictionaries and select options the form depends on.
+     * Load the dictionaries and select options the form depends on, and start the episode now by default.
      *
      * @return void
      */
@@ -29,6 +29,8 @@ class EpisodeCreate extends BaseEpisodeComponent
         parent::initializeComponent();
 
         $this->form->id = Str::uuid()->toString();
+        $this->form->startDate = now()->format(config('app.date_format'));
+        $this->form->startTime = now()->format('H:i');
     }
 
     /**

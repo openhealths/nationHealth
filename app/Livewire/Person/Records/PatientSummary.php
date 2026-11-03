@@ -921,6 +921,12 @@ class PatientSummary extends BasePatientComponent
             return;
         }
 
+        if (Auth::user()->cannot('viewAny', Preperson::class)) {
+            Session::flash('error', __('preperson.policy.view'));
+
+            return;
+        }
+
         $prepersonId = $mergedPerson->mergedPrepersonId ?? $this->pullMergedPreperson($mergedPerson);
 
         if ($prepersonId === null) {

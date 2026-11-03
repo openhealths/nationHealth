@@ -121,7 +121,7 @@
                 this.isLoading = true;
 
                 try {
-                    const rawData = this.$wire.dictionaries?.[dictionaryKey] ?? {};
+                    const rawData = this.$wire.dictionaries?.[dictionaryKey] ?? this.$store[dictionaryKey] ?? {};
 
                     if (optionsSource) {
                         this.setExplicitOptions(optionsSource());
@@ -248,9 +248,10 @@
                 this.options = Object.entries(rawData ?? {}).map(([value, label]) => this.makeOption(value, label));
                 this.buildOptionsMap();
                 if (this.selected) {
-                    const label = rawData?.[this.selected]
-                        ?? this.$wire.dictionaries?.[dictionaryKey]?.[this.selected]
-                        ?? this.selected;
+                    const label =
+                        rawData?.[this.selected] ??
+                        this.$wire.dictionaries?.[dictionaryKey]?.[this.selected] ??
+                        this.selected;
                     this.search = this.getDisplayText(this.makeOption(this.selected, label));
                 }
                 this.filterOptions();

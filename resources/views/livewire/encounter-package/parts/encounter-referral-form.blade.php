@@ -361,6 +361,7 @@
         zIndex="50"
     >
         <livewire:dictionary.service-catalog
+            lazy
             :legal-entity="legalEntity()"
             :selection-mode="true"
             :request-allowed-only="true"

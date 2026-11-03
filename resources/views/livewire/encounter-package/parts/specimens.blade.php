@@ -23,7 +23,7 @@
         },
 
         procedureLabel(procedure) {
-            const service = Object.values($wire.dictionaries['custom/services'] ?? {}).find((service) => service.id === procedure.codeValue);
+            const service = Object.values($store['custom/services'] ?? {}).find((service) => service.id === procedure.codeValue);
 
             return service ? `${service.code} / ${service.name}` : procedure.codeValue || procedure.uuid || '-';
         },

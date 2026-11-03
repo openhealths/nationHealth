@@ -1,6 +1,6 @@
 <div
-        class="space-y-6 p-5"
-        x-data="{
+    class="space-y-6 p-5"
+    x-data="{
         showReferencesDrawer: false,
         selectedReferences: $wire.entangle('form.encounter.supportingInfo'),
 
@@ -57,7 +57,7 @@
             );
         },
      }"
-        @encounter-supporting-info-selected.window="addReference($event.detail.record)"
+    @encounter-supporting-info-selected.window="addReference($event.detail.record)"
 >
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div class="form-group group">
@@ -66,21 +66,21 @@
                     @icon('calendar-week', 'w-5 h-5 text-gray-400')
                 </div>
                 <input
-                        wire:model="form.encounter.periodDate"
-                        datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                        datepicker-autoselect-today
-                        type="text"
-                        name="date"
-                        id="date"
-                        class="datepicker-input with-leading-icon input peer @error('form.encounter.periodDate') input-error @enderror"
-                        placeholder=" "
-                        required
-                        autocomplete="off"
+                    wire:model="form.encounter.periodDate"
+                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                    datepicker-autoselect-today
+                    type="text"
+                    name="date"
+                    id="date"
+                    class="datepicker-input with-leading-icon input peer @error('form.encounter.periodDate') input-error @enderror"
+                    placeholder=" "
+                    required
+                    autocomplete="off"
                 />
                 <label for="date" class="wrapped-label required"> {{ __('encounters.period_date') }} </label>
             </div>
             @error('form.encounter.periodDate')
-            <p class="text-error">{{ $message }}</p>
+                <p class="text-error">{{ $message }}</p>
             @enderror
         </div>
 
@@ -90,19 +90,19 @@
                     @icon('mingcute-time-fill', 'w-5 h-5 text-gray-400')
                 </div>
                 <input
-                        wire:model="form.encounter.periodStart"
-                        type="text"
-                        name="periodStart"
-                        id="periodStart"
-                        class="timepicker-uk with-leading-icon input peer @error('form.encounter.periodStart') input-error @enderror"
-                        placeholder=" "
-                        required
-                        autocomplete="off"
+                    wire:model="form.encounter.periodStart"
+                    type="text"
+                    name="periodStart"
+                    id="periodStart"
+                    class="timepicker-uk with-leading-icon input peer @error('form.encounter.periodStart') input-error @enderror"
+                    placeholder=" "
+                    required
+                    autocomplete="off"
                 />
                 <label for="periodStart" class="wrapped-label required"> {{ __('encounters.period_start') }} </label>
             </div>
             @error('form.encounter.periodStart')
-            <p class="text-error">{{ $message }}</p>
+                <p class="text-error">{{ $message }}</p>
             @enderror
         </div>
 
@@ -112,25 +112,25 @@
                     @icon('mingcute-time-fill', 'w-5 h-5 text-gray-400')
                 </div>
                 <input
-                        wire:model="form.encounter.periodEnd"
-                        type="text"
-                        name="periodEnd"
-                        id="periodEnd"
-                        class="timepicker-uk with-leading-icon input peer @error('form.encounter.periodEnd') input-error @enderror"
-                        placeholder=" "
-                        required
-                        autocomplete="off"
+                    wire:model="form.encounter.periodEnd"
+                    type="text"
+                    name="periodEnd"
+                    id="periodEnd"
+                    class="timepicker-uk with-leading-icon input peer @error('form.encounter.periodEnd') input-error @enderror"
+                    placeholder=" "
+                    required
+                    autocomplete="off"
                 />
                 <label for="periodEnd" class="wrapped-label required"> {{ __('encounters.period_end') }} </label>
             </div>
             @error('form.encounter.periodEnd')
-            <p class="text-error">{{ $message }}</p>
+                <p class="text-error">{{ $message }}</p>
             @enderror
         </div>
     </div>
 
     <div
-            x-data="{
+        x-data="{
             isPerformerAllowed(index) {
                 const classCode = $wire.form.encounter.classCode;
                 const typeCode = $wire.form.encounter.typeCode;
@@ -150,8 +150,8 @@
                 syncLocalEncounterParticipants('performer', performer ? [performer] : []);
             },
         }"
-            x-init="syncPerformerParticipant()"
-            x-effect="
+        x-init="syncPerformerParticipant()"
+        x-effect="
             const selectedIndex = $wire.performerEmployees.findIndex(
                 (employee) => employee.uuid === $wire.form.encounter.performerId,
             );
@@ -164,42 +164,41 @@
     >
         <div class="form-group group">
             <select
-                    wire:model="form.encounter.performerId"
-                    @change="syncPerformerParticipant()"
-                    id="encounterPerformer"
-                    class="input-select peer @error('form.encounter.performerId') input-error @enderror"
-                    required
+                wire:model="form.encounter.performerId"
+                @change="syncPerformerParticipant()"
+                id="encounterPerformer"
+                class="input-select peer @error('form.encounter.performerId') input-error @enderror"
+                required
             >
                 <option value="" selected>{{ __('forms.select') }}</option>
                 @foreach ($performerEmployees as $employee)
                     <option
-                            value="{{ $employee['uuid'] }}"
-                            :hidden="! isPerformerAllowed({{ $loop->index }})"
-                            :disabled="! isPerformerAllowed({{ $loop->index }})"
+                        value="{{ $employee['uuid'] }}"
+                        :hidden="! isPerformerAllowed({{ $loop->index }})"
+                        :disabled="! isPerformerAllowed({{ $loop->index }})"
                     >
-                        {{ $employee['name'] }}
-                        ({{ $this->dictionaries['POSITION'][$employee['position']] ?? $employee['position'] }})
+                        {{ $employee['name'] }} ({{ $this->dictionaries['POSITION'][$employee['position']] ?? $employee['position'] }})
                     </option>
                 @endforeach
             </select>
             <label for="encounterPerformer" class="label required"> {{ __('medical-events.performer') }} </label>
 
             @error('form.encounter.performerId')
-            <p class="text-error">{{ $message }}</p>
+                <p class="text-error">{{ $message }}</p>
             @enderror
         </div>
     </div>
 
     <div class="form-group group">
         <select
-                wire:model="form.encounter.divisionId"
-                x-on:change="
+            wire:model="form.encounter.divisionId"
+            x-on:change="
                 $dispatch('encounter-division-changed', {
                     divisionId: $event.target.value,
                 })
             "
-                id="divisionNames"
-                class="input-select peer @error('form.encounter.divisionId') input-error @enderror"
+            id="divisionNames"
+            class="input-select peer @error('form.encounter.divisionId') input-error @enderror"
         >
             <option value="" selected>{{ __('forms.select') }} {{ mb_strtolower(__('forms.division_name')) }}</option>
             @foreach ($divisions as $key => $division)
@@ -208,15 +207,15 @@
         </select>
         <label for="divisionNames" class="label"> {{ __('forms.division_name') }} </label>
         @error('form.encounter.divisionId')
-        <p class="text-error">{{ $message }}</p>
+            <p class="text-error">{{ $message }}</p>
         @enderror
     </div>
 
     <div class="form-group group">
         <select
-                wire:model="form.encounter.priorityCode"
-                id="priority"
-                class="input-select peer @error('form.encounter.priorityCode') input-error @enderror"
+            wire:model="form.encounter.priorityCode"
+            id="priority"
+            class="input-select peer @error('form.encounter.priorityCode') input-error @enderror"
         >
             <option value="" selected>{{ __('forms.select') }} {{ mb_strtolower(__('encounters.priority')) }}</option>
             @foreach ($this->dictionaries['eHealth/encounter_priority'] as $key => $encounterPriority)
@@ -225,7 +224,7 @@
         </select>
         <label for="priority" class="label"> {{ __('encounters.priority') }} </label>
         @error('form.encounter.priorityCode')
-        <p class="text-error">{{ $message }}</p>
+            <p class="text-error">{{ $message }}</p>
         @enderror
     </div>
 
@@ -234,15 +233,15 @@
             {{ __('encounters.assignments') }}
         </label>
         <textarea
-                wire:model="form.encounter.prescriptions"
-                id="encounterPrescriptions"
-                class="w-full min-h-30 p-4 text-[15px] text-gray-900 dark:text-white bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none resize-none @error('form.encounter.prescriptions') input-error @enderror"
-                placeholder="{{ __('encounters.write_assignments_here') }}"
+            wire:model="form.encounter.prescriptions"
+            id="encounterPrescriptions"
+            class="w-full min-h-30 p-4 text-[15px] text-gray-900 dark:text-white bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none resize-none @error('form.encounter.prescriptions') input-error @enderror"
+            placeholder="{{ __('encounters.write_assignments_here') }}"
         ></textarea>
     </div>
 
     <div
-            x-data="{
+        x-data="{
             services: $wire.entangle('form.encounter.actionReferences'),
             serviceOptions: [],
             serviceSearches: [],
@@ -252,7 +251,7 @@
             selectedServiceIndex: null,
 
             init() {
-                this.serviceOptions = Object.entries($wire.dictionaries['custom/services'] ?? {})
+                this.serviceOptions = Object.entries($store['custom/services'] ?? {})
                     .map(([key, service]) => ({
                         id: String(typeof service === 'object' ? (service.id ?? key) : key),
                         code: String(typeof service === 'object' ? (service.code ?? '') : ''),
@@ -396,13 +395,13 @@
                 this.coAuthors = this.coAuthors.filter((_, rowIndex) => rowIndex !== index);
             },
         }"
-            @encounter-service-selected.window="selectServiceFromCatalog($event.detail.service)"
-            class="space-y-6"
+        @encounter-service-selected.window="selectServiceFromCatalog($event.detail.service)"
+        class="space-y-6"
     >
         <div
-                class="space-y-3"
-                x-show="$wire.form.encounter.classCode !== 'PHC'"
-                x-effect="
+            class="space-y-3"
+            x-show="$wire.form.encounter.classCode !== 'PHC'"
+            x-effect="
                 if ($wire.form.encounter.classCode === 'PHC' && services.some((service) => service.uuid)) {
                     services = [{ uuid: '' }];
                     serviceSearches = [''];
@@ -416,24 +415,24 @@
                     <div class="flex items-center gap-6">
                         <div class="form-group group relative flex-1" @click.away="serviceDropdowns[index] = false">
                             <input
-                                    type="text"
-                                    class="input peer @error('form.encounter.actionReferences.0') input-error @enderror"
-                                    :id="'service_' + index"
-                                    x-model="serviceSearches[index]"
-                                    @input.debounce.150ms="
+                                type="text"
+                                class="input peer @error('form.encounter.actionReferences.0') input-error @enderror"
+                                :id="'service_' + index"
+                                x-model="serviceSearches[index]"
+                                @input.debounce.150ms="
                                     services[index] = { uuid: '' };
                                     serviceDropdowns[index] = true;
                                     updateFilteredOptions(index);
                                 "
-                                    placeholder=" "
-                                    autocomplete="off"
+                                placeholder=" "
+                                autocomplete="off"
                             />
                             <label :for="'service_' + index" class="label">{{ __('encounters.services') }}</label>
 
                             <div
-                                    x-show="serviceDropdowns[index]"
-                                    x-cloak
-                                    class="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                                x-show="serviceDropdowns[index]"
+                                x-cloak
+                                class="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
                             >
                                 <template x-if="! serviceSearches[index]">
                                     <div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
@@ -441,21 +440,20 @@
                                     </div>
                                 </template>
 
-                                <template
-                                        x-if="serviceSearches[index] && (serviceFilteredOptions[index] || []).length === 0">
+                                <template x-if="serviceSearches[index] && (serviceFilteredOptions[index] || []).length === 0">
                                     <div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                                         {{ __('forms.nothing_found') }}
                                     </div>
                                 </template>
 
                                 <template
-                                        x-for="serviceOption in (serviceFilteredOptions[index] || [])"
-                                        :key="serviceOption.id"
+                                    x-for="serviceOption in (serviceFilteredOptions[index] || [])"
+                                    :key="serviceOption.id"
                                 >
                                     <button
-                                            type="button"
-                                            class="block w-full cursor-pointer px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                                            @click="selectService(index, serviceOption)"
+                                        type="button"
+                                        class="block w-full cursor-pointer px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                                        @click="selectService(index, serviceOption)"
                                     >
                                         <span x-text="serviceLabel(serviceOption)"></span>
                                     </button>
@@ -464,22 +462,17 @@
                         </div>
 
                         <button
-                                type="button"
-                                @click.prevent="openServiceDictionary(index)"
-                                class="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                            type="button"
+                            @click.prevent="openServiceDictionary(index)"
+                            class="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                         >
-                            <svg
-                                    class="h-5 w-5 shrink-0"
-                                    viewBox="0 0 16 16"
-                                    fill="none"
-                                    aria-hidden="true"
-                            >
+                            <svg class="h-5 w-5 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                                 <path
-                                        d="M8 4.667C8 3.96 7.719 3.281 7.219 2.781 6.719 2.281 6.041 2 5.333 2H1.333V12H6c.53 0 1.039.21 1.414.586.375.375.586.884.586 1.414M8 4.667V14m0-9.333c0-.707.281-1.386.781-1.886.5-.5 1.179-.781 1.886-.781h4V12h-4.667c-.53 0-1.039.21-1.414.586-.375.375-.586.884-.586 1.414"
-                                        stroke="currentColor"
-                                        stroke-width="1.2"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
+                                    d="M8 4.667C8 3.96 7.719 3.281 7.219 2.781 6.719 2.281 6.041 2 5.333 2H1.333V12H6c.53 0 1.039.21 1.414.586.375.375.586.884.586 1.414M8 4.667V14m0-9.333c0-.707.281-1.386.781-1.886.5-.5 1.179-.781 1.886-.781h4V12h-4.667c-.53 0-1.039.21-1.414.586-.375.375-.586.884-.586 1.414"
+                                    stroke="currentColor"
+                                    stroke-width="1.2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
                                 />
                             </svg>
 
@@ -488,11 +481,11 @@
                     </div>
 
                     <button
-                            type="button"
-                            x-show="index > 0"
-                            x-cloak
-                            @click="removeService(index)"
-                            class="absolute top-3 right-0 cursor-pointer text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
+                        type="button"
+                        x-show="index > 0"
+                        x-cloak
+                        @click="removeService(index)"
+                        class="absolute top-3 right-0 cursor-pointer text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
                     >
                         @icon('delete', 'w-6 h-6')
                     </button>
@@ -500,32 +493,33 @@
             </template>
 
             <button
-                    type="button"
-                    @click="addService()"
-                    class="ml-1 flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                type="button"
+                @click="addService()"
+                class="ml-1 flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
             >
                 @icon('plus', 'w-4 h-4')
                 <span>{{ __('encounters.add_service') }}</span>
             </button>
             @error('form.encounter.actionReferences.0')
-            <p class="text-error">{{ $message }}</p>
+                <p class="text-error">{{ $message }}</p>
             @enderror
         </div>
 
         @unless ($isReadonly)
             <x-dialog-drawer
-                    x-model="openServiceCatalog"
-                    onCloseClick="openServiceCatalog = false"
-                    maxWidth="4/5"
-                    overlayWidth="100%"
-                    zIndex="50"
+                x-model="openServiceCatalog"
+                onCloseClick="openServiceCatalog = false"
+                maxWidth="4/5"
+                overlayWidth="100%"
+                zIndex="50"
             >
                 <livewire:dictionary.service-catalog
-                        :legal-entity="legalEntity()"
-                        :selection-mode="true"
-                        selection-event="encounter-service-selected"
-                        :allowed-categories="$this->form->encounter['classCode'] === 'AMB' ? ['counselling'] : []"
-                        :key="'encounter-service-catalog'"
+                    lazy
+                    :legal-entity="legalEntity()"
+                    :selection-mode="true"
+                    selection-event="encounter-service-selected"
+                    :allowed-categories="$this->form->encounter['classCode'] === 'AMB' ? ['counselling'] : []"
+                    :key="'encounter-service-catalog'"
                 />
 
                 <div class="mt-8">
@@ -542,12 +536,12 @@
                     <template x-if="coAuthor.locked || {{ $isReadonly ? 'true' : 'false' }}">
                         <div class="form-group group">
                             <input
-                                    type="text"
-                                    class="input peer"
-                                    :id="'coAuthor_' + index"
-                                    :value="participantName(coAuthor)"
-                                    disabled
-                                    placeholder=" "
+                                type="text"
+                                class="input peer"
+                                :id="'coAuthor_' + index"
+                                :value="participantName(coAuthor)"
+                                disabled
+                                placeholder=" "
                             />
                             <label :for="'coAuthor_' + index" class="label" x-text="participantLabel(coAuthor)"></label>
                         </div>
@@ -556,17 +550,17 @@
                     <template x-if="! coAuthor.locked && ! {{ $isReadonly ? 'true' : 'false' }}">
                         <div class="form-group group">
                             <select
-                                    class="input-select peer @error('form.encounter.participant.0') input-error @enderror"
-                                    :id="'coAuthor_' + index"
-                                    x-model="coAuthors[index].uuid"
-                                    @change="validateCoAuthorSelection(index)"
+                                class="input-select peer @error('form.encounter.participant.0') input-error @enderror"
+                                :id="'coAuthor_' + index"
+                                x-model="coAuthors[index].uuid"
+                                @change="validateCoAuthorSelection(index)"
                             >
                                 <option value="">{{ __('encounters.find_doctor') }}</option>
 
                                 @foreach ($this->employees as $employee)
                                     <option
-                                            value="{{ $employee['uuid'] }}"
-                                            :disabled="isCoAuthorAlreadySelected(
+                                        value="{{ $employee['uuid'] }}"
+                                        :disabled="isCoAuthorAlreadySelected(
                                             @js((string) $employee['uuid']),
                                             index
                                         )"
@@ -581,11 +575,11 @@
                     </template>
 
                     <button
-                            type="button"
-                            x-show="! coAuthor.locked && ! {{ $isReadonly ? 'true' : 'false' }}"
-                            x-cloak
-                            @click="removeCoAuthor(index)"
-                            class="absolute top-3 right-0 cursor-pointer text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
+                        type="button"
+                        x-show="! coAuthor.locked && ! {{ $isReadonly ? 'true' : 'false' }}"
+                        x-cloak
+                        @click="removeCoAuthor(index)"
+                        class="absolute top-3 right-0 cursor-pointer text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
                     >
                         @icon('delete', 'w-6 h-6')
                     </button>
@@ -594,19 +588,19 @@
 
             @unless ($isReadonly)
                 <button
-                        type="button"
-                        @click="addCoAuthor()"
-                        class="ml-1 flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                    type="button"
+                    @click="addCoAuthor()"
+                    class="ml-1 flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                     @icon('plus', 'w-4 h-4')
                     <span>{{ __('encounters.add_coauthor') }}</span>
                 </button>
             @endunless
             @error('form.encounter.participant.0')
-            <p class="text-error">{{ $message }}</p>
+                <p class="text-error">{{ $message }}</p>
             @enderror
             @error('form.encounter.participant')
-            <p class="text-error">{{ $message }}</p>
+                <p class="text-error">{{ $message }}</p>
             @enderror
         </div>
     </div>
@@ -619,22 +613,22 @@
         <div x-show="selectedReferences.length > 0" x-cloak class="my-3 overflow-x-auto">
             <table class="table-input w-inherit">
                 <thead class="thead-input">
-                <tr>
-                    <th scope="col" class="th-input w-[15%] uppercase">{{ mb_strtoupper(__('forms.date')) }}</th>
-                    <th scope="col" class="th-input w-[75%] uppercase">{{ mb_strtoupper(__('forms.name')) }}</th>
-                    <th scope="col" class="th-input w-[10%] pr-8 text-right uppercase">
-                        {{ mb_strtoupper(__('forms.actions')) }}
-                    </th>
-                </tr>
+                    <tr>
+                        <th scope="col" class="th-input w-[15%] uppercase">{{ mb_strtoupper(__('forms.date')) }}</th>
+                        <th scope="col" class="th-input w-[75%] uppercase">{{ mb_strtoupper(__('forms.name')) }}</th>
+                        <th scope="col" class="th-input w-[10%] pr-8 text-right uppercase">
+                            {{ mb_strtoupper(__('forms.actions')) }}
+                        </th>
+                    </tr>
                 </thead>
                 <tbody>
-                <template x-for="ref in selectedReferences" :key="ref.type + '-' + ref.uuid">
-                    <tr class="border-b border-gray-200 dark:border-gray-700">
-                        <td
+                    <template x-for="ref in selectedReferences" :key="ref.type + '-' + ref.uuid">
+                        <tr class="border-b border-gray-200 dark:border-gray-700">
+                            <td
                                 class="td-input text-[14px] text-gray-900 dark:text-gray-300"
                                 x-text="ref.date || '—'"
-                        ></td>
-                        <td
+                            ></td>
+                            <td
                                 class="td-input text-[14px] text-gray-900 dark:text-white"
                                 x-text="
                                     (() => {
@@ -646,9 +640,9 @@
                                         const codeName = dictName
                                             ? `${ref.code} - ${dictName}`
                                             : (() => {
-                                                  const serviceOption = Object.values(
-                                                      $wire.dictionaries['custom/services'],
-                                                  ).find((serviceOption) => serviceOption.id === ref.code);
+                                                  const serviceOption = Object.values($store['custom/services']).find(
+                                                      (serviceOption) => serviceOption.id === ref.code,
+                                                  );
                                                   return serviceOption
                                                       ? `${serviceOption.code} / ${serviceOption.name}`
                                                       : ref.name || ref.code || '—';
@@ -657,36 +651,36 @@
                                         return [ref.typeLabel, codeName].filter(Boolean).join(' ');
                                     })()
                                 "
-                        ></td>
-                        <td class="td-input pr-8 text-right">
-                            <button
+                            ></td>
+                            <td class="td-input pr-8 text-right">
+                                <button
                                     type="button"
                                     @click="removeReference(ref.uuid, ref.type)"
                                     class="cursor-pointer p-1 text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
-                            >
-                                @icon('delete', 'w-5 h-5')
-                            </button>
-                        </td>
-                    </tr>
-                </template>
+                                >
+                                    @icon('delete', 'w-5 h-5')
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
                 </tbody>
             </table>
         </div>
 
         <button
-                type="button"
-                @click="openReferencesDrawer()"
-                class="block flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+            type="button"
+            @click="openReferencesDrawer()"
+            class="block flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
         >
             @icon('plus', 'w-4 h-4')
             <span>{{ __('encounters.add_observations_reports_conditions') }}</span>
         </button>
 
         @error('form.encounter.supportingInfo.0.uuid')
-        <p class="text-error">{{ $message }}</p>
+            <p class="text-error">{{ $message }}</p>
         @enderror
         @error('form.encounter.supportingInfo.0.type')
-        <p class="text-error">{{ $message }}</p>
+            <p class="text-error">{{ $message }}</p>
         @enderror
     </div>
 

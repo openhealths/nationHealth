@@ -14,7 +14,7 @@
                 return `${code} - ${dictionaryName}`;
             }
 
-            const service = Object.values(dictionaries['custom/services'] ?? {}).find(
+            const service = Object.values($store['custom/services'] ?? {}).find(
                 (serviceOption) => serviceOption.id === code,
             );
 

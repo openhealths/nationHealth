@@ -40,12 +40,12 @@
     <div class="form-row-modal">
         <div>
             <label for="bodySite" class="label-modal"> {{ __('observations.body_site') }} </label>
-            <select x-model="modalObservation.bodySiteCode" id="bodySite" class="input-modal" type="text" required>
-                <option value="" selected>{{ __('forms.select') }}</option>
-                @foreach ($this->dictionaries['eHealth/body_sites'] as $key => $bodySite)
-                    <option value="{{ $key }}">{{ $bodySite }}</option>
-                @endforeach
-            </select>
+            <x-select2
+                modelPath="modalObservation.bodySiteCode"
+                dictionaryName="eHealth/body_sites"
+                id="bodySite"
+                required
+            />
         </div>
 
         <div>

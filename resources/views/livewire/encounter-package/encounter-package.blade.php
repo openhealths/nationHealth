@@ -4,6 +4,7 @@
     use App\Enums\User\Role;
     use App\Models\MedicalEvents\Sql\ClinicalImpression;
     use App\Models\MedicalEvents\Sql\Encounter;
+    use Livewire\Livewire;
 
     $patientName = $patientFullName ?? __('forms.patient');
     $title = __('encounters.label') . ' - ' . $patientName;
@@ -500,3 +501,13 @@
 
     <x-forms.loading />
 </x-layouts.patient>
+
+{{-- The services reach the page once through an @script instead of travelling with the component state. Livewire
+     sends an @script only on the first render, so later requests skip building it --}}
+@unless (Livewire::isLivewireRequest())
+    @script
+        <script>
+            Alpine.store('custom/services', @json(dictionary()->services()->flattened()));
+        </script>
+    @endscript
+@endunless

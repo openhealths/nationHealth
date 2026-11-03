@@ -16,9 +16,12 @@ use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\User;
 use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
+use App\Services\Dictionary\Collections\ServiceCollection;
+use App\Services\Dictionary\DictionaryManager;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Mockery;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -162,15 +165,18 @@ class PatientReferralsPhase6Test extends TestCase
                 'service_id' => $serviceId, 'category_id' => $categoryId,
             ]);
             if ($category !== null) {
-                $services[] = ['id' => $serviceId, 'category' => $category];
+                $services[] = ['id' => $serviceId, 'code' => $category, 'name' => $category, 'category' => $category];
             }
             $expected[$uuid] = [$category, $procedureAllowed, $reportAllowed];
         }
 
+        $manager = Mockery::mock(DictionaryManager::class);
+        $manager->shouldReceive('services')->andReturn(ServiceCollection::make($services));
+        $this->instance(DictionaryManager::class, $manager);
+
         $component = new EncounterPackageComponent();
         $component->personId = $this->person->id;
         $component->dictionaries = [
-            'custom/services' => $services,
             'eHealth/procedure_categories' => ['procedure' => 'Procedure'],
             'eHealth/diagnostic_report_categories' => ['laboratory' => 'Laboratory'],
         ];
@@ -189,7 +195,7 @@ class PatientReferralsPhase6Test extends TestCase
         }
 
         $edit = new DiagnosticReportEdit();
-        $edit->dictionaries = $component->dictionaries;
+        $edit->dictionaries = [...$component->dictionaries, 'custom/services' => $services];
         foreach ($component->availableReferrals as $referral) {
             [$category, , $reportAllowed] = $expected[$referral['id']];
             $this->assertSame($category === null
