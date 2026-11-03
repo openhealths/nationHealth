@@ -89,6 +89,17 @@ trait BatchLegalEntityQueries
     }
 
     /**
+     * Strip the prefixes added when a failed job is re-dispatched ("retry_", "FirstLoginSync_retry_").
+     *
+     * @param  string  $batchName
+     * @return string
+     */
+    protected function baseBatchName(string $batchName): string
+    {
+        return preg_replace('/^(FirstLoginSync_)?(retry_)?/', '', $batchName);
+    }
+
+    /**
      * Retrieves a failed batch by its name.
      *
      * @param  string  $batchName  The name of the batch to retrieve
@@ -185,13 +196,24 @@ trait BatchLegalEntityQueries
             ->withOption('user', $user)
             ->onQueue('sync');
 
-        $syncEntity = app(BatchRepository::class)->find($batch->id)?->options['sync_entity'] ?? null;
+        $oldOptions = app(BatchRepository::class)->find($batch->id)?->options ?? [];
 
-        if ($syncEntity !== null) {
-            $batchOptions->withOption('sync_entity', $syncEntity);
+        // The patient context is read by the patient jobs from the batch options, so it must survive the restart
+        foreach (['sync_entity', 'patient_uuid', 'person_id', 'preperson_id', 'has_patient_access'] as $option) {
+            if (($oldOptions[$option] ?? null) !== null) {
+                $batchOptions->withOption($option, $oldOptions[$option]);
+            }
         }
 
         $newBatch = $batchOptions->dispatch();
+
+        // A resumed first login chain continues the overall synchronization that was paused or failed with it
+        if (
+            ($oldOptions['sync_entity'] ?? null) === ''
+            && \in_array($legalEntity->getEntityStatus(), [JobStatus::PAUSED, JobStatus::FAILED, JobStatus::PAUSED->value, JobStatus::FAILED->value], true)
+        ) {
+            $legalEntity->setEntityStatus(JobStatus::PROCESSING);
+        }
 
         // Here do echo only into the job context where legalEntity() is not set
         if (!legalEntity()) {

@@ -426,7 +426,7 @@ class LegalEntityConnectionIndex extends LegalEntityConnectionComponent
         $failedBatches = $this->findFailedBatchesByLegalEntity($this->legalEntityId, 'ASC');
 
         foreach ($failedBatches as $batch) {
-            if ($batch->name === self::BATCH_NAME || $batch->name === self::BATCH_SUBNAME) {
+            if (\in_array($this->baseBatchName($batch->name), [self::BATCH_NAME, self::BATCH_SUBNAME], true)) {
                 try {
                     $isResumed = DB::transaction(function () use ($batch, $user, $encryptedToken) {
                         $pendingJobs = $this->extractPendingJobsFromBatches($batch);

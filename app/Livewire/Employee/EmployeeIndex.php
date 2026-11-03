@@ -667,7 +667,7 @@ class EmployeeIndex extends EmployeeComponent
         $failedBatches = $this->findFailedBatchesByLegalEntity(legalEntity()->id, 'ASC');
 
         foreach ($failedBatches as $batch) {
-            if ($batch->name === self::BATCH_NAME || $batch->name === self::DEPENDENT_BATCH_NAME) {
+            if (\in_array($this->baseBatchName($batch->name), [self::BATCH_NAME, self::DEPENDENT_BATCH_NAME], true)) {
                 Log::info('Resuming Employee sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
                 legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_EMPLOYEE);
