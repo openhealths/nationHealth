@@ -169,6 +169,27 @@ input:-webkit-autofill:active {
     background-clip: text !important;
 }
 
+/* WebKit sets display: block !important inline on its Contacts AutoFill button. */
+input::-webkit-contacts-auto-fill-button {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+}
+
+.patient-create-form input::-webkit-contacts-auto-fill-button,
+.patient-create-form input::-webkit-credentials-auto-fill-button {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+}
+
 .input-select {
     @apply input dark:border-gray-700 dark:focus:border-blue-500 dark:bg-gray-800 pl-1 pr-9 whitespace-nowrap overflow-hidden text-ellipsis cursor-pointer
 }

@@ -1,5 +1,6 @@
 @props([
     'bind',
+    'alpineModel' => null,
     'options' => [],
     'label' => null,
     'placeholder' => null,
@@ -21,6 +22,10 @@
 --}}
 <div
     {{ $attributes->merge(['class' => 'relative w-full']) }}
+    @if ($alpineModel)
+        x-modelable="selected"
+        x-model="{{ $alpineModel }}"
+    @endif
     :class="{ 'z-50': open }"
     x-data="{
         open: false,
@@ -31,14 +36,14 @@
         addCustomValue() {
             const value = this.searchValue.trim();
 
-            if (!value) {
+            if (! value) {
                 return;
             }
 
             const key = Object.keys(this.options).find(option => option.toLowerCase() === value.toLowerCase()) ?? value;
             this.options = { ...this.options, [key]: this.options[key] ?? value };
 
-            if (!this.selected.includes(key)) {
+            if (! this.selected.includes(key)) {
                 this.selected = [...this.selected, key];
             }
 
@@ -48,7 +53,7 @@
         get filteredOptions() {
             const searchValue = this.searchValue.trim().toLowerCase();
 
-            if (!searchValue) {
+            if (! searchValue) {
                 return this.options;
             }
 
@@ -67,8 +72,8 @@
         }
     }"
     x-init="
-        @if ($initial !== null)
-            selected = @js($initial);
+        @if ($initial !== null || $alpineModel)
+            selected = @js($initial ?? []);
         @else
             $nextTick(() => {
                 const wireValue = $wire.get('{{ $bind }}');
@@ -77,6 +82,7 @@
                 }
             });
         @endif
+        @if (!$alpineModel)
         $watch('selected', (val) => {
             const next = Array.isArray(val) ? [...val] : val;
             if (JSON.stringify(next) === JSON.stringify($wire.get('{{ $bind }}'))) {
@@ -84,6 +90,7 @@
             }
             $wire.set('{{ $bind }}', next, {{ $live ? 'true' : 'false' }});
         });
+        @endif
     "
     x-effect="$dispatch('open-changed', { open })"
     @click.outside="open = false"
@@ -141,7 +148,7 @@
                         <button
                             type="button"
                             @click="addCustomValue()"
-                            :disabled="!searchValue.trim()"
+                            :disabled="! searchValue.trim()"
                             class="button-primary mt-2 px-4! py-2! text-xs!"
                         >
                             {{ __('forms.add_to_search') }}

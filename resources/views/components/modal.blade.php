@@ -1,4 +1,4 @@
-@props(['id', 'maxWidth'])
+@props(['id', 'maxWidth', 'alpineModel' => null])
 
 @php
     $id = $id ?? md5($attributes->wire('model'));
@@ -14,19 +14,25 @@
 @endphp
 
 <div
-    x-data="{ show: @entangle($attributes->wire('model')) }"
+    @if ($alpineModel)
+        x-data="{ show: false }"
+        x-modelable="show"
+        x-model="{{ $alpineModel }}"
+    @else
+        x-data="{ show: @entangle($attributes->wire('model')) }"
+    @endif
     x-on:close.stop="show = false"
     x-on:keydown.escape.window="show = false"
     x-show="show"
     id="{{ $id }}"
     class="fixed inset-0 z-50 overflow-y-auto px-4 py-6 sm:px-0"
-    style="display: none;"
+    style="display: none"
 >
     <div class="fixed inset-0 flex items-center justify-center">
         <!-- Overlay -->
         <div
             x-show="show"
-            class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80 transition-opacity"
+            class="fixed inset-0 bg-gray-500/75 transition-opacity dark:bg-gray-900/80"
             x-on:click="show = false"
             x-transition:enter="ease-out duration-300"
             x-transition:enter-start="opacity-0"

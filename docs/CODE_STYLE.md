@@ -91,6 +91,13 @@ during a Livewire request does not prevent duplicates while background processin
 
 ## Blade + Alpine.js
 
+For frontend-only changes, preserve runtime Livewire components and their existing
+action arguments, authorization, validation and side effects. Keep local filters
+and presentation-only modal state in Alpine; do not add server requests on input.
+Status filters must use the status and processing state, independently of action
+availability. Scrollable tables must contain page overflow and keep the first,
+last and single-row dropdowns accessible after scrolling and Livewire updates.
+
 Read-only address components must skip edit and suggestion-search watchers.
 Keep their `entangle` and `x-model` bindings active so saved values still update.
 

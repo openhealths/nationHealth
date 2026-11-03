@@ -4,7 +4,9 @@
 <div>
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     @if ($syncBatchIds !== [])
-        <div wire:poll.3s="checkSyncStatus" class="mb-4 text-sm text-gray-600 dark:text-gray-300">{{ __('care-plan.sync_running') }}</div>
+        <div wire:poll.3s="checkSyncStatus" class="mb-4 text-sm text-gray-600 dark:text-gray-300">
+            {{ __('care-plan.sync_running') }}
+        </div>
     @endif
     <x-header-navigation class="items-start" x-data="{ showFilter: false }">
         <x-slot name="title">{{ __('care-plan.care_plans') }}</x-slot>
@@ -223,7 +225,7 @@
                         $medRecordNo = $plan->encounterIdentifier?->value ?? $plan->encounter?->uuid ?? $plan->requisition ?? $plan->encounter_id ?? '-';
                     @endphp
                     <div class="record-inner-card" wire:key="care-plan-{{ $plan->id }}">
-                        <div class="record-inner-header">
+                        <div class="record-inner-header md:min-h-28">
                             <div class="record-inner-checkbox-col">
                                 <input
                                     type="checkbox"
@@ -251,74 +253,75 @@
                                 </div>
                             </div>
 
-                                <div class="record-inner-action-col">
-                                    <div
-                                        x-data="{
-                                            open: false,
-                                            toggle() {
-                                                if (this.open) {
-                                                    return this.close();
-                                                }
-                                                this.$refs.button.focus();
-                                                this.open = true;
-                                            },
-                                            close(focusAfter) {
-                                                if (! this.open) return;
-                                                this.open = false;
-                                                focusAfter && focusAfter.focus();
-                                            },
-                                        }"
-                                        @keydown.escape.prevent.stop="close($refs.button)"
-                                        @focusin.window="! $refs.panel.contains($event.target) && close()"
-                                        x-id="['dropdown-button']"
-                                        class="relative"
+                            <div class="record-inner-action-col">
+                                <div
+                                    x-data="{
+                                        open: false,
+                                        toggle() {
+                                            if (this.open) {
+                                                return this.close();
+                                            }
+                                            this.$refs.button.focus();
+                                            this.open = true;
+                                        },
+                                        close(focusAfter) {
+                                            if (! this.open) return;
+                                            this.open = false;
+                                            focusAfter && focusAfter.focus();
+                                        },
+                                    }"
+                                    @keydown.escape.prevent.stop="close($refs.button)"
+                                    @focusin.window="! $refs.panel.contains($event.target) && close()"
+                                    x-id="['dropdown-button']"
+                                    class="relative"
+                                >
+                                    <button
+                                        @click="toggle()"
+                                        x-ref="button"
+                                        :aria-expanded="open"
+                                        :aria-controls="$id('dropdown-button')"
+                                        type="button"
+                                        aria-label="{{ __('forms.actions') }}"
+                                        class="record-inner-action-btn cursor-pointer rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
                                     >
-                                        <button
-                                            @click="toggle()"
-                                            x-ref="button"
-                                            :aria-expanded="open"
-                                            :aria-controls="$id('dropdown-button')"
-                                            type="button"
-                                            class="record-inner-action-btn cursor-pointer rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                                        >
-                                            @icon('edit-user-outline', 'w-6 h-6 text-gray-700 dark:text-gray-300')
-                                        </button>
+                                        @icon('edit-user-outline', 'w-6 h-6 text-gray-700 dark:text-gray-300')
+                                    </button>
 
-                                        <div
-                                            x-show="open"
-                                            x-cloak
-                                            x-ref="panel"
-                                            x-transition.origin.top.right
-                                            @click.outside="close($refs.button)"
-                                            :id="$id('dropdown-button')"
-                                            class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-700"
-                                        >
-                                            @if (isset($plan->id))
-                                                @if (!$plan->requiresFhirImport() && $plan->status === 'draft')
-                                                    <a
-                                                        href="{{ route('care-plans.edit', [legalEntity(), $plan->id]) }}"
-                                                        class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                    >
-                                                        @icon('edit', 'w-5 h-5 text-gray-500')
-                                                        {{ __('forms.edit') }}
-                                                    </a>
-                                                @endif
-
+                                    <div
+                                        x-show="open"
+                                        x-cloak
+                                        x-ref="panel"
+                                        x-transition.origin.top.right
+                                        @click.outside="close($refs.button)"
+                                        :id="$id('dropdown-button')"
+                                        class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-700"
+                                    >
+                                        @if (isset($plan->id))
+                                            @if (!$plan->requiresFhirImport() && $plan->status === 'draft')
                                                 <a
-                                                    href="{{ route('care-plans.show', [legalEntity(), $plan->id]) }}"
+                                                    href="{{ route('care-plans.edit', [legalEntity(), $plan->id]) }}"
                                                     class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
                                                 >
-                                                    @icon('eye', 'w-5 h-5 text-gray-500')
-                                                    {{ __('forms.view_details') }}
+                                                    @icon('edit', 'w-5 h-5 text-gray-500')
+                                                    {{ __('forms.edit') }}
                                                 </a>
                                             @endif
-                                        </div>
+
+                                            <a
+                                                href="{{ route('care-plans.show', [legalEntity(), $plan->id]) }}"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                            >
+                                                @icon('eye', 'w-5 h-5 text-gray-500')
+                                                {{ __('forms.view_details') }}
+                                            </a>
+                                        @endif
                                     </div>
                                 </div>
+                            </div>
                         </div>
 
-                        <div class="record-inner-body">
-                            <div class="record-inner-grid-container md:!pl-4">
+                        <div class="record-inner-body md:min-h-44">
+                            <div class="record-inner-grid-container min-w-0 md:!pl-4">
                                 <div class="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-3 lg:grid-cols-6">
                                     <div class="min-w-0">
                                         <div class="record-inner-label">{{ __('forms.created') }}</div>

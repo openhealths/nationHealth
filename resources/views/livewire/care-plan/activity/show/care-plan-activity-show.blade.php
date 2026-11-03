@@ -31,7 +31,10 @@
         @include('livewire.care-plan.parts.activity.submission-status')
 
         @if (!$this->canManageActivities && !$this->isTerminalCarePlan)
-            <p class="text-sm text-amber-700 dark:text-amber-300" role="status">
+            <p
+                class="rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-900 dark:bg-gray-800 dark:text-yellow-300"
+                role="status"
+            >
                 {{ __('care-plan.prescribing_patient_access_required') }}
             </p>
         @endif
@@ -42,12 +45,7 @@
             </div>
         @endif
 
-        <div class="flex flex-wrap items-center gap-3">
-            <a href="{{ route('care-plans.show', [legalEntity(), $carePlan->id]) }}" class="button-minor" wire:navigate>
-                @icon('arrow-left', 'w-4 h-4')
-                <span>{{ __('forms.back') }}</span>
-            </a>
-
+        <div class="flex flex-wrap items-center justify-start gap-3">
             @if (filled($activity->uuid) || filled($carePlan->uuid))
                 <button
                     type="button"
@@ -127,6 +125,17 @@
         @elseif (in_array($resolvedKind, ['service_request', 'device_request'], true))
             @include('livewire.care-plan.parts.activity.referrals-list')
         @endif
+
+        <div class="flex justify-start pt-4 pb-12">
+            <a
+                href="{{ route('care-plans.show', [legalEntity(), $carePlan->id]) }}"
+                class="button-minor flex items-center gap-2"
+                wire:navigate
+            >
+                @icon('arrow-left', 'w-4 h-4')
+                <span>{{ __('forms.back') }}</span>
+            </a>
+        </div>
 
         @if ($actionType === 'cancel_activity')
             @include('livewire.care-plan.parts.modals.cancel-activity-modal', ['method' => 'sign'])
