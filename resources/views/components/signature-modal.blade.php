@@ -74,7 +74,7 @@
 
                     {{-- Content --}}
                     <div class="p-6">
-                        <form>
+                        <form wire:submit="{{ $method }}">
                             <div class="flex flex-col gap-6">
                                 {{-- Care-plan cancel/complete still @extends this layout and fill @section('custom-fields'). --}}
                                 {{-- Encounter/contract flows pass a $customFields slot instead. Keep both. --}}
@@ -167,24 +167,23 @@
                                     @enderror
                                 </div>
                             </div>
-                        </form>
 
-                        <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6">
-                            <button type="button" @click="showSignatureModal = false" class="button-minor">
-                                {{ __('forms.cancel') }}
-                            </button>
-                            <button
-                                wire:click="{{ $method }}"
-                                type="button"
-                                class="button-primary"
-                                wire:loading.attr="disabled"
-                                wire:loading.class="opacity-50 cursor-not-allowed"
-                                wire:target="{{ $method }}"
-                            >
-                                <span wire:loading.remove wire:target="{{ $method }}">{{ __('forms.sign') }}</span>
-                                <span wire:loading wire:target="{{ $method }}">{{ __('forms.signature') }}...</span>
-                            </button>
-                        </div>
+                            <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6">
+                                <button type="button" @click="showSignatureModal = false" class="button-minor">
+                                    {{ __('forms.cancel') }}
+                                </button>
+                                <button
+                                    type="submit"
+                                    class="button-primary"
+                                    wire:loading.attr="disabled"
+                                    wire:loading.class="opacity-50 cursor-not-allowed"
+                                    wire:target="{{ $method }}"
+                                >
+                                    <span wire:loading.remove wire:target="{{ $method }}">{{ __('forms.sign') }}</span>
+                                    <span wire:loading wire:target="{{ $method }}">{{ __('forms.signature') }}...</span>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
