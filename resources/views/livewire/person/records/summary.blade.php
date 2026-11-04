@@ -72,15 +72,7 @@
                 ['id' => 'conditions', 'action' => 'getConditions', 'syncAction' => 'syncConditions', 'label' => __('conditions.plural'), 'icon' => 'file-minus', 'syncEntity' => PatientSummary::ENTITY_TYPE_CONDITION],
                 ['id' => 'diagnosticReports', 'action' => 'getDiagnosticReports', 'syncAction' => 'syncDiagnosticReports', 'label' => __('diagnostic-reports.plural'), 'icon' => 'activity', 'syncEntity' => PatientSummary::ENTITY_TYPE_DIAGNOSTIC_REPORT],
                 ['id' => 'procedures', 'action' => 'getProcedures', 'syncAction' => 'syncProcedures', 'label' => __('procedures.plural'), 'icon' => 'settings', 'syncEntity' => ''],
-                ['id' => 'allergies', 'action' => 'syncAllergyIntolerances', 'syncAction' => 'syncAllergyIntolerances', 'label' => __('patients.allergies'), 'icon' => 'alert', 'syncEntity' => ''],
-                ['id' => 'risk_assessments', 'action' => 'syncRiskAssessments', 'syncAction' => 'syncRiskAssessments', 'label' => __('patients.risk_assessments'), 'icon' => 'alert-octagon', 'syncEntity' => ''],
                 ['id' => 'devices', 'action' => 'getDevices', 'syncAction' => 'syncDevices', 'label' => __('devices.plural'), 'icon' => 'monitor', 'syncEntity' => PatientSummary::ENTITY_TYPE_DEVICE],
-                ['id' => 'associatedDevices', 'action' => 'syncAssociatedDevices', 'syncAction' => 'syncAssociatedDevices', 'label' => __('patients.associated_devices'), 'icon' => 'equipment', 'syncEntity' => ''],
-                ['id' => 'deviceAssociations', 'action' => 'syncDeviceAssociations', 'syncAction' => 'syncDeviceAssociations', 'label' => __('patients.device_associations'), 'icon' => 'boxicons-plug-connect-filled', 'syncEntity' => ''],
-                ['id' => 'deviceIssues', 'action' => 'syncDeviceIssues', 'syncAction' => 'syncDeviceIssues', 'label' => __('patients.device_issues'), 'icon' => 'alert-octagon', 'syncEntity' => ''],
-                ['id' => 'deviceDispenses', 'action' => 'syncDeviceDispenses', 'syncAction' => 'syncDeviceDispenses', 'label' => __('patients.device_dispenses'), 'icon' => 'solid-notes-medical', 'syncEntity' => ''],
-                ['id' => 'specimens', 'action' => 'syncSpecimens', 'syncAction' => 'syncSpecimens', 'label' => __('patients.specimens'), 'icon' => 'sample-outline', 'syncEntity' => ''],
-                ['id' => 'medicines', 'action' => 'syncMedicationStatements', 'syncAction' => 'syncMedicationStatements', 'label' => __('patients.medicines'), 'icon' => 'pill-outline', 'syncEntity' => ''],
             ];
         @endphp
 
@@ -147,20 +139,8 @@
                                 @include('livewire.person.records.parts.conditions')
                             @elseif ($item['id'] === 'diagnosticReports')
                                 @include('livewire.person.records.parts.diagnostic-reports')
-                                {{-- The allergy and risk assessment parts still hold mock records, so the sections
-                                fall through to the empty state until they are built on real data
-                            @elseif ($item['id'] === 'allergies')
-                                @include('livewire.person.records.parts.allergies')
-                            @elseif ($item['id'] === 'risk_assessments')
-                                @include('livewire.person.records.parts.risk-assessments')
-                            --}}
                             @elseif ($item['id'] === 'devices')
                                 @include('livewire.person.records.parts.devices')
-                                {{-- The medicine part still holds mock records, so the section falls through
-                                to the empty state until it is built on real data
-                            @elseif ($item['id'] === 'medicines')
-                                @include('livewire.person.records.parts.medicines')
-                            --}}
                             @elseif ($item['id'] === 'procedures')
                                 @include('livewire.person.records.parts.procedures')
                             @else
