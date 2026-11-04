@@ -114,6 +114,9 @@ abstract class EHealthJob implements ShouldQueue
 
     public function handle(): void
     {
+        // Detail jobs may omit the constructor flag, but the batch retains the first login context.
+        $this->isFirstLogin = $this->isFirstLogin || ($this->batch()?->options['sync_entity'] ?? null) === '';
+
         echo "Processing Job: " . static::BATCH_NAME . " Page: " . $this->page . ' is First Login: ' . ($this->isFirstLogin ? 'Yes' : 'No') . PHP_EOL;
         echo "Start from user: " . ($this->user ? $this->user->id : 'No user found') . PHP_EOL;
         echo "Legal Entity ID: " . ($this->legalEntity ? $this->legalEntity->id : 'No legal entity found') . PHP_EOL;
@@ -172,6 +175,9 @@ abstract class EHealthJob implements ShouldQueue
     // Handle job failure
     public function failed(?Throwable $exception): void
     {
+        // An exhausted job may fail before handle() or middleware(), including jobs queued before this fix.
+        $this->isFirstLogin = $this->isFirstLogin || ($this->batch()?->options['sync_entity'] ?? null) === '';
+
         // It is need because if job is failed the middleware doesn't called
         $olduser = $this->user ?? ($this->batch()->options['user'] ?? null);
 

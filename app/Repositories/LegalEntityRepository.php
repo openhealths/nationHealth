@@ -73,7 +73,7 @@ class LegalEntityRepository
      * @param  array  $data  The data to fill the license with.
      * @param  LegalEntityModel  $legalEntity  the legal entity the license belongs to
      */
-    public function saveLicense(array $data, LegalEntityModel $legalEntity): void
+    public function saveLicense(array $data, LegalEntityModel $legalEntity, bool $preserveEmptyActivity = true): void
     {
         if (isset($data['ehealth_inserted_at'])) {
             $data['ehealth_inserted_at'] = convertToYmd($data['ehealth_inserted_at']);
@@ -84,7 +84,15 @@ class LegalEntityRepository
         }
 
         $license = License::firstOrNew(['uuid' => $data['uuid']]);
+        $keepEmptyActivity = $preserveEmptyActivity && $license->exists && $license->what_licensed === null;
+
         $license->fill($data);
+
+        // eHealth echoes its last value even after the user intentionally omits this field.
+        if ($keepEmptyActivity) {
+            $license->what_licensed = null;
+        }
+
         $license->is_primary = $data['type'] === LicenseType::MSP->value || $data['type'] === LicenseType::PHARMACY->value;
 
         $legalEntity->licenses()->save($license);
@@ -210,12 +218,10 @@ class LegalEntityRepository
     }
 
     /**
-     * Handles the owner change process for the legal entity.
+     * Deactivates the previous OWNER locally after eHealth confirms the replacement.
      *
-     * Removes the OWNER and/or REORGANIZATION_OWNER roles from the current authenticated user,
-     * detaches their employee records from the pivot table, and sets status to STOPPED
-     * for the OWNER's employee record in the employees table.
-     * Logs out the old owner and redirects to login.
+     * Keeps the employee and its user_id for history. Removes this employee's OWNER access
+     * and pivot links while preserving other positions and employment in other legal entities.
      *
      * @return void
      */
@@ -223,39 +229,40 @@ class LegalEntityRepository
     {
         $legalEntity ??= legalEntity();
 
-        setPermissionsTeamId($legalEntity->id);
-
-        // Get users from the same party who are associated ONLY with the current legal entity.
-        $partyUsers = User::with(['roles', 'employees'])
-            ->where('party_id', $oldOwner->party_id)
-            ->whereDoesntHave('employees', function ($query) use ($legalEntity) {
-                $query->where('legal_entity_id', '!=', $legalEntity->id);
-            })
-            ->get();
-
-        $partyUserIds = $partyUsers->pluck('id');
-
-        // If there are no other party users besides the new user, there's nothing to disable.
-        if ($partyUserIds->isEmpty()) {
+        // Only process an OWNER belonging to the given legal entity; leave other employees unchanged.
+        if ($oldOwner->employeeType !== Role::OWNER->value || $oldOwner->legalEntityId !== $legalEntity->id) {
             return;
         }
 
-        // Disable the old owner if they are not the new user.
-        // This important in case when the same user is both the old owner and the new user.
-        if ($oldOwner->userId != $newUserId) {
-            Auth::shouldUse('web');
+        // Scope Spatie role removal to this legal entity, preserving roles in other entities.
+        setPermissionsTeamId($legalEntity->id);
 
-            // Remove the OWNER's roles for all party users via web guard
-            $partyUsers->each->removeRole([Role::OWNER, Role::REORGANIZATION_OWNER]);
+        // Find users linked to the old OWNER through employee_users and the stored employees.user_id.
+        // Employment elsewhere must not prevent removing their OWNER access in this legal entity.
+        $oldUserIds = $oldOwner->users()->pluck('users.id')->push($oldOwner->userId)->filter()->unique();
 
-            Auth::shouldUse('ehealth');
+        // Preserve the new owner's role: the same user may receive a new OWNER employee UUID.
+        $oldUsers = User::whereIn('id', $oldUserIds)
+            ->where('id', '!=', $newUserId)
+            ->get();
 
-            // Remove the OWNER's roles for all party users via 'ehealth' guard
-            $partyUsers->each->removeRole([Role::OWNER, Role::REORGANIZATION_OWNER]);
+        // Switch guards to remove both sets of roles, then restore the original guard even on failure.
+        $savedGuard = Auth::getDefaultDriver();
+        try {
+            foreach (['web', 'ehealth'] as $guard) {
+                Auth::shouldUse($guard);
+                // Remove only OWNER and its derived access role; preserve all other roles.
+                $oldUsers->each->removeRole([Role::OWNER, Role::REORGANIZATION_OWNER]);
+            }
+        } finally {
+            Auth::shouldUse($savedGuard);
         }
 
-        $oldOwner->users()->detach($partyUserIds);
+        // Remove only the old OWNER's employee_users links, even when the new owner is the same user.
+        // Leave links to other employees, including the new OWNER, unchanged.
+        $oldOwner->users()->detach();
 
+        // Keep employees.user_id and set STOPPED regardless of employment in other legal entities.
         $oldOwner->update(['status' => Status::STOPPED->value]);
 
         Log::info(__('** OWNER CHANGED **', [], 'en'), ['old_owner_id' => $oldOwner->id, 'legal_entity_id' => $legalEntity->id]);

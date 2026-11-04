@@ -29,7 +29,7 @@ return new class extends Migration
             $table->string('order_no');
             $table->string('license_number')->nullable();
             $table->date('expiry_date')->nullable();
-            $table->string('what_licensed');
+            $table->string('what_licensed')->nullable();
             $table->boolean('is_primary')->default(false);
             $table->date('ehealth_inserted_at')->nullable();
             $table->uuid('ehealth_inserted_by')->nullable();

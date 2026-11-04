@@ -14,6 +14,8 @@ use Illuminate\Translation\PotentiallyTranslatedString;
 
 class TaxId implements ValidationRule, DataAwareRule
 {
+    public const array OWNER_NO_TAX_ID_DOCUMENT_TYPES = ['PASSPORT', 'NATIONAL_ID'];
+
     /**
      * The entire data array under validation.
      *
@@ -114,13 +116,21 @@ class TaxId implements ValidationRule, DataAwareRule
     {
         // When no_tax_id=true, tax_id stores an identity document number (not РНОКПП).
         if ($this->noTaxId) {
+            $documentTypes = $this->isOwner
+                ? self::OWNER_NO_TAX_ID_DOCUMENT_TYPES
+                : config('ehealth.no_tax_id_document_types', []);
+
             $identityDoc = collect($this->documents)->first(
-                fn (array $doc) => in_array($doc['type'] ?? '', config('ehealth.no_tax_id_document_types', []), true)
-                    && !empty($doc['number'])
+                fn (array $doc) => in_array($doc['type'] ?? '', $documentTypes, true)
+                    && filled($doc['number'] ?? null)
             );
 
             if (!$identityDoc) {
-                $fail(__('forms.no_tax_id_document_required'));
+                $message = $this->isOwner
+                    ? __('forms.owner_no_tax_id_document_required')
+                    : __('forms.no_tax_id_document_required');
+
+                $fail($message);
 
                 return;
             }

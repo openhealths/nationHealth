@@ -173,6 +173,9 @@ class EHealthLoginController extends Controller
             return $this->breakAuth($message);
         }
 
+        // Start a fresh inactivity window after the login listeners complete successfully.
+        Session::put('last_activity', now()->timestamp);
+
         $user->refresh();
 
         if (!$user->party) {

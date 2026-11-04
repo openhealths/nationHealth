@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\PermissionRegistrar;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthConnectionException;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 
 class OwnerNewReplace
 {
@@ -36,7 +37,7 @@ class OwnerNewReplace
 
         $role = session('single_role_login');
 
-        if ($role !== Role::OWNER->value) {
+        if ($role !== null && $role !== Role::OWNER->value) {
             return;
         }
 
@@ -48,15 +49,8 @@ class OwnerNewReplace
             ->pluck('name')
             ->all() ?? [];
 
-        // Order-independent equality check
-        $scopesMatch = empty(array_diff($ownerScopes, $event->scopes));
-
-        if ($role !== Role::OWNER->value) {
-            return;
-        }
-
-        // If OWNER by role but not by permissions, we don't need to do anything
-        if (!$scopesMatch) {
+        // Combined logins must also carry all OWNER scopes granted by eHealth.
+        if (empty($ownerScopes) || array_diff($ownerScopes, $event->scopes)) {
             return;
         }
 
@@ -72,11 +66,11 @@ class OwnerNewReplace
             throw new RuntimeException( __('auth.login.error.owner_replacement.new_owner_employees_not_found'));
         }
 
-        $newOwner = Arr::first($data);
+        $newOwner = \count($data) === 1 ? Arr::first($data) : null;
 
-        $oldOwners = Employee::activeOwners($legalEntityId)
-            ->get()
-            ->reject(fn ($owner) => $owner->uuid === $newOwner['uuid']);
+        if (empty($newOwner['uuid'])) {
+            throw new RuntimeException(__('auth.login.error.owner_replacement.new_owner_employees_not_found'));
+        }
 
         try {
             $newOwnerDetails = EHealth::employee()->getDetails($newOwner['uuid'])->validate();
@@ -86,9 +80,36 @@ class OwnerNewReplace
             throw new RuntimeException( __('auth.login.error.owner_replacement.new_owner_details_not_found'));
         }
 
-        if (empty($newOwnerDetails)) {
+        // Require the requested OWNER UUID, APPROVED/active state and a party UUID.
+        // Check the legal entity UUID when it is returned. Before updateOrCreate(),
+        // reject UUID collisions with local employees of another legal entity or employee type.
+        if (($newOwnerDetails['uuid'] ?? null) !== $newOwner['uuid']
+            || ($newOwnerDetails['employee_type'] ?? null) !== Role::OWNER->value
+            || ($newOwnerDetails['status'] ?? null) !== Status::APPROVED->value
+            || empty($newOwnerDetails['is_active'])
+            || empty($newOwnerDetails['party']['uuid'])
+            || ($newOwnerDetails['legal_entity_uuid'] ?? $event->legalEntity->uuid) !== $event->legalEntity->uuid
+            || Employee::whereUuid($newOwner['uuid'])->where(
+                fn (EloquentBuilder $query): EloquentBuilder => $query
+                    ->where('legal_entity_id', '!=', $legalEntityId)
+                    ->orWhere('employee_type', '!=', Role::OWNER->value)
+            )->exists()
+        ) {
+            throw new RuntimeException(__('auth.login.error.owner_replacement.new_owner_details_not_found'));
+        }
+
+        // A different party may have other roles in a combined login; never assign it the OWNER employee.
+        if ($user->party?->uuid && $user->party->uuid !== $newOwnerDetails['party']['uuid']) {
+            if ($role === Role::OWNER->value) {
+                throw new RuntimeException(__('auth.login.error.owner_replacement.new_owner_party_not_found'));
+            }
+
             return;
         }
+
+        $oldOwners = Employee::activeOwners($legalEntityId)
+            ->get()
+            ->reject(fn ($owner) => $owner->uuid === $newOwner['uuid']);
 
         // ===================================================================================
         // Create missed OWNER

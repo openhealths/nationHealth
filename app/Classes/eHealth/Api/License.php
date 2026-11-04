@@ -56,7 +56,7 @@ class License extends Request
         $this->setValidator($this->validateResponse(...));
         $this->setMapper($this->mapResponse(...));
 
-        $data = $this->format($data, ['issuedDate', 'expiryDate', 'activeFromDate']);
+        $data = $this->formatAdditionalLicenseData($data);
 
         return $this->post(self::URL, $data);
     }
@@ -82,13 +82,25 @@ class License extends Request
         $clearLicenseNumber = (array_key_exists('licenseNumber', $data) && blank($data['licenseNumber']))
             || (array_key_exists('license_number', $data) && blank($data['license_number']));
 
-        $data = $this->format($data, ['issuedDate', 'expiryDate', 'activeFromDate']);
+        $data = $this->formatAdditionalLicenseData($data);
 
         if ($clearLicenseNumber) {
             $data['license_number'] = '';
         }
 
         return $this->patch(self::URL . '/' . $uuid, $data);
+    }
+
+    private function formatAdditionalLicenseData(array $data): array
+    {
+        $activity = Validator::make([
+            'what_licensed' => $data['whatLicensed'] ?? ($data['what_licensed'] ?? null),
+        ], [
+            'what_licensed' => ['required', 'string', 'max:255'],
+        ])->validate();
+
+        // Preserve required strings such as "0" after removeEmptyKeys() runs in format().
+        return array_replace($this->format($data, ['issuedDate', 'expiryDate', 'activeFromDate']), $activity);
     }
 
     /**
@@ -133,7 +145,11 @@ class License extends Request
 
         // Add *. to every rule
         $rules = collect($this->validationRules())
-            ->mapWithKeys(static fn (string|array $rule, string $key) => ["*.$key" => $rule])
+            ->mapWithKeys(static fn (string|array $rule, string $key) => [
+                "*.$key" => $key === 'what_licensed'
+                    ? 'nullable|required_unless:*.is_primary,true|string'
+                    : $rule,
+            ])
             ->toArray();
 
         $validator = Validator::make($replaced, $rules);

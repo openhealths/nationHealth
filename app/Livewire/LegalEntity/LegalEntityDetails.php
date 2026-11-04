@@ -259,7 +259,7 @@ class LegalEntityDetails extends LegalEntityComponent
     {
         $owner = $this->legalEntity->getOwner();
 
-        if (!$owner->exists()) {
+        if ($owner === null) {
             return;
         }
 

@@ -521,6 +521,44 @@
                 @include('livewire.legal-entity.step._step_accreditation')
                 @include('livewire.legal-entity.step._step_license')
                 @include('livewire.legal-entity.step._step_additional_information')
+
+            <div class="mt-6 flex flex-col gap-6 xl:flex-row justify-between items-center max-w-[1280px]">
+                <div class="form-group group">
+                    <div class="form-row mx-5 mb-6 sm:w-1/2 lg:w-1/2">
+                        <div class="form-group group opacity-50">
+                            <input
+                                type="url"
+                                id="legalEntityDetailsRedirectUri"
+                                name="security.redirect_uri"
+                                value="{{ config('ehealth.api.connection_redirect_uri') }}"
+                                placeholder=" "
+                                class="input peer"
+                                readonly
+                                disabled
+                            />
+                            <label for="legalEntityDetailsRedirectUri" class="label z-10">
+                                {{ __('legal-entity.security.redirect_uri') }}
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center p-5 opacity-50">
+                        <input
+                            type="checkbox"
+                            id="public_offer_consent"
+                            class="steps-agreement_checkbox"
+                            checked
+                            disabled
+                        />
+                        <label
+                            for="public_offer_consent"
+                            class="steps-agreement_label !text-xs"
+                        >
+                            {{ __(dictionary()->basics()->byName('LE_CONSENT_TEXT')->value('description')) }}
+                        </label>
+                    </div>
+                </div>
+            </div>
         </fieldset>
 
         <x-forms.loading/>

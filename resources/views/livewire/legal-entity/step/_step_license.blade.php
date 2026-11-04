@@ -180,7 +180,6 @@
 
         <div class="form-group group">
             <input
-                required
                 type="text"
                 placeholder=" "
                 id="licenseWhatLicensed"
