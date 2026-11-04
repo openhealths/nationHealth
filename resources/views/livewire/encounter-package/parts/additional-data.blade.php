@@ -411,7 +411,7 @@
             "
         >
             <template x-for="(service, index) in services" :key="index">
-                <div class="relative pr-10">
+                <div class="relative pr-10" :class="{ 'z-30': serviceDropdowns[index] }">
                     <div class="flex items-center gap-6">
                         <div class="form-group group relative flex-1" @click.away="serviceDropdowns[index] = false">
                             <input
