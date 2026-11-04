@@ -99,13 +99,15 @@ class PersonRequestRepository
     }
 
     /**
-     * Create person request for update.
+     * Create person request for update, linked to the person it changes from the start, so that an unfinished one
+     * is told apart from a registration.
      *
      * @param  array  $validatedData
+     * @param  int  $personId
      * @return void
      * @throws Throwable
      */
-    public function update(array $validatedData): void
+    public function update(array $validatedData, int $personId): void
     {
         $personData = $validatedData['person'];
         $personFields = Arr::except(
@@ -113,8 +115,8 @@ class PersonRequestRepository
             ['names', 'documents', 'phones', 'addresses', 'confidant_person']
         );
 
-        DB::transaction(static function () use ($personFields, $personData) {
-            $personRequest = PersonRequest::create($personFields);
+        DB::transaction(static function () use ($personFields, $personData, $personId) {
+            $personRequest = PersonRequest::create([...$personFields, 'person_id' => $personId]);
 
             $personRequest->names()->createMany($personData['names']);
             $personRequest->documents()->createMany($personData['documents']);

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Person\Records;
 
 use App\Classes\eHealth\EHealth;
+use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\JobStatus;
 use App\Enums\Person\DiagnosticReportStatus;
+use App\Enums\Person\EncounterStatus;
 use App\Enums\Person\MergedPersonStatus;
 use App\Enums\Person\ProcedureStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -313,7 +315,8 @@ class PatientSummary extends BasePatientComponent
                 ->readableFor(
                     $this->patient(),
                     Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
-                ),
+                )
+                ->whereNot('status', EpisodeStatus::DRAFT),
             'episodes',
             visible: ['id']
         );
@@ -368,7 +371,8 @@ class PatientSummary extends BasePatientComponent
 
         $this->setPaginatedRecords(
             'encounters',
-            $encounters->with(['class', 'episode.type.coding', 'type.coding', 'period', 'performerSpeciality.coding']),
+            $encounters->whereNot('status', EncounterStatus::DRAFT)
+                ->with(['class', 'episode.type.coding', 'type.coding', 'period', 'performerSpeciality.coding']),
             'encounters',
             visible: ['id']
         );

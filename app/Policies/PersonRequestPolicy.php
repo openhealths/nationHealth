@@ -68,6 +68,23 @@ class PersonRequestPolicy
     }
 
     /**
+     * Determine whether the user can continue the change of a person's data the request carries.
+     * A new request still waits for the patient's confirmation and an approved one for the signature.
+     */
+    public function continue(User $user, PersonRequest $personRequest): Response
+    {
+        if ($user->cannot('person_request:write')) {
+            return Response::denyWithStatus(404);
+        }
+
+        if (!in_array($personRequest->status, [Status::NEW, Status::APPROVED], true)) {
+            return Response::denyWithStatus(404);
+        }
+
+        return Response::allow();
+    }
+
+    /**
      * Determine whether the user can delete the local draft of the person request.
      */
     public function delete(User $user, PersonRequest $personRequest): Response

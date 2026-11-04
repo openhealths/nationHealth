@@ -7,6 +7,7 @@ namespace App\Livewire\Person;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Person\AuthStep;
+use App\Enums\Person\Status;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Person\Traits\InteractsWithAuthenticationMethods;
@@ -145,7 +146,7 @@ class PersonUpdate extends PersonComponent
      */
     public bool $showTerminateModal = false;
 
-    public function mount(LegalEntity $legalEntity, Person $person): void
+    public function mount(LegalEntity $legalEntity, Person $person, ?PersonRequest $personRequest = null): void
     {
         $this->canManageConfidantRelationships = true;
         $this->personId = $person->id;
@@ -192,6 +193,10 @@ class PersonUpdate extends PersonComponent
         $this->confidantPersonRelationshipRequests = $this->loadConfidantPersonRelationshipRequests($person);
 
         $this->loadAuthenticationMethods($person);
+
+        if ($personRequest !== null) {
+            $this->continuePersonRequest($personRequest);
+        }
     }
 
     /**
@@ -238,7 +243,8 @@ class PersonUpdate extends PersonComponent
         // save in DB
         try {
             Repository::personRequest()->update(
-                removeEmptyKeys($this->withSettlementTypes($response->map($response->validate())))
+                removeEmptyKeys($this->withSettlementTypes($response->map($response->validate()))),
+                $this->personId
             );
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to update person request');
@@ -255,6 +261,61 @@ class PersonUpdate extends PersonComponent
 
         if ($this->form->needsNhsVerification()) {
             Auth::user()->notify(new NhsVerificationNeededNotification());
+        }
+    }
+
+    /**
+     * Pick the person request up where it was left: a new one waits for the patient's confirmation, an approved one
+     * for the signature. The status is read from eHealth first, as the request may have been signed, rejected or
+     * cancelled there since it was last stored here.
+     *
+     * @param  PersonRequest  $personRequest
+     * @return void
+     */
+    private function continuePersonRequest(PersonRequest $personRequest): void
+    {
+        try {
+            $response = EHealth::personRequest()->getById($personRequest->uuid);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error when getting person request by ID');
+            $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
+
+            return;
+        }
+
+        $personRequestData = $response->getData();
+
+        try {
+            Repository::personRequest()->updateStatusByUuid($personRequestData);
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to update person request status');
+
+            return;
+        }
+
+        $status = Status::from($personRequestData['status']);
+
+        if (!in_array($status, [Status::NEW, Status::APPROVED], true)) {
+            Session::flash('error', __('patients.messages.person_request_cannot_be_continued', [
+                'status' => $status->label()
+            ]));
+            $this->redirectRoute('persons.index', [legalEntity()], navigate: true);
+
+            return;
+        }
+
+        $urgent = $response->getUrgent();
+
+        $this->form->person['id'] = $personRequest->uuid;
+        // eHealth does not return the settlement type, only the addresses stored with the request keep it
+        $this->addresses = Arr::toCamelCase($personRequest->addresses->toArray()) ?: $this->addresses;
+        $this->uploadedDocuments = $urgent['documents'] ?? [];
+        $this->authenticationMethodCurrent = $urgent['authentication_method_current'] ?? [];
+        $this->viewState = 'new';
+
+        if ($status === Status::APPROVED) {
+            $this->leafletContent = $personRequestData['content'];
+            $this->showLeafletModal = true;
         }
     }
 

@@ -117,6 +117,16 @@ class Person extends BasePerson
     }
 
     /**
+     * Requests that registered the person or changed their data.
+     *
+     * @return HasMany
+     */
+    public function personRequests(): HasMany
+    {
+        return $this->hasMany(PersonRequest::class);
+    }
+
+    /**
      * The person's name groups, one per language.
      *
      * @return HasMany

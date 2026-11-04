@@ -43,6 +43,10 @@
 
         <div class="space-y-6 pl-3.5" wire:key="patients-{{ $paginatedPatients->total() }}">
             @forelse ($paginatedPatients->items() as $patient)
+                @php
+                    // A request linked to a person changes that person's data, any other one registers a new person
+                    $isUpdateRequest = $patient['source'] === 'request' && $patient['personId'] !== null;
+                @endphp
                 <fieldset
                     wire:key="patient-{{ $patient['source'] }}-{{ $patient['id'] }}"
                     class="shift-content mt-6 mb-16 max-w-6xl rounded-lg border border-gray-200 p-4 shadow sm:p-8 sm:pb-10 dark:border-gray-700 dark:bg-gray-800"
@@ -99,11 +103,11 @@
                         <div class="flex items-center space-x-6">
                             @if ($patient['source'] === 'request')
                                 <a
-                                    href="{{ route('persons.edit', [legalEntity(), $patient['id']]) }}"
+                                    href="{{ $isUpdateRequest ? route('persons.update-request', [legalEntity(), $patient['personId'], $patient['id']]) : route('persons.edit', [legalEntity(), $patient['id']]) }}"
                                     class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800"
                                 >
                                     @icon('file-lines', 'w-4 h-4')
-                                    <span>{{ __('patients.continue_registration') }}</span>
+                                    <span>{{ $isUpdateRequest ? __('patients.continue_update') : __('patients.continue_registration') }}</span>
                                 </a>
                             @else
                                 @can('view', Person::class)
@@ -230,9 +234,9 @@
                                             @if ($patient['source'] === 'request')
                                                 <div class="inline-flex items-center gap-1">
                                                     <a
-                                                        href="{{ route('persons.edit', [legalEntity(), $patient['id']]) }}"
+                                                        href="{{ $isUpdateRequest ? route('persons.update-request', [legalEntity(), $patient['personId'], $patient['id']]) : route('persons.edit', [legalEntity(), $patient['id']]) }}"
                                                         class="inline-block cursor-pointer rounded-full p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
-                                                        title="{{ __('patients.continue_registration') }}"
+                                                        title="{{ $isUpdateRequest ? __('patients.continue_update') : __('patients.continue_registration') }}"
                                                     >
                                                         @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
                                                     </a>
