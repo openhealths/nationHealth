@@ -158,9 +158,7 @@ class ClinicalImpressionIndex extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('clinical_impression')) {
-            $this->handleResumeLogic('clinical_impression');
-
+        if ($this->shouldResumeSync('clinical_impression') && $this->handleResumeLogic('clinical_impression')) {
             return;
         }
 

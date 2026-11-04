@@ -229,9 +229,7 @@ class DeviceDispenses extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('device_dispense')) {
-            $this->handleResumeLogic('device_dispense');
-
+        if ($this->shouldResumeSync('device_dispense') && $this->handleResumeLogic('device_dispense')) {
             return;
         }
 

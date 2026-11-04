@@ -189,9 +189,7 @@ class DeviceAssociationIndex extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('device_association')) {
-            $this->handleResumeLogic('device_association');
-
+        if ($this->shouldResumeSync('device_association') && $this->handleResumeLogic('device_association')) {
             return;
         }
 

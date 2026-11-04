@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Traits;
 
 use stdClass;
+use Closure;
 use Exception;
 use App\Models\User;
 use App\Core\EHealthJob;
@@ -125,24 +126,40 @@ trait BatchLegalEntityQueries
      * @param  User  $user  The user context for the new batch execution
      * @param  string  $token  Encrypted authentication token for API requests
      * @param  LegalEntity|null  $legalEntity  The legal entity context for the batch (optional)
-     * @return void
+     * @param  Closure|null  $beforeDispatch  Runs in the restart transaction before the new batch is dispatched, so the
+     *                                        status it sets can't overwrite a completion made by a fast worker and is
+     *                                        rolled back together with the restart on a dispatch error
+     * @return bool False when the batch has no pending jobs and nothing was restarted
      */
-    protected function restartBatch(stdClass $batch, User $user, string $token, ?LegalEntity $legalEntity = null): void
+    protected function restartBatch(stdClass $batch, User $user, string $token, ?LegalEntity $legalEntity = null, ?Closure $beforeDispatch = null): bool
     {
-        $legalEntity = $legalEntity ?? legalEntity();
+        $legalEntity ??= legalEntity();
 
-        $pendingJobs = $this->extractPendingJobsFromBatches($batch);
-
-        if (empty($pendingJobs)) {
-            // Here do echo only into the job context where legalEntity() is not set
-            if (!legalEntity()) {
-                echo 'No pending jobs found in batch: ' . $batch->name . ' id: ' . $batch->id . PHP_EOL;
+        // Extraction of the failed payloads, dispatch of the new batch and removal of the old one are applied all together,
+        // so a dispatch error doesn't lose the jobs
+        return DB::transaction(function () use ($batch, $user, $token, $legalEntity, $beforeDispatch): bool {
+            // The lock prevents the same failed batch from being restarted twice concurrently
+            if (!DB::table('job_batches')->where('id', $batch->id)->lockForUpdate()->exists()) {
+                return false;
             }
 
-            return;
-        }
+            $pendingJobs = $this->extractPendingJobsFromBatches($batch);
 
-        $this->restartFailedBatch($user, $batch, $token, $legalEntity, $pendingJobs);
+            if (empty($pendingJobs)) {
+                // Here do echo only into the job context where legalEntity() is not set
+                if (!legalEntity()) {
+                    echo 'No pending jobs found in batch: ' . $batch->name . ' id: ' . $batch->id . PHP_EOL;
+                }
+
+                return false;
+            }
+
+            $beforeDispatch?->__invoke();
+
+            $this->restartFailedBatch($user, $batch, $token, $legalEntity, $pendingJobs);
+
+            return true;
+        });
     }
 
     /**
@@ -177,6 +194,21 @@ trait BatchLegalEntityQueries
     }
 
     /**
+     * Check whether a batch with one of the given names (retries included) is running for the legal entity.
+     *
+     * Never cached: it decides whether a full sync may start right after a failed batch could not be resumed,
+     * e.g. because a concurrent request has just restarted it.
+     *
+     * @param  array<int, string>  $batchNames
+     * @return bool
+     */
+    protected function hasRunningBatch(array $batchNames): bool
+    {
+        return $this->findRunningBatchesByLegalEntity(legalEntity()->id)
+            ->contains(fn (stdClass $batch): bool => \in_array($this->baseBatchName($batch->name), $batchNames, true));
+    }
+
+    /**
      * Restart a failed batch by creating a new batch with pending jobs
      *
      * @param  User  $user  The user context for the new batch execution
@@ -205,15 +237,16 @@ trait BatchLegalEntityQueries
             }
         }
 
-        $newBatch = $batchOptions->dispatch();
-
-        // A resumed first login chain continues the overall synchronization that was paused or failed with it
+        // A resumed first login chain continues the overall synchronization that was paused or failed with it.
+        // It is set before the dispatch, otherwise a fast worker could complete it first
         if (
             ($oldOptions['sync_entity'] ?? null) === ''
             && \in_array($legalEntity->getEntityStatus(), [JobStatus::PAUSED, JobStatus::FAILED, JobStatus::PAUSED->value, JobStatus::FAILED->value], true)
         ) {
             $legalEntity->setEntityStatus(JobStatus::PROCESSING);
         }
+
+        $newBatch = $batchOptions->dispatch();
 
         // Here do echo only into the job context where legalEntity() is not set
         if (!legalEntity()) {

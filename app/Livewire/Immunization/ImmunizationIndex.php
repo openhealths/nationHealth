@@ -133,9 +133,7 @@ class ImmunizationIndex extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('immunization')) {
-            $this->handleResumeLogic('immunization');
-
+        if ($this->shouldResumeSync('immunization') && $this->handleResumeLogic('immunization')) {
             return;
         }
 

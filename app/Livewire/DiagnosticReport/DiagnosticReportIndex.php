@@ -202,9 +202,7 @@ class DiagnosticReportIndex extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('diagnostic_report')) {
-            $this->handleResumeLogic('diagnostic_report');
-
+        if ($this->shouldResumeSync('diagnostic_report') && $this->handleResumeLogic('diagnostic_report')) {
             return;
         }
 

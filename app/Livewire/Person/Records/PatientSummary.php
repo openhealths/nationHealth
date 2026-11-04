@@ -267,9 +267,7 @@ class PatientSummary extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync(self::ENTITY_TYPE_EPISODE)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_EPISODE);
-
+        if ($this->shouldResumeSync(self::ENTITY_TYPE_EPISODE) && $this->handleResumeLogic(self::ENTITY_TYPE_EPISODE)) {
             return;
         }
 
@@ -322,9 +320,7 @@ class PatientSummary extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync(self::ENTITY_TYPE_ENCOUNTER)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_ENCOUNTER);
-
+        if ($this->shouldResumeSync(self::ENTITY_TYPE_ENCOUNTER) && $this->handleResumeLogic(self::ENTITY_TYPE_ENCOUNTER)) {
             return;
         }
 
@@ -378,9 +374,7 @@ class PatientSummary extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync(self::ENTITY_TYPE_CLINICAL_IMPRESSION)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_CLINICAL_IMPRESSION);
-
+        if ($this->shouldResumeSync(self::ENTITY_TYPE_CLINICAL_IMPRESSION) && $this->handleResumeLogic(self::ENTITY_TYPE_CLINICAL_IMPRESSION)) {
             return;
         }
 
@@ -433,9 +427,7 @@ class PatientSummary extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync(self::ENTITY_TYPE_IMMUNIZATION)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_IMMUNIZATION);
-
+        if ($this->shouldResumeSync(self::ENTITY_TYPE_IMMUNIZATION) && $this->handleResumeLogic(self::ENTITY_TYPE_IMMUNIZATION)) {
             return;
         }
 
@@ -482,9 +474,7 @@ class PatientSummary extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync(self::ENTITY_TYPE_OBSERVATION)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_OBSERVATION);
-
+        if ($this->shouldResumeSync(self::ENTITY_TYPE_OBSERVATION) && $this->handleResumeLogic(self::ENTITY_TYPE_OBSERVATION)) {
             return;
         }
 
@@ -571,9 +561,7 @@ class PatientSummary extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync(self::ENTITY_TYPE_CONDITION)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_CONDITION);
-
+        if ($this->shouldResumeSync(self::ENTITY_TYPE_CONDITION) && $this->handleResumeLogic(self::ENTITY_TYPE_CONDITION)) {
             return;
         }
 
@@ -627,9 +615,7 @@ class PatientSummary extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync(self::ENTITY_TYPE_DIAGNOSTIC_REPORT)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_DIAGNOSTIC_REPORT);
-
+        if ($this->shouldResumeSync(self::ENTITY_TYPE_DIAGNOSTIC_REPORT) && $this->handleResumeLogic(self::ENTITY_TYPE_DIAGNOSTIC_REPORT)) {
             return;
         }
 
@@ -685,9 +671,7 @@ class PatientSummary extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync(self::ENTITY_TYPE_DEVICE)) {
-            $this->handleResumeLogic(self::ENTITY_TYPE_DEVICE);
-
+        if ($this->shouldResumeSync(self::ENTITY_TYPE_DEVICE) && $this->handleResumeLogic(self::ENTITY_TYPE_DEVICE)) {
             return;
         }
 

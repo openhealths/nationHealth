@@ -137,9 +137,7 @@ class ConditionIndex extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('condition')) {
-            $this->handleResumeLogic('condition');
-
+        if ($this->shouldResumeSync('condition') && $this->handleResumeLogic('condition')) {
             return;
         }
 

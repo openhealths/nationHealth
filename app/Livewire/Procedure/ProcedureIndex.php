@@ -208,9 +208,7 @@ class ProcedureIndex extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('procedure')) {
-            $this->handleResumeLogic('procedure');
-
+        if ($this->shouldResumeSync('procedure') && $this->handleResumeLogic('procedure')) {
             return;
         }
 

@@ -122,9 +122,7 @@ class EpisodeIndex extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('episode')) {
-            $this->handleResumeLogic('episode');
-
+        if ($this->shouldResumeSync('episode') && $this->handleResumeLogic('episode')) {
             return;
         }
 
