@@ -281,6 +281,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
                             'codeSystem' => 'eHealth/ICD10_AM/condition_codes',
                             'codeCode' => $report['conclusionCode'],
                         ])
+                        ->all()
                 )
                 ->toArray()
         );
@@ -325,6 +326,18 @@ class EncounterPackageEdit extends EncounterPackageComponent
             return null;
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to store registered conditions');
+
+            return null;
+        }
+
+        try {
+            $this->syncSelectedEpisode($validated['episode']['id'] ?? null);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while getting the selected episode');
+
+            return null;
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to store the selected episode');
 
             return null;
         }

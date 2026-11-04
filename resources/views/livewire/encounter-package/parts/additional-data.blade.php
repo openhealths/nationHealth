@@ -304,6 +304,10 @@
                 return [service.code, service.name].filter(Boolean).join(' / ');
             },
 
+            areServicesProhibited() {
+                return $wire.form.encounter.classCode === 'PHC' || $wire.form.encounter.typeCode === 'concilium';
+            },
+
             updateFilteredOptions(index) {
                 const query = String(this.serviceSearches[index] ?? '')
                     .toLowerCase()
@@ -400,9 +404,9 @@
     >
         <div
             class="space-y-3"
-            x-show="$wire.form.encounter.classCode !== 'PHC'"
+            x-show="! areServicesProhibited()"
             x-effect="
-                if ($wire.form.encounter.classCode === 'PHC' && services.some((service) => service.uuid)) {
+                if (areServicesProhibited() && services.some((service) => service.uuid)) {
                     services = [{ uuid: '' }];
                     serviceSearches = [''];
                     serviceDropdowns = [false];
