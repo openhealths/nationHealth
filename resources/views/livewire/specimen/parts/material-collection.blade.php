@@ -204,12 +204,12 @@
         </div>
 
         <div class="form-group group">
-            <select x-model="modalSpecimen.bodySiteCode" id="collectionBodySite" class="input-select peer">
-                <option value="" selected>{{ __('forms.select') }}</option>
-                @foreach ($this->dictionaries['eHealth/body_sites'] as $code => $bodySite)
-                    <option value="{{ $code }}">{{ $bodySite }}</option>
-                @endforeach
-            </select>
+            <x-select2
+                modelPath="modalSpecimen.bodySiteCode"
+                dictionaryName="eHealth/body_sites"
+                id="collectionBodySite"
+                class="input peer"
+            />
             <label for="collectionBodySite" class="label">{{ __('specimens.body_site') }}</label>
         </div>
     </div>

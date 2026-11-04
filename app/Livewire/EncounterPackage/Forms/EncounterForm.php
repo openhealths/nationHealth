@@ -642,24 +642,37 @@ class EncounterForm extends BaseForm
                 return;
             }
 
-            $codes = collect($this->component->observationForm->observations)
-                ->pluck('codeCode')
-                ->filter()
-                ->all();
+            $dictionaries = $this->component->dictionaries;
+            $observations = collect($this->component->observationForm->observations)
+                ->filter(static fn (array $observation): bool => filled($observation['codeCode'] ?? null));
 
-            $missing = array_diff(config('ehealth.preperson_required_observation_codes', []), $codes);
+            $missing = array_diff(
+                config('ehealth.preperson_required_observation_codes', []),
+                $observations->pluck('codeCode')->all()
+            );
 
+            // The mandatory codes are LOINC codes, so they are named from the LOINC dictionary
             if ($missing !== []) {
                 $fail(__('validation.custom.encounter.observations.patient_identity_required', [
-                    'codes' => implode(', ', $missing)
+                    'observations' => collect($missing)
+                        ->map(static fn (string $code): string => "«{$dictionaries['eHealth/LOINC/observation_codes'][$code]}»")
+                        ->implode(', ')
                 ]));
             }
 
-            $notAllowed = array_diff($codes, config('ehealth.preperson_allowed_observation_codes', []));
+            $notAllowed = $observations->reject(static fn (array $observation): bool => in_array(
+                $observation['codeCode'],
+                config('ehealth.preperson_allowed_observation_codes', []),
+                true
+            ));
 
-            if ($notAllowed !== []) {
+            if ($notAllowed->isNotEmpty()) {
                 $fail(__('validation.custom.encounter.observations.patient_identity_not_allowed', [
-                    'codes' => implode(', ', array_unique($notAllowed))
+                    'observations' => $notAllowed
+                        ->map(static fn (array $observation): string
+                            => "«{$dictionaries[$observation['codeSystem']][$observation['codeCode']]}»")
+                        ->unique()
+                        ->implode(', ')
                 ]));
             }
         };

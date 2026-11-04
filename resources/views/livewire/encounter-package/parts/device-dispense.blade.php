@@ -1,7 +1,7 @@
 <div
-        class="p-4 sm:p-8"
-        id="device-dispenses-section"
-        x-data="{
+    class="p-4 sm:p-8"
+    id="device-dispenses-section"
+    x-data="{
         deviceDispenses: $wire.entangle('deviceDispenseForm.deviceDispenses'),
         procedures: $wire.entangle('procedureForm.procedures'),
         // Entangle so Alpine sees eHealth-loaded requests after mount / refresh.
@@ -143,7 +143,7 @@
         },
 
         procedureLabel(procedure) {
-            const service = Object.values($wire.dictionaries['custom/services'] ?? {}).find((service) => service.id === procedure.codeValue);
+            const service = Object.values($store['custom/services'] ?? {}).find((service) => service.id === procedure.codeValue);
 
             return service ? `${service.code} / ${service.name}` : procedure.codeValue || procedure.uuid || '-';
         },
@@ -176,7 +176,7 @@
                 return `${supporting.code} - ${dictName}`;
             }
 
-            const service = Object.values($wire.dictionaries['custom/services'] ?? {}).find(
+            const service = Object.values($store['custom/services'] ?? {}).find(
                 (service) => service.id === supporting.code
             );
 
@@ -257,10 +257,10 @@
                     <div class="record-inner-checkbox-col">
                         <label :for="`deviceDispenseRecord${index}`" class="sr-only">{{ __('forms.select') }}</label>
                         <input
-                                type="checkbox"
-                                :id="`deviceDispenseRecord${index}`"
-                                class="default-checkbox h-5 w-5"
-                                disabled
+                            type="checkbox"
+                            :id="`deviceDispenseRecord${index}`"
+                            class="default-checkbox h-5 w-5"
+                            disabled
                         />
                     </div>
 
@@ -271,7 +271,7 @@
 
                     <div class="record-inner-action-col">
                         <div
-                                x-data="{
+                            x-data="{
                                 openDropdown: false,
                                 toggle() {
                                     if (this.openDropdown) {
@@ -286,52 +286,62 @@
                                     focusAfter && focusAfter.focus();
                                 },
                             }"
-                                @keydown.escape.prevent.stop="close($refs.button)"
-                                @focusin.window="$refs.panel && ! $refs.panel.contains($event.target) && close()"
-                                x-id="['dropdown-button']"
-                                class="relative"
+                            @keydown.escape.prevent.stop="close($refs.button)"
+                            @focusin.window="$refs.panel && ! $refs.panel.contains($event.target) && close()"
+                            x-id="['dropdown-button']"
+                            class="relative"
                         >
                             @if ($isReadonly ?? false)
                                 <a
-                                        href="#"
-                                        @click.prevent="editDeviceDispense(index)"
-                                        class="record-inner-action-btn cursor-pointer"
-                                        title="{{ __('forms.view') }}"
+                                    href="#"
+                                    @click.prevent="editDeviceDispense(index)"
+                                    class="record-inner-action-btn cursor-pointer"
+                                    title="{{ __('forms.view') }}"
                                 >
                                     @icon('eye', 'w-6 h-6')
                                     <span class="sr-only">{{ __('forms.view') }}</span>
                                 </a>
                             @else
                                 <button
-                                        x-ref="button"
-                                        @click="toggle()"
-                                        :aria-expanded="openDropdown"
-                                        :aria-controls="$id('dropdown-button')"
-                                        type="button"
-                                        class="record-inner-action-btn cursor-pointer"
+                                    x-ref="button"
+                                    @click="toggle()"
+                                    :aria-expanded="openDropdown"
+                                    :aria-controls="$id('dropdown-button')"
+                                    type="button"
+                                    class="record-inner-action-btn cursor-pointer"
                                 >
-                                    <svg class="h-6 w-6 text-gray-800 dark:text-gray-200" aria-hidden="true"
-                                         xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
-                                         viewBox="0 0 24 24">
-                                        <path stroke="currentColor" stroke-linecap="square" stroke-linejoin="round"
-                                              stroke-width="2"
-                                              d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z" />
+                                    <svg
+                                        class="h-6 w-6 text-gray-800 dark:text-gray-200"
+                                        aria-hidden="true"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="24"
+                                        height="24"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke="currentColor"
+                                            stroke-linecap="square"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"
+                                        />
                                     </svg>
                                 </button>
 
                                 <div class="absolute right-0 z-50">
                                     <div
-                                            x-ref="panel"
-                                            x-show="openDropdown"
-                                            x-transition.origin.top.left
-                                            @click.outside="close($refs.button)"
-                                            :id="$id('dropdown-button')"
-                                            x-cloak
-                                            class="dropdown-panel relative"
+                                        x-ref="panel"
+                                        x-show="openDropdown"
+                                        x-transition.origin.top.left
+                                        @click.outside="close($refs.button)"
+                                        :id="$id('dropdown-button')"
+                                        x-cloak
+                                        class="dropdown-panel relative"
                                     >
                                         <button
-                                                type="button"
-                                                @click.prevent="
+                                            type="button"
+                                            @click.prevent="
                                                 editDeviceDispense(index);
                                                 close($refs.button);
                                             "
@@ -340,9 +350,9 @@
                                         </button>
 
                                         <button
-                                                type="button"
-                                                class="dropdown-delete"
-                                                @click.prevent="
+                                            type="button"
+                                            class="dropdown-delete"
+                                            @click.prevent="
                                                 deviceDispenses.splice(index, 1);
                                                 close($refs.button);
                                             "
@@ -362,8 +372,8 @@
                             <div>
                                 <div class="record-inner-label">{{ __('device-dispenses.date_and_time') }}</div>
                                 <div
-                                        class="record-inner-subvalue"
-                                        x-text="
+                                    class="record-inner-subvalue"
+                                    x-text="
                                         `${deviceDispense.whenHandedOverDate || '-'} ${deviceDispense.whenHandedOverTime || ''}`
                                     "
                                 ></div>
@@ -371,15 +381,15 @@
                             <div>
                                 <div class="record-inner-label">{{ __('device-dispenses.procedure_id') }}</div>
                                 <div
-                                        class="record-inner-subvalue break-all"
-                                        x-text="deviceDispense.partOfId || '-'"
+                                    class="record-inner-subvalue break-all"
+                                    x-text="deviceDispense.partOfId || '-'"
                                 ></div>
                             </div>
                             <div>
                                 <div class="record-inner-label">{{ __('device-dispenses.care_plan_id') }}</div>
                                 <div
-                                        class="record-inner-subvalue break-all"
-                                        x-text="carePlanId(deviceDispense.basedOnId)"
+                                    class="record-inner-subvalue break-all"
+                                    x-text="carePlanId(deviceDispense.basedOnId)"
                                 ></div>
                             </div>
                             <div>
@@ -387,29 +397,29 @@
                                     {{ __('device-dispenses.related_prescription_episode_id') }}
                                 </div>
                                 <div
-                                        class="record-inner-subvalue break-all"
-                                        x-text="deviceDispense.originEpisodeId || '-'"
+                                    class="record-inner-subvalue break-all"
+                                    x-text="deviceDispense.originEpisodeId || '-'"
                                 ></div>
                             </div>
                             <div>
                                 <div class="record-inner-label">{{ __('device-dispenses.legal_entity') }}</div>
                                 <div
-                                        class="record-inner-subvalue"
-                                        x-text="deviceDispense.legalEntityName || legalEntityName"
+                                    class="record-inner-subvalue"
+                                    x-text="deviceDispense.legalEntityName || legalEntityName"
                                 ></div>
                             </div>
                             <div>
                                 <div class="record-inner-label">{{ __('device-dispenses.employee') }}</div>
                                 <div
-                                        class="record-inner-subvalue"
-                                        x-text="deviceDispense.performerName || employeeName(deviceDispense.performerId)"
+                                    class="record-inner-subvalue"
+                                    x-text="deviceDispense.performerName || employeeName(deviceDispense.performerId)"
                                 ></div>
                             </div>
                             <div>
                                 <div class="record-inner-label">{{ __('device-dispenses.created_at') }}</div>
                                 <div
-                                        class="record-inner-subvalue"
-                                        x-text="deviceDispense.createdDate || $wire.form.encounter.periodDate || '-'"
+                                    class="record-inner-subvalue"
+                                    x-text="deviceDispense.createdDate || $wire.form.encounter.periodDate || '-'"
                                 ></div>
                             </div>
                             <div>
@@ -419,15 +429,15 @@
                                         {{ __('device-dispenses.specify_type_or_model') }}
                                     </div>
                                     <div
-                                            class="record-inner-subvalue"
-                                            x-text="deviceSelectionTypeName(deviceDispense)"
+                                        class="record-inner-subvalue"
+                                        x-text="deviceSelectionTypeName(deviceDispense)"
                                     ></div>
                                 </div>
 
                                 <div>
                                     <div
-                                            class="record-inner-label"
-                                            x-text="
+                                        class="record-inner-label"
+                                        x-text="
                                             deviceDispense.deviceSelectionType === 'model'
                                                 ? '{{ __('device-dispenses.device_model') }}'
                                                 : '{{ __('device-dispenses.device_type') }}'
@@ -446,12 +456,12 @@
                                     <template x-if="deviceDispense.supportingInfo?.length">
                                         <div class="space-y-1">
                                             <template
-                                                    x-for="supporting in deviceDispense.supportingInfo"
-                                                    :key="supporting.uuid"
+                                                x-for="supporting in deviceDispense.supportingInfo"
+                                                :key="supporting.uuid"
                                             >
                                                 <div
-                                                        class="record-inner-subvalue"
-                                                        x-text="supportingInfoName(supporting)"
+                                                    class="record-inner-subvalue"
+                                                    x-text="supportingInfoName(supporting)"
                                                 ></div>
                                             </template>
                                         </div>
@@ -480,16 +490,16 @@
                 <div class="form-row-2">
                     <div class="form-group group">
                         <select
-                                x-model="modalDeviceDispense.basedOnId"
-                                @change="syncDeviceRequest()"
-                                id="deviceDispenseBasedOn"
-                                class="input-select peer"
+                            x-model="modalDeviceDispense.basedOnId"
+                            @change="syncDeviceRequest()"
+                            id="deviceDispenseBasedOn"
+                            class="input-select peer"
                         >
                             <option value="">{{ __('forms.select') }}</option>
                             <template x-for="deviceRequest in activeDeviceRequests()" :key="deviceRequest.uuid">
                                 <option
-                                        :value="deviceRequest.uuid"
-                                        x-text="deviceRequestOptionLabel(deviceRequest)"
+                                    :value="deviceRequest.uuid"
+                                    x-text="deviceRequestOptionLabel(deviceRequest)"
                                 ></option>
                             </template>
                         </select>
@@ -498,24 +508,24 @@
                         </label>
                         <p class="mt-1 text-sm text-gray-500">{{ __('device-dispenses.based_on_optional_hint') }}</p>
                         <p
-                                x-show="
+                            x-show="
                                 ! loadingDeviceRequests &&
                                 activeDeviceRequests().length === 0 &&
                                 programDeviceRequests().length === 0
                             "
-                                x-cloak
-                                class="mt-1 text-sm text-gray-500"
+                            x-cloak
+                            class="mt-1 text-sm text-gray-500"
                         >
                             {{ __('device-dispenses.no_active_device_requests') }}
                         </p>
                         <p
-                                x-show="
+                            x-show="
                                 ! loadingDeviceRequests &&
                                 activeDeviceRequests().length === 0 &&
                                 programDeviceRequests().length > 0
                             "
-                                x-cloak
-                                class="mt-1 text-sm text-amber-600 dark:text-amber-400"
+                            x-cloak
+                            class="mt-1 text-sm text-amber-600 dark:text-amber-400"
                         >
                             {{ __('device-dispenses.no_device_requests_without_program') }}
                         </p>
@@ -523,9 +533,9 @@
 
                     <div class="form-group group">
                         <select
-                                x-model="modalDeviceDispense.partOfId"
-                                id="deviceDispenseProcedure"
-                                class="input-select peer"
+                            x-model="modalDeviceDispense.partOfId"
+                            id="deviceDispenseProcedure"
+                            class="input-select peer"
                         >
                             <option value="">{{ __('forms.select') }}</option>
                             <template x-for="procedure in procedures" :key="procedure.uuid">
@@ -540,11 +550,11 @@
                 <div class="form-row-2 mt-6">
                     <div class="form-group group">
                         <input
-                                type="text"
-                                id="deviceDispensePerformer"
-                                class="input-select peer !cursor-not-allowed !text-gray-500 dark:!text-gray-400"
-                                :value="modalDeviceDispense.performerName || employeeName(modalDeviceDispense.performerId)"
-                                disabled
+                            type="text"
+                            id="deviceDispensePerformer"
+                            class="input-select peer !cursor-not-allowed !text-gray-500 dark:!text-gray-400"
+                            :value="modalDeviceDispense.performerName || employeeName(modalDeviceDispense.performerId)"
+                            disabled
                         />
                         <label for="deviceDispensePerformer" class="label">
                             {{ __('device-dispenses.employee') }}
@@ -553,10 +563,10 @@
 
                     <div class="form-group group">
                         <select
-                                x-model="modalDeviceDispense.locationId"
-                                id="deviceDispenseLocation"
-                                class="input-select peer"
-                                required
+                            x-model="modalDeviceDispense.locationId"
+                            id="deviceDispenseLocation"
+                            class="input-select peer"
+                            required
                         >
                             <option value="">{{ __('forms.select') }}</option>
                             @foreach ($divisions as $division)
@@ -573,14 +583,14 @@
                     <div class="form-group group relative flex justify-between">
                         <div class="datepicker-wrapper flex-1">
                             <input
-                                    x-model="modalDeviceDispense.whenHandedOverDate"
-                                    :datepicker-max-date="$wire.form.encounter.periodDate"
-                                    type="text"
-                                    id="deviceDispenseWhenHandedOverDate"
-                                    autocomplete="off"
-                                    class="datepicker-input with-leading-icon input peer rounded-r-none border-r-0"
-                                    placeholder=" "
-                                    required
+                                x-model="modalDeviceDispense.whenHandedOverDate"
+                                :datepicker-max-date="$wire.form.encounter.periodDate"
+                                type="text"
+                                id="deviceDispenseWhenHandedOverDate"
+                                autocomplete="off"
+                                class="datepicker-input with-leading-icon input peer rounded-r-none border-r-0"
+                                placeholder=" "
+                                required
                             />
                             <label for="deviceDispenseWhenHandedOverDate" class="wrapped-label">
                                 {{ __('device-dispenses.date_and_time') }}
@@ -589,12 +599,12 @@
 
                         <div class="relative -ml-px w-32">
                             <input
-                                    x-model="modalDeviceDispense.whenHandedOverTime"
-                                    type="time"
-                                    id="deviceDispenseWhenHandedOverTime"
-                                    class="input peer rounded-l-none pl-10"
-                                    placeholder=" "
-                                    required
+                                x-model="modalDeviceDispense.whenHandedOverTime"
+                                type="time"
+                                id="deviceDispenseWhenHandedOverTime"
+                                class="input peer rounded-l-none pl-10"
+                                placeholder=" "
+                                required
                             />
                             @icon('clock', 'svg-input left-2.5 text-gray-400')
                         </div>
@@ -602,24 +612,24 @@
 
                     <div class="form-group group relative">
                         <input
-                                x-model.number="modalDeviceDispense.quantity"
-                                type="number"
-                                min="1"
-                                step="1"
-                                :max="modalDeviceDispense.remainingQuantity"
-                                id="deviceDispenseQuantity"
-                                class="input peer"
-                                placeholder=" "
-                                required
+                            x-model.number="modalDeviceDispense.quantity"
+                            type="number"
+                            min="1"
+                            step="1"
+                            :max="modalDeviceDispense.remainingQuantity"
+                            id="deviceDispenseQuantity"
+                            class="input peer"
+                            placeholder=" "
+                            required
                         />
                         <label for="deviceDispenseQuantity" class="label">
                             {{ __('device-dispenses.quantity_integer') }}
                         </label>
                         <button
-                                type="button"
-                                @click="modalDeviceDispense.quantity = null"
-                                class="absolute top-1/2 right-2.5 -translate-y-1/2 text-gray-400"
-                                tabindex="-1"
+                            type="button"
+                            @click="modalDeviceDispense.quantity = null"
+                            class="absolute top-1/2 right-2.5 -translate-y-1/2 text-gray-400"
+                            tabindex="-1"
                         >
                             @icon('close', 'h-4 w-4')
                         </button>
@@ -629,11 +639,11 @@
                 <div class="form-row-2 mt-6">
                     <div class="form-group group">
                         <select
-                                x-model="modalDeviceDispense.deviceSelectionType"
-                                @change="onDeviceSelectionTypeChange()"
-                                id="deviceDispenseSelectionType"
-                                class="input-select peer"
-                                required
+                            x-model="modalDeviceDispense.deviceSelectionType"
+                            @change="onDeviceSelectionTypeChange()"
+                            id="deviceDispenseSelectionType"
+                            class="input-select peer"
+                            required
                         >
                             <option value="">{{ __('forms.select') }}</option>
                             <option value="type">{{ __('device-dispenses.type') }}</option>
@@ -648,10 +658,10 @@
                         <template x-if="modalDeviceDispense.deviceSelectionType === 'type'">
                             <div class="form-group group">
                                 <select
-                                        x-model="modalDeviceDispense.deviceCode"
-                                        id="deviceDispenseDeviceType"
-                                        class="input-select peer"
-                                        required
+                                    x-model="modalDeviceDispense.deviceCode"
+                                    id="deviceDispenseDeviceType"
+                                    class="input-select peer"
+                                    required
                                 >
                                     <option value="">{{ __('forms.select') }}</option>
                                     <template x-for="option in deviceTypeOptions()" :key="option.value">
@@ -667,15 +677,15 @@
                         <template x-if="modalDeviceDispense.deviceSelectionType === 'model'">
                             <div class="form-group group">
                                 <select
-                                        x-model="modalDeviceDispense.deviceDefinitionId"
-                                        id="deviceDispenseDeviceModel"
-                                        class="input-select peer"
-                                        required
+                                    x-model="modalDeviceDispense.deviceDefinitionId"
+                                    id="deviceDispenseDeviceModel"
+                                    class="input-select peer"
+                                    required
                                 >
                                     <option value="">{{ __('forms.select') }}</option>
                                     <template
-                                            x-for="deviceDefinition in deviceDefinitionOptions()"
-                                            :key="deviceDefinition.id"
+                                        x-for="deviceDefinition in deviceDefinitionOptions()"
+                                        :key="deviceDefinition.id"
                                     >
                                         <option :value="deviceDefinition.id" x-text="deviceDefinition.name"></option>
                                     </template>
@@ -688,17 +698,17 @@
 
                         <div class="form-group group" x-show="! modalDeviceDispense.deviceSelectionType" x-cloak>
                             <select
-                                    id="deviceDispenseDevicePlaceholder"
-                                    class="input-select peer !cursor-not-allowed !text-gray-500 dark:!text-gray-400"
-                                    disabled
+                                id="deviceDispenseDevicePlaceholder"
+                                class="input-select peer !cursor-not-allowed !text-gray-500 dark:!text-gray-400"
+                                disabled
                             >
                                 <option value="" selected>
                                     {{ __('device-dispenses.select_device_type_or_model_first') }}
                                 </option>
                             </select>
                             <label
-                                    for="deviceDispenseDevicePlaceholder"
-                                    class="label"
+                                for="deviceDispenseDevicePlaceholder"
+                                class="label"
                             >{{ __('device-dispenses.device_type') }}</label>
                         </div>
                     </div>
@@ -714,12 +724,12 @@
                         </label>
                         <div>
                             <textarea
-                                    x-model="modalDeviceDispense.note"
-                                    id="deviceDispenseNote"
-                                    class="textarea"
-                                    rows="4"
-                                    maxlength="3000"
-                                    placeholder="{{ __('forms.text_for_input') }}"
+                                x-model="modalDeviceDispense.note"
+                                id="deviceDispenseNote"
+                                class="textarea"
+                                rows="4"
+                                maxlength="3000"
+                                placeholder="{{ __('forms.text_for_input') }}"
                             ></textarea>
                         </div>
                     </div>
@@ -731,10 +741,10 @@
                     </button>
                     @unless ($isReadonly ?? false)
                         <button
-                                type="button"
-                                @click="saveDeviceDispense()"
-                                class="button-primary"
-                                :disabled="! canSaveDeviceDispense()"
+                            type="button"
+                            @click="saveDeviceDispense()"
+                            class="button-primary"
+                            :disabled="! canSaveDeviceDispense()"
                         >
                             {{ __('forms.add') }}
                         </button>

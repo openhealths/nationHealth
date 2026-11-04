@@ -332,8 +332,8 @@ return [
                 'service_not_provided' => 'Направлення видане на послугу :service. Додайте її до дій, діагностичних звітів або процедур взаємодії.'
             ],
             'observations' => [
-                'patient_identity_required' => 'Для альтернативної ідентифікації обов’язкові спостереження з кодами: :codes',
-                'patient_identity_not_allowed' => 'Для альтернативної ідентифікації неприпустимі спостереження з кодами: :codes',
+                'patient_identity_required' => 'Для альтернативної ідентифікації обов’язкові спостереження: :observations',
+                'patient_identity_not_allowed' => 'Для альтернативної ідентифікації неприпустимі спостереження: :observations',
             ],
         ],
         'form.documents' => [

@@ -584,7 +584,7 @@ class EncounterPackageComponent extends Component
             return;
         }
 
-        $services = collect($this->dictionaries['custom/services'] ?? []);
+        $services = dictionary()->services()->flattened();
         $procedureCategories = array_keys($this->dictionaries['eHealth/procedure_categories'] ?? []);
         $diagnosticReportCategories = array_keys($this->dictionaries['eHealth/diagnostic_report_categories'] ?? []);
 
@@ -1416,7 +1416,6 @@ class EncounterPackageComponent extends Component
         $this->dictionaries['eHealth/assistive_products'] = $basics->byName('eHealth/assistive_products')
             ->flattenedChildValues(true)
             ->toArray();
-        $this->dictionaries['custom/services'] = dictionary()->services()->flattened()->toArray();
 
         $this->dictionaries['custom/rule_engine_rule_list'] = [];
         $this->dictionaries['custom/rule_engine_details'] = [];

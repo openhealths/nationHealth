@@ -31,7 +31,7 @@ trait SearchesElectronicReferrals
 
             return [];
         }
-        
+
         if ($this->personId === null || !isset($this->patientUuid) || $this->patientUuid === '') {
             return [];
         }
@@ -54,7 +54,7 @@ trait SearchesElectronicReferrals
             return [];
         }
 
-        $services = collect($this->dictionaries['custom/services'] ?? []);
+        $services = dictionary()->services()->flattened();
         $hasProcedureCategories = array_key_exists('eHealth/procedure_categories', $this->dictionaries);
         $hasDiagnosticReportCategories = array_key_exists('eHealth/diagnostic_report_categories', $this->dictionaries);
         $procedureCategories = array_keys($this->dictionaries['eHealth/procedure_categories'] ?? []);

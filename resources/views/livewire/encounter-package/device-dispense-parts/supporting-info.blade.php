@@ -49,7 +49,7 @@
                                         return `${supporting.code} - ${dictName}`;
                                     }
 
-                                    const service = Object.values($wire.dictionaries['custom/services']).find(
+                                    const service = Object.values($store['custom/services']).find(
                                         (s) => s.id === supporting.code,
                                     );
                                     return service ? `${service.code} / ${service.name}` : supporting.code;

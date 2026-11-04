@@ -1,7 +1,7 @@
 <div
-        class="p-4 sm:p-8"
-        id="procedures-section"
-        x-data="{
+    class="p-4 sm:p-8"
+    id="procedures-section"
+    x-data="{
         procedures: $wire.entangle('procedureForm.procedures'),
         encounter: $wire.entangle('form.encounter'),
         selectedRecords: $wire.entangle('selectedRecords.procedures'),
@@ -198,7 +198,7 @@
                 .find((device) => device.uuid === uuid);
         },
       }"
-        @procedure-service-selected.window="selectProcedureService($event.detail.service)"
+    @procedure-service-selected.window="selectProcedureService($event.detail.service)"
 >
     <div class="space-y-4">
         <template x-for="(procedure, index) in procedures" :key="index">
@@ -207,12 +207,12 @@
                     <div class="record-inner-checkbox-col">
                         <label :for="`procedureRecord${index}`" class="sr-only">{{ __('forms.select') }}</label>
                         <input
-                                type="checkbox"
-                                :id="`procedureRecord${index}`"
-                                class="default-checkbox h-5 w-5"
-                                :value="procedure.uuid"
-                                x-model="selectedRecords"
-                                :disabled="! canCancelRecords ||
+                            type="checkbox"
+                            :id="`procedureRecord${index}`"
+                            class="default-checkbox h-5 w-5"
+                            :value="procedure.uuid"
+                            x-model="selectedRecords"
+                            :disabled="! canCancelRecords ||
                             ! procedure.uuid ||
                             cancelledRecords.includes(procedure.uuid)"
                         />
@@ -225,10 +225,10 @@
                     <div class="record-inner-column flex-1">
                         <div class="record-inner-label">{{ __('procedures.label') }}</div>
                         <div
-                                class="record-inner-value text-[16px]"
-                                x-text="
+                            class="record-inner-value text-[16px]"
+                            x-text="
                                 (() => {
-                                    const service = Object.values($wire.dictionaries['custom/services']).find(
+                                    const service = Object.values($store['custom/services']).find(
                                         (service) => service.id === procedure.codeValue,
                                     );
                                     return service ? `${service.code} / ${service.name}` : '';
@@ -239,7 +239,7 @@
 
                     <div class="record-inner-action-col">
                         <div
-                                x-data="{
+                            x-data="{
                                 openDropdown: false,
                                 toggle() {
                                     if (this.openDropdown) {
@@ -256,22 +256,22 @@
                                     focusAfter && focusAfter.focus();
                                 },
                             }"
-                                @keydown.escape.prevent.stop="close($refs.button)"
-                                @focusin.window="$refs.panel && ! $refs.panel.contains($event.target) && close()"
-                                x-id="['dropdown-button']"
-                                class="relative"
+                            @keydown.escape.prevent.stop="close($refs.button)"
+                            @focusin.window="$refs.panel && ! $refs.panel.contains($event.target) && close()"
+                            x-id="['dropdown-button']"
+                            class="relative"
                         >
                             @if ($isReadonly)
                                 <a
-                                        href="#"
-                                        @click.prevent="
+                                    href="#"
+                                    @click.prevent="
                                         item = index;
                                         modalProcedure = JSON.parse(JSON.stringify(procedures[index]));
                                         newProcedure = false;
                                         openProcedureDrawer = true;
                                     "
-                                        class="record-inner-action-btn cursor-pointer"
-                                        title="{{ __('forms.view') }}"
+                                    class="record-inner-action-btn cursor-pointer"
+                                    title="{{ __('forms.view') }}"
                                 >
                                     @icon('eye', 'w-6 h-6')
                                     <span class="sr-only"> {{ __('forms.view') }} </span>
@@ -279,28 +279,28 @@
                             @else
                                 {{-- Dropdown Button --}}
                                 <button
-                                        x-ref="button"
-                                        @click="toggle()"
-                                        :aria-expanded="openDropdown"
-                                        :aria-controls="$id('dropdown-button')"
-                                        type="button"
-                                        class="record-inner-action-btn cursor-pointer"
+                                    x-ref="button"
+                                    @click="toggle()"
+                                    :aria-expanded="openDropdown"
+                                    :aria-controls="$id('dropdown-button')"
+                                    type="button"
+                                    class="record-inner-action-btn cursor-pointer"
                                 >
                                     <svg
-                                            class="h-6 w-6 text-gray-800 dark:text-gray-200"
-                                            aria-hidden="true"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="24"
-                                            height="24"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
+                                        class="h-6 w-6 text-gray-800 dark:text-gray-200"
+                                        aria-hidden="true"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="24"
+                                        height="24"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
                                     >
                                         <path
-                                                stroke="currentColor"
-                                                stroke-linecap="square"
-                                                stroke-linejoin="round"
-                                                stroke-width="2"
-                                                d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"
+                                            stroke="currentColor"
+                                            stroke-linecap="square"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"
                                         />
                                     </svg>
                                 </button>
@@ -308,16 +308,16 @@
                                 {{-- Dropdown Panel --}}
                                 <div class="absolute right-0 z-50">
                                     <div
-                                            x-ref="panel"
-                                            x-show="openDropdown"
-                                            x-transition.origin.top.left
-                                            @click.outside="close($refs.button)"
-                                            :id="$id('dropdown-button')"
-                                            x-cloak
-                                            class="dropdown-panel relative"
+                                        x-ref="panel"
+                                        x-show="openDropdown"
+                                        x-transition.origin.top.left
+                                        @click.outside="close($refs.button)"
+                                        :id="$id('dropdown-button')"
+                                        x-cloak
+                                        class="dropdown-panel relative"
                                     >
                                         <button
-                                                @click.prevent="
+                                            @click.prevent="
                                                 item = index;
                                                 modalProcedure = JSON.parse(JSON.stringify(procedures[index]));
                                                 newProcedure = false;
@@ -329,8 +329,8 @@
                                         </button>
 
                                         <button
-                                                class="dropdown-delete"
-                                                @click.prevent="
+                                            class="dropdown-delete"
+                                            @click.prevent="
                                                 procedures.splice(index, 1);
                                                 syncProcedureParticipants();
                                                 close($refs.button);
@@ -351,8 +351,8 @@
                             <div>
                                 <div class="record-inner-label">{{ __('procedures.category') }}</div>
                                 <div
-                                        class="record-inner-subvalue"
-                                        x-text="
+                                    class="record-inner-subvalue"
+                                    x-text="
                                         $wire.dictionaries['eHealth/procedure_categories'][procedure.categoryCode] ||
                                         '-'
                                     "
@@ -361,8 +361,8 @@
                             <div>
                                 <div class="record-inner-label">{{ __('procedures.performed_date') }}</div>
                                 <div
-                                        class="record-inner-subvalue"
-                                        x-text="
+                                    class="record-inner-subvalue"
+                                    x-text="
                                         procedure.status !== 'completed'
                                             ? '-'
                                             : procedure.performedType === 'date_time'
@@ -378,8 +378,8 @@
                             <div>
                                 <div class="record-inner-label">{{ __('procedures.division') }}</div>
                                 <div
-                                        class="record-inner-subvalue"
-                                        x-text="
+                                    class="record-inner-subvalue"
+                                    x-text="
                                         (() => {
                                             const div = divisions.find((d) => d.uuid === procedure.divisionId);
                                             return div ? div.name : '-';
@@ -390,8 +390,8 @@
                             <div>
                                 <div class="record-inner-label">{{ __('procedures.outcome_result') }}</div>
                                 <div
-                                        class="record-inner-subvalue"
-                                        x-text="
+                                    class="record-inner-subvalue"
+                                    x-text="
                                         $wire.dictionaries['eHealth/procedure_outcomes'][procedure.outcomeCode] || '-'
                                     "
                                 ></div>
@@ -399,8 +399,8 @@
                             <div>
                                 <div class="record-inner-label">{{ __('forms.status.label') }}</div>
                                 <div
-                                        class="record-inner-subvalue"
-                                        x-text="procedure.status === 'not_done' ? '{{ __('procedures.status.not_done') }}' : '{{ __('procedures.status.completed') }}'"
+                                    class="record-inner-subvalue"
+                                    x-text="procedure.status === 'not_done' ? '{{ __('procedures.status.not_done') }}' : '{{ __('procedures.status.completed') }}'"
                                 ></div>
                             </div>
                         </div>
@@ -414,12 +414,12 @@
         {{-- Button to trigger the drawer --}}
         @unless ($isReadonly)
             <button
-                    @click.prevent="
+                @click.prevent="
                     newProcedure = true;
                     modalProcedure = new Procedure(null, $wire.form.encounter);
                     openProcedureDrawer = true;
                 "
-                    class="item-add my-5"
+                class="item-add my-5"
             >
                 {{ __('forms.add') }}
             </button>
@@ -445,7 +445,7 @@
 
                         @unless ($isReadonly)
                             <button
-                                    @click.prevent="
+                                @click.prevent="
                                     clearWrongComplicationDetails();
                                     newProcedure !== false
                                         ? procedures.push(modalProcedure)
@@ -453,12 +453,13 @@
                                     syncProcedureParticipants();
                                     openProcedureDrawer = false;
                                 "
-                                    class="button-primary"
-                                    :disabled="! (
+                                class="button-primary"
+                                :disabled="! (
                                     modalProcedure.categoryCode.trim() &&
                                     modalProcedure.codeValue.trim() &&
                                     (modalProcedure.primarySource !== true || modalProcedure.performerEmployeeId) &&
-                                    (modalProcedure.status !== 'completed' || modalProcedure.focalDevice.every((focalDevice) => focalDevice.manipulatedId))
+                                    (modalProcedure.status !== 'completed' ||
+                                        modalProcedure.focalDevice.every((focalDevice) => focalDevice.manipulatedId))
                                 ) || procedurePerformedOutsideEncounterPeriod()"
                             >
                                 {{ __('forms.save') }}
@@ -470,20 +471,21 @@
         </x-dialog-drawer>
         @unless ($isReadonly)
             <x-dialog-drawer
-                    x-model="openServiceCatalog"
-                    onCloseClick="openServiceCatalog = false"
-                    maxWidth="4/5"
-                    overlayWidth="100%"
-                    backdropClickThrough="true"
-                    stopClickPropagation="true"
-                    zIndex="50"
+                x-model="openServiceCatalog"
+                onCloseClick="openServiceCatalog = false"
+                maxWidth="4/5"
+                overlayWidth="100%"
+                backdropClickThrough="true"
+                stopClickPropagation="true"
+                zIndex="50"
             >
                 <livewire:dictionary.service-catalog
-                        :legal-entity="legalEntity()"
-                        :selection-mode="true"
-                        selection-event="procedure-service-selected"
-                        :allowed-categories="array_keys($this->dictionaries['eHealth/procedure_categories'] ?? [])"
-                        :key="'encounter-procedure-service-catalog'"
+                    lazy
+                    :legal-entity="legalEntity()"
+                    :selection-mode="true"
+                    selection-event="procedure-service-selected"
+                    :allowed-categories="array_keys($this->dictionaries['eHealth/procedure_categories'] ?? [])"
+                    :key="'encounter-procedure-service-catalog'"
                 />
 
                 <div class="mt-8">

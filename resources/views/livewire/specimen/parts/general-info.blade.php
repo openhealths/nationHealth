@@ -7,12 +7,13 @@
 
     <div class="form-row-2">
         <div class="form-group group">
-            <select x-model="modalSpecimen.typeCode" id="specimenType" class="input-select peer" required>
-                <option value="" selected>{{ __('forms.select') }}</option>
-                @foreach ($this->dictionaries['specimen_types'] as $code => $specimenType)
-                    <option value="{{ $code }}">{{ $specimenType }}</option>
-                @endforeach
-            </select>
+            <x-select2
+                modelPath="modalSpecimen.typeCode"
+                dictionaryName="specimen_types"
+                id="specimenType"
+                class="input peer"
+                required
+            />
             <label for="specimenType" class="label">{{ __('specimens.specimen_type') }}</label>
         </div>
 
