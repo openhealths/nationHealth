@@ -11,8 +11,6 @@ use App\Enums\JobStatus;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
 use App\Classes\eHealth\EHealth;
-use Spatie\Permission\Models\Role;
-use Illuminate\Support\Collection;
 use Illuminate\Queue\SerializesModels;
 use App\Classes\eHealth\EHealthResponse;
 use App\Models\Relations\ConfidantPerson;
@@ -181,26 +179,5 @@ class ConfidantPersonSync extends EHealthJob
         return $this->standalone || !$this->nextEntity
             ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
             : $this->nextEntity;
-    }
-
-    /**
-     * Determine which authentication guards define the given role.
-     * Checks only the 'web' and 'ehealth' guards.
-     * Queries Spatie\Permission\Models\Role by name and guard_name.
-     * Returns an empty collection if the role is not defined for any of the checked guards.
-     *
-     * @param  string  $role  The role name to check across guards.
-     * @return Collection<int, string> Collection of guard names that have this role defined.
-     */
-    protected function getGuardsForRole(string $role): Collection
-    {
-        $guards = collect(['web', 'ehealth']);
-
-        return $guards->filter(
-            fn ($guard) =>
-                Role::where('name', $role)
-                    ->where('guard_name', $guard)
-                    ->exists()
-        );
     }
 }

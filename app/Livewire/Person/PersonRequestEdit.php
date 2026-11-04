@@ -22,10 +22,13 @@ class PersonRequestEdit extends PersonComponent
         $this->isIncapacitated = PersonRequest::whereId($this->personId)->whereHas('confidantPersons')->exists();
 
         if ($this->isIncapacitated) {
-            $person = $personRequest->confidantPersons->first()->person->toArray();
+            $confidant = $personRequest->confidantPersons->first()->person->load(['names', 'phones']);
 
-            $this->selectedConfidantPersonId = $person['uuid'];
-            $this->confidantPerson = [$person];
+            // Shaped like a person search result, which names the person by their eHealth ID
+            $this->selectedConfidantPersonId = $confidant->uuid;
+            $this->confidantPerson = [
+                [...Arr::toCamelCase(Arr::except($confidant->toArray(), ['id', 'uuid'])), 'id' => $confidant->uuid]
+            ];
         }
 
         $this->form->person = Arr::toCamelCase(

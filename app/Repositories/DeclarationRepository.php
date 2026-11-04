@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
-use Exception;
+use Throwable;
 use Carbon\Carbon;
 use App\Enums\Status;
+use App\Enums\Declaration\Status as DeclarationStatus;
 use App\Models\Division;
 use App\Enums\JobStatus;
 use App\Models\Declaration;
@@ -16,7 +17,6 @@ use App\Models\Relations\Party;
 use App\Models\Employee\Employee;
 use App\Models\DeclarationRequest;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use App\Models\ReorganizationEmployeeDeclaration;
 
 class DeclarationRepository
@@ -62,35 +62,39 @@ class DeclarationRepository
         return $data;
     }
 
+    /**
+     * Store a page of declarations along with their persons and declaration requests.
+     *
+     * @param  array  $responseData
+     * @param  LegalEntity|null  $legalEntity
+     * @return void
+     * @throws Throwable
+     */
     public function storeMany(array $responseData, ?LegalEntity $legalEntity = null): void
     {
         $declarations = $responseData['declarations'];
 
-        try {
-            DB::transaction(function () use ($declarations, $legalEntity) {
-                // Data for upserting persons
-                $personsData = $this->mapPersonDataToUpsert($declarations);
+        DB::transaction(function () use ($declarations, $legalEntity): void {
+            $personsData = $this->mapPersonDataToUpsert($declarations);
 
-                Person::upsert($personsData, uniqueBy: ['uuid']);
+            Person::upsert($personsData, uniqueBy: ['uuid'], update: ['birth_date', 'verification_status']);
 
-                $relationData = $this->mapRelationDataToUpsert($declarations);
+            $personNames = collect($declarations)->pluck('person')->keyBy('uuid');
 
-                // Data for upserting declarations
-                $declarationRequestsData = $this->mapDeclarationRequestDataToUpsert($declarations, $relationData, $legalEntity);
+            foreach (Person::with('names')->whereIn('uuid', $personNames->keys())->get() as $person) {
+                Repository::declarationRequest()->syncPersonNames($person, $personNames[$person->uuid]);
+            }
 
-                DeclarationRequest::upsert($declarationRequestsData, uniqueBy: ['uuid']);
+            $relationData = $this->mapRelationDataToUpsert($declarations);
 
-                // Data for upserting declaration requests
-                $declarationsData = $this->mapDeclarationDataToUpsert($declarations, $relationData, $legalEntity);
+            $declarationRequestsData = $this->mapDeclarationRequestDataToUpsert($declarations, $relationData, $legalEntity);
 
-                Declaration::upsert($declarationsData, uniqueBy: ['declaration_number']);
+            DeclarationRequest::upsert($declarationRequestsData, uniqueBy: ['uuid']);
 
-            });
-        } catch (Exception $err) {
-            Log::channel('db_errors')->error('Error storing declarations: ' . $err->getMessage());
+            $declarationsData = $this->mapDeclarationDataToUpsert($declarations, $relationData, $legalEntity);
 
-            session()->flash('error', __('Виникла помилка при збереженні декларацій: ') . $err->getMessage());
-        }
+            Declaration::upsert($declarationsData, uniqueBy: ['declaration_number']);
+        });
     }
 
     protected function mapRelationDataToUpsert(array $declarations): array
@@ -183,11 +187,13 @@ class DeclarationRepository
             $data['person_id'] = $relationData['person'][$declaration['person']['uuid']];
             $data['end_date'] = $declaration['end_date'];
             $data['inserted_at'] = Carbon::parse($declaration['inserted_at'])->format('Y-m-d H:i:s');
-            $data['signed_at'] = Carbon::createFromDate(1900, 1, 1)->format('Y-m-d');
+            $data['signed_at'] = Declaration::where('uuid', $declaration['uuid'])->value('signed_at')
+                ?? Carbon::createFromDate(1900, 1, 1)->format('Y-m-d');
             $data['reason'] = $declaration['reason'];
             $data['reason_description'] = $declaration['reason_description'];
             $data['start_date'] = $declaration['start_date'];
             $data['status'] = $declaration['status'];
+            $data['is_active'] = $declaration['status'] === DeclarationStatus::ACTIVE->value;
             $data['sync_status'] = JobStatus::PARTIAL->value;
 
             $declarationsData[] = array_intersect_key($data, array_flip(new Declaration()->getFillable()));
