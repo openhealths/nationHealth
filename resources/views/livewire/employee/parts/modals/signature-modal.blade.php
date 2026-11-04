@@ -49,7 +49,7 @@
                 <h3 class="modal-header">{{ __('forms.sign_with_KEP') }}</h3>
 
                 {{-- Content --}}
-                <div class="p-6">
+                <form wire:submit="sign" class="p-6">
                     {{-- Error display inside the modal --}}
                     @if (session()->has('error-modal'))
                         <div class="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-800" role="alert">
@@ -196,8 +196,7 @@
                             {{ __('forms.cancel') }}
                         </button>
                         <button
-                            wire:click="sign"
-                            type="button"
+                            type="submit"
                             class="button-primary"
                             wire:loading.attr="disabled"
                             wire:target="sign"
@@ -206,7 +205,7 @@
                             <span wire:loading wire:target="sign">{{ __('general.loading') }}</span>
                         </button>
                     </div>
-                </div>
+                </form>
             </div>
         </div>
     </div>
