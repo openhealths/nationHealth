@@ -52,6 +52,7 @@
                     <th scope="col" class="th-input">{{ __('forms.certificateNumber') }}</th>
                     <th scope="col" class="th-input">{{ __('forms.issuedDate') }}</th>
                     <th scope="col" class="th-input">{{ __('forms.valid_until') }}</th>
+                    <th scope="col" class="th-input">{{ __('forms.additional_info') }}</th>
                     <th scope="col" class="th-input">{{ __('forms.actions') }}</th>
                 </tr>
             </thead>
@@ -64,6 +65,7 @@
                         <td class="td-input" x-text="qualification.certificateNumber"></td>
                         <td class="td-input" x-text="qualification.issuedDate"></td>
                         <td class="td-input" x-text="qualification.validTo"></td>
+                        <td class="td-input whitespace-pre-line" x-text="qualification.additionalInfo ?? '—'"></td>
                         <td class="td-input">
                             <div
                                 x-data="{ openDropdown: false }"

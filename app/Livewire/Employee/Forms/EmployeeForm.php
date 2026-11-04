@@ -287,7 +287,7 @@ class EmployeeForm extends Form
             ],
             'documents.*.issuedBy' => ['present', 'nullable', 'string'],
             'documents.*.issuedAt' => [
-                'required',
+                'nullable',
                 new DateFormat(),
                 'before_or_equal:today',
                 new DocumentIssuedAfterBirthDate($this->party['birthDate'] ?? null),

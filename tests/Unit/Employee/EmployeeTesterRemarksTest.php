@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\In;
 use Livewire\Component;
 use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionMethod;
 use ReflectionProperty;
 use Tests\TestCase;
@@ -181,6 +182,35 @@ class EmployeeTesterRemarksTest extends TestCase
         );
 
         $this->assertFalse($later->fails(), (string) $later->errors());
+    }
+
+    public static function documentIssueDates(): array
+    {
+        return [
+            'omitted' => [[], true],
+            'null' => [['issuedAt' => null], true],
+            'empty' => [['issuedAt' => ''], true],
+            'valid' => [['issuedAt' => '01.03.2018'], true],
+            'birth date' => [['issuedAt' => '23.02.2001'], true],
+            'before birth' => [['issuedAt' => '22.02.2001'], false],
+            'future' => [['issuedAt' => '01.01.2999'], false],
+            'malformed' => [['issuedAt' => 'invalid'], false],
+        ];
+    }
+
+    #[Test]
+    #[DataProvider('documentIssueDates')]
+    public function document_issue_date_is_optional_but_validated_when_present(array $date, bool $valid): void
+    {
+        $form = $this->form();
+        $form->party['birthDate'] = '23.02.2001';
+        $rules = (new ReflectionMethod(EmployeeForm::class, 'documentsRules'))->invoke($form);
+        $validator = Validator::make(
+            ['documents' => [array_merge(['type' => 'NATIONAL_ID', 'number' => '123456789'], $date)]],
+            ['documents.*.issuedAt' => $rules['documents.*.issuedAt']]
+        );
+
+        $this->assertSame($valid, $validator->passes(), (string) $validator->errors());
     }
 
     #[Test]

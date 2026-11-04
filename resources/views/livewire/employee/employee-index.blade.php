@@ -5,7 +5,7 @@
 @use('App\Models\Employee\EmployeeRequest')
 
 <div>
-    <livewire:components.x-message :key="now()->timestamp" />
+    <livewire:components.x-message :key="(string) str()->uuid()" />
     @php
         $currentUser = auth()->user();
         // We cache the hospital ID so as not to call the legalEntity() function 100 times in a loop
@@ -467,9 +467,25 @@
                                             <tr>
                                                 <td class="td-input align-top break-words whitespace-normal">
                                                     {{ $dictionaries['POSITION'][$position->position] ?? $position->position }}
+                                                    <div class="mt-1 text-xs text-gray-500">
+                                                        <span>{{ __('forms.employee_uuid') }}:</span>
+                                                        <span class="block break-all font-mono">{{ $position->uuid ?? $position->id }}</span>
+                                                    </div>
                                                 </td>
                                                 <td class="td-input align-top break-words whitespace-normal">
                                                     {{ $dictionaries['EMPLOYEE_TYPE'][$position->employee_type] ?? $position->employee_type }}
+                                                    <dl class="mt-1 space-y-1 text-xs text-gray-500">
+                                                        <div>
+                                                            <dt>{{ __('forms.start_date_work') }}</dt>
+                                                            <dd>{{ $position->startDate ?: '—' }}</dd>
+                                                        </div>
+                                                        @if ($position->endDate)
+                                                            <div>
+                                                                <dt>{{ __('forms.end_date') }}</dt>
+                                                                <dd>{{ $position->endDate }}</dd>
+                                                            </div>
+                                                        @endif
+                                                    </dl>
                                                 </td>
                                                 <td class="td-input align-top break-words whitespace-normal">
                                                     {{ $position->division->name ?? __('forms.undefined') }}

@@ -198,6 +198,7 @@
                         <th class="th-input">{{ __('forms.speciality') }}</th>
                         <th class="th-input">{{ __('forms.issued_by') }}</th>
                         <th class="th-input">{{ __('forms.speciality_level') }}</th>
+                        <th class="th-input">{{ __('forms.qualificationType') }}</th>
                         <th class="th-input">{{ __('forms.speciality_officio') }}</th>
                         <th class="th-input">{{ __('forms.certificate_number') }}</th>
                         <th class="th-input">{{ __('forms.attestation_date') }}</th>
@@ -211,6 +212,7 @@
                             <td class="td-input" x-text="specDict[speciality.speciality] ?? speciality.speciality"></td>
                             <td class="td-input" x-text="speciality.attestationName"></td>
                             <td class="td-input" x-text="levelDict[speciality.level] ?? speciality.level"></td>
+                            <td class="td-input" x-text="specQualDict[speciality.qualificationType] ?? speciality.qualificationType ?? '—'"></td>
                             <td class="td-input text-left">
                                 <template x-if="isPrimary(speciality)">
                                     <svg class="h-6 w-6 text-green-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">

@@ -378,7 +378,11 @@ class EmployeeIndex extends EmployeeComponent
         $employee = Employee::find($id);
 
         if ($employee) {
-            $this->authorize('deactivate', $employee);
+            if (Auth::user()->cannot('deactivate', $employee)) {
+                Session::flash('error', __('employees.policy.deactivate_denied'));
+
+                return;
+            }
 
             $this->employeeIdToDeactivate = $id;
 
@@ -433,6 +437,12 @@ class EmployeeIndex extends EmployeeComponent
         if (!$employee) {
             // If the employee is not found, just close and clean UI state
             $this->resetDeactivateState();
+
+            return;
+        }
+
+        if (Auth::user()->cannot('deactivate', $employee)) {
+            Session::flash('error', __('employees.policy.deactivate_denied'));
 
             return;
         }
