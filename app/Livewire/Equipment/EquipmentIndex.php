@@ -122,7 +122,7 @@ class EquipmentIndex extends Component
         $this->syncStatus = $this->getSyncStatus();
 
         // Require the overall synchronization to be completed
-        $legalEntitySync = legalEntity()->isSyncBlocked();
+        $legalEntitySync = legalEntity()->isSyncBlocked(LegalEntity::ENTITY_EQUIPMENT);
 
         // Get the sync status only for Division
         $divisionSyncStatus = legalEntity()->getEntityStatus(LegalEntity::ENTITY_DIVISION);
@@ -275,7 +275,7 @@ class EquipmentIndex extends Component
         $failedBatches = $this->findFailedBatchesByLegalEntity(legalEntity()->id, 'ASC');
 
         foreach ($failedBatches as $batch) {
-            if ($batch->name === self::BATCH_NAME) {
+            if ($this->baseBatchName($batch->name) === self::BATCH_NAME) {
                 Log::info('Resuming Equipment sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
                 legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_EQUIPMENT);

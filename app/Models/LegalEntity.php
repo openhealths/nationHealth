@@ -374,13 +374,27 @@ class LegalEntity extends Model
      * Determine whether a partial synchronization is blocked.
      * The overall synchronization and dependencies must be completed before a partial sync can start or resume.
      *
-     * @param  string  $entityType  The entity whose own synchronization status is checked
+     * @param  string  $entityType  The entity whose own synchronization status is checked. When it is paused or failed
+     *                              together with the overall synchronization, the overall one does not block it
      * @param  array<string>  $dependencies  Entity types whose synchronization must be completed
      * @return bool
      */
     public function isSyncBlocked(string $entityType = '', array $dependencies = []): bool
     {
+        $isResumable = static fn (JobStatus|string|null $status): bool => \in_array($status, [
+            JobStatus::PAUSED, JobStatus::PAUSED->value, JobStatus::FAILED, JobStatus::FAILED->value
+        ], true);
+
+        // The first login sync that stopped on this very entity pauses the overall status too, but it must be resumable
+        $canResumeFirstLogin = $entityType !== ''
+            && $isResumable($this->getEntityStatus())
+            && $isResumable($this->getEntityStatus($entityType));
+
         foreach (['', ...$dependencies] as $dependency) {
+            if ($dependency === '' && $canResumeFirstLogin) {
+                continue;
+            }
+
             $dependencyStatus = $this->getEntityStatus($dependency);
 
             if ($dependencyStatus !== JobStatus::COMPLETED && $dependencyStatus !== JobStatus::COMPLETED->value) {

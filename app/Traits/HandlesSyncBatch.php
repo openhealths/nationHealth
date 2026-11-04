@@ -10,11 +10,13 @@ use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\User;
 use App\Notifications\SyncNotification;
 use Illuminate\Bus\Batch;
+use Illuminate\Bus\BatchRepository;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
+use stdClass;
 use Throwable;
 
 /**
@@ -139,7 +141,9 @@ trait HandlesSyncBatch
     }
 
     /**
-     * Returns true if the entity sync is in a paused or failed state that should be resumed.
+     * Returns true if the entity sync is in a paused or failed state and this patient has a failed batch to resume.
+     *
+     * The status is stored per legal entity, so it may be left by the sync of another patient.
      *
      * @param  string  $entityType
      * @return bool
@@ -148,7 +152,35 @@ trait HandlesSyncBatch
     {
         $status = $this->getSyncStatus($entityType);
 
-        return $status === JobStatus::PAUSED->value || $status === JobStatus::FAILED->value;
+        return ($status === JobStatus::PAUSED->value || $status === JobStatus::FAILED->value)
+            && $this->findFailedBatchForPatient($entityType) !== null;
+    }
+
+    /**
+     * Finds the oldest failed batch of the entity type that belongs to the current patient.
+     *
+     * @param  string  $entityType
+     * @return stdClass|null
+     */
+    private function findFailedBatchForPatient(string $entityType): ?stdClass
+    {
+        $batchName = $this->getBatchName($entityType);
+
+        foreach ($this->findFailedBatchesByLegalEntity(legalEntity()->id, 'ASC') as $batch) {
+            // A retried batch is named "retry_<name>" without the uuid, so it is matched by its patient_uuid option
+            $isOwnBatch = $batch->name === $batchName . '_' . $this->uuid
+                || (
+                    $this->baseBatchName($batch->name) === $batchName
+                    && $batch->name !== $batchName
+                    && (app(BatchRepository::class)->find($batch->id)?->options['patient_uuid'] ?? null) === $this->uuid
+                );
+
+            if ($isOwnBatch) {
+                return $batch;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -200,21 +232,19 @@ trait HandlesSyncBatch
     private function resumeSynchronization(string $entityType, User $user, string $token): void
     {
         $encryptedToken = Crypt::encryptString($token);
-        $batchName = $this->getBatchName($entityType);
         $entityConstant = $this->getEntityConstant($entityType);
 
-        $failedBatches = $this->findFailedBatchesByLegalEntity(legalEntity()->id, 'ASC');
+        $batch = $this->findFailedBatchForPatient($entityType);
 
-        foreach ($failedBatches as $batch) {
-            if ($batch->name === $batchName . '_' . $this->uuid) {
-                Log::info('Resuming ' . ucfirst($entityType) . ' sync batch: ' . $batch->name . ' id: ' . $batch->id);
-
-                legalEntity()->setEntityStatus(JobStatus::PROCESSING, $entityConstant);
-                $this->onSyncStatusChanged($entityType, JobStatus::PROCESSING);
-                $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
-                break;
-            }
+        if ($batch === null) {
+            return;
         }
+
+        Log::info('Resuming ' . ucfirst($entityType) . ' sync batch: ' . $batch->name . ' id: ' . $batch->id);
+
+        legalEntity()->setEntityStatus(JobStatus::PROCESSING, $entityConstant);
+        $this->onSyncStatusChanged($entityType, JobStatus::PROCESSING);
+        $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
     }
 
     /**

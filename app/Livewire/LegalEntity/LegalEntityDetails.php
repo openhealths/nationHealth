@@ -14,6 +14,7 @@ use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
 use App\Enums\LegalEntity\States;
 use Livewire\Attributes\Computed;
+use Illuminate\Bus\BatchRepository;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
@@ -343,16 +344,18 @@ class LegalEntityDetails extends LegalEntityComponent
         $token = Session::get(config('ehealth.api.oauth.bearer_token'));
 
         // Try to resume previous sync if it was paused or failed
-        if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
-
-            $this->resumeSynchronization($user, $token);
-
+        if (
+            ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value)
+            && $this->resumeSynchronization($user, $token)
+        ) {
             Session::flash('success', __('forms.success.sync_resumed_in_background'));
 
             $user->notify(new SyncNotification('legal_entity', 'resumed'));
 
             return;
         }
+
+        // Otherwise the failed run was a manual one that has no batch to resume, so it is simply started again
 
         $legalEntity = legalEntity();
 
@@ -466,9 +469,9 @@ class LegalEntityDetails extends LegalEntityComponent
     *
      * @param  User  $user  The user instance for whom synchronization should be resumed
      * @param  string  $token  The authentication or session token used to resume the sync process
-     * @return void
+     * @return bool True if a failed batch was found and restarted
     */
-    protected function resumeSynchronization(User $user, string $token): void
+    protected function resumeSynchronization(User $user, string $token): bool
     {
         $encryptedToken = Crypt::encryptString($token);
 
@@ -476,16 +479,22 @@ class LegalEntityDetails extends LegalEntityComponent
         $failedBatches = $this->findFailedBatchesByLegalEntity(legalEntity()->id, 'ASC');
 
         foreach ($failedBatches as $batch) {
-            if ($batch->name === self::BATCH_NAME) {
+            // The batches of the first login chain are named after their job, but all of them have the empty sync_entity
+            $isFirstLoginBatch = str_starts_with($batch->name, self::BATCH_NAME)
+                || app(BatchRepository::class)->find($batch->id)?->options['sync_entity'] === '';
+
+            if ($isFirstLoginBatch) {
                 Log::info('Resuming Equipment sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
                 legalEntity()?->setEntityStatus(JobStatus::PROCESSING);
 
                 $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
 
-                break;
+                return true;
             }
         }
+
+        return false;
     }
 
     public function render()

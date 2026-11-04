@@ -103,7 +103,7 @@ class DivisionIndex extends DivisionComponent
         $this->syncStatus = $this->getSyncStatus();
 
         // Require the overall synchronization to be completed
-        $legalEntitySync = legalEntity()?->isSyncBlocked() ?? false;
+        $legalEntitySync = legalEntity()?->isSyncBlocked(LegalEntity::ENTITY_DIVISION) ?? false;
 
         // Determine if either the Division's sync is in progress
         $divisionSync = $this->isEntitySyncIsInProgress($this->syncStatus);
@@ -342,7 +342,7 @@ class DivisionIndex extends DivisionComponent
         $failedBatches = $this->findFailedBatchesByLegalEntity(legalEntity()->id, 'ASC');
 
         foreach ($failedBatches as $batch) {
-            if ($batch->name === self::BATCH_NAME) {
+            if ($this->baseBatchName($batch->name) === self::BATCH_NAME) {
                 Log::info('Resuming Division sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
                 legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DIVISION);

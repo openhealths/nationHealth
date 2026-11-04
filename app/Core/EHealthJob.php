@@ -195,7 +195,10 @@ abstract class EHealthJob implements ShouldQueue
             return;
         }
 
-        $this->user = $this->getUserWithActiveSession($olduser);
+        // A revoked token (401) does not spoil the same user's new login, unlike 403 or 429 that follow the user
+        $revokedToken = $exception->getCode() === 401 ? $this->getBatchToken() : null;
+
+        $this->user = $this->getUserWithActiveSession($olduser, $revokedToken);
         echo "Retrying with new user: " . ($this->user ? $this->user->id : 'No user found') . PHP_EOL;
 
         if ($this->user) {
@@ -263,11 +266,30 @@ abstract class EHealthJob implements ShouldQueue
      */
     protected function getToken(): string
     {
-        if (!$this->user) {
-            return '';
-        }
+        return $this->user ? $this->getSessionToken($this->user) : '';
+    }
 
-        $session = DB::table('sessions')->where('user_id', $this->user->id)->first();
+    /**
+     * Get the token that the batch was dispatched with
+     *
+     * @return string|null
+     */
+    protected function getBatchToken(): ?string
+    {
+        $token = $this->batch()?->options['token'] ?? null;
+
+        return \is_string($token) && $token !== '' ? Crypt::decryptString($token) : null;
+    }
+
+    /**
+     * Get the authentication token of the user's session
+     *
+     * @param  User  $user
+     * @return string
+     */
+    protected function getSessionToken(User $user): string
+    {
+        $session = DB::table('sessions')->where('user_id', $user->id)->first();
 
         if (!$session) {
             return '';
@@ -322,7 +344,8 @@ abstract class EHealthJob implements ShouldQueue
      * Get user with active session for the legal entity
      *
      * This method performs a complex database query to find users that meet two specific criteria:
-     * 1. User must not be the current user (to avoid reusing the same user)
+     * 1. User must not be the current user (to avoid reusing the same user), unless the current user has logged in
+     *    again and his new session holds another token than the revoked one
      * 2. User must be an employee of the specified legal entity
      * 3. User must have an active session (record exists in sessions table)
      *
@@ -330,9 +353,11 @@ abstract class EHealthJob implements ShouldQueue
      * - whereHas('employees'): Uses LEFT JOIN to check user-employee relationship through employees table
      * - whereExists(): Uses EXISTS subquery to check for session records without joining session data
      *
+     * @param  User  $user
+     * @param  string|null  $revokedToken  The token that eHealth has rejected as invalid
      * @return User|null
      */
-    protected function getUserWithActiveSession(User $user): ?User
+    protected function getUserWithActiveSession(User $user, ?string $revokedToken = null): ?User
     {
         $legalEntity = $this->legalEntity;
 
@@ -341,7 +366,8 @@ abstract class EHealthJob implements ShouldQueue
         // Execute complex query to find users matching three criteria
         $users = User::with('roles', 'permissions')
             // FIRST CRITERIA: Exclude current user's party from search (if it still logined but if here (error occurs), we need to find another user)
-            ->whereNot('users.party_id', $user->party_id ?? 0)
+            // The exception is a revoked token: the same user is checked below by the token of his current session
+            ->when($revokedToken === null, fn ($query) => $query->whereNot('users.party_id', $user->party_id ?? 0))
             // SECOND CRITERIA: User must be employee of this legal entity
             // This uses nested whereHas to check User -> Employee relationship
             // SQL equivalent: EXISTS (SELECT 1 FROM employees WHERE employees.user_id = users.id AND employees.legal_entity_id = ?)
@@ -358,6 +384,13 @@ abstract class EHealthJob implements ShouldQueue
                     ->whereColumn('sessions.user_id', 'users.id')
             )
             ->get();
+
+        if ($revokedToken !== null) {
+            $users = $users->reject(
+                fn (User $candidate): bool => $candidate->party_id === $user->party_id
+                    && \in_array($this->getSessionToken($candidate), ['', $revokedToken], true)
+            );
+        }
 
         echo "Found " . $users->count() . " users with active sessions for legal entity {$legalEntity->id}" . PHP_EOL;
 

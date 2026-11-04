@@ -28,6 +28,7 @@ use App\Enums\Declaration\RequestStatus;
 use App\Models\Employee\Employee;
 use Livewire\Attributes\Computed;
 use App\Jobs\ConfidantPersonSync;
+use App\Jobs\PersonAuthMethodSync;
 use App\Models\DeclarationRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
@@ -175,7 +176,7 @@ class DeclarationIndex extends Component
         $this->syncStatus = $this->getSyncStatus();
 
         // Require the overall synchronization to be completed
-        $legalEntitySync = legalEntity()->isSyncBlocked();
+        $legalEntitySync = legalEntity()->isSyncBlocked(LegalEntity::ENTITY_DECLARATION);
 
         // Determine if either the Division's sync is in progress
         $divisionSync = $divisionSyncStatus !== JobStatus::COMPLETED->value;
@@ -644,11 +645,14 @@ class DeclarationIndex extends Component
         $failedBatches = $this->findFailedBatchesByLegalEntity(legalEntity()->id, 'ASC');
 
         foreach ($failedBatches as $batch) {
+            $batchName = $this->baseBatchName($batch->name);
+
             if (
-                $batch->name === self::BATCH_NAME ||
-                $batch->name === self::SUB_BATCH_NAME ||
-                $batch->name === self::DEPENDENT_BATCH_NAME ||
-                $batch->name === ConfidantPersonSync::BATCH_NAME
+                $batchName === self::BATCH_NAME ||
+                $batchName === self::SUB_BATCH_NAME ||
+                $batchName === self::DEPENDENT_BATCH_NAME ||
+                $batchName === ConfidantPersonSync::BATCH_NAME ||
+                $batchName === PersonAuthMethodSync::BATCH_NAME
             ) {
                 Log::info('Resuming Declaration sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
