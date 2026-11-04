@@ -29,9 +29,12 @@
                 </div>
 
                 <div class="record-inner-action-col">
-                    <button class="record-inner-action-btn cursor-pointer">
-                        @icon('edit-user-outline', 'w-5 h-5')
-                    </button>
+                    <x-patient.record-actions
+                        :href="route(
+                            $prepersonId !== null ? 'prepersons.devices.view' : 'persons.devices.view',
+                            [legalEntity(), $prepersonId !== null ? 'preperson' : 'person' => $prepersonId ?? $personId, 'device' => data_get($device, 'id')]
+                        )"
+                    />
                 </div>
             </div>
 

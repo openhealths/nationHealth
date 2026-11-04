@@ -369,7 +369,8 @@ class PatientSummary extends BasePatientComponent
         $this->setPaginatedRecords(
             'encounters',
             $encounters->with(['class', 'episode.type.coding', 'type.coding', 'period', 'performerSpeciality.coding']),
-            'encounters'
+            'encounters',
+            visible: ['id']
         );
     }
 
@@ -423,7 +424,8 @@ class PatientSummary extends BasePatientComponent
         $this->setPaginatedRecords(
             'clinicalImpressions',
             $clinicalImpressions->notInDraftEncounter($this->patient())->allowedForSummary()->withAllRelations(),
-            'clinicalImpressions'
+            'clinicalImpressions',
+            visible: ['id']
         );
     }
 
@@ -471,7 +473,8 @@ class PatientSummary extends BasePatientComponent
         $this->setPaginatedRecords(
             'immunizations',
             Immunization::forPatient($this->patient())->notInDraftEncounter($this->patient())->withAllRelations(),
-            'immunizations'
+            'immunizations',
+            visible: ['id']
         );
     }
 
@@ -525,7 +528,8 @@ class PatientSummary extends BasePatientComponent
         $this->setPaginatedRecords(
             'observations',
             $observations->notInDraftEncounter($this->patient())->notInDraftDiagnosticReport($this->patient())->allowedForSummary()->withAllRelations(),
-            'observations'
+            'observations',
+            visible: ['id']
         );
     }
 
@@ -614,7 +618,8 @@ class PatientSummary extends BasePatientComponent
             'conditions',
             $conditions->notInDraftEncounter($this->patient())->allowedForSummary()->withAllRelations(),
             'conditions',
-            fn (array $conditions) => $this->populateIcd10Descriptions($conditions)
+            fn (array $conditions) => $this->populateIcd10Descriptions($conditions),
+            visible: ['id']
         );
     }
 
@@ -671,7 +676,8 @@ class PatientSummary extends BasePatientComponent
                 ->notInDraftEncounter($this->patient())
                 ->allowedForSummary()
                 ->withAllRelations(),
-            'diagnosticReports'
+            'diagnosticReports',
+            visible: ['id']
         );
     }
 
@@ -765,7 +771,8 @@ class PatientSummary extends BasePatientComponent
         $this->setPaginatedRecords(
             'devices',
             $devices->notInDraftEncounter($this->patient())->allowedForSummary()->withAllRelations(),
-            'devices'
+            'devices',
+            visible: ['id']
         );
     }
 
@@ -821,7 +828,8 @@ class PatientSummary extends BasePatientComponent
                 ->notInDraftEncounter($this->patient())
                 ->allowedForSummary()
                 ->withAllRelations(),
-            'procedures'
+            'procedures',
+            visible: ['id']
         );
     }
 

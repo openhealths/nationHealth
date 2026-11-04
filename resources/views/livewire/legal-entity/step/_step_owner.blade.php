@@ -85,20 +85,18 @@
         <h3 class="font-bold text-sm text-gray-600 mb-6">{{ __('forms.credentials_owner') }} *</h3>
 
         @if($isEdit && !$isDetails)
-            <label class="inline-flex items-center cursor-pointer">
+            <label class="form-toggle">
                 <input
                     type="checkbox"
                     id="isOwnerChange"
-                    class="sr-only peer"
+                    class="form-toggle-input"
                     x-model="isOwnerChange"
                     :checked="isOwnerChange"
                     @change="ownerChange()"
                 >
-                <div
-                    class="relative w-11 h-6 bg-blue-400 rounded-full peer peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:bg-gray-700 dark:peer-focus:ring-blue-800 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:w-5 after:h-5 after:transition-all peer-checked:bg-blue-600 dark:peer-checked:bg-blue-600 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full"
-                ></div>
+                <div class="form-toggle-track" aria-hidden="true"></div>
                 <span
-                    class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300"
+                    class="form-toggle-label"
                     x-text="'{{ __('forms.owner_change') }}'"
                 ></span>
             </label>

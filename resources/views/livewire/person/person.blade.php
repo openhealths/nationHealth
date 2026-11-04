@@ -69,7 +69,7 @@
         </section>
 
     @elseif ($viewState === 'new')
-        <section class="section-form">
+        <section class="section-form shift-content">
             <form class="form">
                 @include('livewire.person.parts.sign')
             </form>
