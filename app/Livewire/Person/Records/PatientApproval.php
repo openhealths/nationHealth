@@ -902,6 +902,12 @@ class PatientApproval extends Component
 
     public function continueAfterCreation(): void
     {
+        if (Auth::user()->cannot('create', Approval::class)) {
+            Session::flash('error', __('approval.create.role_forbidden'));
+
+            return;
+        }
+
         if ($this->step !== 'confirming' || $this->approvalId === null) {
             return;
         }
@@ -909,26 +915,30 @@ class PatientApproval extends Component
         try {
             $service = app(PatientApprovalService::class);
 
-            if ($this->selectedAuthType === 'OFFLINE') {
-                $this->linkId = $service->verify(
-                    $this->person(),
-                    $this->approvalId,
-                    null
-                );
+            if ($this->selectedAuthType !== 'OFFLINE') {
+                $details = $service->details($this->person(), $this->approvalId);
+                $method = $service->resolveConfirmationMethod($details['authentication_method_current'] ?? [], $this->person()->uuid, $this->selectedAuthUuid);
+                if (AuthenticationMethod::confirmationMethod($method) !== AuthenticationMethod::OFFLINE) {
+                    $this->smsPhone = AuthenticationMethod::confirmationPhone($method) ?? $this->smsPhone;
+                    $this->smsResendAvailableAt = $service->smsResendAvailableAt($this->person(), $this->approvalId);
+                    $this->step = 'code';
 
-                if ($this->linkId !== null) {
-                    $this->step = 'verifying';
-                } else {
-                    $this->finish();
+                    return;
                 }
+                $this->selectedAuthType = AuthenticationMethod::OFFLINE->value;
+            }
+            if (!$this->leafletConfirmed) {
+                $this->addError('leafletConfirmed', __('approval.create.leaflet_required'));
 
                 return;
             }
 
-            $details = $service->details($this->person(), $this->approvalId);
-            $this->smsPhone = $details['authentication_method_current']['number'] ?? $this->smsPhone;
-            $this->smsResendAvailableAt = $service->smsResendAvailableAt($this->person(), $this->approvalId);
-            $this->step = 'code';
+            $this->linkId = $service->verify($this->person(), $this->approvalId, null);
+            if ($this->linkId !== null) {
+                $this->step = 'verifying';
+            } else {
+                $this->finish();
+            }
         } catch (Throwable) {
             $this->addError('approvalCreation', __('approval.create.confirmation_failed'));
         }

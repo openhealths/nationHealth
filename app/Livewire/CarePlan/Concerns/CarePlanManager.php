@@ -18,9 +18,14 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Repositories\CarePlanActivityRepository;
 use App\Repositories\CarePlanRepository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
+use App\Services\MedicalEvents\PatientApprovalService;
+use App\Services\MedicalEvents\MedicalRequestOwnership;
+use App\Models\CarePlan;
+use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Services\MedicalEvents\CarePlanLifecycleGateService;
 use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
 use Exception;
+use RuntimeException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -509,7 +514,9 @@ trait CarePlanManager
 
     public function openMethodSelectionModal(): void
     {
-        $this->authorizeCarePlanWrite();
+        if (!$this->guardApprovalAccess($this->carePlan)) {
+            return;
+        }
         if ($this->guardTerminalCarePlanMutation()) {
             return;
         }
@@ -540,7 +547,7 @@ trait CarePlanManager
                 $employeeUuid = $this->currentCarePlanEmployee()?->uuid;
                 $bearerToken = session()->get(config('ehealth.api.oauth.bearer_token'));
                 if (!$employeeUuid || !$bearerToken) {
-                    throw new \RuntimeException(__('care-plan.approval_create_error'));
+                    throw new RuntimeException(__('care-plan.approval_create_error'));
                 }
                 app(CarePlanRepository::class)->queueInpatientApproval($submission, legalEntity(), Auth::user(), $bearerToken, $employeeUuid);
                 $this->inpatientApprovalStatus = 'queued';
@@ -554,7 +561,9 @@ trait CarePlanManager
         }
 
         try {
-            $this->authMethods = EHealth::person()->getAuthMethods($this->carePlan->person->uuid)->validate();
+            $methods = EHealth::person()->getAuthMethods($this->carePlan->person->uuid)->validate();
+            $this->authMethods = app(PatientApprovalService::class)
+                ->enrichAuthenticationMethods($methods, $this->carePlan->person);
             $this->showMethodSelectionModal = true;
         } catch (Exception $e) {
             Log::error('CarePlanShow: failed to load auth methods: ' . $e->getMessage());
@@ -594,16 +603,10 @@ trait CarePlanManager
 
     public function selectAuthMethod(string $methodUuid): void
     {
-        $this->currentAuthMethod = collect($this->authMethods)->first(function ($method) use ($methodUuid) {
-            return ($method['id'] ?? $method['uuid'] ?? null) === $methodUuid;
-        });
-
-        if (is_array($this->currentAuthMethod)) {
-            $this->phoneNumber = $this->currentAuthMethod['phone_number']
-                ?? $this->currentAuthMethod['phoneNumber']
-                ?? null;
+        if (!$this->guardApprovalAccess($this->carePlan)) {
+            return;
         }
-
+        $this->currentAuthMethod = $this->selectedApprovalAuthMethod($methodUuid);
         $this->showMethodSelectionModal = false;
         $this->createApproval($methodUuid);
     }
@@ -641,7 +644,7 @@ trait CarePlanManager
 
             $this->approvalId = $result->approvalId;
 
-            if ($result->requiresOtp()) {
+            if ($result->requiresConfirmation()) {
                 $this->currentAuthMethod = $result->authMethod ?? $this->currentAuthMethod;
                 $this->openAuthModal();
 
@@ -688,7 +691,7 @@ trait CarePlanManager
         }
 
         $service = app(CarePlanApprovalService::class);
-        if ($status->requiresOtp()) {
+        if ($status->requiresConfirmation()) {
             $this->currentAuthMethod = $status->authMethod ?? $this->currentAuthMethod;
             $this->openAuthModal();
 
@@ -712,9 +715,18 @@ trait CarePlanManager
 
             return;
         }
-        $this->authorizeCarePlanWrite();
-        app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)->approvalForCarePlan($this->carePlan, $this->approvalId ?? '');
-        $this->validate($this->approvalVerificationRules());
+        if (!$this->guardApprovalAccess($this->carePlan)) {
+            return;
+        }
+        app(MedicalRequestOwnership::class)->approvalForCarePlan($this->carePlan, $this->approvalId ?? '');
+        try {
+            $this->validate($this->approvalVerificationRules(), $this->approvalVerificationMessages());
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
+            $this->setErrorBag($exception->validator->getMessageBag());
+
+            return;
+        }
 
         try {
             app(CarePlanApprovalService::class)->verify(
@@ -725,7 +737,7 @@ trait CarePlanManager
         } catch (Exception $e) {
             Log::warning('Care plan approval confirmation failed', ['exceptionType' => $e::class, 'statusCode' => $e->getCode()]);
             $message = $e instanceof EHealthValidationException ? $e->getFormattedMessage()
-                : ($e instanceof EHealthResponseException && \App\Classes\eHealth\Api\Approval::errorMessage($e->response) === 'Invalid verification code'
+                : ($e instanceof EHealthResponseException && ApprovalApi::errorMessage($e->response) === 'Invalid verification code'
                     ? __('errors.ehealth.messages.invalid_verification_code') : __('care-plan.approval_verify_error'));
             $this->addError('verificationCode', $message);
             Session::flash('error', $message);
@@ -746,7 +758,7 @@ trait CarePlanManager
         Session::flash('success', __('care-plan.approval_verified'));
     }
 
-    protected function carePlanForSms(): \App\Models\CarePlan
+    protected function carePlanForSms(): CarePlan
     {
         return $this->carePlan;
     }
@@ -781,7 +793,9 @@ trait CarePlanManager
             return;
         }
         $batch = \Illuminate\Support\Facades\Bus::batch([new \App\Jobs\CarePlanFullSync(
-            legalEntity(), standalone: true, resourceUuid: $this->carePlan->uuid,
+            legalEntity(),
+            standalone: true,
+            resourceUuid: $this->carePlan->uuid,
             patientContext: [
                 'patient_uuid' => $this->carePlan->person->uuid,
                 'person_id' => $this->carePlan->personId,

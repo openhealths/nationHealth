@@ -30,6 +30,7 @@ use App\Enums\JobStatus;
 use App\Enums\Person\AuthenticationMethod;
 use App\Enums\Specimen\Status as SpecimenStatus;
 use App\Repositories\MedicalEvents\Repository;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Auth;
@@ -131,6 +132,127 @@ class PatientApprovalService
             ->whereNotNull('uuid')
             ->get()
             ->toArray();
+    }
+
+    /**
+     * Enrich eHealth authentication methods with normalized identifiers and local confidant details when available.
+     *
+     * @param  array<int, array<string, mixed>>  $methods
+     * @return array<int, array<string, mixed>>
+     */
+    public function enrichAuthenticationMethods(array $methods, ?Person $person = null): array
+    {
+        $confidantsByUuid = collect();
+
+        if ($person !== null && collect($methods)->contains(static fn (mixed $m): bool => is_array($m) && ($m['type'] ?? null) === AuthenticationMethod::THIRD_PERSON->value)) {
+            $person->loadMissing([
+                'confidantPersons.person.names',
+                'confidantPersons.person.documents',
+                'confidantPersons.person.phones',
+            ]);
+
+            $confidantsByUuid = $person->confidantPersons
+                ->filter(static fn ($relation): bool => $relation->person !== null && filled($relation->person->uuid))
+                ->keyBy(static fn ($relation): string => (string) $relation->person->uuid);
+        }
+
+        return collect($methods)
+            ->filter(static function (mixed $method): bool {
+                if (!is_array($method)) {
+                    return false;
+                }
+
+                if (!in_array($method['type'] ?? null, [
+                    AuthenticationMethod::OTP->value,
+                    AuthenticationMethod::OFFLINE->value,
+                    AuthenticationMethod::THIRD_PERSON->value,
+                ], true)) {
+                    return false;
+                }
+
+                $endedAt = $method['ehealth_ended_at'] ?? ($method['ehealthEndedAt'] ?? ($method['ended_at'] ?? ($method['endedAt'] ?? null)));
+
+                return empty($endedAt) || CarbonImmutable::parse((string) $endedAt)->isFuture();
+            })
+            ->map(static function (array $method) use ($confidantsByUuid): array {
+                $uuid = $method['id'] ?? ($method['uuid'] ?? null);
+                if ($uuid !== null) {
+                    $method['id'] ??= $uuid;
+                    $method['uuid'] ??= $uuid;
+                }
+
+                if (($method['type'] ?? null) === AuthenticationMethod::THIRD_PERSON->value
+                    && empty($method['confidantPerson'])
+                    && empty($method['confidant_person'])
+                    && !empty($method['value'])
+                ) {
+                    $relation = $confidantsByUuid->get((string) $method['value']);
+                    $confidant = $relation?->person;
+
+                    if ($confidant !== null) {
+                        $firstPhone = $confidant->phones?->first();
+                        $method['confidantPerson'] = [
+                            'name' => $confidant->fullName,
+                            'taxId' => $confidant->taxId,
+                            'unzr' => $confidant->unzr,
+                            'documentsPerson' => $confidant->documents?->toArray() ?? [],
+                            'phones' => $firstPhone ? ['number' => $firstPhone->number, 'type' => $firstPhone->type] : null,
+                        ];
+                    }
+                }
+
+                return $method;
+            })
+            ->values()
+            ->all();
+    }
+
+    public function resolveConfirmationMethod(array $method, ?string $patientUuid, ?string $authorizeWith): array
+    {
+        if (AuthenticationMethod::confirmationMethod($method) !== null) {
+            return $method;
+        }
+        if (($method['type'] ?? null) === AuthenticationMethod::THIRD_PERSON->value && !empty($method['number'])) {
+            $method['reference'] = ['type' => AuthenticationMethod::OTP->value, 'phone_number' => $method['number']];
+
+            return $method;
+        }
+        if ($patientUuid === null || $authorizeWith === null) {
+            return $method;
+        }
+        $methods = EHealth::person()->getAuthMethods($patientUuid)->validate();
+        $selected = collect($methods)->first(fn (array $candidate): bool => ($candidate['id'] ?? ($candidate['uuid'] ?? null)) === $authorizeWith);
+        if (!is_array($selected)) {
+            return $method;
+        }
+        if (in_array($selected['type'] ?? null, [AuthenticationMethod::OTP->value, AuthenticationMethod::OFFLINE->value], true)) {
+            return array_replace($method, $selected, [
+                'phone_number' => $selected['phone_number'] ?? ($selected['number'] ?? ($method['phone_number'] ?? null)),
+            ]);
+        }
+        if (($selected['type'] ?? null) !== AuthenticationMethod::THIRD_PERSON->value) {
+            return $method;
+        }
+        $type = AuthenticationMethod::confirmationMethod($selected);
+        if ($type === null && !empty($selected['value'])) {
+            $representativeMethods = collect($this->enrichAuthenticationMethods(
+                EHealth::person()->getAuthMethods($selected['value'])->validate()
+            ));
+            $reference = $representativeMethods->firstWhere('type', AuthenticationMethod::OTP->value)
+                ?? $representativeMethods->firstWhere('type', AuthenticationMethod::OFFLINE->value);
+            $type = AuthenticationMethod::confirmationMethod($reference ?? []);
+            $selected = $reference ?? [];
+        }
+        if ($type === null) {
+            return $method;
+        }
+        $method['type'] = AuthenticationMethod::THIRD_PERSON->value;
+        $method['reference'] = [
+            'type' => $type->value,
+            'phone_number' => $method['phone_number'] ?? ($method['number'] ?? AuthenticationMethod::confirmationPhone($selected)),
+        ];
+
+        return $method;
     }
 
     /**

@@ -37,6 +37,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\WithFileUploads;
+use Livewire\Attributes\Locked;
 use RuntimeException;
 use Throwable;
 
@@ -65,6 +66,7 @@ class CarePlanCreate extends BasePatientComponent
     #[\Livewire\Attributes\Locked]
     public array $allowedCategoryCodes = [];
     public array $diagnoses = [];
+    #[Locked]
     public array $authMethods = [];
     public array $patientSearchResults = [];
     public bool $allowsPatientChange = false;
@@ -486,6 +488,10 @@ class CarePlanCreate extends BasePatientComponent
             ? app(CarePlanRepository::class)->findByUuid($this->carePlanUuid, (int) legalEntity()->id, $this->personId)
             : null;
 
+        if ($carePlan === null || !$this->guardApprovalAccess($carePlan)) {
+            return;
+        }
+
         if ($this->shouldSkipPatientAuthUi($carePlan)) {
             $this->createApproval('');
 
@@ -501,7 +507,19 @@ class CarePlanCreate extends BasePatientComponent
         }
 
         if ($this->approvalId) {
-            $this->openAuthModal();
+            try {
+                $result = app(CarePlanApprovalService::class)->pendingConfirmation($this->patientUuid, $this->approvalId);
+                if ($result->isGranted()) {
+                    Session::flash('success', __('care-plan.approval_verified'));
+                    $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan->id], navigate: true);
+
+                    return;
+                }
+                $this->currentAuthMethod = $result->authMethod;
+                $this->openAuthModal();
+            } catch (Throwable $exception) {
+                Session::flash('error', __('care-plan.approval_result_unavailable'));
+            }
         } else {
             $this->openMethodSelectionModal();
         }
@@ -512,6 +530,10 @@ class CarePlanCreate extends BasePatientComponent
         $carePlan = $this->carePlanUuid
             ? app(CarePlanRepository::class)->findByUuid($this->carePlanUuid, (int) legalEntity()->id, $this->personId)
             : null;
+
+        if ($carePlan === null || !$this->guardApprovalAccess($carePlan)) {
+            return;
+        }
 
         if ($this->shouldSkipPatientAuthUi($carePlan)) {
             $this->createApproval('');
@@ -534,18 +556,12 @@ class CarePlanCreate extends BasePatientComponent
 
     public function selectAuthMethod(string $methodUuid): void
     {
-        $this->currentAuthMethod = collect($this->authMethods)->first(function ($method) use ($methodUuid) {
-            return ($method['id'] ?? $method['uuid'] ?? null) === $methodUuid;
-        });
-        $this->showMethodSelectionModal = false;
-
-        $selected = collect($this->authMethods)->first(fn ($m) => ($m['id'] ?? ($m['uuid'] ?? null)) === $methodUuid);
-        if ($selected && !empty($selected['phone_number'])) {
-            $this->phoneNumber = $selected['phone_number'];
-        } elseif ($selected && !empty($selected['phoneNumber'])) {
-            $this->phoneNumber = $selected['phoneNumber'];
+        $carePlan = $this->carePlanForSms();
+        if (!$this->guardApprovalAccess($carePlan)) {
+            return;
         }
-
+        $this->currentAuthMethod = $this->selectedApprovalAuthMethod($methodUuid);
+        $this->showMethodSelectionModal = false;
         $this->createApproval($methodUuid);
     }
 
@@ -590,7 +606,7 @@ class CarePlanCreate extends BasePatientComponent
 
             $this->approvalId = $result->approvalId;
 
-            if ($result->requiresOtp() && !$skipsOtp) {
+            if ($result->requiresConfirmation() && !$skipsOtp) {
                 $this->currentAuthMethod = $result->authMethod ?? $this->currentAuthMethod;
                 $this->openAuthModal();
 
@@ -640,7 +656,7 @@ class CarePlanCreate extends BasePatientComponent
         $carePlan = app(CarePlanRepository::class)->findByUuid($this->carePlanUuid, (int) legalEntity()->id, $this->personId);
         $skipsOtp = $this->shouldSkipPatientAuthUi($carePlan);
 
-        if ($status->requiresOtp() && !$skipsOtp) {
+        if ($status->requiresConfirmation() && !$skipsOtp) {
             $this->currentAuthMethod = $status->authMethod ?? $this->currentAuthMethod;
             $this->openAuthModal();
 
@@ -850,9 +866,11 @@ class CarePlanCreate extends BasePatientComponent
             return;
         }
         $plan = $this->carePlanForSms();
-        $this->authorize('manage', $plan);
+        if (!$this->guardApprovalAccess($plan)) {
+            return;
+        }
         app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)->approvalForCarePlan($plan, $this->approvalId ?? '');
-        $this->validate($this->approvalVerificationRules());
+        $this->validate($this->approvalVerificationRules(), $this->approvalVerificationMessages());
 
         try {
             $response = app(CarePlanApprovalService::class)->verify(

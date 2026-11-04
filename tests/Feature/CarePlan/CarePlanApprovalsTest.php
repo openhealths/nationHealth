@@ -387,7 +387,8 @@ class CarePlanApprovalsTest extends TestCase
         );
     }
 
-    public function test_pending_approval_row_offers_revoke(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('approvalVisibility')]
+    public function test_only_granted_approvals_are_visible(string $status, bool $visible): void
     {
         $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
@@ -459,7 +460,7 @@ class CarePlanApprovalsTest extends TestCase
             'approvable_id' => $carePlan->id,
             'granted_to_id' => $identifier->id,
             'granted_to_type' => 'employee',
-            'status' => 'pending',
+            'status' => $status,
             'is_verified' => false,
         ]);
 
@@ -477,11 +478,30 @@ class CarePlanApprovalsTest extends TestCase
         $this->actingAs($user);
         $this->grantMedicalEventAbilities($user);
 
-        Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, [
+        $component = Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, [
             'legalEntity' => $legalEntity,
             'carePlan' => $carePlan->fresh(),
         ])
-            ->assertSee(__('care-plan.revoke_approval'), false)
-            ->assertSeeHtml("wire:click=\"cancelApproval");
+            ->assertSet('approvals.0.status', $status);
+
+        if ($visible) {
+            $component->assertSeeHtml('wire:click="cancelApproval')
+                ->assertDontSee(__('care-plan.no_approvals_found'));
+        } else {
+            $component->assertDontSeeHtml('wire:click="cancelApproval')
+                ->assertSee(__('care-plan.no_approvals_found'));
+        }
+    }
+
+    public static function approvalVisibility(): array
+    {
+        return [
+            'active' => ['active', true],
+            'legacy approved' => ['APPROVED', true],
+            'pending' => ['pending', false],
+            'new' => ['NEW', false],
+            'inactive' => ['inactive', false],
+            'terminated' => ['terminated', false],
+        ];
     }
 }

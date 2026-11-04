@@ -13,6 +13,7 @@ use App\Models\LegalEntity;
 use App\Models\EhealthLink;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use App\Models\Person\Person;
 use App\Classes\eHealth\EHealth;
 use App\Models\Employee\Employee;
@@ -135,19 +136,25 @@ class ApprovalRepository extends BaseRepository
     {
         $this->storageTransaction(function () use ($link, $data): void {
             $approval = $link->linkable;
+            $authorizeWith = $approval->authorizeWith ?: data_get($link->job?->request_data, 'authorize_with');
             $resolved = Approval::whereUuid($data['id'])->first();
             if ($resolved !== null && $resolved->id !== $approval->id) {
                 if ($resolved->approvableId !== $approval->approvableId || $resolved->approvableType !== $approval->approvableType) {
-                    throw \Illuminate\Validation\ValidationException::withMessages(['approval' => __('care-plan.approval_result_unavailable')]);
+                    throw ValidationException::withMessages(['approval' => __('care-plan.approval_result_unavailable')]);
                 }
                 $approval->ehealthLinks()->update(['linkable_id' => $resolved->id]);
                 $approval->delete();
                 $approval = $resolved;
             }
-            if (($data['is_verified'] ?? null) === false && ApprovalStatus::resolve($data['status'] ?? null) !== ApprovalStatus::INACTIVE) {
+            if ($authorizeWith !== null && empty($data['authorize_with'])) {
+                $data['authorize_with'] = $authorizeWith;
+            }
+            $remoteStatus = ApprovalStatus::resolve($data['status'] ?? null);
+            $remoteDeniesAccess = isset($data['status']) && !($remoteStatus?->isGranted() || $remoteStatus?->isAwaitingPatient());
+            if (($data['is_verified'] ?? null) === false && !$remoteDeniesAccess) {
                 $data['status'] = ApprovalStatus::PENDING->value;
             }
-            if ($approval->getAttribute('is_verified') && ApprovalStatus::resolve($approval->status)?->isGranted()) {
+            if (!$remoteDeniesAccess && $approval->getAttribute('is_verified') && ApprovalStatus::resolve($approval->status)?->isGranted()) {
                 $data['is_verified'] = true;
                 $data['status'] = ApprovalStatus::ACTIVE->value;
             }
@@ -184,10 +191,10 @@ class ApprovalRepository extends BaseRepository
             fn ($query) => $query->whereHas('person', fn ($person) => $person->whereUuid($patientUuid))
         )->with('approvable')->firstOrFail();
         if (isset($data['id']) && $data['id'] !== $approvalUuid) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['approval' => __('care-plan.approval_result_unavailable')]);
+            throw ValidationException::withMessages(['approval' => __('care-plan.approval_result_unavailable')]);
         }
         if ($confirmedStatus === ApprovalStatus::ACTIVE->value && array_key_exists('is_verified', $data) && $data['is_verified'] !== true) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['approval' => __('care-plan.approval_verify_error')]);
+            throw ValidationException::withMessages(['approval' => __('care-plan.approval_verify_error')]);
         }
         if (isset($data['id'], $data['is_verified'])) {
             $this->sync($data, $approval->approvable, $approval);
@@ -294,6 +301,9 @@ class ApprovalRepository extends BaseRepository
 
     /**
      * Fetch approvals from eHealth and sync them locally for a given polymorphic entity.
+     * Reconcile missing approvals only after every page of a successful response is
+     * validated, including a complete empty list. Failed/incomplete snapshots leave
+     * local access unchanged; pending jobs and recipient scoping remain protected.
      *
      * - Prefers Get approvals filters (`granted_resource_type`, `granted_resources`) when patient uuid is known.
      * - Still applies a client-side filter as a safety net if the API ignores filters.
@@ -328,97 +338,95 @@ class ApprovalRepository extends BaseRepository
                 'granted_resources' => $entity->uuid,
             ], $additionalFilters), static fn ($value) => $value !== null && $value !== '');
 
-            if ($patientUuid) {
-                $response = $api->getPatientApprovals($patientUuid, $filters);
-                $data = $response->validate();
-
-                // Safety net: keep only approvals that reference this specific resource
-                if (!empty($data) && is_array($data)) {
-                    $filteredData = [];
-
-                    foreach ($data as $approvalData) {
-                        $grantedResources = $approvalData['granted_resources'] ?? [];
-
-                        foreach ($grantedResources as $resource) {
-                            $typeCode = $resource['identifier']['type']['coding'][0]['code'] ?? null;
-                            $value = $resource['identifier']['value'] ?? null;
-
-                            if ($typeCode === $resourceType && $value === $entity->uuid) {
-                                $filteredData[] = $approvalData;
-                                break;
-                            }
+            $data = [];
+            $page = 1;
+            do {
+                $query = $filters;
+                if ($page > 1) {
+                    $query['page'] = $page;
+                }
+                $response = $patientUuid
+                    ? $api->getPatientApprovals($patientUuid, $query)
+                    : $api->getMany($query);
+                $pageData = $response->validate();
+                $paging = $response->getPaging();
+                if ((int) ($paging['page_number'] ?? $paging['page'] ?? 0) !== $page) {
+                    throw ValidationException::withMessages(['paging' => 'Unexpected approval response page.']);
+                }
+                foreach ($pageData as $approvalData) {
+                    if ($patientUuid) {
+                        $matchesResource = collect($approvalData['granted_resources'] ?? [])->contains(
+                            fn (array $resource): bool => data_get($resource, 'identifier.type.coding.0.code') === $resourceType
+                                && data_get($resource, 'identifier.value') === $entity->uuid
+                        );
+                        if (!$matchesResource) {
+                            continue;
                         }
                     }
-
-                    $data = $filteredData;
+                    $data[] = $approvalData;
                 }
-            } else {
-                $response = $api->getMany($filters);
-                $data = $response->validate();
-            }
+                $page++;
+            } while ($page <= (int) $paging['total_pages']);
 
-            if (empty($data)) {
-                return;
-            }
+            $this->storageTransaction(function () use ($entity, $data, $additionalFilters): void {
+                $syncedUuids = [];
+                foreach ($data as $approvalData) {
+                    // Persist full raw eHealth JSON to MongoDB
+                    try {
+                        MongoApproval::updateOrCreate(
+                            ['id' => $approvalData['id']],
+                            $approvalData
+                        );
+                    } catch (\Throwable $e) {
+                        Log::warning('MedicalEvents\\ApprovalRepository Mongo sync failed: '.$e->getMessage());
+                    }
 
-            $syncedUuids = [];
-            foreach ($data as $approvalData) {
-                // Persist full raw eHealth JSON to MongoDB
-                try {
-                    MongoApproval::updateOrCreate(
-                        ['id' => $approvalData['id']],
-                        $approvalData
+                    $syncedUuids[] = $approvalData['id'];
+
+                    // Resolve granted_to → Identifier FK
+                    $grantedToValue = $approvalData['granted_to']['identifier']['value'] ?? null;
+                    $grantedToCode = $approvalData['granted_to']['identifier']['type']['coding'][0]['code'] ?? 'legal_entity';
+
+                    // Resolve reason → Identifier FK (never a raw string)
+                    $reasonValue = $approvalData['reason']['value'] ?? null;
+
+                    // Resolve created_by → Identifier FK
+                    $createdByValue = $approvalData['created_by']['identifier']['value'] ?? null;
+
+                    Approval::updateOrCreate(
+                        ['uuid' => $approvalData['id']],
+                        [
+                            'approvable_type' => get_class($entity),
+                            'approvable_id' => $entity->id,
+                            'granted_to_id' => $this->resolveIdentifier($grantedToValue)?->id,
+                            'granted_to_type' => $grantedToCode,
+                            'reason_id' => $this->resolveIdentifier($reasonValue)?->id,
+                            'created_by_id' => $this->resolveIdentifier($createdByValue)?->id,
+                            'status' => ApprovalStatus::forStorage($approvalData['status'] ?? (!empty($approvalData['is_verified']) ? ApprovalStatus::ACTIVE->value : ApprovalStatus::PENDING->value)),
+                            'access_level' => $approvalData['access_level'] ?? 'read',
+                            'is_verified' => (bool) ($approvalData['is_verified'] ?? false),
+                            'expires_at' => $approvalData['expires_at'] ?? null,
+                        ]
                     );
-                } catch (\Throwable $e) {
-                    Log::warning('MedicalEvents\\ApprovalRepository Mongo sync failed: '.$e->getMessage());
                 }
 
-                $syncedUuids[] = $approvalData['id'];
+                $inactiveQuery = Approval::where('approvable_type', get_class($entity))
+                    ->where('approvable_id', $entity->id)
+                    ->whereDoesntHave('ehealthLinks', fn ($links) => $links->whereHas('job', fn ($jobs) => $jobs->whereIn('status', ['PENDING', 'PROCESSING'])))
+                    ->whereNotIn('uuid', $syncedUuids);
 
-                // Resolve granted_to → Identifier FK
-                $grantedToValue = $approvalData['granted_to']['identifier']['value'] ?? null;
-                $grantedToCode = $approvalData['granted_to']['identifier']['type']['coding'][0]['code'] ?? 'legal_entity';
-
-                // Resolve reason → Identifier FK (never a raw string)
-                $reasonValue = $approvalData['reason']['value'] ?? null;
-
-                // Resolve created_by → Identifier FK
-                $createdByValue = $approvalData['created_by']['identifier']['value'] ?? null;
-
-                Approval::updateOrCreate(
-                    ['uuid' => $approvalData['id']],
-                    [
-                        'approvable_type' => get_class($entity),
-                        'approvable_id' => $entity->id,
-                        'granted_to_id' => $this->resolveIdentifier($grantedToValue)?->id,
-                        'granted_to_type' => $grantedToCode,
-                        'reason_id' => $this->resolveIdentifier($reasonValue)?->id,
-                        'created_by_id' => $this->resolveIdentifier($createdByValue)?->id,
-                        'status' => ApprovalStatus::resolve($approvalData['status'] ?? null) === ApprovalStatus::INACTIVE
-                            ? ApprovalStatus::INACTIVE->value
-                            : (!empty($approvalData['is_verified']) ? ApprovalStatus::ACTIVE->value : ApprovalStatus::PENDING->value),
-                        'access_level' => $approvalData['access_level'] ?? 'read',
-                        'is_verified' => (bool) ($approvalData['is_verified'] ?? false),
-                        'expires_at' => $approvalData['expires_at'] ?? null,
-                    ]
-                );
-            }
-
-            $inactiveQuery = Approval::where('approvable_type', get_class($entity))
-                ->where('approvable_id', $entity->id)
-                ->whereDoesntHave('ehealthLinks', fn ($links) => $links->whereHas('job', fn ($jobs) => $jobs->whereIn('status', ['PENDING', 'PROCESSING'])))
-                ->whereNotIn('uuid', $syncedUuids);
-
-            if (isset($additionalFilters['granted_to.identifier.value'])) {
-                $identifier = \App\Models\MedicalEvents\Sql\Identifier::where('value', $additionalFilters['granted_to.identifier.value'])->first();
-                if ($identifier) {
-                    $inactiveQuery->where('granted_to_id', $identifier->id);
-                } else {
-                    $inactiveQuery->whereRaw('1 = 0');
+                if (isset($additionalFilters['granted_to.identifier.value'])) {
+                    $identifier = Identifier::where('value', $additionalFilters['granted_to.identifier.value'])->first();
+                    if ($identifier) {
+                        $inactiveQuery->where('granted_to_id', $identifier->id);
+                    } else {
+                        $inactiveQuery->whereRaw('1 = 0');
+                    }
                 }
-            }
 
-            $inactiveQuery->update(['status' => ApprovalStatus::INACTIVE->value]);
+                $inactiveQuery->update(['status' => ApprovalStatus::INACTIVE->value]);
+            });
+            $entity->unsetRelation('approvals');
         } catch (\App\Exceptions\EHealth\EHealthValidationException $e) {
             if ($entity instanceof \App\Models\CarePlan) {
                 throw $e;

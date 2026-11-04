@@ -34,7 +34,12 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse ($approvals as $approval)
+                    @php
+                        $activeApprovals = collect($approvals)->filter(
+                            fn (array $approval): bool => \App\Enums\Person\ApprovalStatus::resolve($approval['status'] ?? null)?->isGranted() ?? false
+                        );
+                    @endphp
+                    @forelse ($activeApprovals as $approval)
                         <tr class="index-table-tr">
                             <td class="index-table-td">
                                 <div class="flex flex-col">
@@ -197,22 +202,33 @@
                             <div class="form-group group">
                                 <select
                                     class="input-select peer"
-                                    wire:model="selectedAuthMethodUuid"
+                                    wire:model.live="selectedAuthMethodUuid"
                                     id="selectedAuthMethodUuid"
+                                    x-effect="if ($wire.selectedAuthMethodUuid && $el.value !== $wire.selectedAuthMethodUuid) $nextTick(() => $el.value = $wire.selectedAuthMethodUuid)"
                                 >
                                     <option value="">{{ __('care-plan.choose_auth_method') }}</option>
                                     @foreach ($authMethods as $method)
-                                        <option value="{{ $method['id'] ?? $method['uuid'] }}">
-                                            @if (($method['type'] ?? '') === 'OTP')
-                                                SMS ({{ $method['phone_number'] ?? '' }})
-                                            @elseif (($method['type'] ?? '') === 'OFFLINE')
-                                                {{ __('care-plan.offline_paper') }}
-                                            @else
-                                                {{ \App\Enums\Person\AuthenticationMethod::tryFrom($method['type'] ?? '')?->label() ?? __('care-plan.other') }}
-                                            @endif
+                                        @continue(!in_array($method['type'] ?? '', ['OTP', 'OFFLINE', 'THIRD_PERSON'], true))
+                                        @php
+                                            $methodUuid = $method['id'] ?? $method['uuid'];
+                                            $methodDetails = array_filter([
+                                                $method['alias'] ?? null,
+                                                data_get($method, 'confidantPerson.name', data_get($method, 'confidant_person.name')),
+                                                \App\Enums\Person\AuthenticationMethod::confirmationPhone($method),
+                                            ]);
+                                        @endphp
+                                        <option
+                                            value="{{ $methodUuid }}"
+                                            wire:key="care-plan-auth-method-{{ $methodUuid }}"
+                                            @selected($methodUuid === $selectedAuthMethodUuid)
+                                        >
+                                            {{ __('care-plan.approval_method_' . strtolower($method['type'])) }}{{ $methodDetails !== [] ? ' — ' . implode(' · ', $methodDetails) : '' }}
                                         </option>
                                     @endforeach
                                 </select>
+                                @error('selectedAuthMethodUuid')
+                                    <p class="text-error">{{ $message }}</p>
+                                @enderror
                                 <label for="selectedAuthMethodUuid" class="label">
                                     {{ __('care-plan.auth_method') }} *
                                 </label>
@@ -220,6 +236,11 @@
                         @endif
                     </div>
 
+                    @unless ($skipsPatientOtp)
+                        <p class="text-sm text-gray-600 dark:text-gray-300">
+                            {{ __('care-plan.approval_method_selection_help') }}
+                        </p>
+                    @endunless
                     <div class="mt-4 flex justify-end">
                         <button
                             type="submit"

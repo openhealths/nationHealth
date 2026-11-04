@@ -103,6 +103,7 @@ class RequestStatusEnumsTest extends TestCase
         $this->assertTrue(ApprovalStatus::ACTIVE->isGranted());
         $this->assertTrue(ApprovalStatus::APPROVED->isGranted());
         $this->assertFalse(ApprovalStatus::NEW->isGranted());
+        $this->assertFalse(ApprovalStatus::TERMINATED->isGranted());
 
         $this->assertTrue(ApprovalStatus::NEW->isAwaitingPatient());
         $this->assertTrue(ApprovalStatus::PENDING->isAwaitingPatient());
@@ -116,6 +117,7 @@ class RequestStatusEnumsTest extends TestCase
         $this->assertSame('active', ApprovalStatus::forStorage('APPROVED'));
         $this->assertSame('active', ApprovalStatus::forStorage('active'));
         $this->assertSame('inactive', ApprovalStatus::forStorage('inactive'));
+        $this->assertSame('terminated', ApprovalStatus::forStorage('TERMINATED'));
         $this->assertSame('pending', ApprovalStatus::forStorage(null));
     }
 

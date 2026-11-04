@@ -7,10 +7,14 @@ namespace Tests\Feature\Person;
 use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\JobStatus;
+use App\Enums\Person\AuthenticationMethod;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\MedicalEvents\ApprovalVerificationException;
 use App\Livewire\Person\Forms\PersonForm;
+use App\Livewire\CarePlan\Forms\CarePlanForm;
 use App\Livewire\Person\Records\PatientData;
+use App\Livewire\Person\Records\PatientApproval;
+use App\Services\MedicalEvents\PatientApprovalService;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Approval;
@@ -27,11 +31,13 @@ use App\Traits\HasApproval;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Response as HttpResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -39,6 +45,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Mockery;
+use Livewire\Component;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -155,6 +162,218 @@ class PatientApprovalConfirmationTest extends TestCase
             'pending, HTTP 204' => ['pending', 204],
             'legacy active, HTTP 200' => ['active', 200],
         ];
+    }
+
+    #[DataProvider('offlineMethods')]
+    public function test_document_confirmation_waits_for_explicit_acknowledgement(string $type): void
+    {
+        $component = Mockery::mock(PatientApproval::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $component->personId = $this->person->id;
+        $component->step = 'confirming';
+        $component->approvalId = (string) Str::uuid();
+        $component->selectedAuthType = $type;
+        $service = $this->mock(PatientApprovalService::class)->makePartial();
+        if ($type === 'THIRD_PERSON') {
+            $service->shouldReceive('details')->once()->andReturn([
+                'authentication_method_current' => ['type' => 'THIRD_PERSON', 'reference' => ['type' => 'OFFLINE']],
+            ]);
+        }
+        $service->shouldReceive('verify')->once()->with(
+            Mockery::on(fn (Person $person): bool => $person->is($this->person)),
+            $component->approvalId,
+            null,
+        )->andReturnUsing(function () use ($component): null {
+            $this->assertTrue($component->leafletConfirmed);
+
+            return null;
+        });
+        $component->shouldReceive('finish')->once();
+
+        $component->continueAfterCreation();
+
+        $this->assertSame('confirming', $component->step);
+        $this->assertSame('OFFLINE', $component->selectedAuthType);
+        $this->assertTrue($component->getErrorBag()->has('leafletConfirmed'));
+
+        $component->leafletConfirmed = true;
+        $component->continueAfterCreation();
+    }
+
+    public static function offlineMethods(): array
+    {
+        return ['patient' => ['OFFLINE'], 'representative' => ['THIRD_PERSON']];
+    }
+
+    public function test_representative_otp_still_opens_code_entry_without_document_acknowledgement(): void
+    {
+        $component = new PatientApproval();
+        $component->personId = $this->person->id;
+        $component->step = 'confirming';
+        $component->approvalId = (string) Str::uuid();
+        $component->selectedAuthType = 'THIRD_PERSON';
+        $service = $this->mock(PatientApprovalService::class)->makePartial();
+        $service->shouldReceive('details')->once()->andReturn([
+            'authentication_method_current' => ['type' => 'THIRD_PERSON', 'reference' => ['type' => 'OTP', 'phone_number' => '+38093*****85']],
+        ]);
+        $service->shouldReceive('smsResendAvailableAt')->once()->andReturn(123);
+        $service->shouldNotReceive('verify');
+
+        $component->continueAfterCreation();
+
+        $this->assertSame('code', $component->step);
+        $this->assertSame('+38093*****85', $component->smsPhone);
+        $this->assertFalse($component->getErrorBag()->has('leafletConfirmed'));
+    }
+
+    public function test_document_confirmation_denial_stops_before_api_calls(): void
+    {
+        $component = new PatientApproval();
+        $component->step = 'confirming';
+        $component->approvalId = (string) Str::uuid();
+        $component->selectedAuthType = 'OFFLINE';
+        $component->leafletConfirmed = true;
+        Auth::user()->shouldReceive('cannot')->once()->with('create', Approval::class)->andReturnTrue();
+        $service = $this->mock(PatientApprovalService::class);
+        $service->shouldNotReceive('details');
+        $service->shouldNotReceive('verify');
+
+        $component->continueAfterCreation();
+
+        $this->assertSame('confirming', $component->step);
+        $this->assertSame(__('approval.create.role_forbidden'), Session::get('error'));
+    }
+
+    #[DataProvider('incompleteSnapshotPages')]
+    public function test_incomplete_snapshot_preserves_existing_approval(bool $failsOnSecondPage): void
+    {
+        $approval = $this->createApproval(['status' => 'active', 'is_verified' => true]);
+        $attributesBefore = $approval->fresh()->getAttributes();
+        $filters = ['granted_resource_type' => 'person', 'granted_resources' => $this->person->uuid];
+        $validator = fn (EHealthResponse $response): array => (new \ReflectionMethod(ApprovalApi::class, 'validateApprovalList'))
+            ->invoke($this->api, $response);
+        if ($failsOnSecondPage) {
+            $this->api->shouldReceive('getMany')->once()->with($filters)->andReturn(new EHealthResponse(
+                new Response(200, [], '{"data":[],"paging":{"page_number":1,"total_pages":2}}'), $validator,
+            ));
+            $filters['page'] = 2;
+        }
+        $this->api->shouldReceive('getMany')->once()->with($filters)->andReturn(new EHealthResponse(
+            new Response(200, [], '{}'), $validator,
+        ));
+
+        Repository::approval()->syncApprovals($this->person, 'person');
+
+        $this->assertSame($attributesBefore, $approval->fresh()->getAttributes());
+    }
+
+    public static function incompleteSnapshotPages(): array
+    {
+        return ['first page' => [false], 'later page' => [true]];
+    }
+
+    #[DataProvider('approvalPagingFields')]
+    public function test_complete_empty_snapshot_reconciles_after_all_pages(string $pageField): void
+    {
+        Schema::table('ehealth_links', function (Blueprint $table): void {
+            $table->unsignedBigInteger('ehealth_job_id')->nullable();
+        });
+        Schema::create('ehealth_jobs', function (Blueprint $table): void {
+            $table->id();
+            $table->string('status');
+        });
+        $approval = $this->createApproval(['status' => 'active', 'is_verified' => true]);
+        $filters = ['granted_resource_type' => 'person', 'granted_resources' => $this->person->uuid];
+        foreach ([1, 2] as $page) {
+            $query = $page === 1 ? $filters : $filters + ['page' => $page];
+            $response = new EHealthResponse(new Response(200, [], json_encode([
+                'data' => [], 'paging' => [$pageField => $page, 'total_pages' => 2],
+            ], JSON_THROW_ON_ERROR)), fn (EHealthResponse $response): array => (new \ReflectionMethod(ApprovalApi::class, 'validateApprovalList'))
+                ->invoke($this->api, $response));
+            $this->api->shouldReceive('getMany')->once()->with($query)->andReturnUsing(function () use ($approval, $response): EHealthResponse {
+                $this->assertSame('active', $approval->fresh()->status);
+
+                return $response;
+            });
+        }
+
+        Repository::approval()->syncApprovals($this->person, 'person');
+
+        $this->assertSame('inactive', $approval->fresh()->status);
+    }
+
+    public static function approvalPagingFields(): array
+    {
+        return ['runtime' => ['page_number'], 'documented' => ['page']];
+    }
+
+    public function test_representative_leaflet_can_override_a_care_plan_form_without_person_data(): void
+    {
+        $form = new CarePlanForm(new class extends Component {}, 'form');
+        $html = view('livewire.person.parts.patient-leaflet', ['form' => $form, 'isThirdPerson' => true])->render();
+
+        $this->assertStringContainsString(__('patients.leaflet.informed_representative'), $html);
+        $this->assertStringContainsString(__('patients.leaflet.confirm_representative_authority'), $html);
+        $this->assertStringNotContainsString(__('patients.leaflet.self_intro'), $html);
+
+        $html = view('livewire.person.parts.patient-leaflet', ['form' => $form, 'isThirdPerson' => false])->render();
+        $this->assertStringContainsString(__('patients.leaflet.self_intro'), $html);
+        $this->assertStringNotContainsString(__('patients.leaflet.confirm_representative_authority'), $html);
+
+        $patientForm = (object) ['person' => ['authenticationMethods' => [['type' => 'THIRD_PERSON']]]];
+        $html = view('livewire.person.parts.patient-leaflet', ['form' => $patientForm])->render();
+        $this->assertStringContainsString(__('patients.leaflet.informed_representative'), $html);
+    }
+
+    public function test_authentication_method_sync_preserves_stored_fields_and_rejects_metadata(): void
+    {
+        Schema::create('authentication_methods', function (Blueprint $table): void {
+            $table->id();
+            $table->string('uuid');
+            $table->morphs('authenticatable');
+            $table->string('type');
+            foreach (['phone_number', 'value', 'alias', 'url'] as $field) {
+                $table->string($field)->nullable();
+            }
+            $table->timestamp('ehealth_ended_at')->nullable();
+            $table->timestamps();
+        });
+        $method = [
+            'uuid' => (string) Str::uuid(), 'type' => 'OTP', 'phone_number' => '+38093*****85',
+            'value' => null, 'alias' => 'Original', 'url' => 'https://example.invalid/auth',
+            'ehealth_ended_at' => null,
+            'reference' => ['type' => 'OTP', 'phone_number' => '+38093*****85'],
+            'authenticatable_type' => 'untrusted', 'authenticatable_id' => 999999,
+        ];
+        $otherPerson = Person::create(['uuid' => (string) Str::uuid()]);
+        $otherMethod = $otherPerson->authenticationMethods()->create(array_replace(Arr::only($method, [
+            'uuid', 'type', 'phone_number', 'value', 'alias', 'url', 'ehealth_ended_at',
+        ]), ['uuid' => (string) Str::uuid()]));
+        $this->person->authenticationMethods()->create(['uuid' => (string) Str::uuid(), 'type' => 'OFFLINE']);
+        $updated = array_replace($method, [
+            'type' => 'THIRD_PERSON', 'value' => (string) Str::uuid(),
+            'alias' => 'Updated', 'phone_number' => null, 'url' => null,
+        ]);
+        $previous = Model::preventsSilentlyDiscardingAttributes();
+        Model::preventSilentlyDiscardingAttributes();
+        try {
+            GeneralRepository::authenticationMethod()->sync($this->person, [$method]);
+            $stored = $this->person->authenticationMethods()->sole();
+            $this->assertSame($method['phone_number'], $stored->phoneNumber);
+            $this->assertSame($method['url'], $stored->url);
+            GeneralRepository::authenticationMethod()->sync($this->person, [$updated]);
+        } finally {
+            Model::preventSilentlyDiscardingAttributes($previous);
+        }
+
+        $stored = $this->person->authenticationMethods()->sole();
+        foreach (['uuid', 'type', 'phone_number', 'value', 'alias', 'url', 'ehealth_ended_at'] as $field) {
+            $this->assertSame($updated[$field], $stored->getRawOriginal($field));
+        }
+        $this->assertSame($this->person->id, $stored->authenticatableId);
+        $this->assertSame(Person::class, $stored->authenticatableType);
+        $this->assertArrayNotHasKey('reference', $stored->getAttributes());
+        $this->assertSame('Original', $otherMethod->fresh()->alias);
+        $this->assertSame(AuthenticationMethod::OTP, AuthenticationMethod::confirmationMethod($method));
     }
 
     #[DataProvider('verificationResponses')]

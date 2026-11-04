@@ -232,7 +232,18 @@ class CarePlanApprovalServiceTest extends TestCase
         );
     }
 
-    public function test_create_returns_otp_required_for_sync_otp_response(): void
+    public static function confirmationMethods(): array
+    {
+        return [
+            'OTP' => [['type' => 'OTP'], true],
+            'OFFLINE' => [['type' => 'OFFLINE'], false],
+            'representative OTP' => [['type' => 'THIRD_PERSON', 'reference' => ['type' => 'OTP']], true],
+            'representative OFFLINE' => [['type' => 'THIRD_PERSON', 'reference' => ['type' => 'OFFLINE']], false],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('confirmationMethods')]
+    public function test_sync_creation_preserves_the_required_confirmation(array $method, bool $requiresOtp): void
     {
         [$carePlan, $legalEntity, $user] = $this->makeCarePlanContext();
 
@@ -243,7 +254,7 @@ class CarePlanApprovalServiceTest extends TestCase
             'id' => '11111111-1111-1111-1111-111111111111',
             'is_verified' => false,
             'urgent' => [
-                'authentication_method_current' => ['type' => 'OTP'],
+                'authentication_method_current' => $method,
             ],
         ]);
 
@@ -266,9 +277,10 @@ class CarePlanApprovalServiceTest extends TestCase
             bearerToken: "synthetic-token",
         );
 
-        $this->assertTrue($result->requiresOtp());
+        $this->assertTrue($result->requiresConfirmation());
+        $this->assertSame($requiresOtp, $result->requiresOtp());
         $this->assertSame('11111111-1111-1111-1111-111111111111', $result->approvalId);
-        $this->assertSame(CarePlanApprovalCreateOutcome::OtpRequired, $result->outcome);
+        $this->assertSame($requiresOtp ? CarePlanApprovalCreateOutcome::OtpRequired : CarePlanApprovalCreateOutcome::OfflineRequired, $result->outcome);
     }
 
     public function test_create_dispatches_async_job_and_returns_polling_link(): void
@@ -374,7 +386,8 @@ class CarePlanApprovalServiceTest extends TestCase
         }
     }
 
-    public function test_resolve_async_job_swaps_uuid_and_requests_otp_when_unverified(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('confirmationMethods')]
+    public function test_async_creation_preserves_the_required_confirmation(array $method, bool $requiresOtp): void
     {
         [$carePlan] = $this->makeCarePlanContext();
 
@@ -391,7 +404,7 @@ class CarePlanApprovalServiceTest extends TestCase
             'response_data' => [
                 'id' => '44444444-4444-4444-4444-444444444444',
                 'is_verified' => false,
-                'authentication_method_current' => ['type' => 'OTP'],
+                'authentication_method_current' => $method,
             ],
         ]);
 
@@ -404,14 +417,16 @@ class CarePlanApprovalServiceTest extends TestCase
         ]);
 
         $before = app(CarePlanApprovalService::class)->resolveAsyncJob($link->id);
-        $this->assertTrue($before->requiresOtp());
+        $this->assertTrue($before->requiresConfirmation());
+        $this->assertSame($requiresOtp, $before->requiresOtp());
         $this->assertSame('33333333-3333-3333-3333-333333333333', $approval->fresh()->uuid);
         \App\Repositories\MedicalEvents\Repository::approval()->completeCarePlanRequest($link, $job->response_data);
         $status = app(CarePlanApprovalService::class)->resolveAsyncJob($link->id);
 
-        $this->assertTrue($status->requiresOtp());
+        $this->assertTrue($status->requiresConfirmation());
+        $this->assertSame($requiresOtp, $status->requiresOtp());
         $this->assertSame('44444444-4444-4444-4444-444444444444', $status->approvalId);
-        $this->assertSame(CarePlanApprovalJobOutcome::OtpRequired, $status->outcome);
+        $this->assertSame($requiresOtp ? CarePlanApprovalJobOutcome::OtpRequired : CarePlanApprovalJobOutcome::OfflineRequired, $status->outcome);
         $this->assertDatabaseHas('approvals', [
             'id' => $approval->id,
             'uuid' => '44444444-4444-4444-4444-444444444444',
@@ -563,6 +578,30 @@ class CarePlanApprovalServiceTest extends TestCase
     /**
      * @return array{0: CarePlan, 1: LegalEntity, 2: User}
      */
+    public function test_a_different_method_cannot_silently_reuse_an_unconfirmed_approval(): void
+    {
+        [$plan, $legalEntity, $user] = $this->makeCarePlanContext();
+        $employeeUuid = $plan->author->uuid;
+        $firstMethod = (string) Str::uuid();
+        $secondMethod = (string) Str::uuid();
+        $link = \App\Repositories\MedicalEvents\Repository::approval()->beginCarePlanRequest(
+            $plan,
+            app(CarePlanApprovalService::class)->buildCreatePayload($plan, $employeeUuid, 'write', $firstMethod),
+        );
+        $this->mock(ApprovalApi::class)->shouldNotReceive('createApproval', 'verify', 'getApprovalDetails');
+        Bus::fake();
+
+        try {
+            app(CarePlanApprovalService::class)->create($plan, $plan->person->uuid, $employeeUuid, 'write', $secondMethod, $legalEntity, $user, 'synthetic-token');
+            $this->fail('Expected an explicit pending-method refusal.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame(__('care-plan.approval_method_pending'), $exception->getMessage());
+        }
+        $this->assertSame($firstMethod, $link->linkable->fresh()->authorizeWith);
+        $this->assertDatabaseCount('approvals', 1);
+        Bus::assertNothingBatched();
+    }
+
     private function makeCarePlanContext(): array
     {
         $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')

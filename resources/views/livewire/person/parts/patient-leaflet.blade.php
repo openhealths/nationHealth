@@ -1,7 +1,7 @@
 @use('App\Enums\Person\AuthenticationMethod')
 
 @php
-    $isThirdPerson = ($form->person['authenticationMethods'][0]['type'] ?? null)
+    $isThirdPerson ??= ($form->person['authenticationMethods'][0]['type'] ?? null)
         === AuthenticationMethod::THIRD_PERSON->value;
 @endphp
 

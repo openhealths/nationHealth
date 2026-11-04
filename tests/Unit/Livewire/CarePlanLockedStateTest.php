@@ -50,6 +50,7 @@ class CarePlanLockedStateTest extends TestCase
                 'approvalId',
                 'pollingLinkId',
                 'currentAuthMethod',
+                'authMethods',
             ],
             CarePlanApprovals::class => [
                 'carePlanId',
@@ -60,6 +61,7 @@ class CarePlanLockedStateTest extends TestCase
                 'approvalId',
                 'pollingLinkId',
                 'currentAuthMethod',
+                'authMethods',
             ],
         ];
 
@@ -110,12 +112,12 @@ class CarePlanLockedStateTest extends TestCase
                 'outcomeCode',
                 'selectedOutcomeReference',
                 'showSignatureModal',
-                'authMethods',
             ],
             CarePlanApprovals::class => [
                 'newApproval',
                 'selectedAuthMethodUuid',
                 'verificationCode',
+                'offlineAcknowledged',
             ],
         ];
 
@@ -136,9 +138,6 @@ class CarePlanLockedStateTest extends TestCase
      */
     public function test_alpine_entangled_properties_are_not_locked(): void
     {
-        $this->assertEmpty(
-            (new ReflectionClass(CarePlanComponent::class))->getProperty('authMethods')->getAttributes(Locked::class)
-        );
         $this->assertEmpty(
             (new ReflectionClass(InteractsWithApprovals::class))->getProperty('smsResent')->getAttributes(Locked::class)
         );

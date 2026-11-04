@@ -61,6 +61,7 @@ abstract class CarePlanComponent extends Component
     public array $dictionaries = [];
 
     /** Entangled with Alpine in the method selection modal, so it cannot be locked. */
+    #[Locked]
     public array $authMethods = [];
 
     public bool $showMethodSelectionModal = false;

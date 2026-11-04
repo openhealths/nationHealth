@@ -33,6 +33,13 @@
                             </legend>
                         </div>
 
+                        <p class="mb-6 text-sm text-gray-600 dark:text-gray-300">
+                            {{ __('care-plan.approval_method_selection_help') }}
+                        </p>
+                        @error('selectedAuthMethodUuid')
+                            <p class="text-error mb-4">{{ $message }}</p>
+                        @enderror
+
                         <template x-if="! authenticationMethods || authenticationMethods.length === 0">
                             <div class="mb-8 rounded-xl border border-red-200 bg-red-100 p-4 dark:border-red-800 dark:bg-red-900/20">
                                 <div class="flex items-center gap-2">
@@ -60,68 +67,14 @@
                                             </div>
 
                                             <div class="flex items-center gap-4">
-                                                <div x-data="{ open: false }" class="relative">
-                                                    <button
-                                                        @click="open = ! open"
-                                                        type="button"
-                                                        class="cursor-pointer text-sm font-medium whitespace-nowrap text-blue-600 hover:underline"
-                                                    >
-                                                        {{ __('patients.change') }}
-                                                    </button>
-
-                                                    <div
-                                                        x-show="open"
-                                                        @click.away="open = false"
-                                                        x-transition
-                                                        style="display: none"
-                                                        class="absolute right-0 z-50 mt-2 w-64 rounded-lg border border-gray-100 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-800"
-                                                    >
-                                                        <template x-if="method.type === '{{ AuthenticationMethod::OTP->value }}'">
-                                                            <button
-                                                                type="button"
-                                                                @click="open = false"
-                                                                class="w-full cursor-pointer rounded px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                                                            >
-                                                                {{ __('patients.change_phone_number') }}
-                                                            </button>
-                                                        </template>
-
-                                                        <template x-if="method.type === '{{ AuthenticationMethod::OFFLINE->value }}'">
-                                                            <button
-                                                                type="button"
-                                                                @click="open = false"
-                                                                class="w-full cursor-pointer rounded px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                                                            >
-                                                                {{ __('patients.change_method_to_sms') }}
-                                                            </button>
-                                                        </template>
-
-                                                        <button
-                                                            type="button"
-                                                            @click="open = false"
-                                                            class="w-full cursor-pointer rounded px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                                                        >
-                                                            {{ __('patients.change_method_alias') }}
-                                                        </button>
-
-                                                        <template x-if="method.type === '{{ AuthenticationMethod::THIRD_PERSON->value }}'">
-                                                            <button
-                                                                type="button"
-                                                                @click="open = false"
-                                                                class="w-full cursor-pointer rounded px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                                                            >
-                                                                {{ __('patients.deactivate_method') }}
-                                                            </button>
-                                                        </template>
-                                                    </div>
-                                                </div>
-
                                                 <button
                                                     type="button"
                                                     class="button-primary px-6 py-2 whitespace-nowrap"
                                                     @click="$wire.selectAuthMethod(method.id || method.uuid)"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="selectAuthMethod"
                                                 >
-                                                    {{ __('forms.select') }}
+                                                    {{ __('care-plan.approval_request_with_method') }}
                                                 </button>
                                             </div>
                                         </div>

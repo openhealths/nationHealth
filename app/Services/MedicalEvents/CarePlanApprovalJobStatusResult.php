@@ -24,6 +24,11 @@ final class CarePlanApprovalJobStatusResult
         return $this->outcome === CarePlanApprovalJobOutcome::OtpRequired;
     }
 
+    public function requiresConfirmation(): bool
+    {
+        return in_array($this->outcome, [CarePlanApprovalJobOutcome::OtpRequired, CarePlanApprovalJobOutcome::OfflineRequired], true);
+    }
+
     public function isGranted(): bool
     {
         return $this->outcome === CarePlanApprovalJobOutcome::Granted;

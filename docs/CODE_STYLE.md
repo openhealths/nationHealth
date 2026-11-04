@@ -12,6 +12,8 @@ Conventions for contributors. Link to a specific rule from code review when need
   `getAttribute('snake_case')` read.
 - Acronyms inside identifiers are treated as a single word — capitalize only the first letter:
   `Uuid`, `Id`, `Url`, `Html`. Write `legalEntityUuid` (not `legalEntityUUID`), `clientId` (not `clientID`).
+- Import PHP classes with `use` instead of repeating fully qualified names at call sites.
+- Use explicit parentheses for chained `??` fallbacks and nested conditional expressions.
 
 ## Repositories
 

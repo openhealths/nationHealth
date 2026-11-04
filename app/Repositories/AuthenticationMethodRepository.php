@@ -45,7 +45,7 @@ class AuthenticationMethodRepository
         foreach ($authMethods as $method) {
             $person->authenticationMethods()->updateOrCreate(
                 ['uuid' => $method['uuid']],
-                Arr::except($method, 'confidant_person')
+                Arr::only($method, ['uuid', 'type', 'phone_number', 'value', 'alias', 'ehealth_ended_at', 'url'])
             );
 
             if (!empty($method['confidant_person'])) {

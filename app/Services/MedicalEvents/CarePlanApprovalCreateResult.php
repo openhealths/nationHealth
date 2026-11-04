@@ -24,6 +24,11 @@ final class CarePlanApprovalCreateResult
         return $this->outcome === CarePlanApprovalCreateOutcome::OtpRequired;
     }
 
+    public function requiresConfirmation(): bool
+    {
+        return in_array($this->outcome, [CarePlanApprovalCreateOutcome::OtpRequired, CarePlanApprovalCreateOutcome::OfflineRequired], true);
+    }
+
     public function isGranted(): bool
     {
         return $this->outcome === CarePlanApprovalCreateOutcome::Granted;
