@@ -4,7 +4,7 @@
     x-data="selectComponent('{{ $dictionaryName }}', '{{ $modelPath }}', {{ $options ? '() => ('.$options.')' : 'null' }})"
     x-modelable="selected"
     x-model="{{ $modelPath }}"
-    @click.away="hideOptions"
+    @click.away.capture="hideOptions"
     @keydown.escape="
         if (optionsVisible && ! $event.isComposing && $event.keyCode !== 229) {
             $event.preventDefault();
@@ -20,8 +20,8 @@
         type="search"
         placeholder="{{ __('forms.type_to_search') }}"
         x-model="search"
-        @focus="showOptions"
         @click="showOptions"
+        @keydown.arrow-down.prevent="showOptions"
         @input.debounce.150ms="showOptions"
         @input="if (! $event.target.value.trim()) selected = '';"
         id="{{ $attributes['id'] ?? '' }}"

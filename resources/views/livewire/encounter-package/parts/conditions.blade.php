@@ -1401,6 +1401,17 @@
         maxWidth="3/5"
         overlayWidth="100%"
         stopClickPropagation="true"
+        @click.capture="
+            const dateInput = $el.querySelector('input.daterangepicker-uk');
+            const picker = dateInput?._flatpickr;
+            if (
+                picker?.isOpen &&
+                ! dateInput.closest('.datepicker-wrapper').contains($event.target) &&
+                ! picker.calendarContainer.contains($event.target)
+            ) {
+                picker.close();
+            }
+        "
         wire:ignore
     >
         <x-slot name="title">{{ __('encounters.search_medical_records') }}</x-slot>

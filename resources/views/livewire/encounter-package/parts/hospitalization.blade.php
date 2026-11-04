@@ -45,16 +45,20 @@
 
     <div class="form-row-2">
         <div class="form-group group">
-            <input
-                wire:model="form.encounter.hospitalization.preAdmissionIdentifier"
-                type="text"
-                id="hospitalizationPreAdmissionIdentifier"
-                class="input peer @error('form.encounter.hospitalization.preAdmissionIdentifier') input-error @enderror"
-                placeholder=" "
-            />
-            <label for="hospitalizationPreAdmissionIdentifier" class="label">
-                {{ __('encounters.hospitalization.pre_admission_identifier') }}
-            </label>
+            <div class="relative">
+                <label
+                    for="hospitalizationPreAdmissionIdentifier"
+                    class="absolute inset-x-0 bottom-[calc(100%-0.1875rem)] text-[0.65625rem] leading-[0.9375rem] text-gray-500 group-focus-within:font-medium group-focus-within:text-blue-600 dark:text-gray-400 dark:group-focus-within:text-blue-500"
+                >
+                    {{ __('encounters.hospitalization.pre_admission_identifier') }}
+                </label>
+                <input
+                    wire:model="form.encounter.hospitalization.preAdmissionIdentifier"
+                    type="text"
+                    id="hospitalizationPreAdmissionIdentifier"
+                    class="input @error('form.encounter.hospitalization.preAdmissionIdentifier') input-error @enderror"
+                />
+            </div>
             @error('form.encounter.hospitalization.preAdmissionIdentifier')
                 <p class="text-error">{{ $message }}</p>
             @enderror
