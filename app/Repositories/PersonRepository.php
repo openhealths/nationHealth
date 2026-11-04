@@ -58,7 +58,7 @@ class PersonRepository
 
         // associate person request with person
         $personRequest = PersonRequest::whereUuid($personRequestUuid)->firstOrFail();
-        $personRequest->person()->associate($person);
+        $personRequest->person()->associate($person)->save();
 
         $person->names()->createMany($personData['names']);
         $person->documents()->createMany($personData['documents']);
@@ -106,7 +106,7 @@ class PersonRepository
 
         // associate person request
         $personRequest = PersonRequest::whereUuid($personRequestUuid)->firstOrFail();
-        $personRequest->person()->associate($person);
+        $personRequest->person()->associate($person)->save();
 
         $this->syncRelations($person, $personData);
     }

@@ -112,6 +112,12 @@ Route::prefix('persons')->whereNumber('person')
                 ->whereNumber('personRequest')
                 ->name('edit');
             Route::get('/update/{person}', PersonUpdate::class)->can('create', PersonRequest::class)->name('update');
+            // The custom key scopes the request to the person, so a request of another person is not found
+            Route::get('/update/{person}/request/{personRequest:id}', PersonUpdate::class)
+                ->can('create', PersonRequest::class)
+                ->can('continue', 'personRequest')
+                ->whereNumber('personRequest')
+                ->name('update-request');
 
             Route::get('/{person}/patient-data', PatientData::class)
                 ->can('viewAny', Person::class)

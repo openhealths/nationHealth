@@ -179,6 +179,9 @@ class PersonIndex extends Component
         $personRequests = PersonRequest::with(['phones', 'names', 'documents'])
             ->where($filters)
             ->whereIn('status', [Status::DRAFT, Status::NEW, Status::APPROVED, Status::REJECTED])
+            // A change of a person's data can be continued only while it is new or approved, unlike a registration
+            ->where(static fn (Builder $query): Builder => $query->whereNull('person_id')
+                ->orWhereIn('status', [Status::NEW, Status::APPROVED]))
             ->forNameFilters($nameFilters)
             ->forDocumentFilters($documentFilters)
             ->when($phoneNumber, static function ($query) use ($phoneNumber) {
@@ -189,6 +192,7 @@ class PersonIndex extends Component
             ->get([
                 'id',
                 'status',
+                'person_id',
                 'gender',
                 'birth_country',
                 'birth_settlement',
