@@ -1,7 +1,7 @@
 @use('App\Livewire\CarePlan\CarePlanIndex')
 @use('App\Enums\CarePlanStatus')
 
-<div>
+<div data-livewire-background-actions="checkSyncStatus">
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     @if ($syncBatchIds !== [])
         <div wire:poll.3s="checkSyncStatus" class="mb-4 text-sm text-gray-600 dark:text-gray-300">
