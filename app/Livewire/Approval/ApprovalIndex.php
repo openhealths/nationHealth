@@ -8,6 +8,7 @@ use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\EHealth\EHealthJobTimeoutException;
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
 use App\Models\User;
@@ -19,6 +20,7 @@ use App\Repositories\MedicalEvents\Repository;
 use App\Traits\LogsExceptions;
 use App\Traits\BatchLegalEntityQueries;
 use App\Jobs\ApprovalSync;
+use App\Services\MedicalEvents\PatientApprovalService;
 use Illuminate\Bus\Batch;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -29,6 +31,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -57,8 +60,10 @@ class ApprovalIndex extends Component
     public string $filterIsExpired = '';
     public string $filterReason = '';
     public string $filterAccessLevel = '';
-    
+
     public bool $isSearching = false;
+    public bool $showCancelApprovalModal = false;
+    public ?int $approvalToCancel = null;
 
     public function mount(): void
     {
@@ -80,9 +85,16 @@ class ApprovalIndex extends Component
     #[Computed]
     public function localApprovalsByUuid(): Collection
     {
-        return Approval::query()->whereIn('uuid', collect($this->paginatedApprovals->items())->pluck('id'))
-            ->whereHas('grantedTo', static fn ($query) => $query->where('value', Auth::user()->activeDoctorEmployee()->uuid))
-            ->get(['id', 'uuid', 'status'])->keyBy('uuid');
+        return Approval::query()
+            ->with([
+                'createdBy',
+                'approvable' => static fn (MorphTo $morphTo) => $morphTo->morphWith([
+                    CarePlan::class => ['person'],
+                ]),
+            ])
+            ->whereIn('uuid', collect($this->paginatedApprovals->items())->pluck('id'))
+            ->get(['id', 'uuid', 'status', 'expires_at', 'created_by_id', 'approvable_id', 'approvable_type'])
+            ->keyBy('uuid');
     }
 
     public function search(): void
@@ -105,6 +117,7 @@ class ApprovalIndex extends Component
             ->firstOrFail();
 
         $employeeUuid = Auth::user()->activeDoctorEmployee()->uuid;
+        $canViewAll = Auth::user()->can('viewAllForPatient', [Approval::class, $patient]);
 
         $batchName = ApprovalSync::BATCH_NAME . '_' . $patient->uuid;
 
@@ -118,16 +131,18 @@ class ApprovalIndex extends Component
         }
 
         try {
-            $response = EHealth::approval()->getPatientApprovals($patient->uuid, [
-                'granted_to' => $employeeUuid,
-                'page' => 1,
-                'page_size' => config('pagination.per_page'),
-            ]);
+            $query = [];
+
+            if (!$canViewAll) {
+                $query['granted_to'] = $employeeUuid;
+            }
+
+            $response = EHealth::approval()->getPatientApprovals($patient->uuid, $query);
 
             $approvals = [];
 
             foreach ($response->validate() as $approval) {
-                if (data_get($approval, 'granted_to.identifier.value') !== $employeeUuid) {
+                if (!$canViewAll && data_get($approval, 'granted_to.identifier.value') !== $employeeUuid) {
                     continue;
                 }
 
@@ -162,7 +177,7 @@ class ApprovalIndex extends Component
                     ->withOption('user', $user)
                     ->withOption('patient_uuid', $patientUuid)
                     ->withOption('person_id', $patient->id)
-                    ->withOption('employee_uuid', $employeeUuid)
+                    ->withOption('employee_uuid', $canViewAll ? null : $employeeUuid)
                     ->withOption('sync_entity', LegalEntity::ENTITY_APPROVAL)
                     ->catch(static function (Batch $batch, Throwable $exception) use (
                         $userId,
@@ -222,17 +237,61 @@ class ApprovalIndex extends Component
         $this->search();
     }
 
+    public function confirmCancelApproval(int $approvalId): void
+    {
+        $this->approvalToCancel = $approvalId;
+        $this->showCancelApprovalModal = true;
+    }
+
+    public function cancelApproval(int $approvalId, PatientApprovalService $service): void
+    {
+        $this->showCancelApprovalModal = false;
+
+        $approval = Approval::query()
+            ->with([
+                'createdBy',
+                'approvable' => static fn (MorphTo $morphTo) => $morphTo->morphWith([
+                    CarePlan::class => ['person'],
+                ]),
+            ])
+            ->findOrFail($approvalId);
+
+        if (Auth::user()->cannot('cancel', $approval)) {
+            Session::flash('error', $approval->expiresAt !== null && !$approval->expiresAt->isFuture() ? __('approval.messages.cancel_expired') : __('approval.messages.cancel_forbidden'));
+
+            return;
+        }
+
+        try {
+            $service->cancel($approval);
+        } catch (EHealthJobTimeoutException $exception) {
+            $exception->handle('Approval cancellation job did not finish');
+
+            return;
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while cancelling approval', __('approval.messages.cancel_failed'));
+
+            return;
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Error while storing cancelled approval');
+
+            return;
+        }
+
+        Session::flash('success', __('approval.messages.cancelled'));
+    }
+
     public function resetFilters(): void
     {
         $this->reset([
-            'filterPatientId', 
-            'filterGrantedTo', 
-            'filterGrantedResources', 
-            'filterGrantedResourceType', 
-            'filterIsVerified', 
-            'filterIsExpired', 
-            'filterReason', 
-            'filterAccessLevel', 
+            'filterPatientId',
+            'filterGrantedTo',
+            'filterGrantedResources',
+            'filterGrantedResourceType',
+            'filterIsVerified',
+            'filterIsExpired',
+            'filterReason',
+            'filterAccessLevel',
             'isSearching'
         ]);
         $this->resetValidation();
@@ -242,9 +301,16 @@ class ApprovalIndex extends Component
     protected function paginateLocalApprovals(): LengthAwarePaginator
     {
         return Approval::query()->withAllRelations()->with([
-            'approvable' => static fn (MorphTo $morphTo) => $morphTo->morphWith([Person::class => ['names'], CarePlan::class => ['person.names']]),
-        ])->whereHas('grantedTo', static fn ($query) => $query->where('value', Auth::user()->activeDoctorEmployee()->uuid))
-            ->latest()->paginate(config('pagination.per_page'));
+            'approvable' => static fn (MorphTo $morphTo) => $morphTo->morphWith([
+                Person::class => ['names'],
+                CarePlan::class => ['person.names']
+            ]),
+        ])->where(static function (Builder $query): void {
+            $employeeUuid = Auth::user()->activeDoctorEmployee()->uuid;
+
+            $query->whereHas('grantedTo', static fn (Builder $identifier): Builder => $identifier->where('value', $employeeUuid))
+                ->orWhereHas('createdBy', static fn (Builder $identifier): Builder => $identifier->where('value', $employeeUuid));
+        })->latest()->paginate(config('pagination.per_page'));
     }
 
     protected function searchApprovalsFromEHealth(): LengthAwarePaginator
@@ -289,8 +355,10 @@ class ApprovalIndex extends Component
 
     private function buildSearchParams(): array
     {
+        $canViewAll = Auth::user()->can('viewAllForPatient', [Approval::class, $this->searchPatient]);
+
         return array_filter([
-            'granted_to' => $this->filterGrantedTo ?: Auth::user()->activeDoctorEmployee()->uuid,
+            'granted_to' => $this->filterGrantedTo ?: ($canViewAll ? '' : Auth::user()->activeDoctorEmployee()->uuid),
             'granted_resources' => $this->filterGrantedResources,
             'granted_resource_type' => $this->filterGrantedResourceType,
             'is_verified' => $this->filterIsVerified,

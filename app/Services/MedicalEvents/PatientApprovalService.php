@@ -27,6 +27,7 @@ use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\User;
 use App\Enums\JobStatus;
+use App\Enums\Person\ApprovalStatus;
 use App\Enums\Person\AuthenticationMethod;
 use App\Enums\Specimen\Status as SpecimenStatus;
 use App\Repositories\MedicalEvents\Repository;
@@ -189,6 +190,27 @@ class PatientApprovalService
             'approval_id' => null,
             'link_id' => $link->id,
         ];
+    }
+
+    public function cancel(Approval $approval): void
+    {
+        $approvable = $approval->approvable;
+        $patient = $approvable instanceof Person ? $approvable : $approvable->person;
+
+        $response = EHealth::approval()->cancelApproval($patient->uuid, $approval->uuid);
+        $data = $response->validate();
+
+        if ($response->status() === 202) {
+            if (empty($data['links'][0]['href'])) {
+                throw new EHealthValidationException([
+                    'error' => ['message' => 'Missing cancellation job link.'],
+                ]);
+            }
+
+            app(EHealthJobResolver::class)->resolve($data);
+        }
+
+        $approval->update(['status' => ApprovalStatus::INACTIVE->value]);
     }
 
     private function dispatchJob(EhealthLink $link, User $user, string $token): void

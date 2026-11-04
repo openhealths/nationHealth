@@ -27,18 +27,20 @@ class ApprovalSync extends PatientEHealthJob
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse
     {
-        return EHealth::approval()
-            ->withToken($token)
-            ->getPatientApprovals($this->patientUuid, [
-                'granted_to' => $this->batch()->options['employee_uuid'],
-                'page' => $this->page,
-                'page_size' => config('pagination.per_page'),
-            ]);
+        $query = [
+            'page' => $this->page
+        ];
+
+        if ($employeeUuid = $this->batch()->options['employee_uuid']) {
+            $query['granted_to'] = $employeeUuid;
+        }
+
+        return EHealth::approval()->withToken($token)->getPatientApprovals($this->patientUuid, $query);
     }
 
     /**
      * {@inheritDoc}
-     * 
+     *
      * @throws Throwable
      */
     protected function processResponse(?EHealthResponse $response): void
@@ -47,7 +49,7 @@ class ApprovalSync extends PatientEHealthJob
         $employeeUuid = $this->batch()->options['employee_uuid'];
 
         foreach ($response?->validate() ?? [] as $approval) {
-            if (data_get($approval, 'granted_to.identifier.value') !== $employeeUuid) {
+            if ($employeeUuid !== null && data_get($approval, 'granted_to.identifier.value') !== $employeeUuid) {
                 continue;
             }
 

@@ -200,10 +200,16 @@
                                                         @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300')
                                                         {{ __('forms.view_details') }}
                                                     </a>
-                                                    <button type="button" class="flex whitespace-nowrap items-center gap-2 w-full last-of-type:rounded-b-md px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-600">
-                                                        @icon('cancel', 'w-5 h-5 text-red-600')
-                                                        {{ __('approval.revoke_access') }}
-                                                    </button>
+                                                    @if ($status && ($status->isGranted() || $status->isAwaitingPatient()) && Auth::user()->can('cancel', $local))
+                                                        <button
+                                                            type="button"
+                                                            wire:click="confirmCancelApproval({{ $local->id }})"
+                                                            class="flex whitespace-nowrap items-center gap-2 w-full last-of-type:rounded-b-md px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-600"
+                                                        >
+                                                            @icon('cancel', 'w-5 h-5 text-red-600')
+                                                            {{ __('approval.revoke_access') }}
+                                                        </button>
+                                                    @endif
                                                 </div>
                                             </div>
                                         </div>
@@ -225,4 +231,34 @@
             @endif
         </div>
     </div>
+
+    <x-confirmation-modal wire:model.live="showCancelApprovalModal" maxWidth="md">
+        <x-slot name="title">
+            {{ __('approval.messages.cancel_confirm') }}
+        </x-slot>
+
+        <x-slot name="content">
+            {{ __('approval.messages.cancel_irreversible') }}
+        </x-slot>
+
+        <x-slot name="footer">
+            <div class="flex w-full items-center justify-between">
+                <x-secondary-button
+                    wire:click="$set('showCancelApprovalModal', false)"
+                >
+                    {{ __('forms.cancel') }}
+                </x-secondary-button>
+
+                @if ($approvalToCancel !== null)
+                    <x-danger-button
+                        wire:click="cancelApproval({{ $approvalToCancel }})"
+                        wire:loading.attr="disabled"
+                        wire:target="cancelApproval"
+                    >
+                        {{ __('approval.revoke_access') }}
+                    </x-danger-button>
+                @endif
+            </div>
+        </x-slot>
+    </x-confirmation-modal>
 </div>
