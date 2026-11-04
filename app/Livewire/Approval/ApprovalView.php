@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Livewire\Approval;
+declare(strict_types=1);
 
+namespace App\Livewire\Approval;
 
 use App\Models\CarePlan;
 use App\Models\MedicalEvents\Sql\Approval;
@@ -84,10 +85,6 @@ class ApprovalView extends Component
                     CarePlan::class => ['person.names'],
                 ]),
             ])
-            ->whereHas(
-                'grantedTo',
-                static fn ($query) => $query->where('value', Auth::user()->activeDoctorEmployee()->uuid)
-            )
             ->findOrFail($this->approvalId);
     }
 
@@ -95,6 +92,7 @@ class ApprovalView extends Component
     public function patient(): Person
     {
         $approval = $this->approval();
+
         return $approval->approvable instanceof Person ? $approval->approvable : $approval->approvable->person;
     }
 

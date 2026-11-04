@@ -370,7 +370,7 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
 
             Route::prefix('data-access')->name('data-access.')->group(static function () {
                 Route::get('/', \App\Livewire\Approval\ApprovalIndex::class)->name('index');
-                Route::get('/{approval}', \App\Livewire\Approval\ApprovalView::class)->name('view');
+                Route::get('/{approval}', \App\Livewire\Approval\ApprovalView::class)->can('view', 'approval')->name('view');
             });
 
             require __DIR__ . '/dictionaries.php';

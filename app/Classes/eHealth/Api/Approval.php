@@ -6,7 +6,6 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
-use App\Classes\eHealth\Request as LegacyRequest;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -139,15 +138,16 @@ class Approval extends Request
     /**
      * Cancel an Approval.
      *
-     * @param  string  $id
-     * @param  array  $payload
-     * @return array
-     */
-    public static function cancelApproval(string $id, array $payload = []): array
+     * @param  string  $patientId
+     * @param  string  $approvalId
+     * @return PromiseInterface|EHealthResponse
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+    */
+    public function cancelApproval(string $patientId, string $approvalId): PromiseInterface|EHealthResponse
     {
-        // Typically a PATCH Request to /api/approvals/{id} with status = null depending on API specifics
-        // However wait to check official api schema for this endpoint if differing from /actions/cancel
-        return (new LegacyRequest('PATCH', self::URL . "/$id/actions/cancel", $payload))->sendRequest();
+        $this->setValidator($this->validateCancellation(...));
+
+        return $this->patch(self::APPROVAL_URL . "/{$patientId}/approvals/{$approvalId}/actions/cancel", []);
     }
 
     /**
@@ -203,6 +203,15 @@ class Approval extends Request
         ];
 
         return $payload;
+    }
+
+    protected function validateCancellation(EHealthResponse $response): array
+    {
+        if (!in_array($response->status(), [201, 202], true)) {
+            throw new EHealthResponseException($response);
+        }
+
+        return $response->status() === 202 ? Job::validateSubmissionResponse($response) : $response->getData();
     }
 
     protected function validateApprovalList(EHealthResponse $response): array
