@@ -109,13 +109,7 @@ class PatientSummary extends BasePatientComponent
 
     public array $procedures = [];
 
-    public array $allergyIntolerances;
-
-    public array $riskAssessments;
-
     public array $devices = [];
-
-    public array $medicationStatements;
 
     /**
      * Options of the selector that opens the records of the persons merged into this patient.
@@ -685,46 +679,6 @@ class PatientSummary extends BasePatientComponent
         );
     }
 
-    public function syncAllergyIntolerances(): void
-    {
-        try {
-            $response = EHealth::patient()->getAllergyIntolerances($this->uuid);
-            $validatedData = $response->validate();
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error when getting allergy intolerances');
-
-            return;
-        }
-    }
-
-    public function syncRiskAssessments(): void
-    {
-        try {
-            $response = EHealth::patient()->getRiskAssessments($this->uuid);
-            $validatedData = $response->validate();
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error when getting risk assessments');
-
-            return;
-        }
-    }
-
-    public function syncAssociatedDevices(): void
-    {
-    }
-    public function syncDeviceAssociations(): void
-    {
-    }
-    public function syncDeviceIssues(): void
-    {
-    }
-    public function syncDeviceDispenses(): void
-    {
-    }
-    public function syncSpecimens(): void
-    {
-    }
-
     public function syncDevices(): void
     {
         if ($this->cannotStartSync(self::ENTITY_TYPE_DEVICE)) {
@@ -984,18 +938,6 @@ class PatientSummary extends BasePatientComponent
         }
 
         return $preperson->id;
-    }
-
-    public function syncMedicationStatements(): void
-    {
-        try {
-            $response = EHealth::patient()->getMedicationStatements($this->uuid);
-            $validatedData = $response->validate();
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error when getting medication statements');
-
-            return;
-        }
     }
 
     private function populateIcd10Descriptions(array $conditions): void

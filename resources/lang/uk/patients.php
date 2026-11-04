@@ -190,14 +190,6 @@ return [
     'data_access' => 'Доступ до даних',
     'revoke_access' => 'Відкликати доступ до записів',
     'sync_success' => 'Дані успішно синхронізовані',
-    'allergies' => 'Алергії',
-    'risk_assessments' => 'Оцінки ризиків',
-    'medicines' => 'Відомості про ліки',
-    'associated_devices' => 'Асоційовані медичні вироби',
-    'device_associations' => 'Зв\'язки медичних виробів з пацієнтом',
-    'device_issues' => 'Виявлені проблеми медичних виробів',
-    'device_dispenses' => 'Видачі медичних виробів',
-    'specimens' => 'Зразок біологічного матеріалу',
 
     // Diagnoses record
     'diagnoses_search' => 'Пошук діагнозів',
