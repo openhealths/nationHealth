@@ -8,6 +8,7 @@
         "test:drawers": "node --test tests/JavaScript/dialog-drawer.test.cjs",
         "test:referrals": "node --test tests/JavaScript/referral-index.test.cjs",
         "test:referral-filters": "node --test tests/JavaScript/referral-index-filters.test.cjs",
+        "prebuild": "node scripts/dev/prepare.cjs",
         "build": "vite build"
     },
     "devDependencies": {
