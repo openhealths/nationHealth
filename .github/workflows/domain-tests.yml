@@ -38,6 +38,8 @@ jobs:
         run: npm run test:print
       - name: Test employee form controls
         run: node --test tests/Frontend/employee-select2.test.cjs tests/Frontend/employee-specialities.test.cjs tests/Frontend/employee-compliance.test.cjs
+      - name: Test frontend build guard
+        run: node --test tests/Frontend/local-dev.test.cjs
 
   phpunit:
     name: Owned domain suites
