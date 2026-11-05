@@ -36,17 +36,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('immunization_dose_quantities', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('immunization_id')->constrained('immunizations')->cascadeOnDelete();
-            $table->integer('value');
-            $table->string('comparator')->nullable();
-            $table->enum('unit', ['MG', 'MKG', 'ML'])->nullable();
-            $table->string('system')->nullable();
-            $table->string('code')->nullable();
-            $table->timestamps();
-        });
-
         Schema::create('immunization_explanations', static function (Blueprint $table) {
             $table->id();
             $table->foreignId('immunization_id')->constrained('immunizations')->cascadeOnDelete();
@@ -99,8 +88,6 @@ return new class extends Migration
         Schema::dropIfExists('immunization_explanations');
 
         Schema::dropIfExists('immunization_reactions');
-
-        Schema::dropIfExists('immunization_dose_quantities');
 
         Schema::dropIfExists('immunizations');
     }

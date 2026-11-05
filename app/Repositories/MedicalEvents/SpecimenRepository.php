@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Repositories\MedicalEvents;
 
 use App\Core\Arr;
-use App\Models\MedicalEvents\Sql\Quantity;
 use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\MedicalEvents\Sql\SpecimenCollection;
 use App\Models\Person\Person;
@@ -164,8 +163,8 @@ class SpecimenRepository extends BaseRepository
             'procedure_id' => $procedure?->id,
             'collector_id' => $this->syncIdentifier($existingCollection, $collection['collector'], 'collector')->id,
             'collected_date_time' => $collection['collected_date_time'] ?? null,
-            'duration_id' => $this->syncQuantity($existingCollection?->duration, $collection['duration'] ?? null)?->id,
-            'quantity_id' => $this->syncQuantity($existingCollection?->quantity, $collection['quantity'] ?? null)?->id,
+            'duration_id' => Repository::quantity()->sync($existingCollection?->duration, $collection['duration'] ?? null)?->id,
+            'quantity_id' => Repository::quantity()->sync($existingCollection?->quantity, $collection['quantity'] ?? null)?->id,
             'method_id' => $method?->id,
             'body_site_id' => $bodySite?->id,
             'fasting_status_codeable_concept_id' => $fastingStatus?->id
@@ -211,8 +210,8 @@ class SpecimenRepository extends BaseRepository
                 'identifier' => $container['identifier'],
                 'description' => $container['description'] ?? null,
                 'type_id' => $type?->id,
-                'capacity_id' => $this->syncQuantity($existingContainer?->capacity, $container['capacity'] ?? null)?->id,
-                'specimen_quantity_id' => $this->syncQuantity(
+                'capacity_id' => Repository::quantity()->sync($existingContainer?->capacity, $container['capacity'] ?? null)?->id,
+                'specimen_quantity_id' => Repository::quantity()->sync(
                     $existingContainer?->specimenQuantity,
                     $container['specimen_quantity'] ?? null
                 )?->id,
@@ -231,27 +230,5 @@ class SpecimenRepository extends BaseRepository
         foreach ($existingContainers->slice(count($containers)) as $extraContainer) {
             $extraContainer->delete();
         }
-    }
-
-    /**
-     * Update quantity or create a new one.
-     *
-     * @param  Quantity|null  $quantity
-     * @param  array|null  $data
-     * @return Quantity|null
-     */
-    private function syncQuantity(?Quantity $quantity, ?array $data): ?Quantity
-    {
-        if (empty($data)) {
-            return null;
-        }
-
-        if ($quantity) {
-            $quantity->update($data);
-
-            return $quantity;
-        }
-
-        return Quantity::create($data);
     }
 }

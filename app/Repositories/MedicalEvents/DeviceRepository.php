@@ -7,7 +7,6 @@ namespace App\Repositories\MedicalEvents;
 use App\Core\Arr;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\DeviceProperty;
-use App\Models\MedicalEvents\Sql\Quantity;
 use App\Models\MedicalEvents\Sql\Range;
 use App\Models\Person\Person;
 use App\Models\Preperson;
@@ -290,16 +289,16 @@ class DeviceRepository extends BaseRepository
         }
 
         if (isset($propertyData['valueQuantity'])) {
-            $valueData['value_quantity_id'] = $this
-                ->syncQuantity($value?->valueQuantity, $propertyData['valueQuantity'])
-                ->id;
+            $valueData['value_quantity_id'] = Repository::quantity()
+                ->sync($value?->valueQuantity, $propertyData['valueQuantity'])
+                ?->id;
         }
 
         if (isset($propertyData['valueRange'])) {
             $range = $value?->valueRange;
             $rangeData = [
-                'low_id' => $this->syncQuantity($range?->low, $propertyData['valueRange']['low'])->id,
-                'high_id' => $this->syncQuantity($range?->high, $propertyData['valueRange']['high'])->id
+                'low_id' => Repository::quantity()->sync($range?->low, $propertyData['valueRange']['low'])?->id,
+                'high_id' => Repository::quantity()->sync($range?->high, $propertyData['valueRange']['high'])?->id
             ];
 
             if ($range) {
@@ -318,23 +317,5 @@ class DeviceRepository extends BaseRepository
         }
 
         $property->value()->create($valueData);
-    }
-
-    /**
-     * Update the given quantity, or create one when the property did not carry it before.
-     *
-     * @param  Quantity|null  $quantity
-     * @param  array  $quantityData
-     * @return Quantity
-     */
-    private function syncQuantity(?Quantity $quantity, array $quantityData): Quantity
-    {
-        if ($quantity) {
-            $quantity->update($quantityData);
-
-            return $quantity;
-        }
-
-        return Quantity::create($quantityData);
     }
 }

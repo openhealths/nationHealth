@@ -74,6 +74,8 @@ class BaseErrorTranslator implements ApiErrorTranslator
             'Invalid legal entity type' => __('errors.ehealth.messages.invalid_legal_entity_type'),
             'Division not found' => __('errors.ehealth.messages.division_not_found'),
             'Division is not active' => __('errors.ehealth.messages.division_not_active'),
+            'Division with such id is not found' => __('errors.ehealth.messages.division_not_found'),
+            'Division is not in current legal entity' => __('errors.ehealth.messages.division_of_another_legal_entity'),
             'value is not allowed in enum' => __('errors.ehealth.messages.value_not_allowed_in_enum'),
             'Request validation fails' => __('errors.ehealth.messages.validation_error'),
             'Validation error' => __('errors.ehealth.messages.request_parameters_validation_error'),
@@ -112,9 +114,18 @@ class BaseErrorTranslator implements ApiErrorTranslator
             'type mismatch. Expected boolean but got {actual}' => __('errors.ehealth.messages.type_mismatch_boolean'),
             'type mismatch. Expected string but got {actual}' => __('errors.ehealth.messages.type_mismatch_string'),
             'type mismatch. Expected object but got {actual}' => __('errors.ehealth.messages.type_mismatch_object'),
+            'type mismatch. Expected integer but got number' => __('errors.ehealth.messages.integer_required'),
+            'type mismatch. Expected {expected} but got {actual}' => __('errors.ehealth.messages.type_mismatch'),
+            'Value {code} not found in the dictionary {system}' => __('errors.ehealth.messages.value_not_found_in_dictionary'),
             'expected "{actual}" to be a valid ISO 8601 date' => __('errors.ehealth.messages.invalid_iso8601_date'),
             'Invalid. Expected "{actual}" to be a valid ISO 8601 date' => __('errors.ehealth.messages.invalid_iso8601_date'),
-            'expected "{actual}" to be a valid ISO 8601 date-time' => __('errors.ehealth.messages.invalid_iso8601_date_time')
+            'expected "{actual}" to be a valid ISO 8601 date-time' => __('errors.ehealth.messages.invalid_iso8601_date_time'),
+            'Exceeded max count of elements in the array' => __('errors.ehealth.messages.elements_count_exceeded'),
+            'expected a maximum of {max} items but got {actual}' => __('errors.ehealth.messages.too_many_items'),
+            'expected a minimum of {min} items but got {actual}' => __('errors.ehealth.messages.too_few_items'),
+            'expected the value to be <= {max}' => __('errors.ehealth.messages.value_too_large'),
+            'expected the value to be >= {min}' => __('errors.ehealth.messages.value_too_small'),
+            'expected value to have a maximum length of {max} but was {actual}' => __('errors.ehealth.messages.value_too_long')
         ];
     }
 

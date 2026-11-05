@@ -1199,14 +1199,14 @@ class EncounterPackageComponent extends Component
      * the current legal entity. The access rules find the encounter by its episode stored this way, so without it the
      * author loses the encounter once it stops being a draft.
      *
-     * @param  string|null  $episodeId  ID of the selected existing episode, null for a new one
+     * @param  string|null  $episodeId  ID of the selected existing episode, empty for a new one
      * @return void
      * @throws EHealthConnectionException|EHealthException|Throwable
      */
     protected function syncSelectedEpisode(?string $episodeId): void
     {
         if ($this->patientUuid === null
-            || $episodeId === null
+            || empty($episodeId)
             || Episode::forPatient($this->patient())->whereUuid($episodeId)->managedByLegalEntity()->exists()) {
             return;
         }

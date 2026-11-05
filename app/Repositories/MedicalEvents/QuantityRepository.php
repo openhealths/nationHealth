@@ -50,6 +50,37 @@ class QuantityRepository extends BaseRepository
         return $quantity;
     }
 
+    /**
+     * Update the quantity, or create one when there was none before.
+     *
+     * @param  Quantity|null  $quantity
+     * @param  array|null  $data
+     * @return Quantity|null Null when no quantity data is given
+     */
+    public function sync(?Quantity $quantity, ?array $data): ?Quantity
+    {
+        if (empty($data)) {
+            return null;
+        }
+
+        // Every field is set, so an optional one missing from the new data is cleared instead of kept
+        $attributes = [
+            'value' => $data['value'] ?? null,
+            'comparator' => $data['comparator'] ?? null,
+            'unit' => $data['unit'] ?? null,
+            'system' => $data['system'] ?? null,
+            'code' => $data['code'] ?? null
+        ];
+
+        if ($quantity) {
+            $quantity->update($attributes);
+
+            return $quantity;
+        }
+
+        return Quantity::create($attributes);
+    }
+
     public function toResource(?Quantity $quantity): ?array
     {
         if ($quantity === null) {

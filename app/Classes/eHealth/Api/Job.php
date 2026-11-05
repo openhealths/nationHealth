@@ -6,6 +6,8 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\MedicalEventsErrorTranslator;
+use App\Contracts\ApiErrorTranslator;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -49,6 +51,21 @@ class Job extends Request
         $this->setValidator($this->validateDetails(...));
 
         return $this->get($href, $query);
+    }
+
+    /**
+     * Get the error eHealth rejected the job with. The job details come with a successful response, so the error is
+     * not raised by the request itself and is translated here.
+     *
+     * @param  array  $job  Job details with the error, described by an error object or by a bare message
+     * @return EHealthValidationException
+     */
+    public function jobError(array $job): EHealthValidationException
+    {
+        return new EHealthValidationException(
+            ['error' => is_array($job['error']) ? $job['error'] : ['message' => $job['error']]],
+            $this->errorTranslator()
+        );
     }
 
     /**
@@ -109,4 +126,13 @@ class Job extends Request
         ];
     }
 
+    /**
+     * Get the translator of the errors the medical events resources return, as the jobs process their packages.
+     *
+     * @return ApiErrorTranslator
+     */
+    protected function errorTranslator(): ApiErrorTranslator
+    {
+        return new MedicalEventsErrorTranslator();
+    }
 }
