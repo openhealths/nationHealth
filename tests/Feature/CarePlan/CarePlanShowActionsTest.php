@@ -6,12 +6,15 @@ namespace Tests\Feature\CarePlan;
 
 use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Api\Approval as ApprovalApi;
+use App\Classes\eHealth\Api\Person as PersonApi;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use GuzzleHttp\Psr7\Response;
 use Mockery;
 
 use App\Enums\Person\ApprovalStatus;
 use App\Livewire\CarePlan\CarePlanShow;
+use App\Livewire\CarePlan\CarePlanApprovals;
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
@@ -19,12 +22,15 @@ use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use App\Models\User;
+use App\Services\MedicalEvents\PatientApprovalService;
+use App\Services\MedicalEvents\CarePlanApprovalService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
 use Tests\Concerns\MocksBasicDictionaries;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class CarePlanShowActionsTest extends TestCase
 {
@@ -1018,27 +1024,66 @@ class CarePlanShowActionsTest extends TestCase
         ]);
     }
 
+    public static function cancellationDenials(): array
+    {
+        return [
+            'creator without scope' => [false, true],
+            'scope without authorship or declaration' => [true, false],
+        ];
+    }
+
+    #[DataProvider('cancellationDenials')]
+    public function test_cancellation_denial_blocks_cancel_and_recreate_without_side_effects(bool $hasScope, bool $isCreator): void
+    {
+        $this->actingAs($this->user);
+        $plan = $this->makeSignedNewPlan();
+        $this->grantApproval($plan, $this->employee, ApprovalStatus::ACTIVE->value);
+        $approval = $plan->approvals()->firstOrFail();
+        if ($isCreator) {
+            $approval->update(['created_by_id' => $approval->grantedToId]);
+        }
+        if ($hasScope) {
+            $this->grantMedicalEventAbilities($this->user, ['approval:cancel']);
+        }
+        $this->mock(CarePlanApprovalService::class)->makePartial()
+            ->shouldReceive('skipsPatientOtp')->andReturn(true);
+        $this->mock(PatientApprovalService::class)->shouldNotReceive('cancel');
+        $this->mock(PersonApi::class)->shouldNotReceive('getAuthMethods');
+        $this->mock(ApprovalApi::class)->shouldNotReceive('cancelApproval', 'createApproval', 'verify');
+
+        Livewire::test(CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $plan])
+            ->call('cancelApproval', $approval->uuid)->assertSee(__('approval.messages.cancel_forbidden'))
+            ->call('recreateApproval', $approval->uuid)->assertSee(__('approval.messages.cancel_forbidden'));
+
+        $this->assertSame(ApprovalStatus::ACTIVE->value, $approval->fresh()->status);
+        $this->assertSame(1, $plan->approvals()->count());
+    }
+
     public function test_terminal_plan_can_revoke_an_existing_approval_but_cannot_grant_a_new_one(): void
     {
         $this->actingAs($this->user);
         $plan = $this->makeSignedNewPlan();
         $plan->update(['status' => 'completed']);
         $this->grantApproval($plan, $this->employee, ApprovalStatus::ACTIVE->value);
-        $approvalUuid = $plan->approvals()->value('uuid');
+        $approval = $plan->approvals()->firstOrFail();
+        $approval->update(['created_by_id' => $approval->grantedToId]);
+        $approvalUuid = $approval->uuid;
+        $this->grantMedicalEventAbilities($this->user, ['approval:cancel']);
         $response = new EHealthResponse(new Response(200, [], '{"data":[]}'));
         $this->mock(\App\Classes\eHealth\Api\Person::class)->shouldReceive('getAuthMethods')->andReturn($response);
         $service = $this->mock(\App\Services\MedicalEvents\CarePlanApprovalService::class)->makePartial();
         $service->shouldReceive('skipsPatientOtp')->andReturn(false);
         $service->shouldReceive('syncForCarePlan')->andReturnNull();
-        $service->shouldReceive('deactivate')->once()->with($this->person->uuid, $approvalUuid)->andReturn($response);
-        Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $plan->fresh()])
+        $this->mock(PatientApprovalService::class)->shouldReceive('cancel')->once()
+            ->with(Mockery::on(fn (Approval $candidate): bool => $candidate->is($approval)))->andReturnNull();
+        Livewire::test(CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $plan->fresh()])
             ->assertSet('isReadOnly', true)->assertSeeHtml('wire:click="cancelApproval')
             ->call('cancelApproval', $approvalUuid)->assertSee(__('care-plan.approval_cancelled'))
             ->call('cancelApproval', (string) Str::uuid())->assertSee(__('care-plan.approval_cancel_error'));
         $plan->approvals()->whereUuid($approvalUuid)->update(['status' => ApprovalStatus::PENDING->value]);
-        Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $plan->fresh()])
-            ->assertDontSeeHtml('wire:click="cancelApproval')
-            ->assertSee(__('care-plan.no_approvals_found'))
+        Livewire::test(CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $plan->fresh()])
+            ->assertSeeHtml('wire:click="cancelApproval')
+            ->assertDontSee(__('care-plan.no_approvals_found'))
             ->assertDontSeeHtml('wire:click="recreateApproval')
             ->assertDontSeeHtml('wire:click="verifyExistingApproval')
             ->call('createApproval')->assertSee(__('care-plan.cannot_grant_terminal', ['status' => \App\Enums\CarePlanStatus::labelFor($plan->status)]));
