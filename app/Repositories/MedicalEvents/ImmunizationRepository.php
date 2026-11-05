@@ -69,7 +69,6 @@ class ImmunizationRepository extends BaseRepository
                 );
 
                 if (!$immunization->wasRecentlyCreated) {
-                    $immunization->doseQuantity()?->delete();
                     $immunization->explanations()?->delete();
                     foreach ($immunization->vaccinationProtocols as $protocol) {
                         $protocol->targetDiseases()->detach();
@@ -77,15 +76,9 @@ class ImmunizationRepository extends BaseRepository
                     }
                 }
 
-                if (isset($datum['doseQuantity'])) {
-                    $immunization->doseQuantity()->create([
-                        'value' => $datum['doseQuantity']['value'],
-                        'comparator' => $datum['doseQuantity']['comparator'] ?? null,
-                        'unit' => $datum['doseQuantity']['unit'] ?? null,
-                        'system' => $datum['doseQuantity']['system'] ?? null,
-                        'code' => $datum['doseQuantity']['code'] ?? null
-                    ]);
-                }
+                $immunization->update([
+                    'dose_quantity_id' => Repository::quantity()->sync($immunization->doseQuantity, $datum['doseQuantity'] ?? null)?->id
+                ]);
 
                 if (isset($datum['explanation']['reasons'])) {
                     foreach ($datum['explanation']['reasons'] as $reasonData) {
@@ -212,6 +205,7 @@ class ImmunizationRepository extends BaseRepository
                     'explanatory_letter' => $data['explanatory_letter'] ?? null,
                     'site_id' => $site?->id,
                     'route_id' => $route?->id,
+                    'dose_quantity_id' => Repository::quantity()->sync($existing?->doseQuantity, $data['dose_quantity'] ?? null)?->id,
                     'ehealth_inserted_at' => $data['ehealth_inserted_at'] ?? null,
                     'ehealth_updated_at' => $data['ehealth_updated_at'] ?? null
                 ];
@@ -225,7 +219,6 @@ class ImmunizationRepository extends BaseRepository
                     );
                 }
 
-                $this->syncDoseQuantity($immunization, $data['dose_quantity'] ?? []);
                 $this->syncExplanations($immunization, $data['explanation'] ?? []);
                 $this->syncReactions($immunization, $data['reactions'] ?? []);
                 $this->syncVaccinationProtocols($immunization, $data['vaccination_protocols'] ?? []);
@@ -304,42 +297,6 @@ class ImmunizationRepository extends BaseRepository
                     $immunization->explanations()->create(['reasons_not_given_id' => $rngId]);
                 }
             }
-        }
-    }
-
-    /**
-     * Sync immunization dose quantity.
-     *
-     * @param  Immunization  $immunization
-     * @param  array  $doseQuantityData
-     * @return void
-     */
-    private function syncDoseQuantity(Immunization $immunization, array $doseQuantityData): void
-    {
-        $doseQuantity = $immunization->relationLoaded('doseQuantity') ? $immunization->doseQuantity : null;
-
-        if (empty($doseQuantityData)) {
-            $doseQuantity?->delete();
-
-            return;
-        }
-
-        if ($doseQuantity) {
-            $doseQuantity->update([
-                'value' => $doseQuantityData['value'],
-                'comparator' => $doseQuantityData['comparator'] ?? null,
-                'unit' => $doseQuantityData['unit'],
-                'system' => $doseQuantityData['system'] ?? null,
-                'code' => $doseQuantityData['code'] ?? null
-            ]);
-        } else {
-            $immunization->doseQuantity()->create([
-                'value' => $doseQuantityData['value'],
-                'comparator' => $doseQuantityData['comparator'] ?? null,
-                'unit' => $doseQuantityData['unit'],
-                'system' => $doseQuantityData['system'] ?? null,
-                'code' => $doseQuantityData['code'] ?? null
-            ]);
         }
     }
 

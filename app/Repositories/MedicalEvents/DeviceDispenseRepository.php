@@ -227,13 +227,13 @@ class DeviceDispenseRepository extends BaseRepository
             $device = isset($detail['device']) ? $this->syncIdentifier($existingDetail, $detail['device'], 'device') : null;
             $deviceCode = isset($detail['device_code']) ? $this->syncCodeableConcept($existingDetail, $detail['device_code'], 'deviceCode') : null;
             $programDevice = isset($detail['program_device']) ? $this->syncIdentifier($existingDetail, $detail['program_device'], 'programDevice') : null;
-            $quantity = $this->syncQuantity($existingDetail?->quantity, $detail['quantity']);
+            $quantity = Repository::quantity()->sync($existingDetail?->quantity, $detail['quantity']);
 
             $detailData = [
                 'device_id' => $device?->id,
                 'device_code_id' => $deviceCode?->id,
                 'program_device_id' => $programDevice?->id,
-                'quantity_id' => $quantity->id,
+                'quantity_id' => $quantity?->id,
                 'sell_price' => $detail['sell_price'] ?? null,
                 'reimbursement_amount' => $detail['reimbursement_amount'] ?? null,
                 'discount_amount' => $detail['discount_amount'] ?? null
@@ -253,24 +253,6 @@ class DeviceDispenseRepository extends BaseRepository
             $extra->delete();
             $quantity?->delete();
         }
-    }
-
-    /**
-     * Update quantity or create a new one.
-     *
-     * @param  Quantity|null  $quantity
-     * @param  array  $data
-     * @return Quantity
-     */
-    private function syncQuantity(?Quantity $quantity, array $data): Quantity
-    {
-        if ($quantity) {
-            $quantity->update($data);
-
-            return $quantity;
-        }
-
-        return Quantity::create($data);
     }
 
     private function storeIdentifier(array $data)

@@ -104,6 +104,7 @@ return [
             'legal_entity_not_found' => 'Юридичну особу не знайдено',
             'division_not_found' => 'Відділення юридичної особи не знайдено',
             'division_not_active' => 'Структурний підрозділ не активний',
+            'division_of_another_legal_entity' => 'Підрозділ не належить до вашого закладу',
             'value_not_allowed_in_enum' => 'Недопустиме значення',
             'employee_not_found' => 'Співробітника не знайдено',
             'employee_user_mismatch' => 'Співробітник не відповідає користувачу',
@@ -146,8 +147,16 @@ return [
             'type_mismatch_boolean' => 'Невідповідність типів. Очікуване значення з типом “булеве”, але отримано :actual',
             'type_mismatch_string' => 'Невідповідність типів. Очікуване значення з типом “текст”, але отримано :actual',
             'type_mismatch_object' => "Невідповідність типів. Очікуване значення з типом “об'єкт”, але отримано :actual",
+            'type_mismatch' => 'Невідповідність типів. Очікуване значення :expected, але отримано :actual',
+            'value_not_found_in_dictionary' => 'Вказане значення :code не знайдено в довіднику',
             'invalid_iso8601_date' => 'Очікується, що ":actual" буде датою в форматі ISO 8601',
             'invalid_iso8601_date_time' => 'Очікується ":actual" в форматі часу ISO 8601',
+            'elements_count_exceeded' => 'Перевищено максимальну кількість елементів',
+            'too_many_items' => 'Можна вказати не більше :max, отримано :actual',
+            'too_few_items' => 'Потрібно вказати щонайменше :min, отримано :actual',
+            'value_too_large' => 'Значення має бути не більше :max',
+            'value_too_small' => 'Значення має бути не менше :min',
+            'value_too_long' => 'Максимальна кількість символів — :max, отримано :actual',
             // Real newlines (not literal \n) so flash UI with whitespace-pre-line renders paragraphs.
             'party_not_verified' => <<<'TXT'
 Увага! Працівника не верифіковано, можливість роботи в ЕСОЗ тимчасово обмежена.

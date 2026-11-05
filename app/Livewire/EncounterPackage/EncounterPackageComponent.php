@@ -1195,6 +1195,29 @@ class EncounterPackageComponent extends Component
     }
 
     /**
+     * Store locally the full existing episode the package is recorded in, unless it is stored already as managed by
+     * the current legal entity. The access rules find the encounter by its episode stored this way, so without it the
+     * author loses the encounter once it stops being a draft.
+     *
+     * @param  string|null  $episodeId  ID of the selected existing episode, empty for a new one
+     * @return void
+     * @throws EHealthConnectionException|EHealthException|Throwable
+     */
+    protected function syncSelectedEpisode(?string $episodeId): void
+    {
+        if ($this->patientUuid === null
+            || empty($episodeId)
+            || Episode::forPatient($this->patient())->whereUuid($episodeId)->managedByLegalEntity()->exists()) {
+            return;
+        }
+
+        MedicalEventsRepository::episode()->syncFull(
+            $this->patient(),
+            [EHealth::episode()->getById($this->patientUuid, $episodeId)->validate()]
+        );
+    }
+
+    /**
      * Refresh the encounter participants required by the package and name the locked ones.
      *
      * @return void

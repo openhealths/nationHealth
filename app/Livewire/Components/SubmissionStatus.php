@@ -8,7 +8,6 @@ use App\Classes\eHealth\EHealth;
 use App\Enums\JobStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Models\EhealthLink;
 use Illuminate\Support\Facades\Auth;
@@ -161,12 +160,7 @@ class SubmissionStatus extends Component
                     : $link['entity'],
                 'id' => basename($link['href'])
             ], $job['links'] ?? []),
-            // eHealth describes the rejection with an error object, or with a bare message
-            'error' => isset($job['error'])
-                ? new EHealthValidationException([
-                    'error' => is_array($job['error']) ? $job['error'] : ['message' => $job['error']]
-                ])->getFormattedMessage()
-                : null
+            'error' => isset($job['error']) ? EHealth::job()->jobError($job)->getFormattedMessage() : null
         ];
 
         $this->statusLabel = $this->job['status'];

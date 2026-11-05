@@ -248,6 +248,20 @@ class EncounterPackageCreate extends EncounterPackageComponent
             return;
         }
 
+        try {
+            $this->syncSelectedEpisode($validatedData['episode']['id'] ?? null);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while getting the selected episode');
+            $this->showSignatureModal = false;
+
+            return;
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to store the selected episode');
+            $this->showSignatureModal = false;
+
+            return;
+        }
+
         if ($this->episodeType === 'new') {
             try {
                 EHealth::episode()->create($this->patientUuid, Arr::toSnakeCase($formattedData['episode']));

@@ -1,13 +1,13 @@
 @php($isEncounterContext = ($context ?? 'encounter') === 'encounter')
 <div
-        class="p-4 sm:p-8"
-        id="observations-section"
-        {{-- Devices are offered from the encounter division's equipment, so a new division drops the picked ones --}}
-        x-on:encounter-division-changed.window="
+    class="p-4 sm:p-8"
+    id="observations-section"
+    {{-- Devices are offered from the encounter division's equipment, so a new division drops the picked ones --}}
+    x-on:encounter-division-changed.window="
         observations = observations.map((observation) => ({ ...observation, deviceId: '' }));
         modalObservation.deviceId = '';
     "
-        x-data="{
+    x-data="{
         observations: $wire.entangle('{{ $isEncounterContext ? 'observationForm' : 'form' }}.observations'),
         @if($isEncounterContext)
             currentImmunizations: $wire.entangle('immunizationForm.immunizations'),
@@ -90,13 +90,10 @@
         },
 
         reactionCandidates() {
-            const items = [...this.reactionImmunizations];
-
-            if (this.reactionEpisodeId && this.reactionEpisodeId === this.currentEpisodeId) {
-                items.unshift(...this.currentImmunizations);
-            }
-
-            return this.uniqueReactionImmunizations(items);
+            return this.uniqueReactionImmunizations([
+                ...this.currentImmunizations,
+                ...this.reactionImmunizations
+            ]);
         },
 
         selectedReactionImmunization() {
@@ -153,12 +150,12 @@
                     <div class="record-inner-checkbox-col">
                         <label :for="`observationRecord${index}`" class="sr-only">{{ __('forms.select') }}</label>
                         <input
-                                type="checkbox"
-                                :id="`observationRecord${index}`"
-                                class="default-checkbox h-5 w-5"
-                                :value="observation.uuid"
-                                x-model="selectedRecords"
-                                :disabled="! canCancelRecords ||
+                            type="checkbox"
+                            :id="`observationRecord${index}`"
+                            class="default-checkbox h-5 w-5"
+                            :value="observation.uuid"
+                            x-model="selectedRecords"
+                            :disabled="! canCancelRecords ||
                             ! observation.uuid ||
                             cancelledRecords.includes(observation.uuid)"
                         />
@@ -171,8 +168,8 @@
                     <div class="record-inner-column flex-1">
                         <div class="record-inner-label">{{ __('observations.code') }}</div>
                         <div
-                                class="record-inner-value text-[16px]"
-                                x-text="
+                            class="record-inner-value text-[16px]"
+                            x-text="
                                 observationCodesDictionary[observation.codeCode] ||
                                 icfObservationCodesDictionary[observation.codeCode] ||
                                 customObservationCodesDictionary[observation.codeCode] ||
@@ -183,7 +180,7 @@
 
                     <div class="record-inner-action-col">
                         <div
-                                x-data="{
+                            x-data="{
                                 openDropdown: false,
                                 toggle() {
                                     if (this.openDropdown) {
@@ -202,22 +199,22 @@
                                     focusAfter && focusAfter.focus();
                                 },
                             }"
-                                @keydown.escape.prevent.stop="close($refs.button)"
-                                @focusin.window="$refs.panel && ! $refs.panel.contains($event.target) && close()"
-                                x-id="['dropdown-button']"
-                                class="relative"
+                            @keydown.escape.prevent.stop="close($refs.button)"
+                            @focusin.window="$refs.panel && ! $refs.panel.contains($event.target) && close()"
+                            x-id="['dropdown-button']"
+                            class="relative"
                         >
                             @if ($isReadonly)
                                 <a
-                                        href="#"
-                                        @click.prevent="
+                                    href="#"
+                                    @click.prevent="
                                         openModal = true;
                                         item = index;
                                         modalObservation = JSON.parse(JSON.stringify(observations[index]));
                                         newObservation = false;
                                     "
-                                        class="record-inner-action-btn cursor-pointer"
-                                        title="{{ __('forms.view') }}"
+                                    class="record-inner-action-btn cursor-pointer"
+                                    title="{{ __('forms.view') }}"
                                 >
                                     @icon('eye', 'w-6 h-6')
                                     <span class="sr-only"> {{ __('forms.view') }} </span>
@@ -225,28 +222,28 @@
                             @else
                                 {{-- Dropdown Button --}}
                                 <button
-                                        x-ref="button"
-                                        @click="toggle()"
-                                        :aria-expanded="openDropdown"
-                                        :aria-controls="$id('dropdown-button')"
-                                        type="button"
-                                        class="record-inner-action-btn cursor-pointer"
+                                    x-ref="button"
+                                    @click="toggle()"
+                                    :aria-expanded="openDropdown"
+                                    :aria-controls="$id('dropdown-button')"
+                                    type="button"
+                                    class="record-inner-action-btn cursor-pointer"
                                 >
                                     <svg
-                                            class="h-6 w-6 text-gray-800 dark:text-gray-200"
-                                            aria-hidden="true"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="24"
-                                            height="24"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
+                                        class="h-6 w-6 text-gray-800 dark:text-gray-200"
+                                        aria-hidden="true"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="24"
+                                        height="24"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
                                     >
                                         <path
-                                                stroke="currentColor"
-                                                stroke-linecap="square"
-                                                stroke-linejoin="round"
-                                                stroke-width="2"
-                                                d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"
+                                            stroke="currentColor"
+                                            stroke-linecap="square"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"
                                         />
                                     </svg>
                                 </button>
@@ -254,16 +251,16 @@
                                 {{-- Dropdown Panel --}}
                                 <div class="absolute right-0 z-50">
                                     <div
-                                            x-ref="panel"
-                                            x-show="openDropdown"
-                                            x-transition.origin.top.left
-                                            @click.outside="close($refs.button)"
-                                            :id="$id('dropdown-button')"
-                                            x-cloak
-                                            class="dropdown-panel relative"
+                                        x-ref="panel"
+                                        x-show="openDropdown"
+                                        x-transition.origin.top.left
+                                        @click.outside="close($refs.button)"
+                                        :id="$id('dropdown-button')"
+                                        x-cloak
+                                        class="dropdown-panel relative"
                                     >
                                         <button
-                                                @click.prevent="
+                                            @click.prevent="
                                                 openModal = true;
                                                 item = index;
                                                 modalObservation = JSON.parse(JSON.stringify(observations[index]));
@@ -275,8 +272,8 @@
                                         </button>
 
                                         <button
-                                                class="dropdown-delete"
-                                                @click.prevent="
+                                            class="dropdown-delete"
+                                            @click.prevent="
                                                 observations.splice(index, 1);
                                                 close($refs.button);
                                             "
@@ -296,8 +293,8 @@
                             <div>
                                 <div class="record-inner-label">{{ __('observations.category') }}</div>
                                 <div
-                                        class="record-inner-subvalue"
-                                        x-text="
+                                    class="record-inner-subvalue"
+                                    x-text="
                                         observationCategoriesDictionary[observation.categoryCode] ||
                                         icfObservationCategoriesDictionary[observation.categoryCode] ||
                                         '-'
@@ -307,8 +304,8 @@
                             <div>
                                 <div class="record-inner-label">{{ __('observations.value') }}</div>
                                 <div
-                                        class="record-inner-subvalue"
-                                        x-text="
+                                    class="record-inner-subvalue"
+                                    x-text="
                                         observation.valueBoolean !== undefined
                                             ? (observation.valueBoolean ? '{{ __('forms.yes') }}' : '{{ __('forms.no') }}')
                                         : observation.valueString !== undefined
@@ -338,7 +335,7 @@
         {{-- Button to trigger the modal --}}
         @unless ($isReadonly)
             <button
-                    @click.prevent="
+                @click.prevent="
                     openModal = true;
                     newObservation = true;
                     modalObservation = new Observation(null, $wire.form.encounter);
@@ -346,7 +343,7 @@
                         modalObservation.performerEmployeeId = $wire.form.encounter.performerId;
                     @endif
                 "
-                    class="item-add my-5"
+                class="item-add my-5"
             >
                 {{ __('forms.add') }}
             </button>
@@ -356,25 +353,25 @@
         <template x-teleport="body">
             {{-- This moves the modal at the end of the body tag --}}
             <div
-                    x-show="openModal"
-                    style="display: none"
-                    @keydown.escape.prevent.stop="openModal = false"
-                    role="dialog"
-                    aria-modal="true"
-                    x-id="['modal-title']"
-                    :aria-labelledby="$id('modal-title')"
-                    {{-- This associates the modal with unique ID --}}
-                    class="modal"
+                x-show="openModal"
+                style="display: none"
+                @keydown.escape.prevent.stop="openModal = false"
+                role="dialog"
+                aria-modal="true"
+                x-id="['modal-title']"
+                :aria-labelledby="$id('modal-title')"
+                {{-- This associates the modal with unique ID --}}
+                class="modal"
             >
                 {{-- Overlay --}}
                 <div x-show="openModal" x-transition.opacity class="fixed inset-0 bg-black/25"></div>
 
                 {{-- Panel --}}
                 <div
-                        x-show="openModal"
-                        x-transition
-                        @click="openModal = false"
-                        class="relative flex min-h-screen items-center justify-center p-4"
+                    x-show="openModal"
+                    x-transition
+                    @click="openModal = false"
+                    class="relative flex min-h-screen items-center justify-center p-4"
                 >
                     <div @click.stop x-trap.noscroll.inert="openModal" class="modal-content h-fit w-full lg:max-w-7xl">
                         {{-- Title --}}
@@ -397,7 +394,7 @@
 
                                     @unless ($isReadonly)
                                         <button
-                                                @click.prevent="
+                                            @click.prevent="
                                                 const selectedValueType = valueMap[modalObservation.codeCode]?.[1];
 
                                                 const fieldsToDelete = [
@@ -442,8 +439,8 @@
                                                 showDuplicateCodeWarning = false;
                                                 openModal = false;
                                             "
-                                                class="button-primary"
-                                                :disabled="! (
+                                            class="button-primary"
+                                            :disabled="! (
                                                 modalObservation.issuedDate.trim() &&
                                                 modalObservation.issuedTime.trim() &&
                                                 modalObservation.categoryCode.trim() &&

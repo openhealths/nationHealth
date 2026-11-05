@@ -16,7 +16,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Builder;
 
 class Immunization extends Model
@@ -41,6 +40,7 @@ class Immunization extends Model
         'explanatory_letter',
         'site_id',
         'route_id',
+        'dose_quantity_id',
         'ehealth_inserted_at',
         'ehealth_updated_at'
     ];
@@ -63,6 +63,7 @@ class Immunization extends Model
         'report_origin_id',
         'site_id',
         'route_id',
+        'dose_quantity_id',
         'created_at',
         'updated_at'
     ];
@@ -200,9 +201,9 @@ class Immunization extends Model
         return $this->belongsTo(CodeableConcept::class, 'route_id');
     }
 
-    public function doseQuantity(): HasOne
+    public function doseQuantity(): BelongsTo
     {
-        return $this->hasOne(ImmunizationDoseQuantity::class, 'immunization_id');
+        return $this->belongsTo(Quantity::class, 'dose_quantity_id');
     }
 
     public function explanations(): HasMany
