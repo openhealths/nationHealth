@@ -14,13 +14,14 @@ class BaseErrorTranslator implements ApiErrorTranslator
 {
     /**
      * Get the Ukrainian text of an error message the API returned, or null when the message is unknown.
+     * A typographic apostrophe is read as a plain one, as the API uses both, e.g. "Encounter’s date…".
      *
      * @param  string  $message
      * @return string|null
      */
     public function translate(string $message): ?string
     {
-        $message = trim($message);
+        $message = str_replace('’', "'", trim($message));
 
         foreach ($this->messages() + $this->baseMessages() as $original => $translation) {
             if (preg_match($this->pattern($original), $message, $matches) === 1) {

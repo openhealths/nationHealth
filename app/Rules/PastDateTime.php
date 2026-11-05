@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Rules;
 
 use Carbon\CarbonImmutable;
+use Carbon\Exceptions\InvalidFormatException;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Translation\PotentiallyTranslatedString;
@@ -17,6 +18,7 @@ readonly class PastDateTime implements ValidationRule
 
     /**
      * Run the validation rule.
+     * A date or time that cannot be parsed is reported by the format rules of its own fields.
      *
      * @param  string  $attribute
      * @param  mixed  $value
@@ -29,7 +31,11 @@ readonly class PastDateTime implements ValidationRule
             return;
         }
 
-        $datetime = CarbonImmutable::createFromFormat(config('app.date_format') . ' H:i', $this->date . ' ' . $value);
+        try {
+            $datetime = CarbonImmutable::createFromFormat(config('app.date_format') . ' H:i', $this->date . ' ' . $value);
+        } catch (InvalidFormatException) {
+            return;
+        }
 
         if ($datetime->isFuture()) {
             $fail(__('validation.before_or_equal', ['date' => __('validation.values.now')]));
