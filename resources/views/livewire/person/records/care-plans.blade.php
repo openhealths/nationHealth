@@ -2,7 +2,7 @@
 <x-layouts.patient :showLegacyMessages="false" :personId="$personId" :patientFullName="$patientFullName">
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     @if ($syncBatchId !== null)
-        <div wire:poll.3s="checkSyncStatus" class="mb-4 text-sm text-gray-600 dark:text-gray-300">
+        <div wire:poll.3s="checkSyncStatus" data-livewire-background-actions="checkSyncStatus" class="mb-4 text-sm text-gray-600 dark:text-gray-300">
             {{ __('care-plan.sync_running') }}
         </div>
     @endif
