@@ -140,7 +140,14 @@ return [
     'rate_limit' => [
         'approval' => 5,
         'employee_request' => 19,
-        'employee' => 29,
+        // Official token quota: 30 GETs/minute shared by employee list and detail.
+        // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/583761951
+        'employee' => [
+            'methods' => ['GET'],
+            'paths' => ['~^/api/employees(?:/[^/]+)?$~i'],
+            'max_requests' => 29,
+            'window_seconds' => 60,
+        ],
         'division_request' => 50,
         'healthcare_service' => 50,
         'equipment' => 50,
@@ -169,7 +176,13 @@ return [
         'legal_entity_legators' => 2,
         'legal_entity_by_id' => 200,
         'person_authentication_method' => 20,
-        'remote_job' => 1399
+        // Conservative application budget; the public job contract does not publish a numeric quota.
+        'remote_job' => [
+            'methods' => ['GET'],
+            'paths' => ['~^/(?:api/)?jobs/[^/]+$~i'],
+            'max_requests' => (int) env('EHEALTH_REMOTE_JOB_REQUESTS_PER_MINUTE', 60),
+            'window_seconds' => 60,
+        ]
     ],
 
     /*

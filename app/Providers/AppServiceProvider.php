@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Jobs\ApprovalSync;
+use App\Classes\eHealth\EHealthRateLimiter;
 use App\Jobs\ClinicalImpressionFullSync;
 use App\Jobs\ClinicalImpressionSync;
 use App\Jobs\ConditionSync;
@@ -49,6 +50,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(EHealthRateLimiter::class, fn ($app) => new EHealthRateLimiter(
+            $app->make('cache')->driver($app['config']->get('cache.limiter'))
+        ));
+
         if ($this->app->isLocal()) {
             $this->app->register(IdeHelperServiceProvider::class);
             $this->app->register(DebugbarServiceProvider::class);
@@ -93,7 +98,10 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('ehealth-employee-get', function (object $job) {
             echo "Rate limiter set for user: " . $job->user->id . PHP_EOL; // TODO: remove it after testing
 
-            return Limit::perMinute(config('ehealth.rate_limit.employee'))->by($job->user->id);
+            return Limit::perSecond(
+                max(1, (int) config('ehealth.rate_limit.employee.max_requests')),
+                max(1, (int) config('ehealth.rate_limit.employee.window_seconds'))
+            )->by($job->user->id);
         });
 
         RateLimiter::for('ehealth-division-get', function (object $job) {
@@ -230,7 +238,10 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for(
             'ehealth-remote-job-get',
-            static fn (RemoteEHealthLinksProcessing $job) => Limit::perMinute(config('ehealth.rate_limit.remote_job'))
+            static fn (RemoteEHealthLinksProcessing $job) => Limit::perSecond(
+                max(1, (int) config('ehealth.rate_limit.remote_job.max_requests')),
+                max(1, (int) config('ehealth.rate_limit.remote_job.window_seconds'))
+            )
                 ->by($job->user->id)
         );
     }

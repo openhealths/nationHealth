@@ -8,9 +8,15 @@ use App\Classes\eHealth\Errors\BaseErrorTranslator;
 use App\Contracts\ApiErrorTranslator;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthRateLimitedException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Traits\EHealthApiFormatter;
 use Closure;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Http\Client\RequestException;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use InvalidArgumentException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\PendingRequest;
@@ -36,9 +42,16 @@ abstract class EHealthRequest extends PendingRequest
 
     protected ?Closure $mapper = null;
 
-    public function __construct(?Factory $factory = null, $middleware = [])
-    {
+    protected EHealthRateLimiter $rateLimiter;
+
+    public function __construct(
+        ?Factory $factory = null,
+        $middleware = [],
+        ?EHealthRateLimiter $rateLimiter = null,
+    ) {
         parent::__construct($factory, $middleware);
+
+        $this->rateLimiter = $rateLimiter ?? app(EHealthRateLimiter::class);
 
         $this->withHeaders([
             'X-Custom-PSK' => config('ehealth.api.token'),
@@ -71,7 +84,7 @@ abstract class EHealthRequest extends PendingRequest
      * @param  string  $url  The endpoint URL.
      * @param  array  $options  Additional request options (query, body, headers, etc.).
      * @return EHealthResponse|Response
-     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException|EHealthRateLimitedException
      */
     public function send(string $method, string $url, array $options = []): EHealthResponse|Response
     {
@@ -83,6 +96,9 @@ abstract class EHealthRequest extends PendingRequest
             $response = parent::send($method, $url, $options);
         } catch (ConnectionException $exception) {
             throw new EHealthConnectionException($exception->getMessage(), $exception->getCode(), $exception);
+        } catch (RequestException $exception) {
+            // Laravel's retry() may throw before send() returns; keep the same eHealth error handling.
+            $response = $exception->response;
         }
 
         if (!is_a($response, EHealthResponse::class)) {
@@ -109,6 +125,94 @@ abstract class EHealthRequest extends PendingRequest
         ]);
 
         throw new EHealthResponseException($response, $this->errorTranslator());
+    }
+
+    /**
+     * Apply limits after Laravel resolves the URL and completes beforeSending header changes.
+     * This handler runs for every HTTP attempt, including retries and redirected requests.
+     */
+    public function buildBeforeSendingHandler(): Closure
+    {
+        $beforeSending = parent::buildBeforeSendingHandler();
+
+        return function (callable $handler) use ($beforeSending): callable {
+            return $beforeSending(function (RequestInterface $request, array $options) use ($handler) {
+                $key = $this->reserveRequest($request);
+
+                return $handler($request, $options)->then(function (ResponseInterface $response) use ($key): ResponseInterface {
+                    if ($key !== null && $response->getStatusCode() === 429) {
+                        $seconds = (new EHealthResponseException(new Response($response)))->retryAfter();
+                        try {
+                            $this->rateLimiter->cooldown($key, $seconds);
+                        } catch (LockTimeoutException) {
+                            // The current caller must still receive HTTP 429 and wait the full Retry-After.
+                            Log::warning('eHealth Retry-After could not be shared because its cache lock is busy.');
+                        }
+                    }
+
+                    return $response;
+                });
+            });
+        };
+    }
+
+    /**
+     * Count the final HTTP request against its configured group and token.
+     * Return the shared key for a later 429, or null when no group/token applies.
+     */
+    protected function reserveRequest(RequestInterface $request): ?string
+    {
+        $group = $this->rateLimitGroup($request);
+        $authorization = $request->getHeaderLine('Authorization');
+        if ($group === null || $authorization === '') {
+            return null;
+        }
+
+        if (count($request->getHeader('Authorization')) !== 1) {
+            throw new InvalidArgumentException('A rate-limited eHealth request must have exactly one Authorization header value.');
+        }
+
+        $key = $this->rateLimitKey($request, $group, $authorization);
+        $this->rateLimiter->reserve(
+            $key,
+            (int) config('ehealth.rate_limit.'.$group.'.max_requests'),
+            (int) config('ehealth.rate_limit.'.$group.'.window_seconds'),
+        );
+
+        return $key;
+    }
+
+    /**
+     * Select the group whose configured method and exact path pattern match this request.
+     * For example, GET /api/employees/123 uses employee; /api/employees/123/roles does not.
+     * Subclasses may override this selection for a resource with different quota rules.
+     */
+    protected function rateLimitGroup(RequestInterface $request): ?string
+    {
+        $path = rtrim($request->getUri()->getPath(), '/');
+        foreach (config('ehealth.rate_limit', []) as $group => $policy) {
+            if (!is_array($policy) || !in_array($request->getMethod(), $policy['methods'] ?? [], true)) {
+                continue;
+            }
+            foreach ($policy['paths'] ?? [] as $pattern) {
+                if (preg_match($pattern, $path) === 1) {
+                    return $group;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Group by the actual API host and token, never by a local user ID or the request client's initial token. */
+    protected function rateLimitKey(RequestInterface $request, string $group, string $authorization): string
+    {
+        // Authentication scheme casing/spacing does not create a new quota for the same bearer token.
+        $identity = preg_match('/^Bearer[ \t]+([^ \t,]+)[ \t]*$/i', trim($authorization), $matches) === 1
+            ? $matches[1]
+            : $authorization;
+
+        return 'ehealth-requests:'.$request->getUri()->getHost().':'.$group.':'.hash('sha256', $identity);
     }
 
     /**

@@ -8,8 +8,6 @@ use App\Models\CarePlanActivity;
 use App\Models\CarePlan;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use Throwable;
-use Carbon\CarbonImmutable;
-use DateTimeInterface;
 use App\Contracts\SubmittedToEHealth;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
@@ -46,15 +44,6 @@ class RemoteEHealthLinksProcessing extends EHealthJob
     protected const int TIME_TO_RETRY = 5; // Time in seconds to wait before retrying the job
 
     protected const int MAX_TIME_TO_RETRY = 300; // Longest time in seconds to wait between polls of a pending job
-
-    protected const int POLLING_HOURS = 24; // How long the job is polled while eHealth keeps it pending
-
-    /**
-     * Exceptions allowed before the job fails, so polls released while the job is pending are not counted against it.
-     *
-     * @var int
-     */
-    public int $maxExceptions = 3;
 
     protected bool $stillPending = false;
     public function __construct(
@@ -200,16 +189,6 @@ class RemoteEHealthLinksProcessing extends EHealthJob
         ]);
 
         $user->notify(new RemoteEHealthLinksNotification(__($rejectedMessage), 'error'));
-    }
-
-    /**
-     * Keep polling the job while eHealth keeps it pending, rather than for a fixed number of attempts.
-     *
-     * @return DateTimeInterface
-     */
-    public function retryUntil(): DateTimeInterface
-    {
-        return CarbonImmutable::now()->addHours(self::POLLING_HOURS);
     }
 
     /**
