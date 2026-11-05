@@ -43,7 +43,7 @@
                                     <button
                                         type="button"
                                         @click.prevent="removeReactionImmunization()"
-                                        class="inline-flex items-center justify-center p-1 text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-500"
+                                        class="inline-flex cursor-pointer items-center justify-center p-1 text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-500"
                                     >
                                         @icon('delete', 'w-5 h-5')
                                     </button>
@@ -148,7 +148,7 @@
                             <button
                                 type="button"
                                 @click.prevent="selectReactionImmunization(immunization)"
-                                class="inline-flex items-center justify-center p-1 text-gray-900 transition-colors hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
+                                class="inline-flex cursor-pointer items-center justify-center p-1 text-gray-900 transition-colors hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
                             >
                                 @icon('plus-circle', 'w-6 h-6')
                             </button>
