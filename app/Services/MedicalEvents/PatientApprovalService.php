@@ -25,6 +25,7 @@ use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
+use App\Models\Relations\AuthenticationMethod as AuthenticationMethodModel;
 use App\Models\User;
 use App\Enums\JobStatus;
 use App\Enums\Person\ApprovalStatus;
@@ -132,7 +133,11 @@ class PatientApprovalService
             ])
             ->whereNotNull('uuid')
             ->get()
-            ->toArray();
+            ->map(static fn (AuthenticationMethodModel $method): array => [
+                ...$method->toArray(),
+                'phoneNumber' => $method->maskedPhoneNumber
+            ])
+            ->all();
     }
 
     /**
