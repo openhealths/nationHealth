@@ -24,18 +24,19 @@ enum ApprovalStatus: string
     case APPROVED = 'APPROVED';
     case ACTIVE = 'active';
     case INACTIVE = 'inactive';
+    case TERMINATED = 'terminated';
 
     /**
-     * The patient has confirmed the request, so the granted employee may use the resource.
-     */
-    /**
      * Canonical spelling to persist on `approvals.status`.
+     * Explicit remote statuses take precedence over historical is_verified. Preserve
+     * terminated as revoked; unknown statuses stay pending and never grant access.
      */
     public static function forStorage(?string $status): string
     {
         return match (self::resolve($status)) {
             self::APPROVED, self::ACTIVE => self::ACTIVE->value,
             self::INACTIVE => self::INACTIVE->value,
+            self::TERMINATED => self::TERMINATED->value,
             self::NEW, self::PENDING => self::PENDING->value,
             default => self::PENDING->value,
         };
@@ -68,7 +69,8 @@ enum ApprovalStatus: string
             self::NEW,
             self::PENDING => 'badge-yellow',
 
-            self::INACTIVE => 'badge-dark',
+            self::INACTIVE,
+            self::TERMINATED => 'badge-dark',
         };
     }
 }

@@ -112,6 +112,12 @@ class Approval extends Request
     {
         $this->setValidator($this->validateVerification(...));
 
+        if ($payload === []) {
+            return $this->withBody('{}', 'application/json')->patch(self::APPROVAL_URL . "/{$patientId}/approvals/{$approvalId}");
+        }
+
+        $this->asJson();
+
         return $this->patch(self::APPROVAL_URL . "/{$patientId}/approvals/{$approvalId}", $payload);
     }
 
@@ -216,19 +222,23 @@ class Approval extends Request
 
     protected function validateApprovalList(EHealthResponse $response): array
     {
-        $data = $response->getData();
+        $data = $response->json() ?? [];
 
-        Validator::make(['items' => $data], [
-            'items' => ['present', 'array'],
-            'items.*.id' => ['required', 'uuid'],
-            'items.*.granted_to.identifier.value' => ['required', 'uuid'],
-            'items.*.is_verified' => ['sometimes', 'boolean:strict'],
-            'items.*.access_level' => ['nullable', Rule::in(['read', 'write'])],
-            'items.*.expires_at' => ['nullable', 'date'],
-            'items.*.status' => ['nullable', 'string'],
+        Validator::make($data, [
+            'data' => ['present', 'array', 'list'],
+            'data.*.id' => ['required', 'uuid'],
+            'data.*.granted_to.identifier.value' => ['required', 'uuid'],
+            'data.*.is_verified' => ['sometimes', 'boolean:strict'],
+            'data.*.access_level' => ['nullable', Rule::in(['read', 'write'])],
+            'data.*.expires_at' => ['nullable', 'date'],
+            'data.*.status' => ['nullable', 'string'],
+            'paging' => ['required', 'array'],
+            'paging.page_number' => ['required_without:paging.page', 'integer', 'min:1'],
+            'paging.page' => ['required_without:paging.page_number', 'integer', 'min:1'],
+            'paging.total_pages' => ['required', 'integer', 'min:0'],
         ])->validate();
 
-        return $data;
+        return $data['data'];
     }
 
     protected function validateApproval(EHealthResponse $response): array
@@ -330,8 +340,10 @@ class Approval extends Request
                 "$field.id" => ['nullable', 'uuid'],
                 "$field.uuid" => ['nullable', 'uuid'],
                 "$field.phone_number" => ['nullable', 'string'],
-                "$field.phoneNumber" => ['nullable', 'string'],
                 "$field.number" => ['nullable', 'string'],
+                "$field.reference" => ['nullable', 'array:type,phone_number'],
+                "$field.reference.type" => ['nullable', Rule::in(['OTP', 'OFFLINE', 'NA'])],
+                "$field.reference.phone_number" => ['nullable', 'string', 'max:255'],
             ];
         }
 

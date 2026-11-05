@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\MedicalEvents;
 
+use App\Enums\Person\AuthenticationMethod;
+
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\CarePlanTermsOfService;
@@ -154,6 +156,9 @@ class CarePlanApprovalService
                 if ($existing->getAttribute('is_verified') && ApprovalStatus::resolve($existing->status)?->isGranted()) {
                     return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Granted, $existing->uuid);
                 }
+                if (!$confirmWithoutOtp && $authorizeWith !== null && $existing->authorizeWith !== $authorizeWith) {
+                    throw new RuntimeException(__('care-plan.approval_method_pending'));
+                }
                 $existingLink = $existing->ehealthLinks->filter(fn ($candidate): bool => data_get($candidate->job?->request_data, 'operation') !== 'resendSms')->sortByDesc('id')->first();
                 if ($confirmWithoutOtp && ($existingLink === null || $existingLink->status === 'PROCESSED')) {
                     $this->confirmWithoutOtp($patientUuid, $existing->uuid, $bearerToken);
@@ -166,7 +171,7 @@ class CarePlanApprovalService
                 $data = EHealth::approval()->withToken($bearerToken)->getApprovalDetails($patientUuid, $existing->uuid)->validate();
                 $repository->sync($data, $carePlan, $existing);
 
-                return $this->resultFromData($data);
+                return $this->resultFromData($data, $patientUuid, $existing->authorizeWith ?: $authorizeWith);
             }
             $payload = $this->buildCreatePayload($carePlan, $employeeUuid, $accessLevel, $authorizeWith, $legalEntity);
             $link = $repository->beginCarePlanRequest($carePlan, $payload, $confirmWithoutOtp);
@@ -194,7 +199,7 @@ class CarePlanApprovalService
                 return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Granted, $data['id']);
             }
 
-            return $this->resultFromData($data);
+            return $this->resultFromData($data, $patientUuid, $authorizeWith);
         } catch (\Throwable $exception) {
             if ($link !== null && !$creationConfirmed && ($exception instanceof \App\Exceptions\EHealth\EHealthValidationException
                 || ($exception instanceof EHealthResponseException && $exception->getCode() >= 400 && $exception->getCode() < 500 && $exception->getCode() !== 408))) {
@@ -215,21 +220,40 @@ class CarePlanApprovalService
         if ($result->isGranted()) {
             return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Granted, $result->approvalId);
         }
-        if ($result->requiresOtp()) {
-            return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::OtpRequired, $result->approvalId, authMethod: $result->authMethod);
+        if ($result->requiresConfirmation()) {
+            return new CarePlanApprovalCreateResult($result->requiresOtp() ? CarePlanApprovalCreateOutcome::OtpRequired : CarePlanApprovalCreateOutcome::OfflineRequired, $result->approvalId, authMethod: $result->authMethod);
         }
 
         return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Async, pollingLinkId: $linkId);
     }
 
-    private function resultFromData(array $data): CarePlanApprovalCreateResult
+    public function pendingConfirmation(string $patientUuid, string $approvalId, ?string $authorizeWith = null): CarePlanApprovalCreateResult
+    {
+        $response = $this->requireSuccessfulResponse(EHealth::approval()->getApprovalDetails($patientUuid, $approvalId));
+        $data = $response->validate();
+        if (($data['id'] ?? null) !== $approvalId) {
+            throw new RuntimeException(__('care-plan.approval_result_unavailable'));
+        }
+        $result = $this->resultFromData($data, $patientUuid, $authorizeWith);
+        if ($result->isGranted()) {
+            Repository::approval()->storePatientResponse($patientUuid, $approvalId, $data, ApprovalStatus::ACTIVE->value);
+        }
+
+        return $result;
+    }
+
+    private function resultFromData(array $data, ?string $patientUuid = null, ?string $authorizeWith = null): CarePlanApprovalCreateResult
     {
         if ($this->approvalIsGranted($data)) {
             return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Granted, $data['id']);
         }
         $method = $this->extractAuthMethod($data);
-        if (isset($data['id']) && in_array($method['type'] ?? null, ['OTP', 'OFFLINE', 'THIRD_PERSON'], true)) {
-            return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::OtpRequired, $data['id'], authMethod: $method);
+        $method = app(PatientApprovalService::class)->resolveConfirmationMethod($method ?? [], $patientUuid, $data['authorize_with'] ?? $authorizeWith);
+        if (isset($data['id']) && AuthenticationMethod::confirmationMethod($method ?? []) !== null) {
+            $outcome = AuthenticationMethod::confirmationMethod($method) === AuthenticationMethod::OTP
+                ? CarePlanApprovalCreateOutcome::OtpRequired : CarePlanApprovalCreateOutcome::OfflineRequired;
+
+            return new CarePlanApprovalCreateResult($outcome, $data['id'], authMethod: $method);
         }
 
         throw new RuntimeException(__('care-plan.approval_result_unavailable'));
@@ -426,7 +450,8 @@ class CarePlanApprovalService
                 && $this->skipsPatientOtp($approval->approvable)) {
                 return new CarePlanApprovalJobStatusResult(CarePlanApprovalJobOutcome::Pending);
             }
-            $result = $this->resultFromData($data);
+            $authorizeWith = $approval->authorizeWith ?: data_get($link->job?->request_data, 'authorize_with');
+            $result = $this->resultFromData($data, $approval->approvable?->person?->uuid, $authorizeWith);
         } catch (\Illuminate\Validation\ValidationException) {
             return new CarePlanApprovalJobStatusResult(CarePlanApprovalJobOutcome::Failed, errorMessage: __('care-plan.approval_result_unavailable'));
         } catch (RuntimeException $exception) {
@@ -434,7 +459,8 @@ class CarePlanApprovalService
         }
 
         return new CarePlanApprovalJobStatusResult(
-            $result->isGranted() ? CarePlanApprovalJobOutcome::Granted : CarePlanApprovalJobOutcome::OtpRequired,
+            $result->isGranted() ? CarePlanApprovalJobOutcome::Granted
+                : ($result->requiresOtp() ? CarePlanApprovalJobOutcome::OtpRequired : CarePlanApprovalJobOutcome::OfflineRequired),
             $result->approvalId,
             $result->authMethod,
         );
@@ -452,7 +478,7 @@ class CarePlanApprovalService
             ?? $data['urgent']['authentication_method_current']
             ?? null;
 
-        return is_array($method) ? $method + ['phone_number' => $method['phoneNumber'] ?? $method['number'] ?? null] : null;
+        return is_array($method) ? $method : null;
     }
 
     /**

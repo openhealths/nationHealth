@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\CarePlan\Concerns;
 
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Enums\Person\AuthenticationMethod;
 use App\Models\CarePlan;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
@@ -31,12 +32,15 @@ trait HandlesCarePlanApprovalSms
 
     public function resendSms(): void
     {
-        if (!$this->approvalId || $this->smsResent || $this->isSmsResending || $this->isOfflineAuthMethod()) {
+        if (!$this->approvalId || $this->smsResent || $this->isSmsResending
+            || AuthenticationMethod::confirmationMethod($this->currentAuthMethod ?? []) !== AuthenticationMethod::OTP) {
             return;
         }
         try {
             $plan = $this->carePlanForSms();
-            $this->authorize('manage', $plan);
+            if (!$this->guardApprovalAccess($plan)) {
+                return;
+            }
             app(MedicalRequestOwnership::class)->approvalForCarePlan($plan, $this->approvalId);
             $this->resetValidation('verificationCode');
             $this->isSmsResending = true;

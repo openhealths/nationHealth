@@ -9,6 +9,10 @@ use App\Classes\eHealth\EHealthResponse;
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Approval;
+use App\Models\MedicalEvents\Sql\Identifier;
+use GuzzleHttp\Psr7\Response;
+use PHPUnit\Framework\Attributes\DataProvider;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\User;
@@ -47,6 +51,7 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
 
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->andReturn([]);
+        $response->shouldReceive('getPaging')->andReturn(['page_number' => 1, 'total_pages' => 1]);
 
         $api = Mockery::mock(ApprovalApi::class);
         $api->shouldReceive('getPatientApprovals')
@@ -67,6 +72,7 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
 
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->andReturn([]);
+        $response->shouldReceive('getPaging')->andReturn(['page_number' => 1, 'total_pages' => 1]);
 
         $api = Mockery::mock(ApprovalApi::class);
         $api->shouldReceive('getPatientApprovals')
@@ -79,6 +85,141 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
         $this->instance(ApprovalApi::class, $api);
 
         Repository::approval()->syncApprovals($carePlan->fresh(['person']), 'care_plan');
+    }
+
+    public static function revokedStatuses(): array
+    {
+        return [
+            'terminated' => ['terminated', 'terminated'],
+            'inactive' => ['inactive', 'inactive'],
+            'unknown' => ['unrecognized', 'pending'],
+        ];
+    }
+
+    #[DataProvider('revokedStatuses')]
+    public function test_remote_status_takes_precedence_over_historical_verification(string $remoteStatus, string $storedStatus): void
+    {
+        $plan = $this->makeCarePlan();
+        $employeeUuid = (string) Str::uuid();
+        $approval = $this->localGrant($plan, $employeeUuid);
+        $response = $this->approvalPage([$this->remoteGrant($plan, $employeeUuid, $approval->uuid, $remoteStatus)]);
+        $this->mock(ApprovalApi::class)->shouldReceive('getPatientApprovals')->once()->andReturn($response);
+
+        Repository::approval()->syncApprovals($plan, 'care_plan');
+
+        $this->assertSame($storedStatus, $approval->fresh()->status);
+        $this->assertTrue($approval->fresh()->getAttribute('is_verified'));
+        $this->assertFalse(\App\Repositories\Repository::carePlan()->hasGrantedApproval($plan->fresh(), $employeeUuid));
+    }
+
+    public function test_empty_snapshot_revokes_only_the_requested_scope_and_preserves_pending_jobs(): void
+    {
+        $plan = $this->makeCarePlan();
+        $employeeUuid = (string) Str::uuid();
+        $stale = $this->localGrant($plan, $employeeUuid);
+        $otherEmployee = $this->localGrant($plan, (string) Str::uuid());
+        $otherPlan = $this->localGrant($this->makeCarePlan(), $employeeUuid);
+        $pending = $this->localGrant($plan, $employeeUuid);
+        $pending->update(['status' => 'pending', 'is_verified' => false]);
+        Repository::approval()->attachEhealthLink($pending, ['href' => '/jobs/pending']);
+        $this->mock(ApprovalApi::class)->shouldReceive('getPatientApprovals')->once()->andReturn($this->approvalPage([]));
+
+        $plan->load('approvals.grantedTo');
+        Repository::approval()->syncApprovals($plan, 'care_plan', ['granted_to.identifier.value' => $employeeUuid]);
+
+        $this->assertSame('inactive', $stale->fresh()->status);
+        $this->assertSame('active', $otherEmployee->fresh()->status);
+        $this->assertSame('active', $otherPlan->fresh()->status);
+        $this->assertSame('pending', $pending->fresh()->status);
+        $this->assertFalse(\App\Repositories\Repository::carePlan()->hasGrantedApproval($plan, $employeeUuid));
+    }
+
+    public function test_all_pages_are_imported_before_reconciling_missing_grants(): void
+    {
+        $plan = $this->makeCarePlan();
+        $employeeUuid = (string) Str::uuid();
+        $first = $this->localGrant($plan, $employeeUuid);
+        $second = $this->localGrant($plan, (string) Str::uuid());
+        $stale = $this->localGrant($plan, (string) Str::uuid());
+        $query = ['granted_resource_type' => 'care_plan', 'granted_resources' => $plan->uuid];
+        $api = $this->mock(ApprovalApi::class);
+        $api->shouldReceive('getPatientApprovals')->once()->with($plan->person->uuid, $query)
+            ->andReturn($this->approvalPage([$this->remoteGrant($plan, $employeeUuid, $first->uuid)], 1, 2));
+        $api->shouldReceive('getPatientApprovals')->once()->with($plan->person->uuid, $query + ['page' => 2])
+            ->andReturn($this->approvalPage([$this->remoteGrant($plan, $second->grantedTo->value, $second->uuid)], 2, 2));
+
+        Repository::approval()->syncApprovals($plan, 'care_plan');
+
+        $this->assertSame('active', $first->fresh()->status);
+        $this->assertSame('active', $second->fresh()->status);
+        $this->assertSame('inactive', $stale->fresh()->status);
+    }
+
+    public function test_a_failed_later_page_preserves_the_entire_local_snapshot(): void
+    {
+        $plan = $this->makeCarePlan();
+        $employeeUuid = (string) Str::uuid();
+        $approval = $this->localGrant($plan, $employeeUuid);
+        $query = ['granted_resource_type' => 'care_plan', 'granted_resources' => $plan->uuid];
+        $api = $this->mock(ApprovalApi::class);
+        $api->shouldReceive('getPatientApprovals')->once()->with($plan->person->uuid, $query)
+            ->andReturn($this->approvalPage([$this->remoteGrant($plan, $employeeUuid, $approval->uuid, 'terminated')], 1, 2));
+        $api->shouldReceive('getPatientApprovals')->once()->with($plan->person->uuid, $query + ['page' => 2])
+            ->andThrow(new \RuntimeException('Second page unavailable'));
+
+        try {
+            Repository::approval()->syncApprovals($plan, 'care_plan');
+            $this->fail('An incomplete snapshot must not be accepted.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Second page unavailable', $exception->getMessage());
+        }
+        $this->assertSame('active', $approval->fresh()->status);
+        $this->assertTrue(\App\Repositories\Repository::carePlan()->hasGrantedApproval($plan->fresh(), $employeeUuid));
+    }
+
+    public function test_direct_sync_and_completed_jobs_cannot_restore_terminated_access(): void
+    {
+        $plan = $this->makeCarePlan();
+        $employeeUuid = (string) Str::uuid();
+        $approval = $this->localGrant($plan, $employeeUuid);
+        $data = $this->remoteGrant($plan, $employeeUuid, $approval->uuid, 'terminated');
+        Repository::approval()->sync($data, $plan, $approval);
+        $this->assertSame('terminated', $approval->fresh()->status);
+        $approval->update(['status' => 'active']);
+        $link = Repository::approval()->attachEhealthLink($approval, ['href' => '/jobs/completed']);
+
+        Repository::approval()->completeCarePlanRequest($link, $data);
+
+        $this->assertSame('terminated', $approval->fresh()->status);
+        $this->assertFalse(\App\Repositories\Repository::carePlan()->hasGrantedApproval($plan->fresh(), $employeeUuid));
+    }
+
+    private function localGrant(CarePlan $plan, string $employeeUuid): Approval
+    {
+        $identifier = Identifier::create(['value' => $employeeUuid]);
+
+        return $plan->approvals()->create([
+            'uuid' => (string) Str::uuid(), 'granted_to_id' => $identifier->id,
+            'granted_to_type' => 'employee', 'status' => 'active', 'is_verified' => true,
+            'access_level' => 'write', 'expires_at' => now()->addDay(),
+        ]);
+    }
+
+    private function remoteGrant(CarePlan $plan, string $employeeUuid, string $uuid, string $status = 'active'): array
+    {
+        return [
+            'id' => $uuid, 'status' => $status, 'is_verified' => true, 'access_level' => 'write',
+            'expires_at' => now()->addDay()->toIso8601String(),
+            'granted_to' => ['identifier' => ['value' => $employeeUuid, 'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'employee']]]]],
+            'granted_resources' => [['identifier' => ['value' => $plan->uuid, 'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'care_plan']]]]]],
+        ];
+    }
+
+    private function approvalPage(array $data, int $page = 1, int $totalPages = 1): EHealthResponse
+    {
+        return new EHealthResponse(new Response(200, [], json_encode([
+            'data' => $data, 'paging' => ['page_number' => $page, 'total_pages' => $totalPages],
+        ], JSON_THROW_ON_ERROR)), fn (EHealthResponse $response): array => $response->getData());
     }
 
     private function makeCarePlan(): CarePlan

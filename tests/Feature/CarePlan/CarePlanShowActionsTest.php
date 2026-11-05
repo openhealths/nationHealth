@@ -487,6 +487,162 @@ class CarePlanShowActionsTest extends TestCase
         }
     }
 
+    public static function approvalConfirmationMethods(): array
+    {
+        return [
+            'patient SMS' => [['type' => 'OTP', 'phone_number' => '+38093*****85'], true],
+            'patient documents' => [['type' => 'OFFLINE'], false],
+            'representative SMS' => [['type' => 'THIRD_PERSON', 'reference' => ['type' => 'OTP', 'phone_number' => '+38093*****85']], true],
+            'representative documents' => [['type' => 'THIRD_PERSON', 'reference' => ['type' => 'OFFLINE']], false],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('approvalConfirmationMethods')]
+    public function test_selected_approval_method_controls_the_request_and_confirmation(array $method, bool $requiresOtp): void
+    {
+        $this->actingAs($this->user);
+        $plan = $this->makeSignedNewPlan();
+        $authId = (string) Str::uuid();
+        $approvalId = (string) Str::uuid();
+        session()->put(config('ehealth.api.oauth.bearer_token'), 'synthetic-token');
+        $authResponse = Mockery::mock(EHealthResponse::class);
+        $authResponse->shouldReceive('validate')->andReturn([$method + ['id' => $authId]]);
+        $this->mock(\App\Classes\eHealth\Api\Person::class)->shouldReceive('getAuthMethods')->once()->andReturn($authResponse);
+        $created = Mockery::mock(EHealthResponse::class);
+        $created->shouldReceive('successful')->andReturnTrue();
+        $created->shouldReceive('getStatusCode')->andReturn(201);
+        $created->shouldReceive('validate')->andReturn([
+            'id' => $approvalId, 'is_verified' => false, 'status' => 'new',
+            'expires_at' => now()->addYear()->toIso8601String(),
+            'authentication_method_current' => $method,
+        ]);
+        $verified = Mockery::mock(EHealthResponse::class);
+        $verified->shouldReceive('successful')->andReturnTrue();
+        $verified->shouldReceive('validate')->andReturn([]);
+        $api = $this->mock(\App\Classes\eHealth\Api\Approval::class);
+        $api->shouldReceive('withToken')->andReturnSelf();
+        $api->shouldReceive('createApproval')->once()->with($this->person->uuid, Mockery::on(
+            fn (array $payload): bool => $payload['authorize_with'] === $authId
+        ))->andReturn($created);
+        $api->shouldReceive('verify')->once()->with($this->person->uuid, $approvalId, $requiresOtp ? ['code' => 1234] : [])->andReturn($verified);
+        $api->shouldNotReceive('resendSms');
+
+        $component = Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
+            ->call('openMethodSelectionModal')
+            ->assertSee(__('care-plan.approval_request_with_method'))
+            ->assertDontSee(__('patients.change_phone_number'))
+            ->call('selectAuthMethod', $authId)
+            ->assertSet('showAuthModal', true)
+            ->assertSet('currentAuthMethod.type', $method['type']);
+        if ($requiresOtp) {
+            $component->assertSeeHtml('id="verificationCode"')
+                ->assertDontSeeHtml('wire:model="offlineAcknowledged"')
+                ->call('verify')->assertHasErrors('verificationCode')
+                ->set('verificationCode', '1234');
+        } else {
+            $component->assertDontSeeHtml('id="verificationCode"')
+                ->assertSeeHtml('wire:model="offlineAcknowledged"')
+                ->call('resendSms')
+                ->call('verify')->assertHasErrors('offlineAcknowledged')
+                ->assertSee(__('care-plan.approval_offline_acknowledgement_required'))
+                ->set('offlineAcknowledged', true);
+            if ($method['type'] === 'THIRD_PERSON') {
+                $component->assertSee(__('patients.leaflet.informed_representative'));
+            }
+        }
+        $component->call('verify')->assertHasNoErrors()->assertSet('showAuthModal', false);
+        $this->assertDatabaseHas('approvals', ['uuid' => $approvalId, 'is_verified' => true]);
+        $this->assertTrue(\App\Repositories\Repository::carePlan()->hasGrantedApproval($plan->fresh(), $this->employee->uuid));
+    }
+
+    public function test_invalid_method_does_not_create_an_approval(): void
+    {
+        $this->actingAs($this->user);
+        $plan = $this->makeSignedNewPlan();
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->andReturn([['id' => (string) Str::uuid(), 'type' => 'OTP']]);
+        $this->mock(\App\Classes\eHealth\Api\Person::class)->shouldReceive('getAuthMethods')->once()->andReturn($response);
+        $this->mock(\App\Classes\eHealth\Api\Approval::class)->shouldNotReceive('createApproval');
+        \Illuminate\Support\Facades\Bus::fake();
+
+        Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
+            ->call('openMethodSelectionModal')
+            ->call('selectAuthMethod', (string) Str::uuid())
+            ->assertHasErrors('selectedAuthMethodUuid')
+            ->assertSet('showMethodSelectionModal', true);
+
+        $this->assertDatabaseCount('approvals', 0);
+        \Illuminate\Support\Facades\Bus::assertNothingBatched();
+    }
+
+    public function test_denied_method_selection_has_no_api_database_or_queue_side_effects(): void
+    {
+        $this->actingAs($this->user);
+        $plan = $this->makeSignedNewPlan();
+        $this->user->revokePermissionTo('care_plan:write');
+        $this->user->unsetRelation('permissions');
+        $this->mock(\App\Classes\eHealth\Api\Person::class)->shouldNotReceive('getAuthMethods');
+        $this->mock(\App\Classes\eHealth\Api\Approval::class)->shouldNotReceive('createApproval', 'verify');
+        \Illuminate\Support\Facades\Bus::fake();
+
+        Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
+            ->call('openMethodSelectionModal')->assertSet('showMethodSelectionModal', false)
+            ->call('selectAuthMethod', (string) Str::uuid())
+            ->assertSee(__('care-plan.approval_access_denied'))
+            ->call('verify')->assertSet('showAuthModal', false);
+
+        $this->assertDatabaseCount('approvals', 0);
+        \Illuminate\Support\Facades\Bus::assertNothingBatched();
+    }
+
+    public function test_resuming_a_remotely_verified_approval_reconciles_local_access(): void
+    {
+        $this->actingAs($this->user);
+        $plan = $this->makeSignedNewPlan();
+        $identifier = Identifier::create(['value' => $this->employee->uuid]);
+        $approval = Approval::create([
+            'uuid' => (string) Str::uuid(), 'approvable_type' => CarePlan::class, 'approvable_id' => $plan->id,
+            'granted_to_id' => $identifier->id, 'granted_to_type' => 'employee',
+            'access_level' => 'write', 'status' => 'NEW', 'is_verified' => false,
+        ]);
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('successful')->andReturnTrue();
+        $response->shouldReceive('validate')->andReturn(['id' => $approval->uuid, 'is_verified' => true, 'status' => 'active', 'expires_at' => now()->addYear()->toIso8601String()]);
+        $this->mock(\App\Classes\eHealth\Api\Approval::class)->shouldReceive('getApprovalDetails')->once()
+            ->with($this->person->uuid, $approval->uuid)->andReturn($response);
+
+        Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $plan])
+            ->call('verifyExistingApproval', $approval->uuid)->assertSet('showAuthModal', false);
+
+        $this->assertTrue($approval->fresh()->getAttribute('is_verified'));
+        $this->assertTrue(\App\Repositories\Repository::carePlan()->hasGrantedApproval($plan->fresh(), $this->employee->uuid));
+    }
+
+    public function test_existing_patient_approval_reuses_representative_sms_confirmation(): void
+    {
+        $this->actingAs($this->user);
+        $role = \App\Models\Role::findOrCreate('DOCTOR', 'web');
+        $role->givePermissionTo(\App\Models\Permission::findOrCreate('approval:create', 'web'));
+        $this->user->assignRole($role);
+        $this->user->givePermissionToParent(...$role->permissions);
+        $service = $this->mock(\App\Services\MedicalEvents\PatientApprovalService::class)->makePartial();
+        $service->shouldReceive('details')->once()->with(Mockery::type(Person::class), 'approval')
+            ->andReturn(['authentication_method_current' => ['type' => 'THIRD_PERSON', 'number' => '+38093*****85']]);
+        $service->shouldReceive('smsResendAvailableAt')->once()->andReturn(now()->addMinute()->timestamp);
+        $this->mock(\App\Classes\eHealth\Api\Person::class)->shouldNotReceive('getAuthMethods');
+        $component = new \App\Livewire\Person\Records\PatientApproval();
+        $component->personId = $this->person->id;
+        $component->step = 'confirming';
+        $component->approvalId = 'approval';
+        $component->selectedAuthType = 'THIRD_PERSON';
+        $component->selectedAuthUuid = (string) Str::uuid();
+
+        $component->continueAfterCreation();
+
+        $this->assertSame('code', $component->step);
+        $this->assertSame('+38093*****85', $component->smsPhone);
+    }
+
     private function makeSignedNewPlan(): CarePlan
     {
         return $this->createFhirCarePlan([
@@ -722,7 +878,8 @@ class CarePlanShowActionsTest extends TestCase
             ->call('saveActivity')->assertHasNoErrors();
 
         $activity = app(\App\Repositories\CarePlanActivityRepository::class)->findOwned(
-            $plan->id, \App\Models\CarePlanActivity::whereCarePlanId($plan->id)->value('id')
+            $plan->id,
+            \App\Models\CarePlanActivity::whereCarePlanId($plan->id)->value('id')
         );
         $resource = app(\App\Repositories\CarePlanActivityRepository::class)->getResource($activity);
         $this->assertEquals(45, $resource['detail']['quantity']['value']);
@@ -880,7 +1037,8 @@ class CarePlanShowActionsTest extends TestCase
             ->call('cancelApproval', (string) Str::uuid())->assertSee(__('care-plan.approval_cancel_error'));
         $plan->approvals()->whereUuid($approvalUuid)->update(['status' => ApprovalStatus::PENDING->value]);
         Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $plan->fresh()])
-            ->assertSeeHtml('wire:click="cancelApproval')
+            ->assertDontSeeHtml('wire:click="cancelApproval')
+            ->assertSee(__('care-plan.no_approvals_found'))
             ->assertDontSeeHtml('wire:click="recreateApproval')
             ->assertDontSeeHtml('wire:click="verifyExistingApproval')
             ->call('createApproval')->assertSee(__('care-plan.cannot_grant_terminal', ['status' => \App\Enums\CarePlanStatus::labelFor($plan->status)]));

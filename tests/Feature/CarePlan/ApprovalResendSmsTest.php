@@ -18,6 +18,20 @@ use Tests\TestCase;
  */
 class ApprovalResendSmsTest extends TestCase
 {
+    public function test_document_confirmation_sends_an_empty_json_object_and_keeps_later_sms_payloads(): void
+    {
+        Http::fake(['*' => Http::response([], 200)]);
+        $api = $this->makeApi();
+
+        $api->verify('patient-1', 'approval-1', []);
+        $api->verify('patient-1', 'approval-2', ['code' => 1234]);
+
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/approvals/approval-1')
+            && $request->method() === 'PATCH' && $request->body() === '{}');
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/approvals/approval-2')
+            && $request->method() === 'PATCH' && $request['code'] === 1234);
+    }
+
     public function test_explicit_patient_search_uses_the_patient_scoped_endpoint(): void
     {
         Http::fake(['*' => Http::response(['data' => []], 200)]);

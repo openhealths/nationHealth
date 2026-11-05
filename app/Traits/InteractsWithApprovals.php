@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Traits;
 
+use App\Enums\Person\AuthenticationMethod;
+use App\Models\CarePlan;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 
 /**
@@ -22,6 +27,8 @@ trait InteractsWithApprovals
      * Verification code entered by the user.
      */
     public string $verificationCode = '';
+
+    public bool $offlineAcknowledged = false;
 
     /**
      * Phone number shown in the OTP authentication modal (read-only display).
@@ -68,9 +75,14 @@ trait InteractsWithApprovals
      */
     protected function approvalVerificationRules(): array
     {
+        if (AuthenticationMethod::confirmationMethod($this->currentAuthMethod ?? []) === null) {
+            throw ValidationException::withMessages(['verificationCode' => __('care-plan.approval_result_unavailable')]);
+        }
+
         if ($this->isOfflineAuthMethod()) {
             return [
                 'verificationCode' => ['nullable'],
+                'offlineAcknowledged' => ['accepted'],
             ];
         }
 
@@ -79,15 +91,19 @@ trait InteractsWithApprovals
         ];
     }
 
+    protected function approvalVerificationMessages(): array
+    {
+        return ['offlineAcknowledged.accepted' => __('care-plan.approval_offline_acknowledgement_required')];
+    }
+
     /**
      * Check if the current authentication method is OFFLINE or document-based (no SMS required).
      */
     public function isOfflineAuthMethod(?array $authMethod = null): bool
     {
         $method = $authMethod ?? $this->currentAuthMethod;
-        $type = $method['type'] ?? null;
 
-        return $type === 'OFFLINE' || $type === 'THIRD_PERSON' || ($type !== 'OTP' && !is_null($type));
+        return AuthenticationMethod::confirmationMethod($method ?? []) === AuthenticationMethod::OFFLINE;
     }
 
     /**
@@ -95,14 +111,18 @@ trait InteractsWithApprovals
      */
     public function openAuthModal(): void
     {
-        if (is_array($this->currentAuthMethod ?? null)) {
-            $this->phoneNumber = $this->currentAuthMethod['phone_number']
-                ?? $this->currentAuthMethod['phoneNumber']
-                ?? $this->phoneNumber;
+        if (AuthenticationMethod::confirmationMethod($this->currentAuthMethod ?? []) === null) {
+            $this->showAuthModal = false;
+            Session::flash('error', __('care-plan.approval_result_unavailable'));
+
+            return;
         }
 
+        $this->phoneNumber = AuthenticationMethod::confirmationPhone($this->currentAuthMethod);
         $this->showAuthModal = true;
         $this->verificationCode = '';
+        $this->offlineAcknowledged = false;
+        $this->resetValidation(['verificationCode', 'offlineAcknowledged']);
         $this->smsResent = false;
     }
 
@@ -113,6 +133,7 @@ trait InteractsWithApprovals
     {
         $this->showAuthModal = false;
         $this->verificationCode = '';
+        $this->offlineAcknowledged = false;
     }
 
     /**
@@ -122,5 +143,32 @@ trait InteractsWithApprovals
     {
         $this->verificationCode = '';
         $this->smsResent = false;
+    }
+
+    protected function selectedApprovalAuthMethod(string $methodUuid): array
+    {
+        $method = collect($this->authMethods)->first(fn (array $method): bool => ($method['id'] ?? $method['uuid'] ?? null) === $methodUuid);
+        if ($method === null || !in_array($method['type'] ?? null, ['OTP', 'OFFLINE', 'THIRD_PERSON'], true)) {
+            throw ValidationException::withMessages(['selectedAuthMethodUuid' => __('care-plan.approval_auth_method_invalid')]);
+        }
+
+        return $method;
+    }
+
+    protected function guardApprovalAccess(CarePlan $carePlan): bool
+    {
+        if (Auth::user()->cannot('manage', $carePlan)) {
+            Session::flash('error', __('care-plan.approval_access_denied'));
+
+            return false;
+        }
+
+        if ($carePlan->requiresFhirImport()) {
+            Session::flash('error', __('care-plan.full_sync_required'));
+
+            return false;
+        }
+
+        return true;
     }
 }

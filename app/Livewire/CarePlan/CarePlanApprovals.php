@@ -6,16 +6,21 @@ namespace App\Livewire\CarePlan;
 
 use App\Classes\eHealth\EHealth;
 use App\Enums\CarePlanStatus;
+use App\Enums\Person\ApprovalStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Repositories\Repository as GeneralRepository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
+use App\Services\MedicalEvents\PatientApprovalService;
 use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Traits\FormTrait;
 use App\Traits\InteractsWithApprovals;
 use Exception;
+use Carbon\CarbonImmutable;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -50,6 +55,7 @@ class CarePlanApprovals extends Component
 
     public ?string $selectedAuthMethodUuid = null;
 
+    #[Locked]
     public array $authMethods = [];
 
     /** Active employees of the current legal entity for the dropdown. */
@@ -102,12 +108,21 @@ class CarePlanApprovals extends Component
 
     public function loadAuthMethods(): void
     {
-        if ($this->skipsPatientOtp || $this->authMethods !== []) {
+        if (!$this->guardApprovalAccess($this->currentCarePlan()) || $this->isReadOnly) {
             return;
         }
-        $this->authMethods = EHealth::person()->getAuthMethods($this->patientUuid)->validate();
-        $method = collect($this->authMethods)->firstWhere('type', 'OTP') ?? ($this->authMethods[0] ?? null);
-        $this->selectedAuthMethodUuid = $method['id'] ?? $method['uuid'] ?? null;
+        if ($this->skipsPatientOtp) {
+            return;
+        }
+        if ($this->authMethods === []) {
+            $methods = EHealth::person()->getAuthMethods($this->patientUuid)->validate();
+            $this->authMethods = app(PatientApprovalService::class)
+                ->enrichAuthenticationMethods($methods, $this->currentCarePlan()->person);
+        }
+        if (empty($this->selectedAuthMethodUuid)) {
+            $method = collect($this->authMethods)->firstWhere('type', 'OTP') ?? ($this->authMethods[0] ?? null);
+            $this->selectedAuthMethodUuid = $method['id'] ?? $method['uuid'] ?? null;
+        }
     }
 
     /**
@@ -145,7 +160,9 @@ class CarePlanApprovals extends Component
         ]);
 
         $carePlan = $this->currentCarePlan();
-        $this->authorize('manage', $carePlan);
+        if (!$this->guardApprovalAccess($carePlan)) {
+            return;
+        }
         $this->isReadOnly = CarePlanStatus::fromStored($carePlan->status)->isTerminal();
 
         if ($this->isReadOnly) {
@@ -159,10 +176,8 @@ class CarePlanApprovals extends Component
 
         try {
             $this->loadAuthMethods();
-            if ($this->selectedAuthMethodUuid) {
-                $this->currentAuthMethod = collect($this->authMethods)->first(function ($method) {
-                    return ($method['id'] ?? $method['uuid'] ?? null) === $this->selectedAuthMethodUuid;
-                });
+            if (!$this->skipsPatientOtp) {
+                $this->currentAuthMethod = $this->selectedApprovalAuthMethod($this->selectedAuthMethodUuid ?? '');
             }
 
             $service = app(CarePlanApprovalService::class);
@@ -186,7 +201,7 @@ class CarePlanApprovals extends Component
                 return;
             }
 
-            if ($result->requiresOtp()) {
+            if ($result->requiresConfirmation()) {
                 $this->approvalId = $result->approvalId;
                 $this->currentAuthMethod = $result->authMethod ?? $this->currentAuthMethod;
                 $this->openAuthModal();
@@ -200,6 +215,10 @@ class CarePlanApprovals extends Component
             $this->reset('newApproval');
             $this->fetchApprovals();
             $this->dispatch('care-plan-approvals-changed');
+        } catch (ValidationException $e) {
+            $this->errorMessage = $e->validator->errors()->first();
+            Session::flash('error', $this->errorMessage);
+            $this->setErrorBag($e->validator->getMessageBag());
         } catch (EHealthValidationException|EHealthResponseException $e) {
             Log::error('CarePlanApprovals: eHealth error: ' . $e->getMessage());
             $this->errorMessage = $e instanceof EHealthValidationException
@@ -242,7 +261,7 @@ class CarePlanApprovals extends Component
             $this->approvalId = $status->approvalId;
         }
 
-        if ($status->requiresOtp()) {
+        if ($status->requiresConfirmation()) {
             $this->currentAuthMethod = $status->authMethod ?? $this->currentAuthMethod;
             $this->openAuthModal();
 
@@ -279,20 +298,27 @@ class CarePlanApprovals extends Component
 
             return;
         }
-        $this->loadAuthMethods();
-        $this->approvalId = $approvalUuid;
-        $this->currentAuthMethod = collect($this->authMethods)->first(fn (array $method): bool => ($method['id'] ?? $method['uuid'] ?? null) === $approval->authorizeWith);
-        if ($this->currentAuthMethod === null) {
-            Session::flash('error', __('care-plan.approval_result_unavailable'));
+        try {
+            $result = app(CarePlanApprovalService::class)->pendingConfirmation($this->patientUuid, $approvalUuid, $approval->authorizeWith);
+            $this->approvalId = $result->approvalId;
+            if ($result->isGranted()) {
+                $this->fetchApprovals();
+                Session::flash('success', __('care-plan.approval_verified'));
 
-            return;
+                return;
+            }
+            $this->currentAuthMethod = $result->authMethod;
+            $this->openAuthModal();
+        } catch (\Throwable $exception) {
+            Session::flash('error', __('care-plan.approval_result_unavailable'));
         }
-        $this->openAuthModal();
     }
 
     public function resumeApprovalRequest(string $approvalUuid): void
     {
-        $this->authorize('manage', $this->currentCarePlan());
+        if (!$this->guardApprovalAccess($this->currentCarePlan())) {
+            return;
+        }
         $approval = app(MedicalRequestOwnership::class)->approvalForCarePlan($this->currentCarePlan(), $approvalUuid);
         $link = \App\Repositories\MedicalEvents\Repository::approval()->creationLinkFor($approval);
         if ($link === null) {
@@ -319,16 +345,6 @@ class CarePlanApprovals extends Component
         try {
             app(MedicalRequestOwnership::class)->approvalForCarePlan($this->currentCarePlan(), $oldApprovalUuid);
             $this->loadAuthMethods();
-            try {
-                app(CarePlanApprovalService::class)
-                    ->deactivate($this->patientUuid, $oldApprovalUuid);
-            } catch (EHealthResponseException $e) {
-                // Only an absent approval can be safely replaced without deactivation.
-                if ($e->getCode() !== 404) {
-                    throw $e;
-                }
-            }
-
             $carePlan = $this->currentCarePlan();
             $oldApproval = $carePlan->approvals()->with('grantedTo')->where('uuid', $oldApprovalUuid)->first();
             $employeeUuid = $oldApproval?->grantedTo?->value
@@ -338,6 +354,18 @@ class CarePlanApprovals extends Component
                 Session::flash('error', __('care-plan.employee_not_found'));
 
                 return;
+            }
+
+            if (!$this->skipsPatientOtp) {
+                $this->currentAuthMethod = $this->selectedApprovalAuthMethod($this->selectedAuthMethodUuid ?? '');
+            }
+            GeneralRepository::carePlan()->assertApprovalRecipient($employeeUuid, legalEntity()->id);
+            try {
+                app(CarePlanApprovalService::class)->deactivate($this->patientUuid, $oldApprovalUuid);
+            } catch (EHealthResponseException $e) {
+                if ($e->getCode() !== 404) {
+                    throw $e;
+                }
             }
 
             $service = app(CarePlanApprovalService::class);
@@ -360,7 +388,7 @@ class CarePlanApprovals extends Component
                 return;
             }
 
-            if ($result->requiresOtp()) {
+            if ($result->requiresConfirmation()) {
                 $this->approvalId = $result->approvalId;
                 $this->currentAuthMethod = $result->authMethod ?? $this->currentAuthMethod;
                 $this->openAuthModal();
@@ -420,9 +448,18 @@ class CarePlanApprovals extends Component
 
             return;
         }
-        $this->authorize('manage', $this->currentCarePlan());
+        if (!$this->guardApprovalAccess($this->currentCarePlan())) {
+            return;
+        }
         app(MedicalRequestOwnership::class)->approvalForCarePlan($this->currentCarePlan(), $this->approvalId ?? '');
-        $this->validate($this->approvalVerificationRules());
+        try {
+            $this->validate($this->approvalVerificationRules(), $this->approvalVerificationMessages());
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
+            $this->setErrorBag($exception->validator->getMessageBag());
+
+            return;
+        }
 
         try {
             app(CarePlanApprovalService::class)->verify(
@@ -511,8 +548,8 @@ class CarePlanApprovals extends Component
 
             return data_get($approval, 'grantedTo.value', data_get($approval, 'granted_to.value')) === $this->newApproval['employee_uuid']
                 && ($approval['isVerified'] ?? $approval['is_verified'] ?? false)
-                && ($expiresAt === null || \Carbon\CarbonImmutable::parse($expiresAt)->isFuture())
-                && \App\Enums\Person\ApprovalStatus::resolve($approval['status'] ?? null)?->isGranted();
+                && ($expiresAt === null || CarbonImmutable::parse($expiresAt)->isFuture())
+                && ApprovalStatus::resolve($approval['status'] ?? null)?->isGranted();
         });
     }
 
@@ -524,7 +561,9 @@ class CarePlanApprovals extends Component
     protected function guardReadOnlyApprovals(): bool
     {
         $carePlan = $this->currentCarePlan();
-        $this->authorize('manage', $carePlan);
+        if (!$this->guardApprovalAccess($carePlan)) {
+            return true;
+        }
         $this->isReadOnly = CarePlanStatus::fromStored($carePlan->status)->isTerminal();
         $this->statusLabel = CarePlanStatus::labelFor($carePlan->status);
 
