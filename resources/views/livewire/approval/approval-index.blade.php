@@ -1,5 +1,5 @@
-@use(App\Enums\Person\ApprovalStatus)
 @use(App\Models\Person\Person)
+@use(Carbon\Carbon)
 
 <div>
     <livewire:components.x-message :key="time()" />
@@ -122,20 +122,21 @@
     </x-header-navigation>
 
     <div class="flow-root mt-8 shift-content pl-3.5">
-        <div class="max-w-screen-xl">
+        <div class="w-full">
             @if($this->paginatedApprovals->isNotEmpty())
                 <div class="index-table-wrapper">
                     <table class="index-table w-full">
                         <thead class="index-table-thead">
                         <tr>
-                            <th class="index-table-th w-[14%]">{{ __('forms.patient') }}</th>
-                            <th class="index-table-th w-[18%]">{{ __('approval.granted_to') }}</th>
+                            <th class="index-table-th w-[13%]">{{ __('forms.patient') }}</th>
+                            <th class="index-table-th w-[15%]">{{ __('approval.granted_to') }}</th>
                             <th class="index-table-th w-[10%]">{{ __('approval.data_type') }}</th>
-                            <th class="index-table-th w-[15%]">{{ __('approval.data') }}</th>
-                            <th class="index-table-th w-[15%]">{{ __('approval.based_on') }}</th>
-                            <th class="index-table-th w-[10%]">{{ __('approval.access_level') }}</th>
-                            <th class="index-table-th w-[12%]">{{ __('forms.status.label') }}</th>
-                            <th class="index-table-th w-[6%]">{{ __('forms.action') }}</th>
+                            <th class="index-table-th w-[19%]">{{ __('approval.data') }}</th>
+                            <th class="index-table-th w-[12%]">{{ __('approval.based_on') }}</th>
+                            <th class="index-table-th w-[9%]">{{ __('approval.expiration_date') }}</th>
+                            <th class="index-table-th w-[9%]">{{ __('approval.access_level') }}</th>
+                            <th class="index-table-th w-[8%]">{{ __('approval.confirmed_column') }}</th>
+                            <th class="index-table-th w-[5%]">{{ __('forms.action') }}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -146,8 +147,16 @@
                                 $patient = $remote ? $this->searchPatient : ($approval->approvable instanceof Person ? $approval->approvable : $approval->approvable->person);
                                 $type = $remote ? (data_get($approval, 'grantedResources.0.identifier.type.coding.0.code') ?? data_get($approval, 'grantedResourceTypes.0.coding.0.code')) : (data_get($approval, 'grantedResources.0.grantedTo.identifier.type.coding.0.code') ?? data_get($approval, 'grantedResourceTypes.0.codeableConcept.coding.0.code'));
                                 $type ??= $remote ? null : ($approval->approvable instanceof Person ? 'person' : 'care_plan');
-                                $names = collect(data_get($approval, 'grantedResources', []))->pluck($remote ? 'displayValue' : 'grantedTo.displayValue')->merge(collect(data_get($approval, 'grantedResourceTypes', []))->pluck($remote ? 'text' : 'codeableConcept.text'))->filter()->implode(', ');
-                                $status = ApprovalStatus::resolve(data_get($approval, 'status') ?? $local?->status);
+                                $names = $this->resourceNamesByApproval[$remote ? $approval['id'] : $approval->uuid] ?? [];
+                                $recipientType = data_get($approval, 'grantedTo.identifier.type.coding.0.code');
+                                $recipientLabel = match ($recipientType) {
+                                    'employee' => __('approval.employee'),
+                                    'legal_entity' => __('patients.organization'),
+                                    default => __('approval.recipient_types.unknown'),
+                                };
+                                $isVerified = $remote ? data_get($approval, 'isVerified') : $approval->getAttribute('is_verified');
+                                $expiresAt = data_get($approval, 'expiresAt');
+                                $isExpired = $expiresAt !== null && !Carbon::parse($expiresAt)->isFuture();
                             @endphp
                             <tr class="index-table-tr" wire:key="approval-row-{{ $remote ? $approval['id'] : $approval->uuid }}">
                                 <td class="index-table-td-primary">
@@ -155,67 +164,106 @@
                                     <span class="text-xs text-gray-500">{{ $patient->birthDate }} р.н.</span>
                                 </td>
                                 <td class="index-table-td">
-                                    {{ __('approval.employee') }}<br>
+                                    {{ $recipientLabel }}<br>
                                     {{ data_get($approval, 'grantedTo.displayValue') ?? '-' }}
                                 </td>
                                 <td class="index-table-td">{{ $type ? __('approval.resource_types.'.$type) : '-' }}</td>
-                                <td class="index-table-td">{{ $names ?: '-' }}</td>
-                                <td class="index-table-td break-all">{{ data_get($approval, 'reason.displayValue') ?: (data_get($approval, 'reason.identifier.value') ?: '-') }}</td>
-                                <td class="index-table-td">{{ __('patients.'.data_get($approval, 'accessLevel')) }}</td>
+                                <td class="index-table-td">
+                                    @if (count($names) > 1)
+                                        <ul class="list-disc pl-4 space-y-1">
+                                            @foreach ($names as $name)
+                                                <li class="min-w-0">
+                                                    <span class="line-clamp-2 break-words" title="{{ $name }}">
+                                                        {{ $name }}
+                                                    </span>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    @else
+                                        <span class="line-clamp-2 break-words" title="{{ $names[0] ?? '' }}">
+                                            {{ $names[0] ?? '-' }}
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="index-table-td break-all">
+                                    {{ data_get($approval, 'reason.displayValue') ?: (data_get($approval, 'reason.identifier.value') ?: '-') }}
+                                </td>
+
                                 <td class="index-table-td whitespace-nowrap">
-                                    @if ($status)
-                                        <span class="{{ $status->color() }} whitespace-nowrap">{{ $status->label() }}</span>
+                                    @if ($expiresAt === null)
+                                        -
+                                    @elseif ($isExpired)
+                                        <span class="badge-red rounded-lg">
+                                            {{ __('approval.expired_short') }}
+                                        </span>
+                                    @else
+                                        {{ Carbon::parse($expiresAt)->setTimezone(config('app.timezone'))->format('d.m.Y') }}
+                                    @endif
+                                </td>
+
+                                <td class="index-table-td">
+                                    {{ __('patients.'.data_get($approval, 'accessLevel')) }}
+                                </td>
+
+                                <td class="index-table-td whitespace-nowrap">
+                                    @if ($isVerified === true)
+                                        <span class="badge-green whitespace-nowrap">{{ __('forms.yes') }}</span>
+                                    @elseif ($isVerified === false)
+                                        <span class="badge-yellow whitespace-nowrap">{{ __('forms.no') }}</span>
                                     @else
                                         -
                                     @endif
                                 </td>
                                 <td class="index-table-td-actions relative">
-                                    @if ($local)
-                                        <div class="flex justify-center relative">
-                                            <div x-data="{
-                                                    open: false,
-                                                    toggle() {
-                                                        if (this.open) { return this.close(); }
-                                                        this.$refs.button.focus();
-                                                        this.open = true;
-                                                    },
-                                                    close(focusAfter) {
-                                                        if (!this.open) return;
-                                                        this.open = false;
-                                                        focusAfter && focusAfter.focus();
-                                                    }
-                                                }"
-                                                @keydown.escape.prevent.stop="close($refs.button)"
-                                                @focusin.window="!$refs.panel.contains($event.target) && close()"
-                                                class="relative"
-                                            >
-                                                <button @click="toggle()" x-ref="button" type="button" class="hover:text-primary cursor-pointer outline-none">
-                                                    <svg class="svg-hover-action w-6 h-6 text-gray-800 dark:text-gray-300" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24">
-                                                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"/>
-                                                    </svg>
-                                                </button>
+                                    <div class="flex justify-center relative">
+                                        <div x-data="{
+                                                open: false,
+                                                toggle() {
+                                                    if (this.open) { return this.close(); }
+                                                    this.$refs.button.focus();
+                                                    this.open = true;
+                                                },
+                                                close(focusAfter) {
+                                                    if (!this.open) return;
+                                                    this.open = false;
+                                                    focusAfter && focusAfter.focus();
+                                                }
+                                            }"
+                                            @keydown.escape.prevent.stop="close($refs.button)"
+                                            @focusin.window="!$refs.panel.contains($event.target) && close()"
+                                            class="relative"
+                                        >
+                                            <button @click="toggle()" x-ref="button" type="button" class="hover:text-primary cursor-pointer outline-none">
+                                                <svg class="svg-hover-action w-6 h-6 text-gray-800 dark:text-gray-300" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24">
+                                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"/>
+                                                </svg>
+                                            </button>
 
-                                                <div x-show="open" x-cloak x-ref="panel" x-transition.origin.top.left @click.outside="close($refs.button)" class="absolute right-0 mt-2 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-md z-50">
+                                            <div x-show="open" x-cloak x-ref="panel" x-transition.origin.top.left @click.outside="close($refs.button)" class="absolute right-0 mt-2 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-md z-50">
+                                                @if ($local)
                                                     <a href="{{ route('data-access.view', [legalEntity(), $local->id]) }}" class="flex whitespace-nowrap items-center gap-2 w-full first-of-type:rounded-t-md px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
                                                         @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300')
                                                         {{ __('forms.view_details') }}
                                                     </a>
-                                                    @if ($status && ($status->isGranted() || $status->isAwaitingPatient()) && Auth::user()->can('cancel', $local))
-                                                        <button
-                                                            type="button"
-                                                            wire:click="confirmCancelApproval({{ $local->id }})"
-                                                            class="flex whitespace-nowrap items-center gap-2 w-full last-of-type:rounded-b-md px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-600"
-                                                        >
-                                                            @icon('cancel', 'w-5 h-5 text-red-600')
-                                                            {{ __('approval.revoke_access') }}
-                                                        </button>
-                                                    @endif
-                                                </div>
+                                                @else
+                                                    <button type="button" wire:click="view('{{ $approval['id'] }}')" class="flex whitespace-nowrap items-center gap-2 w-full first-of-type:rounded-t-md px-4 py-2.5 text-left text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                                        @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300')
+                                                        {{ __('forms.view_details') }}
+                                                    </button>
+                                                @endif
+                                                @if (!$isExpired && ($remote ? ($local ? Auth::user()->can('cancel', $local) : $this->canCancelSearchedApproval()) : Auth::user()->can('cancel', $approval)))
+                                                    <button
+                                                        type="button"
+                                                        wire:click="{{ $remote ? 'confirmCancelSearchedApproval(\''.$approval['id'].'\')' : 'confirmCancelApproval('.$approval->id.')' }}"
+                                                        class="flex whitespace-nowrap items-center gap-2 w-full last-of-type:rounded-b-md px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-600"
+                                                    >
+                                                        @icon('cancel', 'w-5 h-5 text-red-600')
+                                                        {{ __('approval.revoke_access') }}
+                                                    </button>
+                                                @endif
                                             </div>
                                         </div>
-                                    @else
-                                        -
-                                    @endif
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -254,6 +302,14 @@
                         wire:click="cancelApproval({{ $approvalToCancel }})"
                         wire:loading.attr="disabled"
                         wire:target="cancelApproval"
+                    >
+                        {{ __('approval.revoke_access') }}
+                    </x-danger-button>
+                @elseif ($remoteApprovalToCancel !== null)
+                    <x-danger-button
+                        wire:click="cancelSearchedApproval"
+                        wire:loading.attr="disabled"
+                        wire:target="cancelSearchedApproval"
                     >
                         {{ __('approval.revoke_access') }}
                     </x-danger-button>

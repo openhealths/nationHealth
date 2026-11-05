@@ -25,6 +25,8 @@ use Illuminate\Bus\Batch;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -34,8 +36,10 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Carbon\Carbon;
 use Throwable;
 
 class ApprovalIndex extends Component
@@ -64,6 +68,12 @@ class ApprovalIndex extends Component
     public bool $isSearching = false;
     public bool $showCancelApprovalModal = false;
     public ?int $approvalToCancel = null;
+
+    #[Locked]
+    public ?string $remoteApprovalToCancel = null;
+
+    #[Locked]
+    public ?int $remotePatientToCancel = null;
 
     public function mount(): void
     {
@@ -239,6 +249,7 @@ class ApprovalIndex extends Component
 
     public function confirmCancelApproval(int $approvalId): void
     {
+        $this->reset(['remoteApprovalToCancel', 'remotePatientToCancel']);
         $this->approvalToCancel = $approvalId;
         $this->showCancelApprovalModal = true;
     }
@@ -298,6 +309,146 @@ class ApprovalIndex extends Component
         $this->resetPage();
     }
 
+    /**
+     * Open an approval found by eHealth search, storing it only when it is absent locally.
+     */
+    public function view(string $approvalUuid): void
+    {
+        $approval = $this->storeSearchedApproval($approvalUuid);
+
+        if ($approval === null) {
+            return;
+        }
+
+        $this->redirectRoute('data-access.view', [legalEntity(), $approval->id], navigate: true);
+    }
+
+    protected function storeSearchedApproval(string $approvalUuid): ?Approval
+    {
+        $patient = $this->searchPatient;
+
+        if ($patient === null) {
+            return null;
+        }
+
+        $approval = Approval::query()->whereUuid($approvalUuid)->first();
+
+        if ($approval !== null) {
+            if (Auth::user()->cannot('view', $approval)) {
+                Session::flash('error', __('approval.messages.view_forbidden'));
+
+                return null;
+            }
+
+            return $approval;
+        }
+
+        try {
+            $response = EHealth::approval()->getApprovalDetails($patient->uuid, $approvalUuid);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while loading approval');
+
+            return null;
+        }
+
+        try {
+            return DB::transaction(function () use ($response, $patient, $approvalUuid): Approval {
+                Repository::approval()->syncMany($patient, [$response->validate()]);
+
+                $approval = Approval::query()->whereUuid($approvalUuid)->firstOrFail();
+
+                if (Auth::user()->cannot('view', $approval)) {
+                    throw new AuthorizationException();
+                }
+
+                return $approval;
+            });
+        } catch (AuthorizationException) {
+            Session::flash('error', __('approval.messages.view_forbidden'));
+
+            return null;
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Error while storing approval');
+
+            return null;
+        }
+    }
+
+    public function canCancelSearchedApproval(): bool
+    {
+        return Auth::user()->can('approval:cancel');
+    }
+
+    public function confirmCancelSearchedApproval(string $approvalUuid): void
+    {
+        if (!$this->canCancelSearchedApproval()) {
+            Session::flash('error', __('approval.messages.cancel_forbidden'));
+
+            return;
+        }
+
+        $this->remoteApprovalToCancel = $approvalUuid;
+        $this->remotePatientToCancel = $this->searchPatient->id;
+        $this->approvalToCancel = null;
+        $this->showCancelApprovalModal = true;
+    }
+
+    public function cancelSearchedApproval(PatientApprovalService $service): void
+    {
+        if (!$this->canCancelSearchedApproval()) {
+            Session::flash('error', __('approval.messages.cancel_forbidden'));
+
+            return;
+        }
+
+        if ($this->remoteApprovalToCancel === null || $this->remotePatientToCancel === null) {
+            Session::flash('error', __('approval.messages.cancel_failed'));
+
+            return;
+        }
+
+        $this->showCancelApprovalModal = false;
+        $patient = Person::query()->findOrFail($this->remotePatientToCancel);
+
+        try {
+            $details = EHealth::approval()
+                ->getApprovalDetails($patient->uuid, $this->remoteApprovalToCancel)
+                ->validate();
+
+            $expiresAt = $details['expires_at'] ?? null;
+
+            if ($expiresAt !== null && !Carbon::parse($expiresAt)->isFuture()) {
+                Session::flash('error', __('approval.messages.cancel_expired'));
+
+                return;
+            }
+
+            $service->cancelByUuid($patient, $this->remoteApprovalToCancel);
+        } catch (EHealthJobTimeoutException $exception) {
+            $exception->handle('Approval cancellation job did not finish');
+
+            return;
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle(
+                'Error while cancelling approval',
+                __('approval.messages.cancel_failed')
+            );
+
+            return;
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors(
+                $exception,
+                'Error while storing cancelled approval'
+            );
+
+            return;
+        }
+
+        $this->reset(['remoteApprovalToCancel', 'remotePatientToCancel']);
+
+        Session::flash('success', __('approval.messages.cancelled'));
+    }
+
     protected function paginateLocalApprovals(): LengthAwarePaginator
     {
         return Approval::query()->withAllRelations()->with([
@@ -329,6 +480,95 @@ class ApprovalIndex extends Component
         }
 
         return new LengthAwarePaginator(collect($approvals), $total, $perPage, $page, ['path' => LengthAwarePaginator::resolveCurrentPath()]);
+    }
+
+    #[Computed]
+    public function resourceNamesByApproval(): array
+    {
+        $formatter = app(PatientApprovalService::class);
+        $approvals = collect($this->paginatedApprovals->items());
+        $models = PatientApprovalService::RESOURCE_MODELS + PatientApprovalService::CHILD_MODELS;
+
+        $resources = $approvals->flatMap(static function (array|Approval $approval) {
+            $remote = is_array($approval);
+
+            return collect(data_get($approval, 'grantedResources', []))
+                ->map(static fn ($resource): array => [
+                    'uuid' => data_get($resource, $remote ? 'identifier.value' : 'grantedTo.value'),
+                    'type' => data_get($resource, $remote ? 'identifier.type.coding.0.code' : 'grantedTo.identifier.type.coding.0.code'),
+                ]);
+        })->filter(static fn (array $resource): bool => filled($resource['uuid']) && filled($resource['type']))
+            ->groupBy('type');
+
+        $records = [];
+
+        foreach ($resources as $type => $items) {
+            if (!isset($models[$type])) {
+                continue;
+            }
+
+            $relations = $formatter->resourceRelations($type);
+
+            $records[$type] = $models[$type]::query()
+                ->with($relations)
+                ->whereIn('uuid', $items->pluck('uuid')->unique()->all())
+                ->get()
+                ->keyBy('uuid');
+        }
+
+        $result = [];
+
+        foreach ($approvals as $approval) {
+            $remote = is_array($approval);
+            $patient = $remote ? $this->searchPatient : ($approval->approvable instanceof Person ? $approval->approvable : $approval->approvable->person);
+
+            $names = collect(data_get($approval, 'grantedResources', []))
+                ->map(function ($resource) use ($remote, $patient, $records, $formatter): ?string {
+                    $uuid = data_get($resource, $remote ? 'identifier.value' : 'grantedTo.value');
+                    $type = data_get($resource, $remote ? 'identifier.type.coding.0.code' : 'grantedTo.identifier.type.coding.0.code');
+
+                    if (!$uuid || !$type) {
+                        return null;
+                    }
+
+                    if (in_array($type, ['patient', 'person'], true)) {
+                        return $patient->fullName;
+                    }
+
+                    if (in_array($type, ['diagnoses_group', 'forbidden_group', 'service_group'], true)) {
+                        $groups = match ($type) {
+                            'diagnoses_group' => dictionary()->diagnoseGroups(),
+                            'forbidden_group' => dictionary()->forbiddenGroups(),
+                            'service_group' => dictionary()->services()
+                                ->flatMap(static fn (array $service): array => $service['groups'] ?? []),
+                        };
+
+                        $group = $groups->firstWhere('id', $uuid);
+
+                        return $group ? trim(($group['code'] ?? '').' - '.($group['name'] ?? ''), ' -') : '-';
+                    }
+
+                    $record = isset($records[$type]) ? $records[$type]->get($uuid) : null;
+
+                    if ($record !== null && ($type === 'activity' ? $record->carePlan?->person_id === $patient->id : $record->person_id === $patient->id)) {
+                        return $formatter->recordLabel($record, $type);
+                    }
+
+                    return data_get($resource, $remote ? 'displayValue' : 'grantedTo.displayValue') ?: __('approval.resource_not_synced');
+                })
+                ->merge(collect(data_get($approval, 'grantedResourceTypes', []))
+                    ->map(static fn ($resource): ?string => ($type = data_get(
+                        $resource,
+                        $remote ? 'coding.0.code' : 'codeableConcept.coding.0.code'
+                    )) ? __('approval.resource_types.'.$type) : null))
+                ->filter()
+                ->values()
+                ->all();
+
+            $result[$remote ? $approval['id'] : $approval->uuid] = $names;
+        }
+
+        return $result;
     }
 
     private function loadFilterOptions(): void

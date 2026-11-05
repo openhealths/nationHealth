@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Support\Facades\Auth;
-use App\Enums\Person\ApprovalStatus;
 use App\Models\Person\Person;
 
 class ApprovalPolicy
@@ -79,9 +78,7 @@ class ApprovalPolicy
 
     public function cancel(User $user, Approval $approval): Response
     {
-        $status = ApprovalStatus::resolve($approval->status);
-
-        if ($user->cannot('approval:cancel') || !($status?->isGranted() || $status?->isAwaitingPatient()) || ($approval->expiresAt !== null && !$approval->expiresAt->isFuture())) {
+        if ($user->cannot('approval:cancel') || ($approval->expiresAt !== null && !$approval->expiresAt->isFuture())) {
             return Response::denyWithStatus(404);
         }
 

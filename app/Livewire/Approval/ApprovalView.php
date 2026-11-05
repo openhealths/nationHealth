@@ -21,6 +21,9 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
 
+use App\Services\MedicalEvents\PatientApprovalService;
+use Illuminate\Database\Eloquent\Builder;
+
 class ApprovalView extends Component
 {
     use LogsExceptions;
@@ -67,6 +70,7 @@ class ApprovalView extends Component
         }
 
         $this->approvalModel = null;
+        unset($this->resourceGroups);
 
         Session::flash('success', __('patients.sync_success'));
     }
@@ -94,6 +98,75 @@ class ApprovalView extends Component
         $approval = $this->approval();
 
         return $approval->approvable instanceof Person ? $approval->approvable : $approval->approvable->person;
+    }
+
+    #[Computed]
+    public function resourceGroups(): array
+    {
+        $formatter = app(PatientApprovalService::class);
+
+        $resources = $this->approval()->grantedResources
+            ->map(static fn ($resource): array => [
+                'uuid' => $resource->grantedTo?->value,
+                'type' => data_get($resource, 'grantedTo.identifier.type.coding.0.code'),
+                'display' => $resource->grantedTo?->displayValue,
+            ])
+            ->filter(static fn (array $resource): bool => filled($resource['uuid']) && filled($resource['type']))
+            ->groupBy('type');
+
+        $models = PatientApprovalService::RESOURCE_MODELS + PatientApprovalService::CHILD_MODELS;
+        $groups = [];
+
+        foreach ($resources as $type => $items) {
+            $records = collect();
+
+            if (isset($models[$type])) {
+                $query = $models[$type]::query()
+                    ->whereIn('uuid', $items->pluck('uuid')->all());
+
+                if ($type === 'activity') {
+                    $query->whereHas('carePlan', fn (Builder $plan): Builder => $plan->where('person_id', $this->patient->id));
+                } else {
+                    $query->where('person_id', $this->patient->id);
+                }
+
+                $relations = $formatter->resourceRelations($type);
+
+                $records = $query->with($relations)->get()->keyBy('uuid');
+            }
+
+            $groups[] = [
+                'title' => __('approval.resource_types.'.$type),
+                'rows' => $items->map(function (array $resource) use ($records, $type, $models, $formatter): array {
+                    $record = $records->get($resource['uuid']);
+
+                    $name = $record !== null ? ($formatter->resourceName($record, $type) ?: $resource['display']) : $resource['display'];
+
+                    if (in_array($type, ['patient', 'person'], true) && $resource['uuid'] === $this->patient->uuid) {
+                        $name = $this->patient->fullName;
+                    }
+
+                    return [
+                        'uuid' => $resource['uuid'],
+                        'name' => $name ?: ($record === null && isset($models[$type]) ? __('approval.resource_not_synced') : '-'),
+                        'date' => $record !== null ? $formatter->resourceDate($record, $type) : '',
+                    ];
+                })->values()->all(),
+            ];
+        }
+
+        foreach ($this->approval()->grantedResourceTypes as $resourceType) {
+            $type = data_get($resourceType, 'codeableConcept.coding.0.code');
+
+            if ($type !== null) {
+                $groups[] = [
+                    'title' => __('approval.resource_types.'.$type),
+                    'rows' => [],
+                ];
+            }
+        }
+
+        return $groups;
     }
 
     public function render(): View

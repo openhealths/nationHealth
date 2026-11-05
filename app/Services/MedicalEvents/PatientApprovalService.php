@@ -35,6 +35,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -74,6 +75,116 @@ class PatientApprovalService
         'immunization' => ['completed'],
         'device' => ['active', 'inactive'],
     ];
+
+    private ?array $resourceTypeNames = null;
+
+    public function resourceRelations(string $type): array
+    {
+        return match ($type) {
+            'diagnostic_report' => ['code', 'effectivePeriod'],
+            'procedure' => ['code', 'performedPeriod'],
+            'episode_of_care' => ['period'],
+            'encounter' => ['type.coding', 'period'],
+            'specimen' => ['type.coding', 'collection.collectedPeriod'],
+            'condition', 'observation', 'clinical_impression' => ['code.coding'],
+            'immunization' => ['vaccineCode.coding'],
+            'device' => ['type.coding'],
+            'activity' => ['carePlan'],
+            default => [],
+        };
+    }
+
+    private function resourceTypeNames(): array
+    {
+        return $this->resourceTypeNames ??= [
+            'encounter' => dictionary()
+                ->basics()
+                ->byName('eHealth/encounter_types', false)
+                ->asCodeDescription()
+                ->all(),
+
+            'specimen' => dictionary()
+                ->basics()
+                ->byName('specimen_types', false)
+                ->asCodeDescription()
+                ->all(),
+        ];
+    }
+
+    public function resourceName(Model $record, string $type): ?string
+    {
+        return match ($type) {
+            'episode_of_care' => $record->name,
+            'diagnostic_report', 'procedure' => $record->code?->displayValue ?: $record->code?->value,
+            'encounter', 'specimen' => $this->resourceTypeNames()[$type][$record->type?->coding?->first()?->code]
+                ?? $record->type?->text
+                ?? $record->type?->coding?->first()?->code,
+            'care_plan' => $record->title,
+            'service_request' => $record->requestNumber,
+            'condition', 'observation', 'clinical_impression' => $record->code?->text
+                ?: $record->code?->coding?->first()?->code,
+            'activity' => $record->description,
+            'immunization' => $record->vaccineCode?->text
+                ?: $record->vaccineCode?->coding?->first()?->code,
+            'device' => $record->type?->text
+                ?: $record->type?->coding?->first()?->code,
+            default => null,
+        };
+    }
+
+    public function resourceDate(Model $record, string $type): string
+    {
+        return match ($type) {
+            'episode_of_care', 'encounter' => collect([
+                $record->period?->start,
+                $record->period?->end,
+            ])->filter()->map(fn ($date) => formatDisplayDate($date))->implode(' - '),
+
+            'diagnostic_report' => $record->effectiveDateTime
+                ? formatDisplayDate($record->effectiveDateTime)
+                : (collect([
+                    $record->effectivePeriod?->start,
+                    $record->effectivePeriod?->end,
+                ])->filter()->map(fn ($date) => formatDisplayDate($date))->implode(' - ')
+                    ?: formatDisplayDate($record->issued)),
+
+            'procedure' => $record->performedDateTime
+                ? formatDisplayDate($record->performedDateTime)
+                : collect([
+                    $record->performedPeriod?->start,
+                    $record->performedPeriod?->end,
+                ])->filter()->map(fn ($date) => formatDisplayDate($date))->implode(' - '),
+
+            'care_plan' => collect([
+                $record->periodStart,
+                $record->periodEnd,
+            ])->filter()->map(fn ($date) => formatDisplayDate($date))->implode(' - '),
+
+            'specimen' => formatDisplayDate(
+                $record->collection?->collectedDateTime
+                ?? $record->collection?->collectedPeriod?->start
+                ?? $record->receivedTime
+                ?? $record->ehealthInsertedAt
+            ),
+
+            'service_request' => formatDisplayDate($record->startedAt),
+            'condition' => formatDisplayDate($record->assertedDate ?? $record->onsetDate),
+            'observation' => formatDisplayDate($record->effectiveDateTime ?? $record->issued),
+            'activity' => formatDisplayDate($record->scheduledPeriodStart),
+            'clinical_impression' => formatDisplayDate($record->effectiveDateTime),
+            'immunization' => formatDisplayDate($record->date),
+            'device' => formatDisplayDate($record->ehealthInsertedAt),
+            default => '',
+        };
+    }
+
+    public function recordLabel(Model $record, string $type): string
+    {
+        $name = $this->resourceName($record, $type);
+        $date = $this->resourceDate($record, $type);
+
+        return ($name ?: __('approval.resource_types.'.$type)).($date !== '' ? ', '.$date : '');
+    }
 
     public static function approvalStatusAllowed(string $type, ?string $status): bool
     {
@@ -319,7 +430,12 @@ class PatientApprovalService
         $approvable = $approval->approvable;
         $patient = $approvable instanceof Person ? $approvable : $approvable->person;
 
-        $response = EHealth::approval()->cancelApproval($patient->uuid, $approval->uuid);
+        $this->cancelByUuid($patient, $approval->uuid);
+    }
+
+    public function cancelByUuid(Person $patient, string $approvalUuid): void
+    {
+        $response = EHealth::approval()->cancelApproval($patient->uuid, $approvalUuid);
         $data = $response->validate();
 
         if ($response->status() === 202) {
@@ -332,7 +448,9 @@ class PatientApprovalService
             app(EHealthJobResolver::class)->resolve($data);
         }
 
-        $approval->update(['status' => ApprovalStatus::INACTIVE->value]);
+        Approval::query()
+            ->whereUuid($approvalUuid)
+            ->update(['status' => ApprovalStatus::INACTIVE->value]);
     }
 
     private function dispatchJob(EhealthLink $link, User $user, string $token): void
