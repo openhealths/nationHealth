@@ -343,11 +343,17 @@ class CarePlanApprovals extends Component
         }
 
         try {
-            app(MedicalRequestOwnership::class)->approvalForCarePlan($this->currentCarePlan(), $oldApprovalUuid);
+            $oldApproval = app(MedicalRequestOwnership::class)
+                ->approvalForCarePlan($this->currentCarePlan(), $oldApprovalUuid)
+                ->loadMissing(['grantedTo', 'createdBy']);
+            if (Auth::user()->cannot('cancel', $oldApproval)) {
+                Session::flash('error', __('approval.messages.cancel_forbidden'));
+
+                return;
+            }
             $this->loadAuthMethods();
             $carePlan = $this->currentCarePlan();
-            $oldApproval = $carePlan->approvals()->with('grantedTo')->where('uuid', $oldApprovalUuid)->first();
-            $employeeUuid = $oldApproval?->grantedTo?->value
+            $employeeUuid = $oldApproval->grantedTo?->value
                 ?? Auth::user()?->getCarePlanWriterEmployee($carePlan->termsOfServiceCode())?->uuid;
 
             if (!$employeeUuid) {
@@ -361,7 +367,7 @@ class CarePlanApprovals extends Component
             }
             GeneralRepository::carePlan()->assertApprovalRecipient($employeeUuid, legalEntity()->id);
             try {
-                app(CarePlanApprovalService::class)->deactivate($this->patientUuid, $oldApprovalUuid);
+                app(PatientApprovalService::class)->cancel($oldApproval);
             } catch (EHealthResponseException $e) {
                 if ($e->getCode() !== 404) {
                     throw $e;
@@ -520,13 +526,23 @@ class CarePlanApprovals extends Component
 
     public function cancelApproval(string $approvalUuid): void
     {
-        $this->authorize('manage', $this->currentCarePlan());
+        $carePlan = $this->currentCarePlan();
+        if (Auth::user()->cannot('manage', $carePlan)) {
+            Session::flash('error', __('care-plan.approval_access_denied'));
+
+            return;
+        }
 
         try {
-            app(MedicalRequestOwnership::class)
-                ->approvalForCarePlan($this->currentCarePlan(), $approvalUuid);
-            app(CarePlanApprovalService::class)
-                ->deactivate($this->patientUuid, $approvalUuid);
+            $approval = app(MedicalRequestOwnership::class)
+                ->approvalForCarePlan($carePlan, $approvalUuid)
+                ->loadMissing('createdBy');
+            if (Auth::user()->cannot('cancel', $approval)) {
+                Session::flash('error', __('approval.messages.cancel_forbidden'));
+
+                return;
+            }
+            app(PatientApprovalService::class)->cancel($approval);
             Session::flash('success', __('care-plan.approval_cancelled'));
             $this->fetchApprovals();
             $this->dispatch('care-plan-approvals-changed');
