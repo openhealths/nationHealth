@@ -58,7 +58,13 @@ class EncounterForm extends BaseForm
         $conditions = $this->component->conditionForm->conditions;
 
         return [
-            'encounter.periodDate' => ['required', 'date', 'before_or_equal:today'],
+            'encounter.periodDate' => [
+                'bail',
+                'required',
+                'date_format:' . config('app.date_format'),
+                'before_or_equal:today',
+                $this->notBeforeEpisodeStart()
+            ],
             'encounter.periodStart' => [
                 'required',
                 'date_format:H:i',
@@ -358,6 +364,36 @@ class EncounterForm extends BaseForm
     }
 
     /**
+     * An encounter in an existing episode cannot take place before the day the episode started.
+     *
+     * @return Closure
+     */
+    private function notBeforeEpisodeStart(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if (empty($this->episode['id'])) {
+                return;
+            }
+
+            $episode = collect($this->component->episodes)->firstWhere('uuid', $this->episode['id']);
+            $episodeStart = data_get($episode, 'period.start');
+
+            if (empty($episodeStart)) {
+                return;
+            }
+
+            $episodeStartDate = CarbonImmutable::parse($episodeStart)->setTimezone(config('app.timezone'))->startOfDay();
+            $encounterDate = CarbonImmutable::createFromFormat(config('app.date_format'), $value)->startOfDay();
+
+            if ($encounterDate->lt($episodeStartDate)) {
+                $fail(__('validation.custom.encounter.periodDate.before_episode_start', [
+                    'date' => $episodeStartDate->format(config('app.date_format'))
+                ]));
+            }
+        };
+    }
+
+    /**
      * The encounter class has to be allowed for the type of the legal entity.
      *
      * @return Closure
@@ -458,7 +494,7 @@ class EncounterForm extends BaseForm
 
             $periodDate = $this->encounter['periodDate'] ?? '';
 
-            if (empty($periodDate)) {
+            if (!CarbonImmutable::canBeCreatedFromFormat($periodDate, config('app.date_format'))) {
                 return;
             }
 

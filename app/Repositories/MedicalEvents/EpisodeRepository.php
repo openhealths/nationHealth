@@ -226,7 +226,7 @@ class EpisodeRepository extends BaseRepository
     {
         [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
 
-        return $this->model
+        return $this->model::with('period')
             ->where($ownerColumn, $ownerId)
             ->where('uuid', $uuid)
             ->first()
