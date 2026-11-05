@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Str;
 
 class AuthenticationMethod extends Model
 {
@@ -57,6 +58,21 @@ class AuthenticationMethod extends Model
         return Attribute::make(
             get: static fn (mixed $value, array $attributes): bool => empty($attributes['ehealth_ended_at'])
                 || CarbonImmutable::parse($attributes['ehealth_ended_at'])->isFuture()
+        );
+    }
+
+    /**
+     * Phone number of the method as it is shown to the user, with only the operator code and the last two digits
+     * left open. A number stored masked already stays as it is.
+     *
+     * @return Attribute
+     */
+    protected function maskedPhoneNumber(): Attribute
+    {
+        return Attribute::make(
+            get: static fn (mixed $value, array $attributes): ?string => empty($attributes['phone_number'])
+                ? null
+                : Str::mask($attributes['phone_number'], '*', 6, -2)
         );
     }
 
