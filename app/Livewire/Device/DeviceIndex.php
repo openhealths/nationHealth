@@ -182,9 +182,7 @@ class DeviceIndex extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('device')) {
-            $this->handleResumeLogic('device');
-
+        if ($this->shouldResumeSync('device') && $this->handleResumeLogic('device')) {
             return;
         }
 

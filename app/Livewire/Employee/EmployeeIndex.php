@@ -556,6 +556,13 @@ class EmployeeIndex extends EmployeeComponent
 
                 return;
             }
+
+            // The failed batch could have been restarted by a concurrent request, so don't start a full sync over it
+            if ($this->hasRunningBatch([self::BATCH_NAME, self::DEPENDENT_BATCH_NAME])) {
+                Session::flash('error', __('forms.errors.sync_already_running'));
+
+                return;
+            }
         }
 
         $user->notify(new SyncNotification('employee', 'started'));
@@ -670,16 +677,20 @@ class EmployeeIndex extends EmployeeComponent
             if (\in_array($this->baseBatchName($batch->name), [self::BATCH_NAME, self::DEPENDENT_BATCH_NAME], true)) {
                 Log::info('Resuming Employee sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
-                legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_EMPLOYEE);
+                if ($this->restartBatch(
+                    $batch,
+                    $user,
+                    $encryptedToken,
+                    legalEntity(),
+                    fn () => legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_EMPLOYEE)
+                )) {
+                    $this->dispatch('flashMessage', [
+                        'message' => __('forms.success.sync_resumed'),
+                        'type' => 'success'
+                    ]);
 
-                $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
-
-                $this->dispatch('flashMessage', [
-                    'message' => __('forms.success.sync_resumed'),
-                    'type' => 'success'
-                ]);
-
-                return true;
+                    return true;
+                }
             }
         }
 

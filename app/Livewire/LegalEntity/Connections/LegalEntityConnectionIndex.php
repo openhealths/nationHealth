@@ -279,6 +279,13 @@ class LegalEntityConnectionIndex extends LegalEntityConnectionComponent
 
                 return;
             }
+
+            // The failed batch could have been restarted by a concurrent request, so don't start a full sync over it
+            if ($this->hasRunningBatch([self::BATCH_NAME, self::BATCH_SUBNAME])) {
+                Session::flash('error', __('forms.errors.sync_already_running'));
+
+                return;
+            }
         }
 
         if (!Repository::legalEntity()->setConnectionSyncStatus($this->legalEntity, false)) {

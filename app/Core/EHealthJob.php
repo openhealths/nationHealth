@@ -198,7 +198,16 @@ abstract class EHealthJob implements ShouldQueue
         // A revoked token (401) does not spoil the same user's new login, unlike 403 or 429 that follow the user
         $revokedToken = $exception->getCode() === 401 ? $this->getBatchToken() : null;
 
-        $this->user = $this->getUserWithActiveSession($olduser, $revokedToken);
+        // Hashes of the tokens rejected along the retry chain, so the A -> B -> A loop of rejected tokens is impossible
+        $rejectedTokenHashes = $this->batch()?->options['rejected_tokens'] ?? [];
+
+        if ($revokedToken !== null) {
+            $rejectedTokenHashes[] = hash('sha256', $revokedToken);
+        }
+
+        $rejectedTokenHashes = array_values(array_unique($rejectedTokenHashes));
+
+        $this->user = $this->getUserWithActiveSession($olduser, $revokedToken, $rejectedTokenHashes);
         echo "Retrying with new user: " . ($this->user ? $this->user->id : 'No user found') . PHP_EOL;
 
         if ($this->user) {
@@ -232,6 +241,7 @@ abstract class EHealthJob implements ShouldQueue
                 ->withOption('legal_entity_id', $this->legalEntity->id)
                 ->withOption('token', Crypt::encryptString($this->token)) // Passing the same token to the next job
                 ->withOption('user', $this->user)
+                ->withOption('rejected_tokens', $rejectedTokenHashes)
                 ->withOption('sync_entity', $this->batch()?->options['sync_entity'] ?? null)
                 ->withOption('patient_uuid', $this->batch()?->options['patient_uuid'] ?? null)
                 ->withOption('person_id', $this->batch()?->options['person_id'] ?? null)
@@ -282,14 +292,26 @@ abstract class EHealthJob implements ShouldQueue
     }
 
     /**
-     * Get the authentication token of the user's session
+     * Get the token of the session currently bound to the user, if it can serve this job.
+     *
+     * The session must belong to the legal entity of the job, must not be expired and must carry the required scope.
+     * Otherwise an empty string is returned, so a token issued for another legal entity is never used.
      *
      * @param  User  $user
      * @return string
      */
     protected function getSessionToken(User $user): string
     {
-        $session = DB::table('sessions')->where('user_id', $user->id)->first();
+        $sessionId = $user->getAttribute('session_id');
+
+        if (!$sessionId) {
+            return '';
+        }
+
+        $session = DB::table('sessions')
+            ->where('id', $sessionId)
+            ->where('user_id', $user->id)
+            ->first();
 
         if (!$session) {
             return '';
@@ -297,7 +319,19 @@ abstract class EHealthJob implements ShouldQueue
 
         $payload = unserialize(base64_decode($session->payload));
 
-        return $payload['auth_token'] ?? '';
+        if (!\is_array($payload)) {
+            return '';
+        }
+
+        $token = $payload[config('ehealth.api.oauth.bearer_token')] ?? '';
+        $scopes = $payload[config('ehealth.api.oauth.token_scopes')] ?? [];
+
+        $isValid = $token !== ''
+            && ($payload['ehealth_legal_entity_uuid'] ?? null) === $this->legalEntity->uuid
+            && (int)($payload['auth_token_expires_at'] ?? 0) > time()
+            && ($this->requiredScope() === '' || \in_array($this->requiredScope(), (array)$scopes, true));
+
+        return $isValid ? $token : '';
     }
 
     /**
@@ -348,6 +382,7 @@ abstract class EHealthJob implements ShouldQueue
      *    again and his new session holds another token than the revoked one
      * 2. User must be an employee of the specified legal entity
      * 3. User must have an active session (record exists in sessions table)
+     * 4. The session bound to the user must be issued for this legal entity (see getSessionToken())
      *
      * The query uses Eloquent's whereHas() and whereExists() methods for performance optimization:
      * - whereHas('employees'): Uses LEFT JOIN to check user-employee relationship through employees table
@@ -355,9 +390,10 @@ abstract class EHealthJob implements ShouldQueue
      *
      * @param  User  $user
      * @param  string|null  $revokedToken  The token that eHealth has rejected as invalid
+     * @param  array<int, string>  $rejectedTokenHashes  SHA-256 hashes of the tokens rejected earlier in the retry chain
      * @return User|null
      */
-    protected function getUserWithActiveSession(User $user, ?string $revokedToken = null): ?User
+    protected function getUserWithActiveSession(User $user, ?string $revokedToken = null, array $rejectedTokenHashes = []): ?User
     {
         $legalEntity = $this->legalEntity;
 
@@ -385,22 +421,22 @@ abstract class EHealthJob implements ShouldQueue
             )
             ->get();
 
-        if ($revokedToken !== null) {
-            $users = $users->reject(
-                fn (User $candidate): bool => $candidate->party_id === $user->party_id
-                    && \in_array($this->getSessionToken($candidate), ['', $revokedToken], true)
-            );
-        }
+        // Only the users whose current session may serve this job are suitable, and never with a rejected token
+        $users = $users->reject(function (User $candidate) use ($revokedToken, $rejectedTokenHashes): bool {
+            $token = $this->getSessionToken($candidate);
+
+            return $token === ''
+                || $token === $revokedToken
+                || \in_array(hash('sha256', $token), $rejectedTokenHashes, true);
+        });
 
         echo "Found " . $users->count() . " users with active sessions for legal entity {$legalEntity->id}" . PHP_EOL;
 
-        // $users here is a Collection of User models. $userKey is the key/index of the first user that has the required scope/permission
-        $userKey = empty($this->requiredScope())
-            ? $users->keys()->first()
-            : $users->search(fn (User $user) => $user->hasPermissionTo($this->requiredScope(), 'ehealth'));
-
-        // If no user found with required scope, return null
-        return $users->get($userKey);
+        // $users here is a Collection of User models. Take the first user that has the required scope/permission,
+        // or null when there is none
+        return empty($this->requiredScope())
+            ? $users->first()
+            : $users->first(fn (User $user) => $user->hasPermissionTo($this->requiredScope(), 'ehealth'));
     }
 
     /**

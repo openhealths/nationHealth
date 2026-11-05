@@ -220,11 +220,18 @@ class EmployeeRequestIndex extends EmployeeComponent
         // Try to resume previous sync if it was paused or failed
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
 
-            $this->resumeSynchronization($user, $token);
+            if ($this->resumeSynchronization($user, $token)) {
+                $user->notify(new SyncNotification('employee_request', 'resumed'));
 
-            $user->notify(new SyncNotification('employee_request', 'resumed'));
+                return;
+            }
 
-            return;
+            // The failed batch could have been restarted by a concurrent request, so don't start a full sync over it
+            if ($this->hasRunningBatch([self::BATCH_NAME, self::DEPENDENT_BATCH_NAME, 'Full Employee Requests Sync for LE: ' . legalEntity()->id])) {
+                Session::flash('error', __('forms.errors.sync_already_running'));
+
+                return;
+            }
         }
 
         // Notify start
@@ -323,9 +330,9 @@ class EmployeeRequestIndex extends EmployeeComponent
      *
      * @param  User  $user  The user instance for whom synchronization should be resumed
      * @param  string  $token  The authentication or session token used to resume the sync process
-     * @return void
+     * @return bool True if a failed batch was found and restarted
      */
-    protected function resumeSynchronization(User $user, string $token): void
+    protected function resumeSynchronization(User $user, string $token): bool
     {
         $encryptedToken = Crypt::encryptString($token);
 
@@ -339,18 +346,24 @@ class EmployeeRequestIndex extends EmployeeComponent
             if (\in_array($this->baseBatchName($batch->name), [self::BATCH_NAME, self::DEPENDENT_BATCH_NAME, $dailySyncName], true)) {
                 Log::info('Resuming EmployeeRequest sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
-                legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_EMPLOYEE_REQUEST);
+                if ($this->restartBatch(
+                    $batch,
+                    $user,
+                    $encryptedToken,
+                    legalEntity(),
+                    fn () => legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_EMPLOYEE_REQUEST)
+                )) {
+                    $this->dispatch('flashMessage', [
+                        'message' => __('forms.success.sync_resumed'),
+                        'type' => 'success'
+                    ]);
 
-                $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
-
-                $this->dispatch('flashMessage', [
-                    'message' => __('forms.success.sync_resumed'),
-                    'type' => 'success'
-                ]);
-
-                break;
+                    return true;
+                }
             }
         }
+
+        return false;
     }
 
     /**

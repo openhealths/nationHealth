@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\LegalEntity;
 
 use Throwable;
+use stdClass;
 use App\Models\User;
 use App\Enums\Status;
 use App\Enums\JobStatus;
@@ -355,6 +356,16 @@ class LegalEntityDetails extends LegalEntityComponent
             return;
         }
 
+        // The failed batch could have been restarted by a concurrent request, so don't start a manual sync over it
+        if (
+            ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value)
+            && $this->findRunningBatchesByLegalEntity(legalEntity()->id)->contains(fn (stdClass $batch): bool => $this->isFirstLoginBatch($batch))
+        ) {
+            Session::flash('error', __('forms.errors.sync_already_running'));
+
+            return;
+        }
+
         // Otherwise the failed run was a manual one that has no batch to resume, so it is simply started again
 
         $legalEntity = legalEntity();
@@ -479,22 +490,36 @@ class LegalEntityDetails extends LegalEntityComponent
         $failedBatches = $this->findFailedBatchesByLegalEntity(legalEntity()->id, 'ASC');
 
         foreach ($failedBatches as $batch) {
-            // The batches of the first login chain are named after their job, but all of them have the empty sync_entity
-            $isFirstLoginBatch = str_starts_with($batch->name, self::BATCH_NAME)
-                || app(BatchRepository::class)->find($batch->id)?->options['sync_entity'] === '';
-
-            if ($isFirstLoginBatch) {
+            if ($this->isFirstLoginBatch($batch)) {
                 Log::info('Resuming Equipment sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
-                legalEntity()?->setEntityStatus(JobStatus::PROCESSING);
-
-                $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
-
-                return true;
+                if ($this->restartBatch(
+                    $batch,
+                    $user,
+                    $encryptedToken,
+                    legalEntity(),
+                    fn () => legalEntity()?->setEntityStatus(JobStatus::PROCESSING)
+                )) {
+                    return true;
+                }
             }
         }
 
         return false;
+    }
+
+    /**
+     * Determine whether the batch belongs to the first login chain.
+     *
+     * The batches of the first login chain are named after their job, but all of them have the empty sync_entity.
+     *
+     * @param  stdClass  $batch
+     * @return bool
+     */
+    private function isFirstLoginBatch(stdClass $batch): bool
+    {
+        return str_starts_with($batch->name, self::BATCH_NAME)
+            || (app(BatchRepository::class)->find($batch->id)?->options['sync_entity'] ?? null) === '';
     }
 
     public function render()

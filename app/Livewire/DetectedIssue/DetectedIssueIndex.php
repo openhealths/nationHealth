@@ -188,9 +188,7 @@ class DetectedIssueIndex extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('detected_issue')) {
-            $this->handleResumeLogic('detected_issue');
-
+        if ($this->shouldResumeSync('detected_issue') && $this->handleResumeLogic('detected_issue')) {
             return;
         }
 

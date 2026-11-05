@@ -128,9 +128,7 @@ class EncounterIndex extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('encounter')) {
-            $this->handleResumeLogic('encounter');
-
+        if ($this->shouldResumeSync('encounter') && $this->handleResumeLogic('encounter')) {
             return;
         }
 

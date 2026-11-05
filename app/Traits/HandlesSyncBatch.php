@@ -11,8 +11,10 @@ use App\Models\User;
 use App\Notifications\SyncNotification;
 use Illuminate\Bus\Batch;
 use Illuminate\Bus\BatchRepository;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -113,25 +115,29 @@ trait HandlesSyncBatch
      * Returns true if a batch for this entity type is currently running.
      *
      * @param  string  $entityType
+     * @param  bool  $fresh  Read the running batches again instead of the result cached during the request
      * @return bool
      */
-    protected function isSyncProcessing(string $entityType): bool
+    protected function isSyncProcessing(string $entityType, bool $fresh = false): bool
     {
         $batchName = $this->getBatchName($entityType);
-        $runningBatches = once(fn () => $this->findRunningBatchesByLegalEntity(legalEntity()->id));
+        $runningBatches = $fresh
+            ? $this->findRunningBatchesByLegalEntity(legalEntity()->id)
+            : once(fn () => $this->findRunningBatchesByLegalEntity(legalEntity()->id));
 
-        return $runningBatches->where('name', $batchName . '_' . $this->uuid)->isNotEmpty();
+        return $runningBatches->contains(fn (stdClass $batch): bool => $this->isPatientBatch($batch, $batchName));
     }
 
     /**
      * Returns true and flashes an error if a sync is already running for the entity type.
      *
      * @param  string  $entityType
+     * @param  bool  $fresh  Read the running batches again instead of the result cached during the request
      * @return bool
      */
-    protected function cannotStartSync(string $entityType): bool
+    protected function cannotStartSync(string $entityType, bool $fresh = false): bool
     {
-        if ($this->isSyncProcessing($entityType)) {
+        if ($this->isSyncProcessing($entityType, $fresh)) {
             Session::flash('error', __($this->syncLangGroup($entityType) . '.messages.sync_already_running'));
 
             return true;
@@ -141,7 +147,9 @@ trait HandlesSyncBatch
     }
 
     /**
-     * Returns true if the entity sync is in a paused or failed state and this patient has a failed batch to resume.
+     * Returns true if the caller must not start a full sync: the entity sync of this patient is already running
+     * (e.g. a concurrent request has just restarted its failed batch), or it is paused or failed and has a failed batch
+     * to resume. Handle it with handleResumeLogic().
      *
      * The status is stored per legal entity, so it may be left by the sync of another patient.
      *
@@ -150,6 +158,10 @@ trait HandlesSyncBatch
      */
     protected function shouldResumeSync(string $entityType): bool
     {
+        if ($this->isSyncProcessing($entityType, fresh: true)) {
+            return true;
+        }
+
         $status = $this->getSyncStatus($entityType);
 
         return ($status === JobStatus::PAUSED->value || $status === JobStatus::FAILED->value)
@@ -164,39 +176,78 @@ trait HandlesSyncBatch
      */
     private function findFailedBatchForPatient(string $entityType): ?stdClass
     {
+        return $this->findFailedBatchesForPatient($entityType)->first();
+    }
+
+    /**
+     * Finds all failed batches of the entity type that belong to the current patient, the oldest first.
+     *
+     * @param  string  $entityType
+     * @return Collection<int, stdClass>
+     */
+    private function findFailedBatchesForPatient(string $entityType): Collection
+    {
         $batchName = $this->getBatchName($entityType);
 
-        foreach ($this->findFailedBatchesByLegalEntity(legalEntity()->id, 'ASC') as $batch) {
-            // A retried batch is named "retry_<name>" without the uuid, so it is matched by its patient_uuid option
-            $isOwnBatch = $batch->name === $batchName . '_' . $this->uuid
-                || (
-                    $this->baseBatchName($batch->name) === $batchName
-                    && $batch->name !== $batchName
-                    && (app(BatchRepository::class)->find($batch->id)?->options['patient_uuid'] ?? null) === $this->uuid
-                );
+        return $this->findFailedBatchesByLegalEntity(legalEntity()->id, 'ASC')
+            ->filter(fn (stdClass $batch): bool => $this->isPatientBatch($batch, $batchName))
+            ->values();
+    }
 
-            if ($isOwnBatch) {
-                return $batch;
-            }
+    /**
+     * Determines whether the batch is the sync of the entity type for the current patient, either failed or running.
+     *
+     * A retried batch is named "retry_<name>" without the uuid, so it is matched by its patient_uuid option.
+     *
+     * @param  stdClass  $batch
+     * @param  string  $batchName
+     * @return bool
+     */
+    private function isPatientBatch(stdClass $batch, string $batchName): bool
+    {
+        if ($batch->name === $batchName . '_' . $this->uuid) {
+            return true;
         }
 
-        return null;
+        return $this->baseBatchName($batch->name) === $batchName
+            && $batch->name !== $batchName
+            && (app(BatchRepository::class)->find($batch->id)?->options['patient_uuid'] ?? null) === $this->uuid;
     }
 
     /**
      * Restarts the failed batch for the entity type and notifies the user.
      *
      * @param  string  $entityType
-     * @return void
+     * @return bool True when the caller must not run a full sync: the batch was restarted, or the sync is already
+     *              running or being resumed by a concurrent request
      */
-    protected function handleResumeLogic(string $entityType): void
+    protected function handleResumeLogic(string $entityType): bool
     {
-        $user = Auth::user();
-        $token = Session::get(config('ehealth.api.oauth.bearer_token'));
+        // Different failed batches of the same patient must not be resumed concurrently.
+        $lock = Cache::lock('patient-sync-resume:' . legalEntity()->id . ':' . $this->uuid . ':' . $entityType, 120);
 
-        $this->resumeSynchronization($entityType, $user, $token);
-        Session::flash('success', __($this->syncLangGroup($entityType) . '.messages.sync_resume_started'));
-        $user->notify(new SyncNotification($entityType, 'resumed'));
+        if (!$lock->get()) {
+            Session::flash('error', __($this->syncLangGroup($entityType) . '.messages.sync_already_running'));
+
+            return true;
+        }
+
+        try {
+            $user = Auth::user();
+            $token = Session::get(config('ehealth.api.oauth.bearer_token'));
+
+            if (!$this->resumeSynchronization($entityType, $user, $token)) {
+                // The failed batch may already be restarted by a concurrent request, which isn't a reason to start a full sync
+                return $this->cannotStartSync($entityType, fresh: true);
+            }
+
+            Session::flash('success', __($this->syncLangGroup($entityType) . '.messages.sync_resume_started'));
+            $user->notify(new SyncNotification($entityType, 'resumed'));
+
+            return true;
+        } finally {
+            $lock->release();
+        }
     }
 
     /**
@@ -222,29 +273,42 @@ trait HandlesSyncBatch
     }
 
     /**
-     * Finds the oldest failed batch for the entity type and restarts it.
+     * Restarts the oldest failed batch of the entity type for the current patient that still has jobs to restart.
      *
      * @param  string  $entityType
      * @param  User  $user
      * @param  string  $token
-     * @return void
+     * @return bool True if the failed batch was restarted
      */
-    private function resumeSynchronization(string $entityType, User $user, string $token): void
+    private function resumeSynchronization(string $entityType, User $user, string $token): bool
     {
         $encryptedToken = Crypt::encryptString($token);
         $entityConstant = $this->getEntityConstant($entityType);
 
-        $batch = $this->findFailedBatchForPatient($entityType);
+        // An older batch may have no failed jobs left to restart, so try the next ones
+        foreach ($this->findFailedBatchesForPatient($entityType) as $batch) {
+            if ($this->isSyncProcessing($entityType, fresh: true)) {
+                return false;
+            }
 
-        if ($batch === null) {
-            return;
+            Log::info('Resuming ' . ucfirst($entityType) . ' sync batch: ' . $batch->name . ' id: ' . $batch->id);
+
+            $isRestarted = $this->restartBatch(
+                $batch,
+                $user,
+                $encryptedToken,
+                legalEntity(),
+                fn () => legalEntity()->setEntityStatus(JobStatus::PROCESSING, $entityConstant)
+            );
+
+            if ($isRestarted) {
+                $this->onSyncStatusChanged($entityType, JobStatus::PROCESSING);
+
+                return true;
+            }
         }
 
-        Log::info('Resuming ' . ucfirst($entityType) . ' sync batch: ' . $batch->name . ' id: ' . $batch->id);
-
-        legalEntity()->setEntityStatus(JobStatus::PROCESSING, $entityConstant);
-        $this->onSyncStatusChanged($entityType, JobStatus::PROCESSING);
-        $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
+        return false;
     }
 
     /**

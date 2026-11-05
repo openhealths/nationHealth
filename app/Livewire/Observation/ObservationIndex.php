@@ -178,9 +178,7 @@ class ObservationIndex extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('observation')) {
-            $this->handleResumeLogic('observation');
-
+        if ($this->shouldResumeSync('observation') && $this->handleResumeLogic('observation')) {
             return;
         }
 

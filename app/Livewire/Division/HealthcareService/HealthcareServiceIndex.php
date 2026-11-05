@@ -245,13 +245,20 @@ class HealthcareServiceIndex extends Component
 
         // Try to resume previous sync if it was paused or failed
         if ($this->syncStatus === JobStatus::PAUSED->value || $this->syncStatus === JobStatus::FAILED->value) {
-            $this->resumeSynchronization($user, $token);
+            if ($this->resumeSynchronization($user, $token)) {
+                Session::flash('success', __('forms.success.sync_resumed'));
 
-            Session::flash('success', __('forms.success.sync_resumed'));
+                $user->notify(new SyncNotification('hcs', 'resumed'));
 
-            $user->notify(new SyncNotification('hcs', 'resumed'));
+                return;
+            }
 
-            return;
+            // The failed batch could have been restarted by a concurrent request, so don't start a full sync over it
+            if ($this->hasRunningBatch([self::BATCH_NAME])) {
+                Session::flash('error', __('forms.errors.sync_already_running'));
+
+                return;
+            }
         }
 
         try {
@@ -303,9 +310,9 @@ class HealthcareServiceIndex extends Component
      *
      * @param  User  $user  The user instance for whom synchronization should be resumed
      * @param  string  $token  The authentication or session token used to resume the sync process
-     * @return void
+     * @return bool True if a failed batch was found and restarted
      */
-    protected function resumeSynchronization(User $user, string $token): void
+    protected function resumeSynchronization(User $user, string $token): bool
     {
         $encryptedToken = Crypt::encryptString($token);
 
@@ -316,13 +323,19 @@ class HealthcareServiceIndex extends Component
             if ($this->baseBatchName($batch->name) === self::BATCH_NAME) {
                 Log::info('Resuming Division sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
-                legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_HEALTHCARE_SERVICE);
-
-                $this->restartBatch($batch, $user, $encryptedToken, legalEntity());
-
-                break;
+                if ($this->restartBatch(
+                    $batch,
+                    $user,
+                    $encryptedToken,
+                    legalEntity(),
+                    fn () => legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_HEALTHCARE_SERVICE)
+                )) {
+                    return true;
+                }
             }
         }
+
+        return false;
     }
 
     #[Computed]

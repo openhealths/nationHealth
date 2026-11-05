@@ -197,9 +197,7 @@ class PatientSpecimens extends BasePatientComponent
             return;
         }
 
-        if ($this->shouldResumeSync('specimen')) {
-            $this->handleResumeLogic('specimen');
-
+        if ($this->shouldResumeSync('specimen') && $this->handleResumeLogic('specimen')) {
             return;
         }
 
