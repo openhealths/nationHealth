@@ -98,18 +98,17 @@
                     @foreach (['started_at' => 'start', 'ended_at' => 'end'] as $field => $period)
                         <div class="grid grid-cols-1 gap-6">
                             <div class="form-group">
-                                <div class="datepicker-wrapper" wire:key="care-plan-referral-date-{{ $field }}" x-data>
+                                <div class="datepicker-wrapper" wire:key="care-plan-referral-date-{{ $field }}">
                                     <input
                                         type="text"
                                         id="carePlanReferral-{{ $field }}"
-                                        wire:model.lazy="referralForm.{{ $field }}"
+                                        wire:model="referralForm.{{ $field }}"
                                         class="datepicker-input with-leading-icon input peer @error('referralForm.'.$field) input-error @enderror"
                                         placeholder="{{ __('referrals.period_fields.date_placeholder') }}"
                                         autocomplete="off"
                                         datepicker-autohide
                                         datepicker-format="{{ frontendDateFormat() }}"
                                         datepicker-min-date="{{ today()->format(config('app.date_format')) }}"
-                                        x-on:change-date.camel="$el.dispatchEvent(new Event('change', { bubbles: true }))"
                                     />
                                     <label for="carePlanReferral-{{ $field }}" class="wrapped-label required">
                                         {{ $period === 'start' ? __('forms.start_date') : __('forms.end_date') }}
@@ -121,7 +120,7 @@
                                 <input
                                     id="carePlanReferral-{{ $period }}Time"
                                     type="text"
-                                    wire:model.blur="referralForm.{{ $period }}_time"
+                                    wire:model="referralForm.{{ $period }}_time"
                                     class="timepicker-uk input peer"
                                     autocomplete="off"
                                     placeholder="{{ __('referrals.period_fields.time_placeholder') }}"
@@ -180,11 +179,11 @@
                         <div class="form-group group">
                             <label class="label">{{ __('care-plan.priority') }}*</label>
                             <select class="input-select peer w-full" wire:model="referralForm.priority">
-                                <option value="routine">{{ __('care-plan.priority_options.routine') }}</option>
-                                <option value="urgent">{{ __('care-plan.priority_options.urgent') }}</option>
-                                <option value="asap">{{ __('care-plan.priority_options.asap') }}</option>
-                                <option value="stat">{{ __('care-plan.priority_options.stat') }}</option>
+                                @foreach ($this->referralPriorityOptions as $code => $description)
+                                    <option value="{{ $code }}">{{ $description }}</option>
+                                @endforeach
                             </select>
+                            <x-input-error for="referralForm.priority" />
                         </div>
                     </div>
 
@@ -204,11 +203,11 @@
                         <div class="form-group group">
                             <label class="label">{{ __('care-plan.priority') }}*</label>
                             <select class="input-select peer w-full" wire:model="referralForm.priority">
-                                <option value="routine">{{ __('care-plan.priority_options.routine') }}</option>
-                                <option value="urgent">{{ __('care-plan.priority_options.urgent') }}</option>
-                                <option value="asap">{{ __('care-plan.priority_options.asap') }}</option>
-                                <option value="stat">{{ __('care-plan.priority_options.stat') }}</option>
+                                @foreach ($this->referralPriorityOptions as $code => $description)
+                                    <option value="{{ $code }}">{{ $description }}</option>
+                                @endforeach
                             </select>
+                            <x-input-error for="referralForm.priority" />
                         </div>
                     </div>
                 @endif
@@ -324,15 +323,29 @@
                 <button type="button" class="button-minor" @click="showReferralDrawer = false">
                     {{ __('forms.cancel') }}
                 </button>
+                @if (($referralForm['kind'] ?? '') === 'service_request')
+                    <button
+                        type="button"
+                        class="button-primary"
+                        wire:click="saveReferralDraft"
+                        wire:loading.attr="disabled"
+                        wire:target="saveReferralDraft,validateReferral"
+                        @disabled((bool) $referralWarningMessage)
+                    >
+                        {{ __('forms.save') }}
+                    </button>
+                @endif
                 <button
                     type="submit"
                     class="button-primary"
+                    wire:loading.attr="disabled"
+                    wire:target="saveReferralDraft,validateReferral"
                     @if ($referralWarningMessage) disabled class="button-primary cursor-not-allowed opacity-50" @endif
                 >
                     {{
                         ($referralForm['kind'] ?? '') === 'device_request'
                         ? __('care-plan.submit_device_eprescription')
-                        : __('care-plan.submit_referral')
+                        : __('forms.save_and_sign')
                     }}
                 </button>
             </div>

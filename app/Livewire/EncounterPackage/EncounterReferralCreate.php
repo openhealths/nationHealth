@@ -5,11 +5,45 @@ declare(strict_types=1);
 namespace App\Livewire\EncounterPackage;
 
 use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
+use App\Enums\Person\ServiceRequestStatus;
+use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\Person\Person;
+use App\Models\Preperson;
+use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\InformWith;
+use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
+use App\Services\MedicalEvents\MedicalRequestOwnership;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 
 class EncounterReferralCreate extends EncounterDocumentCreate
 {
     use ManagesEncounterReferrals;
+
+    #[Locked]
+    public ?string $submissionId = null;
+
+    #[Locked]
+    public ?int $referralId = null;
+
+    #[Locked]
+    public bool $referralReadOnly = false;
+
+    #[Locked]
+    public bool $prepareReferralForSigning = false;
+
+    #[Locked]
+    public array $referralSummary = [];
+
+    public function mount(LegalEntity $legalEntity, ?Person $person = null, ?Preperson $preperson = null, ?Encounter $encounter = null, ?int $referral = null): void
+    {
+        $this->referralId = $referral;
+        parent::mount($legalEntity, $person, $preperson, $encounter);
+    }
 
     protected function documentAbility(): string
     {
@@ -18,44 +52,84 @@ class EncounterReferralCreate extends EncounterDocumentCreate
 
     protected function initializeComponent(): void
     {
+        $referralId = $this->referralId;
+        $submissionId = $referralId !== null ? (string) $referralId : request()->query('submission');
         $this->openEncounterReferralDrawer();
-        $submissionId = request()->query('submission');
-        if (!is_string($submissionId) || (!ctype_digit($submissionId) && !\Illuminate\Support\Str::isUuid($submissionId))) {
+        $this->referralId = $referralId;
+        if (!is_string($submissionId) || (!ctype_digit($submissionId) && !Str::isUuid($submissionId))) {
             return;
         }
         $encounter = $this->resolveEncounterModelForStandalone();
         $submissionUuid = ctype_digit($submissionId)
-            ? \App\Repositories\MedicalEvents\Repository::serviceRequest()->findForPerson((int) $submissionId, (int) $this->personId)->uuid
+            ? Repository::serviceRequest()->findForPerson((int) $submissionId, (int) $this->personId)->uuid
             : $submissionId;
-        $record = app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)->serviceForEncounter($submissionUuid, $encounter);
-        $resource = \App\Repositories\MedicalEvents\Repository::serviceRequest()->getResource($record);
-        $fields = (new \App\Services\MedicalEvents\Mappers\ServiceRequestMapper())->fromFhir($resource);
+        $record = app(MedicalRequestOwnership::class)->serviceForEncounter($submissionUuid, $encounter);
+        $resource = Repository::serviceRequest()->getResource($record);
+        $fields = (new ServiceRequestMapper())->fromFhir($resource);
         foreach (array_keys($this->encounterReferralForm) as $field) {
             if (array_key_exists($field, $fields)) {
                 $this->encounterReferralForm[$field] = $fields[$field] ?? $this->encounterReferralForm[$field];
             }
         }
+        $this->encounterReferralForm['program_id'] = $fields['program_id'] ?? '';
         $authMethodId = data_get($resource, 'informWith.authMethodId');
         $authMethod = collect($this->encounterReferralAuthMethods)->first(
             static fn (array $method): bool => ($method['uuid'] ?? null) === $authMethodId
         );
         $this->encounterReferralForm['inform_with'] = $authMethod !== null
-            ? \App\Services\MedicalEvents\InformWith::formValue($authMethod)
+            ? InformWith::formValue($authMethod)
             : (string) $authMethodId;
         foreach (['started_at' => 'start_time', 'ended_at' => 'end_time'] as $dateField => $timeField) {
             if (!empty($fields[$dateField])) {
-                $date = \Carbon\CarbonImmutable::parse($fields[$dateField])->setTimezone(config('app.timezone'));
+                $date = CarbonImmutable::parse($fields[$dateField])->setTimezone(config('app.timezone'));
                 $this->encounterReferralForm[$dateField] = $date->format('d.m.Y');
                 $this->encounterReferralForm[$timeField] = $date->format('H:i');
             }
         }
+        $service = dictionary()->services()->flattened()->firstWhere('id', $fields['service_id']);
+        $this->encounterReferralServiceType = $fields['service_type'] ?? 'service';
         $this->encounterReferralSelectedService = [
             'id' => $fields['service_id'],
-            'code' => $fields['service_id'],
-            'name' => data_get($resource, 'code.display', __('encounters.service')),
+            'code' => $service['code'] ?? $fields['service_id'],
+            'name' => $service['name'] ?? (data_get($resource, 'code.displayValue') ?? data_get($resource, 'code.display', __('encounters.service'))),
+            'type' => $this->encounterReferralServiceType,
         ];
         $this->encounterReferralRequestIdToSign = $record->uuid;
+        $this->submissionId = (string) $record->id;
+        $this->referralId = (int) $record->id;
+        $this->referralReadOnly = !in_array(ServiceRequestStatus::resolve((string) $record->status), [ServiceRequestStatus::DRAFT, ServiceRequestStatus::NEW], true);
+        if ($this->referralReadOnly) {
+            $this->referralSummary = ['status' => ServiceRequestStatus::labelFor((string) $record->status), 'number' => $record->requestNumber];
+
+            return;
+        }
         $this->checkEncounterReferralSubmission();
+        if ($this->encounterReferralRequestIdToSign === null) {
+            return;
+        }
+        $this->prepareReferralForSigning = session()->pull('encounter_referral_prepare_signature.'.$record->id, false)
+            && empty($this->encounterReferralSubmission['status']);
+        if (!$this->prepareReferralForSigning && $record->status === 'draft' && empty($this->encounterReferralSubmission['status'])
+            && !session()->has('success') && !session()->has('info')
+            && !session()->has('error') && !session()->has('warning')) {
+            $start = $record->startedAt;
+            if ($start !== null && $start->isPast()) {
+                session()->flash('warning', __('referrals.draft_start_in_past', [
+                    'start' => $start->format('d.m.Y H:i'),
+                ]));
+            } else {
+                session()->flash('info', __('referrals.draft_found_for_signing'));
+            }
+        }
+    }
+
+    public function prepareSavedReferralForSigning(): void
+    {
+        if (!$this->prepareReferralForSigning || $this->referralId === null) {
+            return;
+        }
+        $this->prepareReferralForSigning = false;
+        $this->validateEncounterReferral();
     }
 
     public function sign(): void
@@ -65,17 +139,48 @@ class EncounterReferralCreate extends EncounterDocumentCreate
         }
     }
 
+    protected function afterEncounterReferralDraftChanged(): void
+    {
+        $record = $this->encounterReferralRequestIdToSign !== null
+            ? Repository::serviceRequest()->findByUuid($this->encounterReferralRequestIdToSign)
+            : null;
+        $this->submissionId = $record === null ? null : (string) $record->id;
+        if ($record === null) {
+            $this->referralId = null;
+        }
+    }
+
+    protected function afterEncounterReferralDraftSaved(bool $sign): bool
+    {
+        if ($this->referralId !== null || $this->submissionId === null) {
+            return false;
+        }
+        $this->referralId = (int) $this->submissionId;
+        if ($sign) {
+            session()->flash('success', __('referrals.draft_saved'));
+            session()->flash('encounter_referral_prepare_signature.'.$this->submissionId, true);
+        }
+        $this->redirectToDraft();
+
+        return true;
+    }
+
     protected function afterEncounterReferralSubmitted(): void
     {
-        $this->redirectRoute('encounter.referral.create', [
+        $this->redirectToDraft();
+    }
+
+    private function redirectToDraft(): void
+    {
+        $this->redirectRoute('encounter.referral.edit', [
             'legalEntity' => $this->legalEntityId,
             'person' => $this->personId,
             'encounter' => $this->encounterId,
-            'submission' => \App\Repositories\MedicalEvents\Repository::serviceRequest()->findByUuid($this->encounterReferralRequestIdToSign)?->id,
+            'referral' => $this->submissionId,
         ], navigate: true);
     }
 
-    protected function afterEncounterReferralSigned(): void
+    protected function afterEncounterReferralSigned(ServiceRequestRequest $record): void
     {
         $this->returnToEncounter();
     }

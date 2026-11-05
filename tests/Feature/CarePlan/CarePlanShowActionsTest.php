@@ -50,7 +50,10 @@ class CarePlanShowActionsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockBasicDictionaries();
+        $this->mockBasicDictionaries([
+            'SERVICE_REQUEST_PRIORITY' => ['routine' => 'Планове', 'urgent' => 'Ургентне'],
+            'device_request_priority' => ['routine' => 'Плановий', 'urgent' => 'Ургентний', 'forced' => 'Примусовий'],
+        ]);
 
         config(['cipher.api.domain' => 'https://cipher.invalid']);
         \Illuminate\Support\Facades\Cache::put('knedp_certificate_authority', [], 60);
@@ -692,6 +695,8 @@ class CarePlanShowActionsTest extends TestCase
         ]);
         $lifecycle->shouldReceive('buildSignDbData')->andReturn([
             'uuid' => $request->uuid, 'service_id' => (string) Str::uuid(),
+            'started_at' => now()->addMinutes(30)->toIso8601String(),
+            'ended_at' => now()->addDay()->toIso8601String(),
         ]);
         $this->mock(\App\Services\SignatureService::class)->shouldReceive('signData')->once()->andReturn('synthetic-signature');
         $repository = $this->mock(\App\Repositories\MedicalEvents\ServiceRequestRequestRepository::class);
@@ -909,6 +914,42 @@ class CarePlanShowActionsTest extends TestCase
         $this->assertSame('service_group', data_get($groupResource, 'detail.productReference.identifier.type.coding.0.code'));
     }
 
+    public function test_service_activity_save_and_prepare_signature_keep_the_created_identity(): void
+    {
+        $this->actingAs($this->user);
+        $groupId = (string) Str::uuid();
+        $serviceId = (string) Str::uuid();
+        $this->cacheServicePickerCatalog($groupId, $serviceId);
+        $plan = $this->makeSignedNewPlan();
+        $this->grantCarePlanWriteApproval($plan, $this->employee);
+
+        $component = Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
+            ->call('initActivityForm', 'service_request')
+            ->call('selectCarePlanServiceFromCatalog', ['id' => $serviceId])
+            ->call('saveActivity')->assertHasNoErrors();
+        $activityId = $component->get('activityForm.id');
+        $this->assertNotNull($activityId);
+        $activity = \App\Models\CarePlanActivity::findOrFail($activityId);
+        $uuid = $activity->uuid;
+
+        $component->set('activityForm.description', 'Updated before signing')
+            ->call('saveActivityAndSign')->assertHasNoErrors()
+            ->assertSet('activityForm.id', $activityId)
+            ->set('showSignatureModal', false)
+            ->set('activityForm.description', 'Updated after closing KEP')
+            ->call('saveActivity')->assertHasNoErrors()
+            ->assertSet('activityForm.id', $activityId);
+        $this->assertSame(1, \App\Models\CarePlanActivity::whereCarePlanId($plan->id)->count());
+        $this->assertSame($uuid, $activity->fresh()->uuid);
+        $this->assertSame('Updated after closing KEP', app(\App\Repositories\CarePlanActivityRepository::class)->getResource($activityId)['detail']['description']);
+
+        $component->call('initActivityForm', 'service_request')->assertSet('activityForm.id', null)
+            ->call('selectCarePlanServiceFromCatalog', ['id' => $serviceId])
+            ->call('saveActivity')->assertHasNoErrors();
+        $this->assertNotSame($activityId, $component->get('activityForm.id'));
+        $this->assertSame(2, \App\Models\CarePlanActivity::whereCarePlanId($plan->id)->count());
+    }
+
     public function test_active_plan_without_write_approval_cannot_open_status_actions(): void
     {
         $this->actingAs($this->user);
@@ -949,7 +990,7 @@ class CarePlanShowActionsTest extends TestCase
             'laboratory_procedure' => 'Лабораторні процедури', 'procedure' => 'Процедури',
         ], 'eHealth/SNOMED/service_request_categories' => [
             'laboratory_procedure' => 'Лабораторні дослідження', 'procedure' => 'Процедури',
-        ]]);
+        ], 'SERVICE_REQUEST_PRIORITY' => ['routine' => 'Планове', 'urgent' => 'Ургентне']]);
         \Illuminate\Support\Facades\Cache::put('dictionaries.service', [[
             'id' => $groupId, 'code' => 'GROUP', 'name' => 'Група послуг',
             'is_active' => true, 'request_allowed' => $requestAllowed,
@@ -986,6 +1027,83 @@ class CarePlanShowActionsTest extends TestCase
             ->assertSeeHtml('wire:model="referralForm.category"')
             ->set('referralForm.category', 'invented')->call('validateReferral')
             ->assertHasErrors('referralForm.category');
+    }
+
+    #[DataProvider('referralPages')]
+    public function test_referral_pages_save_the_same_local_draft_without_ehealth_and_then_prepare_signing(string $page): void
+    {
+        $this->actingAs($this->user);
+        $groupId = (string) Str::uuid();
+        $this->cacheServicePickerCatalog($groupId, (string) Str::uuid());
+        $plan = $this->makeSignedNewPlan();
+        $this->grantCarePlanWriteApproval($plan, $this->employee);
+        $activity = $this->createFhirCarePlanActivity([
+            'care_plan_id' => $plan->id, 'author_id' => $this->employee->id,
+            'kind' => 'service_request', 'status' => 'scheduled', 'program' => (string) Str::uuid(),
+            'product_reference' => $groupId, 'product_type' => 'service_group',
+            'quantity' => 3, 'quantity_system' => 'SERVICE_UNIT', 'quantity_code' => 'PIECE',
+        ]);
+        $this->mock(\App\Services\MedicalEvents\CarePlanActivityEHealthGuard::class)
+            ->shouldReceive('assertRegisteredInEHealth')->once()->andReturnNull();
+        $lifecycle = Mockery::mock(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class, [
+            app(\App\Services\MedicalEvents\EHealthJobResolver::class),
+        ])->makePartial();
+        $this->instance(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class, $lifecycle);
+        $api = $this->mock(\App\Classes\eHealth\Api\Patient\ServiceRequest::class);
+        $api->shouldNotReceive('createSigned');
+        $parameters = ['carePlan' => $plan];
+        if ($page !== CarePlanShow::class) {
+            $parameters['activity'] = $activity;
+        }
+        $component = Livewire::test($page, $parameters)->call('initReferralForm', $activity->id)
+            ->assertSeeHtml('wire:click="saveReferralDraft"')
+            ->set('referralForm.category', 'laboratory_procedure')
+            ->call('saveReferralDraft')->assertHasNoErrors()->assertSet('showSignatureModal', false)
+            ->assertSee(__('referrals.draft_saved'));
+        $uuid = $component->get('referralRequestIdToSign');
+        $component->set('referralForm.note', 'Local edit')->call('saveReferralDraft')->assertHasNoErrors()
+            ->assertSet('referralRequestIdToSign', $uuid)->assertSet('showSignatureModal', false);
+        $api->shouldNotHaveReceived('prequalify');
+        $lifecycle->shouldNotHaveReceived('trySyncDraftFromEHealth');
+        $record = \App\Models\MedicalEvents\Sql\ServiceRequestRequest::whereUuid($uuid)->sole();
+        $this->assertSame('draft', $record->status);
+        $this->assertSame('Local edit', $record->note);
+        $this->assertSame(1, \App\Models\MedicalEvents\Sql\ServiceRequestRequest::wherePersonId($this->person->id)->count());
+
+        $lifecycle->shouldReceive('trySyncDraftFromEHealth')->twice()->andReturnFalse();
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('getData')->andReturn(['status' => 'VALID']);
+        $api->shouldReceive('prequalify')->once()->andReturn($response);
+        $component->call('validateReferral')->assertHasNoErrors()->assertSet('showSignatureModal', true)
+            ->assertSet('referralRequestIdToSign', $uuid);
+
+        \App\Repositories\MedicalEvents\Repository::serviceRequest()->beginSubmission($record, ['status' => 'active']);
+        $component->set('showSignatureModal', false)->set('referralForm.note', 'Must not overwrite pending');
+        foreach (['saveReferralDraft', 'validateReferral'] as $action) {
+            $component->call($action)->assertHasErrors('submission')->assertSet('showSignatureModal', false)
+                ->assertSet('showReferralDrawer', true)->assertSee(__('care-plan.submission_pending'));
+        }
+        $this->assertSame('Local edit', $record->fresh()->note);
+    }
+
+    public static function referralPages(): array
+    {
+        return [
+            'plan' => [CarePlanShow::class],
+            'activity' => [\App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow::class],
+        ];
+    }
+
+    public function test_local_referral_save_is_denied_without_current_patient_access(): void
+    {
+        $this->actingAs($this->user);
+        $plan = $this->makeSignedNewPlan();
+        $lifecycle = $this->mock(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class);
+        $lifecycle->shouldNotReceive('createCarePlanDraft');
+        Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
+            ->call('saveReferralDraft')->assertSet('showSignatureModal', false)
+            ->assertSee(__('care-plan.policy.manage_activities_denied'));
+        $this->assertDatabaseCount('service_request_requests', 0);
     }
 
     public function test_active_group_can_be_prescribed_without_permission_to_issue_a_referral(): void

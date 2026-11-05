@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
+use App\Casts\UtcDateTimeCast;
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
@@ -65,8 +66,8 @@ class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToE
     ];
 
     protected $casts = [
-        'started_at' => 'datetime',
-        'ended_at' => 'datetime',
+        'started_at' => UtcDateTimeCast::class,
+        'ended_at' => UtcDateTimeCast::class,
         'quantity' => 'decimal:10',
 
         'details_synced_at' => 'datetime',

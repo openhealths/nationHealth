@@ -20,6 +20,14 @@ use Tests\TestCase;
 
 class EncounterReferralFlowTest extends TestCase
 {
+    use \Tests\Concerns\MocksBasicDictionaries;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->mockBasicDictionaries(['SERVICE_REQUEST_PRIORITY' => ['routine' => 'Планове', 'urgent' => 'Ургентне']]);
+    }
+
     public function testFinishedEncounterOpensAndInitializesReferralDrawer(): void
     {
         $component = $this->finishedEncounterComponent();
@@ -77,14 +85,17 @@ class EncounterReferralFlowTest extends TestCase
         $lifecycle = Mockery::mock(ReferralRequestLifecycleService::class);
         $lifecycle->shouldReceive('resolveEncounterEmployeeContext')->once()
             ->with($component->encounter, null)->andReturn($employeeContext);
-        $lifecycle->shouldReceive('createEncounterDraft')->once()->with(
+        $lifecycle->shouldReceive('createEncounterDraft')->once()
+            ->with($component->encounter, Mockery::type('array'), $employeeContext, null)
+            ->andReturn('11111111-2222-4333-8444-555555555555');
+        $lifecycle->shouldReceive('prepareEncounterDraftForSigning')->once()->with(
             $component->encounter,
             Mockery::on(static fn (array $formData): bool =>
                 $formData['service_id'] === 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
                 && $formData['kind'] === 'service_request'
                 && $formData['program_id'] === null),
-            1.0,
-            $employeeContext
+            $employeeContext,
+            '11111111-2222-4333-8444-555555555555'
         )->andReturn('11111111-2222-4333-8444-555555555555');
         $this->instance(ReferralRequestLifecycleService::class, $lifecycle);
 
@@ -101,7 +112,7 @@ class EncounterReferralFlowTest extends TestCase
         $component = $this->finishedEncounterComponent();
         $component->openEncounterReferralDrawer();
         $lifecycle = Mockery::mock(ReferralRequestLifecycleService::class);
-        $lifecycle->shouldNotReceive('createEncounterDraft');
+        $lifecycle->shouldNotReceive('createEncounterDraft', 'prepareEncounterDraftForSigning');
         $this->instance(ReferralRequestLifecycleService::class, $lifecycle);
 
         try {
@@ -125,6 +136,7 @@ class EncounterReferralFlowTest extends TestCase
         $lifecycle = Mockery::mock(ReferralRequestLifecycleService::class);
         $lifecycle->shouldReceive('resolveEncounterEmployeeContext')->once()->andReturn([]);
         $lifecycle->shouldReceive('createEncounterDraft')->once()->andThrow(new RuntimeException('Draft failed'));
+        $lifecycle->shouldNotReceive('prepareEncounterDraftForSigning');
         $this->instance(ReferralRequestLifecycleService::class, $lifecycle);
 
         $component->validateEncounterReferral();

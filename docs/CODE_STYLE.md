@@ -15,7 +15,23 @@ Conventions for contributors. Link to a specific rule from code review when need
 - Import PHP classes with `use` instead of repeating fully qualified names at call sites.
 - Use explicit parentheses for chained `??` fallbacks and nested conditional expressions.
 
+## Class imports
+
+Import classes with `use` and use their short names in code and type declarations,
+including exceptions, static calls and `::class` references. Do not write fully
+qualified class names inline. Resolve name collisions with explicit aliases.
+
 ## Repositories
+
+Access repositories through the existing static `Repository::...()` entry points.
+Use `App\Repositories\Repository` as `Repository` for general repositories, for
+example `Repository::carePlan()`; do not alias it as `BaseRepository`. When both
+entry points are needed, import the medical-event entry point as
+`App\Repositories\MedicalEvents\Repository as MedicalEventsRepository`.
+A file using only medical-event repositories may import their entry point as
+`Repository`. Do not instantiate or resolve individual repositories at call sites
+with `new`, `app()` or `resolve()`. Keep container resolution inside the entry
+points so test bindings continue to work.
 
 Keep reusable database lookup and selection logic in repositories or model scopes.
 Livewire components and their traits should delegate these lookups to the repository.
@@ -36,6 +52,38 @@ support for underlying exceptions unless a caller passes them.
 Keep database lookups and state checks in the repository.
 
 ## Livewire
+
+### User feedback
+
+For action success, error, warning, and info messages, use Laravel session flash
+and the existing `x-message` component. Follow the surrounding PHP convention:
+
+```php
+Session::flash('success', __('referrals.draft_saved'));
+session()->flash('error', __('care-plan.document_context_unavailable'));
+```
+
+Existing wrappers such as `flashUserError()` are appropriate when they delegate
+to session flash. Keep messages in translations and do not flash from repositories.
+Do not use notification dispatch/browser events, custom JavaScript toasts, or a
+redirect/reload solely to display feedback.
+
+For feedback in the same Livewire response, use the established consumer:
+
+```blade
+<livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
+```
+
+When adding this consumer to a patient page, set `:showLegacyMessages="false"`
+on `x-layouts.patient` to avoid duplicate consumers. Inspect the current component
+and layout first; reuse their message consumption and refresh behavior. Flash
+once when an action changes state, not on every poll/render. Report asynchronous
+success only once the required result is confirmed.
+
+Keep field errors visible in the relevant form. Keep the KEP modal open when
+validation fails on its signing fields. If a service raises a validation error
+whose key is not displayed in the form, also show the refusal through session
+flash. Verification must check user-visible feedback, not just `assertHasErrors()`.
 
 ### Authorization
 
@@ -250,14 +298,6 @@ When an element has text content (or a Blade echo) and its attributes fit on a s
        class="label"
 >{{ __('healthcare-services.providing_condition') }}</label>
 ```
-
-## Repositories
-
-Access repositories through the static `Repository::...()` entry points, rather
-than `app(SomeRepository::class)`. Use `App\Repositories\Repository` for general
-repositories and `App\Repositories\MedicalEvents\Repository` for medical events;
-alias one import when a file needs both. Keep container resolution inside these
-entry points so test bindings continue to work.
 
 ## Dictionary choices
 

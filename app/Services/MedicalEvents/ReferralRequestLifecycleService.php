@@ -6,10 +6,13 @@ namespace App\Services\MedicalEvents;
 
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
+use App\Core\Arr;
 use App\Enums\Person\DeviceRequestStatus;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Jobs\RemoteEHealthLinksProcessing;
+use App\Livewire\Referral\Forms\ServiceRequestForm;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
@@ -19,8 +22,16 @@ use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Concerns\ResolvesEmployeeContext;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
+use Carbon\Carbon;
+use DateTimeInterface;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
+use Picqer\Barcode\BarcodeGeneratorPNG;
+use RuntimeException;
+use Throwable;
 
 class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 {
@@ -55,13 +66,13 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
      * @param  array<string, mixed>  $formData
      * @param  array<string, int|string|null>  $employeeContext
      */
-    public function createCarePlanDraft(CarePlan $carePlan, array $formData, float $qty, array $employeeContext): string
+    public function createCarePlanDraft(CarePlan $carePlan, array $formData, float $qty, array $employeeContext, bool $prequalify = true): string
     {
         $activity = Repository::serviceRequest()->activityForDraft((int) $formData['activity_id'], (int) $carePlan->id, (int) $carePlan->personId);
 
         $resolvedKind = $activity->resolvedKind();
         if (!in_array($resolvedKind, ['service_request', 'device_request'], true)) {
-            throw new \InvalidArgumentException(__('care-plan.referral_wrong_activity_kind'));
+            throw new InvalidArgumentException(__('care-plan.referral_wrong_activity_kind'));
         }
 
         $formData['kind'] = $resolvedKind;
@@ -70,7 +81,10 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             ? Repository::serviceRequest()->findDraftByActivity((string) $activity->uuid)
             : null;
         if ($existingDraft && (int) $existingDraft->personId !== (int) $carePlan->personId) {
-            throw new \InvalidArgumentException(__('care-plan.document_context_unavailable'));
+            throw new InvalidArgumentException(__('care-plan.document_context_unavailable'));
+        }
+        if ($existingDraft !== null) {
+            $this->assertDraftEditable($existingDraft);
         }
 
         app(ActivityRemainingQuantityGuard::class)->assertCanIssue(
@@ -126,7 +140,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 
             $mapper = Fhir::serviceRequest();
 
-            if (!empty($dbData['program_id'])) {
+            if ($prequalify && !empty($dbData['program_id'])) {
                 $prequalifyPayload = $mapper->toPrequalifyPayload(
                     $dbData,
                     $uuids,
@@ -138,7 +152,13 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
                 );
             }
 
-            $this->saveServiceRequest($dbData, $carePlan->personId, $uuids + ['care_plan_uuid' => $carePlan->uuid]);
+            DB::transaction(function () use ($existingDraft, $dbData, $carePlan, $uuids): void {
+                if ($existingDraft !== null) {
+                    $draft = ServiceRequestRequest::whereKey($existingDraft->id)->lockForUpdate()->firstOrFail();
+                    $this->assertDraftEditable($draft);
+                }
+                $this->saveServiceRequest($dbData, $carePlan->personId, $uuids + ['care_plan_uuid' => $carePlan->uuid]);
+            });
 
             return $dbData['uuid'];
         }
@@ -157,7 +177,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 
         // PreQualify schema requires $.programs; Create Device Request allows optional program.
         // Mirror service_request: only prequalify when a medical program is present.
-        if (!empty($dbData['program_id'])) {
+        if ($prequalify && !empty($dbData['program_id'])) {
             $mapper = Fhir::deviceRequest();
             $prequalifyPayload = $mapper->toPrequalifyPayload(
                 $dbData,
@@ -173,18 +193,84 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         return $this->persistLocalDraft($dbData, $carePlan->personId, 'device_request');
     }
 
-    public function createEncounterDraft(\App\Models\MedicalEvents\Sql\Encounter $encounter, array $formData, float $qty, array $employeeContext): string
+    public function createEncounterDraft(Encounter $encounter, array $formData, array $employeeContext, ?string $draftUuid = null): string
+    {
+        return $this->saveEncounterDraft($encounter, $formData, $employeeContext, $draftUuid, prequalify: false);
+    }
+
+    public function prepareEncounterDraftForSigning(Encounter $encounter, array $formData, array $employeeContext, ?string $draftUuid = null): string
+    {
+        return $this->saveEncounterDraft($encounter, $formData, $employeeContext, $draftUuid, prequalify: true);
+    }
+
+    private function saveEncounterDraft(Encounter $encounter, array $formData, array $employeeContext, ?string $draftUuid, bool $prequalify): string
     {
         $kind = $formData['kind'] ?? 'service_request';
-        $dbData = [
-            'uuid' => (string) Str::uuid(),
+        $existingDraft = null;
+        if ($draftUuid !== null) {
+            if ($kind !== 'service_request') {
+                throw new InvalidArgumentException(__('care-plan.referral_wrong_activity_kind'));
+            }
+            $existingDraft = app(MedicalRequestOwnership::class)->serviceForEncounter($draftUuid, $encounter);
+            $this->assertDraftEditable($existingDraft);
+        }
+
+        $dbData = $this->buildEncounterDraftData($encounter, $formData, $employeeContext, $existingDraft?->uuid);
+
+        $personUuid = Repository::serviceRequest()->person((int) $encounter->person_id)?->uuid;
+
+        $uuids = [
+            'person_uuid' => $personUuid,
+            'encounter_uuid' => $encounter->uuid,
+            'episode_uuid' => $encounter->episode?->value ?? null,
+            'employee_uuid' => $employeeContext['employee_uuid'] ?? null,
+            'legal_entity_uuid' => $employeeContext['legal_entity_uuid'] ?? null,
+        ];
+
+        if ($kind === 'service_request') {
+            Repository::serviceRequest()->assertFhirStorageReady(beforeSubmission: true);
+            $dbData['service_id'] = $formData['service_id'] ?? null;
+            $dbData['service_type'] = $formData['service_type'] ?? 'service';
+            if ($prequalify) {
+                $this->prequalifyEncounterDraft($dbData, $uuids, $kind);
+            }
+
+            if ($existingDraft === null) {
+                $this->saveServiceRequest($dbData, (int) $encounter->person_id, $uuids);
+            } else {
+                // Prequalification may outlive another submission; recheck before updating the locked row.
+                DB::transaction(function () use ($existingDraft, $dbData, $encounter, $uuids): void {
+                    $draft = ServiceRequestRequest::whereKey($existingDraft->id)->lockForUpdate()->firstOrFail();
+                    $this->assertDraftEditable($draft);
+                    $this->saveServiceRequest($dbData, (int) $encounter->person_id, $uuids);
+                });
+            }
+
+            return $dbData['uuid'];
+        }
+
+        $dbData['device_id'] = $formData['device_id'] ?? null;
+        $dbData['device_code_type'] = $formData['device_code_type'] ?? 'DEVICE_DEFINITION';
+        if ($prequalify) {
+            $this->prequalifyEncounterDraft($dbData, $uuids, $kind);
+        }
+
+        return $this->persistLocalDraft($dbData, (int) $encounter->person_id, 'device_request');
+    }
+
+    private function buildEncounterDraftData(Encounter $encounter, array $formData, array $employeeContext, ?string $draftUuid): array
+    {
+        $kind = $formData['kind'] ?? 'service_request';
+
+        return [
+            'uuid' => $draftUuid ?? (string) Str::uuid(),
             'employee_id' => $employeeContext['employee_id'] ?? null,
             'person_id' => $encounter->person_id,
             'division_id' => $employeeContext['division_id'] ?? null,
             'status' => $this->draftStatus($kind),
             'started_at' => $kind === 'service_request' ? ($formData['started_at'] ?? now()->toDateString()) : convertToYmd($formData['started_at'] ?? now()->toDateString()),
             'ended_at' => $kind === 'service_request' ? ($formData['ended_at'] ?? now()->addMonths(1)->toDateString()) : convertToYmd($formData['ended_at'] ?? now()->addMonths(1)->toDateString()),
-            'quantity' => $qty,
+            'quantity' => (float) ($formData['quantity'] ?? 1),
             'quantity_system' => $formData['quantity_system'] ?? 'SERVICE_UNIT',
             'quantity_code' => $formData['quantity_code'] ?? 'PIECE',
             'program_id' => $formData['program_id'] ?? null,
@@ -208,56 +294,34 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
                 ? ($formData['performer_type'] ?? null)
                 : null,
         ];
+    }
 
-        $personUuid = Repository::serviceRequest()->person((int) $encounter->person_id)?->uuid;
-
-        $uuids = [
-            'person_uuid' => $personUuid,
-            'encounter_uuid' => $encounter->uuid,
-            'episode_uuid' => $encounter->episode?->value ?? null,
-            'employee_uuid' => $employeeContext['employee_uuid'] ?? null,
-            'legal_entity_uuid' => $employeeContext['legal_entity_uuid'] ?? null,
-        ];
-
-        if ($kind === 'service_request') {
-            Repository::serviceRequest()->assertFhirStorageReady(beforeSubmission: true);
-            $dbData['service_id'] = $formData['service_id'] ?? null;
-            $dbData['service_type'] = $formData['service_type'] ?? 'service';
-            $mapper = Fhir::serviceRequest();
-
-            if ($personUuid && (!empty($dbData['program_id']) || $dbData['category'] === 'transfer_of_care')) {
-                $prequalifyPayload = $mapper->toPrequalifyPayload(
-                    $dbData,
-                    $uuids,
-                    null,
-                    null
-                );
-                $this->runPrequalify(
-                    EHealth::serviceRequest()->prequalify((string) $personUuid, $prequalifyPayload)
-                );
-            }
-
-            $this->saveServiceRequest($dbData, (int) $encounter->person_id, $uuids);
-
-            return $dbData['uuid'];
+    private function prequalifyEncounterDraft(array $dbData, array $uuids, string $kind): void
+    {
+        $personUuid = $uuids['person_uuid'] ?? null;
+        $requiresPrequalification = !empty($dbData['program_id'])
+            || ($kind === 'service_request' && $dbData['category'] === 'transfer_of_care');
+        if (!$personUuid || !$requiresPrequalification) {
+            return;
         }
 
-        $dbData['device_id'] = $formData['device_id'] ?? null;
-        $dbData['device_code_type'] = $formData['device_code_type'] ?? 'DEVICE_DEFINITION';
-        if ($personUuid && !empty($dbData['program_id'])) {
-            $mapper = Fhir::deviceRequest();
-            $prequalifyPayload = $mapper->toPrequalifyPayload(
-                $dbData,
-                $uuids,
-                null,
-                null
-            );
-            $this->runPrequalify(
-                EHealth::deviceRequest()->prequalify((string) $personUuid, $prequalifyPayload)
-            );
-        }
+        $mapper = $kind === 'service_request' ? Fhir::serviceRequest() : Fhir::deviceRequest();
+        $api = $kind === 'service_request' ? EHealth::serviceRequest() : EHealth::deviceRequest();
+        $this->runPrequalify($api->prequalify(
+            (string) $personUuid,
+            $mapper->toPrequalifyPayload($dbData, $uuids, null, null)
+        ));
+    }
 
-        return $this->persistLocalDraft($dbData, (int) $encounter->person_id, 'device_request');
+    private function assertDraftEditable(ServiceRequestRequest $draft): void
+    {
+        if (!in_array(ServiceRequestStatus::resolve((string) $draft->status), [ServiceRequestStatus::DRAFT, ServiceRequestStatus::NEW], true)
+            || filled($draft->requestNumber)) {
+            throw ValidationException::withMessages(['encounterReferralForm' => __('referrals.draft_not_editable')]);
+        }
+        if (Repository::serviceRequest()->hasPendingSubmission($draft)) {
+            throw ValidationException::withMessages(['submission' => __('care-plan.submission_pending')]);
+        }
     }
 
     public function resendSms(string $personUuid, string $requestId, string $kind): EHealthResponse
@@ -267,13 +331,13 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             : EHealth::deviceRequest()->resendSms($personUuid, $requestId);
     }
 
-    public function buildPrintoutHtml(CarePlan|\App\Models\MedicalEvents\Sql\Encounter $contextModel, string $requestId): string
+    public function buildPrintoutHtml(CarePlan|Encounter $contextModel, string $requestId): string
     {
         $record = Repository::serviceRequest()->findByUuid($requestId)
             ?? Repository::deviceRequest()->findByUuid($requestId);
 
         if (!$record instanceof ServiceRequestRequest && !$record instanceof DeviceRequestRequest) {
-            throw new \RuntimeException('Направлення не знайдено');
+            throw new RuntimeException('Направлення не знайдено');
         }
 
         $record->loadMissing(['employee', 'employee.party']);
@@ -285,7 +349,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         $name = $record instanceof ServiceRequestRequest
             ? __('care-plan.referral_printout_type_service')
             : __('care-plan.referral_printout_type_device');
-        $statusLabel = \App\Enums\Person\ServiceRequestStatus::labelFor((string) $record->status);
+        $statusLabel = ServiceRequestStatus::labelFor((string) $record->status);
         $employeeName = $record->employee?->fullName ?? $record->employee?->full_name ?? '—';
         $patient = $contextModel instanceof CarePlan
             ? $contextModel->person
@@ -316,7 +380,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
                     <tr><td style='padding: 8px 0; font-weight: bold;'>Пацієнт:</td><td style='padding: 8px 0;'>" . e($patientName) . "</td></tr>
                     <tr><td style='padding: 8px 0; font-weight: bold;'>Код послуги/виробу:</td><td style='padding: 8px 0;'>" . e($code) . "</td></tr>
                     <tr><td style='padding: 8px 0; font-weight: bold;'>Кількість:</td><td style='padding: 8px 0;'>" . e((string) $record->quantity) . " од.</td></tr>
-                    <tr><td style='padding: 8px 0; font-weight: bold;'>Термін дії:</td><td style='padding: 8px 0;'>з " . e(\Carbon\Carbon::parse($record->startedAt)->format('d.m.Y')) . " по " . e(\Carbon\Carbon::parse($record->endedAt)->format('d.m.Y')) . "</td></tr>
+                    <tr><td style='padding: 8px 0; font-weight: bold;'>Термін дії:</td><td style='padding: 8px 0;'>з " . e(Carbon::parse($record->startedAt)->format('d.m.Y')) . " по " . e(Carbon::parse($record->endedAt)->format('d.m.Y')) . "</td></tr>
                     <tr><td style='padding: 8px 0; font-weight: bold;'>Лікар:</td><td style='padding: 8px 0;'>" . e($employeeName) . "</td></tr>
                     <tr><td style='padding: 8px 0; font-weight: bold;'>Примітки:</td><td style='padding: 8px 0;'>" . e((string) $record->note) . "</td></tr>
                 </table>
@@ -338,13 +402,13 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         }
 
         try {
-            $generator = new \Picqer\Barcode\BarcodeGeneratorPNG();
+            $generator = new BarcodeGeneratorPNG();
             $binary = $generator->getBarcode($value, $generator::TYPE_CODE_128, 2, 60);
 
             return '<img alt="CODE128 '.e($value).'" src="data:image/png;base64,'.base64_encode($binary).'" style="max-width:100%;height:auto;" />'
                 .'<div style="font-family:monospace;font-size:12px;margin-top:4px;">'.e($value).'</div>';
-        } catch (\Throwable $exception) {
-            \Illuminate\Support\Facades\Log::warning('Failed to render CODE128 barcode for referral printout: '.$exception->getMessage());
+        } catch (Throwable $exception) {
+            Log::warning('Failed to render CODE128 barcode for referral printout: '.$exception->getMessage());
 
             return '<div style="font-family:monospace;font-size:14px;">'.e($value).'</div>';
         }
@@ -388,7 +452,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             $entityUuid = $uuids['legal_entity_uuid'] ?? $author?->legalEntity?->uuid;
             if ($author === null || blank($authorUuid) || blank($entityUuid)
                 || $author->uuid !== $authorUuid || $author->legalEntity?->uuid !== $entityUuid) {
-                throw new \InvalidArgumentException(__('care-plan.referral_author_unavailable'));
+                throw new InvalidArgumentException(__('care-plan.referral_author_unavailable'));
             }
             $data['employee_id'] = $author->id;
             $uuids['employee_uuid'] = $authorUuid;
@@ -422,7 +486,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
      * @return array<string, mixed>
      */
     public function syncReferralFromRemote(
-        CarePlan|\App\Models\MedicalEvents\Sql\Encounter $contextModel,
+        CarePlan|Encounter $contextModel,
         ?CarePlanActivity $activity,
         ServiceRequestRequest|DeviceRequestRequest $requestRecord,
         string $kind,
@@ -455,7 +519,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     }
 
     public function trySyncDraftFromEHealth(
-        CarePlan|\App\Models\MedicalEvents\Sql\Encounter $contextModel,
+        CarePlan|Encounter $contextModel,
         ?CarePlanActivity $activity,
         ServiceRequestRequest|DeviceRequestRequest $requestRecord,
         string $kind
@@ -616,7 +680,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     public function buildSignDbData(
         ServiceRequestRequest|DeviceRequestRequest $requestRecord,
         ?CarePlanActivity $activity = null,
-        CarePlan|\App\Models\MedicalEvents\Sql\Encounter|null $context = null,
+        CarePlan|Encounter|null $context = null,
         ?array $employeeContext = null
     ): array {
         $startedAt = $requestRecord->startedAt ?? $activity?->scheduledPeriodStart;
@@ -660,10 +724,10 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
                 ? ($requestRecord->informWith ?? null)
                 : null,
             'supporting_info' => $requestRecord->supportingInfo,
-            'started_at' => $startedAt instanceof \DateTimeInterface
+            'started_at' => $startedAt instanceof DateTimeInterface
                 ? $startedAt->format($requestRecord instanceof ServiceRequestRequest ? 'Y-m-d\TH:i:s.uP' : 'Y-m-d')
                 : (string) $startedAt,
-            'ended_at' => $endedAt instanceof \DateTimeInterface
+            'ended_at' => $endedAt instanceof DateTimeInterface
                 ? $endedAt->format($requestRecord instanceof ServiceRequestRequest ? 'Y-m-d\TH:i:s.uP' : 'Y-m-d')
                 : (string) $endedAt,
             'based_on_uuid' => $requestRecord->basedOn?->value ?? $activity?->uuid,
@@ -709,7 +773,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 
         $response = match ($kind) {
             'device_request' => EHealth::deviceRequest()->createSigned($patientUuid, $payload),
-            default => throw new \InvalidArgumentException(__('care-plan.referral_wrong_activity_kind')),
+            default => throw new InvalidArgumentException(__('care-plan.referral_wrong_activity_kind')),
         };
 
         return $this->jobResolver->resolve($response->getData());
@@ -722,11 +786,11 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     public function submitSignedCancel(string $kind, string $patientUuid, string $referralUuid, array $payload): array
     {
         if ($kind === 'service_request') {
-            return $this->submitServiceRequestOperation($this->signedServiceRequestRecord($patientUuid, $referralUuid), ['status' => ServiceRequestStatus::ENTERED_IN_ERROR->value], fn () => EHealth::serviceRequest()->cancel($patientUuid, $referralUuid, \App\Livewire\Referral\Forms\ServiceRequestForm::buildSignedEnvelope($payload)), 'service_request:cancel', []);
+            return $this->submitServiceRequestOperation($this->signedServiceRequestRecord($patientUuid, $referralUuid), ['status' => ServiceRequestStatus::ENTERED_IN_ERROR->value], fn () => EHealth::serviceRequest()->cancel($patientUuid, $referralUuid, ServiceRequestForm::buildSignedEnvelope($payload)), 'service_request:cancel', []);
         }
         $response = match ($kind) {
             'device_request' => EHealth::deviceRequest()->cancel($patientUuid, $referralUuid, $payload),
-            default => throw new \InvalidArgumentException(__('care-plan.referral_wrong_activity_kind')),
+            default => throw new InvalidArgumentException(__('care-plan.referral_wrong_activity_kind')),
         };
 
         return $this->jobResolver->resolve($response->getData());
@@ -742,10 +806,10 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     {
         $letter = trim((string) ($payload['explanatory_letter'] ?? ''));
         if ($letter === '') {
-            throw new \InvalidArgumentException(__('care-plan.referral_recall_letter_required'));
+            throw new InvalidArgumentException(__('care-plan.referral_recall_letter_required'));
         }
 
-        return $this->submitServiceRequestOperation($this->signedServiceRequestRecord($patientUuid, $referralUuid), ['status' => 'recalled'], fn () => EHealth::serviceRequest()->recall($patientUuid, $referralUuid, \App\Livewire\Referral\Forms\ServiceRequestForm::buildSignedEnvelope($payload)), 'service_request:recall', []);
+        return $this->submitServiceRequestOperation($this->signedServiceRequestRecord($patientUuid, $referralUuid), ['status' => 'recalled'], fn () => EHealth::serviceRequest()->recall($patientUuid, $referralUuid, ServiceRequestForm::buildSignedEnvelope($payload)), 'service_request:recall', []);
     }
 
     /**
@@ -802,7 +866,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 
                     $this->persistSignedReferral($dbData, $kind, $personId);
                 }
-            } catch (\Throwable $exception) {
+            } catch (Throwable $exception) {
                 Log::warning('ReferralRequestLifecycle: failed to enrich requisition after signed create', [
                     'uuid' => $dbData['uuid'] ?? null,
                     'kind' => $kind,
@@ -861,7 +925,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     private function buildLocalSyncBaseData(
         ServiceRequestRequest|DeviceRequestRequest $requestRecord,
         ?CarePlanActivity $activity,
-        CarePlan|\App\Models\MedicalEvents\Sql\Encounter $contextModel
+        CarePlan|Encounter $contextModel
     ): array {
         if ($requestRecord instanceof ServiceRequestRequest) {
             return ['uuid' => $requestRecord->uuid, 'employee_id' => $requestRecord->employeeId, 'division_id' => $requestRecord->divisionId];
@@ -903,20 +967,20 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         $model = Repository::serviceRequest()->findByUuid($referralUuid);
         $patientUuid ??= $model?->person?->uuid;
         if (!$patientUuid || ($model !== null && $model->person?->uuid !== $patientUuid)) {
-            throw new \InvalidArgumentException(__('Направлення не належить поточному пацієнту.'));
+            throw new InvalidArgumentException(__('Направлення не належить поточному пацієнту.'));
         }
 
         $remote = $this->fetchRemoteReferral($patientUuid, $referralUuid, 'service_request');
         if (($remote['id'] ?? null) !== $referralUuid
             || data_get($remote, 'subject.identifier.value') !== $patientUuid) {
-            throw new \InvalidArgumentException(__('Направлення не належить поточному пацієнту.'));
+            throw new InvalidArgumentException(__('Направлення не належить поточному пацієнту.'));
         }
 
         $status = strtolower((string) ($remote['status'] ?? ''));
         $processingStatus = strtolower((string) ($remote['program_processing_status'] ?? ''));
         if ($status !== ServiceRequestStatus::ACTIVE->value
             || $processingStatus === ServiceRequestStatus::COMPLETED->value) {
-            throw new \RuntimeException(__('Направлення недоступне для взяття в роботу.'));
+            throw new RuntimeException(__('Направлення недоступне для взяття в роботу.'));
         }
 
         $programId = data_get($remote, 'program.identifier.value')
@@ -940,7 +1004,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         // Qualify must block process when program is present (TV 3.17.3.2 / 3.17.3.3.2).
         if (!$alreadyUsed && $programId) {
             try {
-                $qualifyResponse = \App\Classes\eHealth\EHealth::serviceRequest()->qualify($referralUuid, [
+                $qualifyResponse = EHealth::serviceRequest()->qualify($referralUuid, [
                     'programs' => [$payload['program']],
                 ])->getData();
                 $resolvedQualify = $this->jobResolver->resolve(
@@ -948,18 +1012,18 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
                 );
                 $this->jobResolver->assertPrequalifyValid($resolvedQualify);
             } catch (EHealthValidationException $e) {
-                throw new \RuntimeException(
+                throw new RuntimeException(
                     __('care-plan.referral_qualify_blocked', [
                         'reason' => $e->getTranslatedMessage() ?: $e->getFormattedMessage(),
                     ]),
                     previous: $e
                 );
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 logger()->warning('Qualify failed (blocking): '.$e->getMessage(), [
                     'referralUuid' => $referralUuid,
                 ]);
 
-                throw new \RuntimeException(
+                throw new RuntimeException(
                     __('care-plan.referral_qualify_blocked', [
                         'reason' => $e->getMessage(),
                     ]),
@@ -974,10 +1038,10 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             if ($model === null || $model->detailsSyncedAt === null) {
                 $model = Repository::serviceRequest()->cacheExecutionResource($remote, $patientUuid, $employee) ?? $model;
                 if ($model !== null && $model->detailsSyncedAt === null) {
-                    throw new \InvalidArgumentException(__('care-plan.referral_full_details_required'));
+                    throw new InvalidArgumentException(__('care-plan.referral_full_details_required'));
                 }
             }
-            $response = $this->submitServiceRequestOperation($model, ['status' => $remote['status'], 'programProcessingStatus' => 'in_progress', ...\App\Core\Arr::toCamelCase($payload)], fn () => EHealth::serviceRequest()->process($referralUuid, $payload), 'service_request:use', ['execution' => true, 'programId' => $programId]);
+            $response = $this->submitServiceRequestOperation($model, ['status' => $remote['status'], 'programProcessingStatus' => 'in_progress', ...Arr::toCamelCase($payload)], fn () => EHealth::serviceRequest()->process($referralUuid, $payload), 'service_request:use', ['execution' => true, 'programId' => $programId]);
             if ($response['submissionPending'] ?? false) {
                 return $response;
             }
@@ -1008,16 +1072,16 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     ): array {
         $allowedTypes = ['encounter', 'procedure', 'diagnostic_report'];
         if (!in_array($resourceType, $allowedTypes, true)) {
-            throw new \InvalidArgumentException(__('care-plan.referral_complete_invalid_emz_type'));
+            throw new InvalidArgumentException(__('care-plan.referral_complete_invalid_emz_type'));
         }
 
         if ($resourceUuid === '') {
-            throw new \InvalidArgumentException(__('care-plan.referral_complete_emz_required'));
+            throw new InvalidArgumentException(__('care-plan.referral_complete_emz_required'));
         }
 
         $this->assertCompletionResourceOwned($referralUuid, $resourceUuid, $resourceType);
 
-        $payload = \App\Livewire\Referral\Forms\ServiceRequestForm::buildCompleteContent($resourceUuid, $resourceType, $payload);
+        $payload = ServiceRequestForm::buildCompleteContent($resourceUuid, $resourceType, $payload);
 
         $model = Repository::serviceRequest()->findByUuid($referralUuid);
         if ($model !== null && $model->detailsSyncedAt === null) {
@@ -1025,7 +1089,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             $detail = EHealth::serviceRequest()->getById($person->uuid, $referralUuid)->validate();
             $detail = (new ServiceRequestMapper())->normalize($detail[0] ?? $detail);
             if (($detail['id'] ?? null) !== $referralUuid) {
-                throw new \InvalidArgumentException(__('care-plan.referral_full_details_required'));
+                throw new InvalidArgumentException(__('care-plan.referral_full_details_required'));
             }
             $localStatus = $model->status;
             $model = Repository::serviceRequest()->importResource($detail, $model->personId, $model->employeeId, $model->divisionId);
@@ -1072,7 +1136,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 
     private function buildTakeIntoWorkPayload(Employee $employee, mixed $programId): array
     {
-        return \App\Livewire\Referral\Forms\ServiceRequestForm::buildUseContent(Repository::serviceRequest()->executorContext($employee), $programId);
+        return ServiceRequestForm::buildUseContent(Repository::serviceRequest()->executorContext($employee), $programId);
     }
 
     private function assertCompletionResourceOwned(string $referralUuid, string $resourceUuid, string $resourceType): void
@@ -1089,16 +1153,16 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         }
         $person = $repository->person($record->personId);
         if ($person?->uuid !== $patientUuid) {
-            throw new \InvalidArgumentException('The Service Request belongs to another patient.');
+            throw new InvalidArgumentException('The Service Request belongs to another patient.');
         }
         if ($repository->hasPendingSubmission($record)) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['submission' => __('care-plan.submission_pending')]);
+            throw ValidationException::withMessages(['submission' => __('care-plan.submission_pending')]);
         }
         if ($record->detailsSyncedAt === null) {
             $detail = EHealth::serviceRequest()->getById($patientUuid, $referralUuid)->validate();
             $detail = (new ServiceRequestMapper())->normalize($detail[0] ?? $detail);
             if (($detail['id'] ?? null) !== $referralUuid) {
-                throw new \InvalidArgumentException(__('care-plan.referral_full_details_required'));
+                throw new InvalidArgumentException(__('care-plan.referral_full_details_required'));
             }
             $record = $repository->importResource($detail, $record->personId, $record->employeeId, $record->divisionId);
         }
@@ -1118,7 +1182,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     private function submitServiceRequestOperation(?ServiceRequestRequest $record, array $changes, callable $send, string $requiredScope, array $operationContext): array
     {
         if ($record !== null) {
-            $result = \App\Jobs\RemoteEHealthLinksProcessing::submitOperation($record, $changes, $send, $requiredScope, $operationContext);
+            $result = RemoteEHealthLinksProcessing::submitOperation($record, $changes, $send, $requiredScope, $operationContext);
 
             return $result ?? ['submissionPending' => true];
         }
