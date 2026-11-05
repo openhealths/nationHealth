@@ -7,7 +7,11 @@ namespace Tests\Unit\CarePlan;
 use App\Classes\eHealth\Api\Approval;
 use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthResponseException;
+use App\Models\CarePlan;
+use App\Models\MedicalEvents\Sql\Approval as ApprovalModel;
+use App\Models\Person\Person as Patient;
 use App\Services\MedicalEvents\CarePlanApprovalService;
+use App\Services\MedicalEvents\PatientApprovalService;
 use GuzzleHttp\Psr7\Response;
 use Mockery;
 use Tests\TestCase;
@@ -29,15 +33,25 @@ class ApprovalResponseContractTest extends TestCase
         app(CarePlanApprovalService::class)->confirmWithoutOtp('patient', 'approval');
     }
 
-    public function test_deactivation_rejects_a_non_success_response(): void
+    public function test_cancellation_propagates_an_esoz_error_without_updating_the_approval(): void
     {
+        $patient = new Patient();
+        $patient->uuid = 'patient';
+        $plan = new CarePlan();
+        $plan->setRelation('person', $patient);
+        $approval = Mockery::mock(ApprovalModel::class)->makePartial();
+        $approval->uuid = 'approval';
+        $approval->setRelation('approvable', $plan);
+        $approval->shouldNotReceive('update');
+
         $api = Mockery::mock(Approval::class);
-        $api->shouldReceive('verify')->once()->with('patient', 'approval', ['status' => 'inactive'])
-            ->andReturn(new EHealthResponse(new Response(503)));
+        $api->shouldNotReceive('verify');
+        $api->shouldReceive('cancelApproval')->once()->with('patient', 'approval')
+            ->andThrow(new EHealthResponseException(new EHealthResponse(new Response(503))));
         $this->instance(Approval::class, $api);
 
         $this->expectException(EHealthResponseException::class);
-        app(CarePlanApprovalService::class)->deactivate('patient', 'approval');
+        app(PatientApprovalService::class)->cancel($approval);
     }
 
     public function test_patient_approval_url_and_filters_are_preserved(): void

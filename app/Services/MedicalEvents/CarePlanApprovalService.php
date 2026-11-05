@@ -156,22 +156,35 @@ class CarePlanApprovalService
                 if ($existing->getAttribute('is_verified') && ApprovalStatus::resolve($existing->status)?->isGranted()) {
                     return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Granted, $existing->uuid);
                 }
-                if (!$confirmWithoutOtp && $authorizeWith !== null && $existing->authorizeWith !== $authorizeWith) {
-                    throw new RuntimeException(__('care-plan.approval_method_pending'));
-                }
                 $existingLink = $existing->ehealthLinks->filter(fn ($candidate): bool => data_get($candidate->job?->request_data, 'operation') !== 'resendSms')->sortByDesc('id')->first();
-                if ($confirmWithoutOtp && ($existingLink === null || $existingLink->status === 'PROCESSED')) {
-                    $this->confirmWithoutOtp($patientUuid, $existing->uuid, $bearerToken);
-
-                    return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Granted, $existing->uuid);
-                }
-                if ($existingLink !== null && $existingLink->status !== 'FAILED') {
+                if ($existingLink !== null && !in_array($existingLink->status, ['PROCESSED', 'FAILED'], true)) {
                     return $this->resultForLink($existingLink->id);
                 }
-                $data = EHealth::approval()->withToken($bearerToken)->getApprovalDetails($patientUuid, $existing->uuid)->validate();
+                try {
+                    $data = $this->requireSuccessfulResponse(EHealth::approval()->withToken($bearerToken)->getApprovalDetails($patientUuid, $existing->uuid))->validate();
+                } catch (EHealthResponseException $exception) {
+                    if ($exception->response->status() !== 404) {
+                        throw $exception;
+                    }
+                    $data = ['id' => $existing->uuid, 'status' => ApprovalStatus::INACTIVE->value, 'is_verified' => false];
+                }
                 $repository->sync($data, $carePlan, $existing);
+                $existing->refresh();
+                if ($this->approvalIsGranted($data)) {
+                    return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Granted, $existing->uuid);
+                }
+                $status = ApprovalStatus::resolve($existing->status);
+                if (($status?->isAwaitingPatient() || $status?->isGranted())
+                    && ($existing->expiresAt === null || $existing->expiresAt->isFuture())
+                    && ($confirmWithoutOtp || $authorizeWith === null || $existing->authorizeWith === $authorizeWith)) {
+                    if ($confirmWithoutOtp) {
+                        $this->confirmWithoutOtp($patientUuid, $existing->uuid, $bearerToken);
 
-                return $this->resultFromData($data, $patientUuid, $existing->authorizeWith ?: $authorizeWith);
+                        return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Granted, $existing->uuid);
+                    }
+
+                    return $this->resultFromData($data, $patientUuid, $existing->authorizeWith);
+                }
             }
             $payload = $this->buildCreatePayload($carePlan, $employeeUuid, $accessLevel, $authorizeWith, $legalEntity);
             $link = $repository->beginCarePlanRequest($carePlan, $payload, $confirmWithoutOtp);
@@ -314,16 +327,6 @@ class CarePlanApprovalService
     public function confirmWithoutOtp(string $patientUuid, string $approvalId, ?string $bearerToken = null): EHealthResponse
     {
         return $this->verify($patientUuid, $approvalId, null, $bearerToken);
-    }
-
-    public function deactivate(string $patientUuid, string $approvalId): EHealthResponse
-    {
-        $response = $this->requireSuccessfulResponse(EHealth::approval()->verify($patientUuid, $approvalId, [
-            'status' => 'inactive',
-        ]));
-        Repository::approval()->storePatientResponse($patientUuid, $approvalId, $response->validate(), ApprovalStatus::INACTIVE->value);
-
-        return $response;
     }
 
     /** Transport exceptions propagate to the UI; a non-success response cannot grant access. */

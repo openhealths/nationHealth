@@ -13,6 +13,7 @@ use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\Person\Person;
 use App\Models\User;
+use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\CarePlanApprovalCreateOutcome;
 use App\Services\MedicalEvents\CarePlanApprovalJobOutcome;
 use App\Services\MedicalEvents\CarePlanApprovalService;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class CarePlanApprovalServiceTest extends TestCase
@@ -575,33 +577,96 @@ class CarePlanApprovalServiceTest extends TestCase
         return $api;
     }
 
-    /**
-     * @return array{0: CarePlan, 1: LegalEntity, 2: User}
-     */
-    public function test_a_different_method_cannot_silently_reuse_an_unconfirmed_approval(): void
+    public function test_a_different_method_resumes_an_inflight_request_without_creating_a_duplicate(): void
     {
         [$plan, $legalEntity, $user] = $this->makeCarePlanContext();
         $employeeUuid = $plan->author->uuid;
         $firstMethod = (string) Str::uuid();
         $secondMethod = (string) Str::uuid();
-        $link = \App\Repositories\MedicalEvents\Repository::approval()->beginCarePlanRequest(
+        $link = Repository::approval()->beginCarePlanRequest(
             $plan,
             app(CarePlanApprovalService::class)->buildCreatePayload($plan, $employeeUuid, 'write', $firstMethod),
         );
         $this->mock(ApprovalApi::class)->shouldNotReceive('createApproval', 'verify', 'getApprovalDetails');
         Bus::fake();
 
-        try {
-            app(CarePlanApprovalService::class)->create($plan, $plan->person->uuid, $employeeUuid, 'write', $secondMethod, $legalEntity, $user, 'synthetic-token');
-            $this->fail('Expected an explicit pending-method refusal.');
-        } catch (\RuntimeException $exception) {
-            $this->assertSame(__('care-plan.approval_method_pending'), $exception->getMessage());
-        }
+        $result = app(CarePlanApprovalService::class)->create($plan, $plan->person->uuid, $employeeUuid, 'write', $secondMethod, $legalEntity, $user, 'synthetic-token');
+
+        $this->assertTrue($result->isAsync());
+        $this->assertSame($link->id, $result->pollingLinkId);
         $this->assertSame($firstMethod, $link->linkable->fresh()->authorizeWith);
         $this->assertDatabaseCount('approvals', 1);
         Bus::assertNothingBatched();
     }
 
+    public static function completedRequestMethods(): array
+    {
+        return [
+            'same known method' => [true, true],
+            'different known method' => [true, false],
+            'unknown previous method' => [false, false],
+        ];
+    }
+
+    #[DataProvider('completedRequestMethods')]
+    public function test_completed_request_checks_esoz_before_reusing_or_changing_the_method(bool $knownMethod, bool $sameMethod): void
+    {
+        [$plan, $legalEntity, $user] = $this->makeCarePlanContext();
+        $employeeUuid = $plan->author->uuid;
+        $firstMethod = $knownMethod ? (string) Str::uuid() : null;
+        $selectedMethod = $sameMethod ? $firstMethod : (string) Str::uuid();
+        $service = app(CarePlanApprovalService::class);
+        $link = Repository::approval()->beginCarePlanRequest(
+            $plan,
+            $service->buildCreatePayload($plan, $employeeUuid, 'write', $firstMethod),
+        );
+        $existingData = [
+            'id' => (string) Str::uuid(),
+            'status' => 'pending',
+            'is_verified' => false,
+            'expires_at' => now()->addDay()->toIso8601String(),
+            'authentication_method_current' => ['type' => 'OFFLINE'],
+        ];
+        Repository::approval()->completeCarePlanRequest($link, $existingData);
+        $details = Mockery::mock(EHealthResponse::class);
+        $details->shouldReceive('successful')->once()->andReturnTrue();
+        $details->shouldReceive('validate')->once()->andReturn($existingData);
+        $api = $this->mock(ApprovalApi::class);
+        $api->shouldReceive('withToken')->with('synthetic-token')->andReturnSelf();
+        $api->shouldReceive('getApprovalDetails')->once()->with($plan->person->uuid, $existingData['id'])->andReturn($details);
+        $api->shouldNotReceive('verify');
+        $newApprovalId = (string) Str::uuid();
+        if ($sameMethod) {
+            $api->shouldNotReceive('createApproval');
+        } else {
+            $created = Mockery::mock(EHealthResponse::class);
+            $created->shouldReceive('successful')->once()->andReturnTrue();
+            $created->shouldReceive('getStatusCode')->once()->andReturn(201);
+            $created->shouldReceive('validate')->once()->andReturn([
+                'id' => $newApprovalId,
+                'status' => 'pending',
+                'is_verified' => false,
+                'authentication_method_current' => ['type' => 'OTP', 'phone_number' => '+380991112233'],
+            ]);
+            $api->shouldReceive('createApproval')->once()
+                ->with($plan->person->uuid, $service->buildCreatePayload($plan, $employeeUuid, 'write', $selectedMethod))
+                ->andReturn($created);
+        }
+        Bus::fake();
+
+        $result = $service->create($plan, $plan->person->uuid, $employeeUuid, 'write', $selectedMethod, $legalEntity, $user, 'synthetic-token');
+
+        $this->assertTrue($result->requiresConfirmation());
+        $this->assertSame(!$sameMethod, $result->requiresOtp());
+        $this->assertSame($sameMethod ? $existingData['id'] : $newApprovalId, $result->approvalId);
+        $this->assertSame($firstMethod, $link->linkable->fresh()->authorizeWith);
+        $this->assertDatabaseCount('approvals', $sameMethod ? 1 : 2);
+        Bus::assertNothingBatched();
+    }
+
+    /**
+     * @return array{0: CarePlan, 1: LegalEntity, 2: User}
+     */
     private function makeCarePlanContext(): array
     {
         $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')

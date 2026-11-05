@@ -1,3 +1,5 @@
+@use('App\Enums\Person\ApprovalStatus')
+
 <div
     @if (!$skipsPatientOtp) wire:init="loadAuthMethods" @endif
     data-livewire-background-actions="checkApprovalJobStatus checkSmsResendStatus event:refreshApprovals"
@@ -35,11 +37,13 @@
                 </thead>
                 <tbody>
                     @php
-                        $activeApprovals = collect($approvals)->filter(
-                            fn (array $approval): bool => \App\Enums\Person\ApprovalStatus::resolve($approval['status'] ?? null)?->isGranted() ?? false
-                        );
+                        $visibleApprovals = collect($approvals)->filter(function (array $approval): bool {
+                            $status = ApprovalStatus::resolve($approval['status'] ?? null);
+
+                            return ($approval['requestPending'] ?? false) || $status?->isGranted() || $status?->isAwaitingPatient();
+                        });
                     @endphp
-                    @forelse ($activeApprovals as $approval)
+                    @forelse ($visibleApprovals as $approval)
                         <tr class="index-table-tr">
                             <td class="index-table-td">
                                 <div class="flex flex-col">
@@ -53,10 +57,13 @@
                             </td>
                             <td class="index-table-td">
                                 @php
-                                    $approvalStatus = \App\Enums\Person\ApprovalStatus::resolve($approval['status'] ?? null);
+                                    $approvalStatus = ApprovalStatus::resolve($approval['status'] ?? null);
+                                    if ($approvalStatus?->isGranted() && !($approval['isVerified'] ?? ($approval['is_verified'] ?? false))) {
+                                        $approvalStatus = ApprovalStatus::PENDING;
+                                    }
                                 @endphp
-                                <span class="badge {{ \App\Enums\Person\ApprovalStatus::colorFor($approval['status'] ?? null) }}">
-                                    {{ \App\Enums\Person\ApprovalStatus::labelFor($approval['status'] ?? null) }}
+                                <span class="badge {{ ApprovalStatus::colorFor($approvalStatus?->value) }}">
+                                    {{ ApprovalStatus::labelFor($approvalStatus?->value) }}
                                 </span>
                             </td>
                             <td class="index-table-td">

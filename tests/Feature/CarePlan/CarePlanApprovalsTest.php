@@ -388,7 +388,7 @@ class CarePlanApprovalsTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('approvalVisibility')]
-    public function test_only_granted_approvals_are_visible(string $status, bool $visible): void
+    public function test_granted_and_awaiting_approvals_are_visible(string $status, bool $visible, bool $verified, bool $awaiting): void
     {
         $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
@@ -461,7 +461,7 @@ class CarePlanApprovalsTest extends TestCase
             'granted_to_id' => $identifier->id,
             'granted_to_type' => 'employee',
             'status' => $status,
-            'is_verified' => false,
+            'is_verified' => $verified,
         ]);
 
         $approvalService = Mockery::mock(CarePlanApprovalService::class)->makePartial();
@@ -487,6 +487,13 @@ class CarePlanApprovalsTest extends TestCase
         if ($visible) {
             $component->assertSeeHtml('wire:click="cancelApproval')
                 ->assertDontSee(__('care-plan.no_approvals_found'));
+            if ($awaiting) {
+                $component->assertSeeHtml('wire:click="verifyExistingApproval')
+                    ->assertSeeHtml('wire:click="recreateApproval');
+            } else {
+                $component->assertDontSeeHtml('wire:click="verifyExistingApproval')
+                    ->assertDontSeeHtml('wire:click="recreateApproval');
+            }
         } else {
             $component->assertDontSeeHtml('wire:click="cancelApproval')
                 ->assertSee(__('care-plan.no_approvals_found'));
@@ -496,12 +503,14 @@ class CarePlanApprovalsTest extends TestCase
     public static function approvalVisibility(): array
     {
         return [
-            'active' => ['active', true],
-            'legacy approved' => ['APPROVED', true],
-            'pending' => ['pending', false],
-            'new' => ['NEW', false],
-            'inactive' => ['inactive', false],
-            'terminated' => ['terminated', false],
+            'active' => ['active', true, true, false],
+            'legacy approved' => ['APPROVED', true, true, false],
+            'active awaiting confirmation' => ['active', true, false, true],
+            'legacy approved awaiting confirmation' => ['APPROVED', true, false, true],
+            'pending' => ['pending', true, false, true],
+            'new' => ['NEW', true, false, true],
+            'inactive' => ['inactive', false, false, false],
+            'terminated' => ['terminated', false, true, false],
         ];
     }
 }
