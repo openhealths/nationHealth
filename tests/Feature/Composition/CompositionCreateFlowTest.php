@@ -409,13 +409,13 @@ class CompositionCreateFlowTest extends TestCase
         ]);
 
         $component->call('pollAsyncJob')
-            ->assertSee(__('compositions.create_temp_disability.signed'))
+            ->assertSee(__('compositions.create_temp_disability.signed', ['number' => 'ТН-0001']))
             ->assertSee('alert-message fixed top-6 right-2', false)
             ->assertDontSee('status-alert-green', false)
             ->assertNotDispatched('flashMessage');
 
         $component->call('pollAsyncJob')
-            ->assertDontSee(__('compositions.create_temp_disability.signed'));
+            ->assertDontSee(__('compositions.create_temp_disability.signed', ['number' => 'ТН-0001']));
 
         $this->assertSame(
             CompositionStatus::FINAL,

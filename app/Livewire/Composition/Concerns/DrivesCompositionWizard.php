@@ -477,7 +477,15 @@ trait DrivesCompositionWizard
         $this->step = self::STEP_REVIEW;
         if ($notify && $previousStep !== self::STEP_REVIEW) {
             $message = $operation->operation === CompositionAsyncOperation::SIGN ? 'signed' : 'created';
-            Session::flash('success', __('compositions.create_'.strtolower($this->conclusionType()->value).'.'.$message));
+            $messageKey = 'compositions.create_'.strtolower($this->conclusionType()->value).'.'.$message;
+            if ($message === 'signed' && blank($composition->title)) {
+                $messageKey = 'compositions.messages.signed_without_number';
+            }
+            Session::flash('success', __($messageKey, [
+                'number' => $composition->title,
+                'type' => $this->conclusionType()->label(),
+                'identifier' => $composition->uuid,
+            ]));
         }
     }
 

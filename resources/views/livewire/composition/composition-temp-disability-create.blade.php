@@ -1,5 +1,6 @@
 @use('App\Livewire\Composition\CompositionTempDisabilityCreate', 'Wizard')
 @use('App\Enums\Composition\CompositionCategory')
+@use('App\Enums\Composition\CompositionJobStatus')
 
 <x-layouts.patient
     :showLegacyMessages="false"
@@ -12,7 +13,7 @@
     <x-slot name="headerActions"></x-slot>
 
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
-    <div class="breadcrumb-form shift-content p-4">
+    <div data-livewire-background-actions="pollAsyncJob" class="breadcrumb-form shift-content p-4">
         <div class="mt-6 w-full max-w-screen-xl space-y-8">
             @php
                 $encounterOptions = $step >= Wizard::STEP_AWAITING_JOB || ($selectedEncounter !== null && !$showEncounterPicker)
@@ -392,7 +393,7 @@
                 </div>
             @endif
             @if ($step === Wizard::STEP_AWAITING_JOB)
-                <div wire:poll.3s="pollAsyncJob">
+                <div @if ($asyncJobStatus === CompositionJobStatus::PENDING->value) wire:poll.3s="pollAsyncJob" @endif>
                     <livewire:components.submission-status
                         :record-type="\App\Models\MedicalEvents\Sql\Composition::class"
                         :record-id="0"

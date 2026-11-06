@@ -8,9 +8,10 @@ use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
+use App\Enums\Composition\CompositionJobStatus;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\CompositionOperation;
-use App\Repositories\MedicalEvents\CompositionOperationRepository;
+use App\Repositories\MedicalEvents\Repository;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -38,7 +39,7 @@ class CompositionAsyncProcessing extends EHealthJob
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse|null
     {
         $this->operation->refresh();
-        if ($this->operation->status !== 'PENDING') {
+        if ($this->operation->status !== CompositionJobStatus::PENDING->value) {
             return null;
         }
 
@@ -50,7 +51,7 @@ class CompositionAsyncProcessing extends EHealthJob
         if ($response === null) {
             return;
         }
-        $finished = app(CompositionOperationRepository::class)->processResult($this->operation, $response->validate(), $this->token);
+        $finished = Repository::compositionOperation()->processResult($this->operation, $response->validate(), $this->token);
         if (!$finished) {
             $this->release(min(5 * 2 ** min($this->attempts() - 1, 6), 300));
         }
@@ -68,5 +69,17 @@ class CompositionAsyncProcessing extends EHealthJob
 
     protected function setEntityStatus(JobStatus $status): void
     {
+        if (!in_array($status, [JobStatus::FAILED, JobStatus::PAUSED], true)) {
+            return;
+        }
+
+        $this->operation->refresh();
+        if ($this->operation->status !== CompositionJobStatus::PENDING->value) {
+            return;
+        }
+
+        $response = $this->operation->job->response_data ?? [];
+        $response['errors'] = ($response['errors'] ?? []) ?: [__('compositions.errors.async_processing_failed')];
+        Repository::compositionOperation()->fail($this->operation, $response);
     }
 }
