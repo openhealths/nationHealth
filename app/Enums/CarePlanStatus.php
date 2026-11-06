@@ -23,6 +23,14 @@ enum CarePlanStatus: string
     case UNKNOWN = 'unknown';
 
     /**
+     * @return list<self>
+     */
+    public static function filterOptions(): array
+    {
+        return [self::DRAFT, self::PENDING, self::ACTIVE, self::COMPLETED, self::CANCELLED, self::TERMINATED];
+    }
+
+    /**
      * @param  array<string, mixed>  $finalResponse
      */
     public static function fromJobResponse(array $finalResponse, self $fallback): self

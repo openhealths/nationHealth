@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Locked;
 
-use App\Repositories\CarePlanRepository;
+use App\Repositories\Repository;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Session;
 use Throwable;
@@ -29,8 +29,6 @@ class PatientCarePlans extends BasePatientComponent
     public string $filterStatus = '';
     public string $filterStartDateRange = '';
     public string $filterEndDateRange = '';
-    public string $filterIsPartOf = '';
-    public string $filterIncludes = '';
     public bool $showAdditionalParams = false;
 
     /**
@@ -56,14 +54,12 @@ class PatientCarePlans extends BasePatientComponent
      */
     public function loadCarePlans(): void
     {
-        $this->carePlans = app(CarePlanRepository::class)->patientListing($this->personId, [
+        $this->carePlans = Repository::carePlan()->patientListing($this->personId, [
             'name' => $this->filterName,
             'status' => $this->filterStatus,
             'encounter_id' => $this->filterEncounterId,
             'start_date' => $this->filterStartDateRange,
             'end_date' => $this->filterEndDateRange,
-            'is_part_of' => $this->filterIsPartOf,
-            'includes' => $this->filterIncludes,
         ], (int) legalEntity()->id);
     }
 
@@ -130,8 +126,6 @@ class PatientCarePlans extends BasePatientComponent
             'filterStatus',
             'filterStartDateRange',
             'filterEndDateRange',
-            'filterIsPartOf',
-            'filterIncludes',
         ]);
         $this->loadCarePlans();
     }
