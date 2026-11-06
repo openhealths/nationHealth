@@ -10,7 +10,7 @@
     </x-header-navigation>
 
     @if ($this instanceof DiagnosticReportView)
-        <div class="form mb-4">
+        <div class="form shift-content mb-4">
             <livewire:components.submission-status
                 :recordType="DiagnosticReport::class"
                 :recordId="$diagnosticReportId"
@@ -21,7 +21,7 @@
     @endif
 
     <form
-        class="form"
+        class="form shift-content"
         x-data="{
             modalDiagnosticReport: new DiagnosticReport(@js($this->form->diagnosticReport), @js(auth()->user()->getDiagnosticReportWriterEmployee()?->uuid)),
             defaultDiagnosticReportPerformerEmployeeId: @js(auth()->user()->getDiagnosticReportWriterEmployee()?->uuid),

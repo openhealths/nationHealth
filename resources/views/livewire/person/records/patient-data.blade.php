@@ -51,7 +51,7 @@
                                 href="{{ route('declaration.create', [legalEntity(), 'person' => $personId]) }}"
                                 class="dropdown-item"
                             >
-                                @icon('file-text', 'w-4 h-4 text-gray-500 shrink-0')
+                                @icon('file-text', 'w-4 h-4 shrink-0')
                                 {{ __('patients.sign_declaration') }}
                             </a>
                         @endcan
@@ -60,7 +60,7 @@
                                 href="{{ route('diagnostic-report.create', [legalEntity(), 'person' => $personId]) }}"
                                 class="dropdown-item"
                             >
-                                @icon('activity', 'w-4 h-4 text-gray-500 shrink-0')
+                                @icon('activity', 'w-4 h-4 shrink-0')
                                 {{ __('diagnostic-reports.create') }}
                             </a>
                         @endcan
@@ -69,7 +69,7 @@
                                 href="{{ route('procedure.create', [legalEntity(), 'person' => $personId]) }}"
                                 class="dropdown-item"
                             >
-                                @icon('settings', 'w-4 h-4 text-gray-500 shrink-0')
+                                @icon('settings', 'w-4 h-4 shrink-0')
                                 {{ __('procedures.create') }}
                             </a>
                         @endcan
@@ -78,7 +78,7 @@
                                 href="{{ route('persons.episodes.create', [legalEntity(), 'person' => $personId]) }}"
                                 class="dropdown-item"
                             >
-                                @icon('book', 'w-4 h-4 text-gray-500 shrink-0')
+                                @icon('book', 'w-4 h-4 shrink-0')
                                 {{ __('episodes.create') }}
                             </a>
                         @endcan
@@ -87,7 +87,7 @@
                                 href="{{ route('encounter.create', [legalEntity(), 'person' => $personId, 'type' => 'discharge']) }}"
                                 class="dropdown-item"
                             >
-                                @icon('hospital-bed', 'w-4 h-4 text-gray-500 shrink-0')
+                                @icon('hospital-bed', 'w-4 h-4 shrink-0')
                                 {{ __('patients.discharge_patient') }}
                             </a>
                         @endcan
@@ -96,7 +96,7 @@
                                 href="{{ route('encounter.create', [legalEntity(), 'person' => $personId, 'type' => 'hospitalization_refusal']) }}"
                                 class="dropdown-item"
                             >
-                                @icon('cancel', 'w-4 h-4 text-gray-500 shrink-0')
+                                @icon('cancel', 'w-4 h-4 shrink-0')
                                 {{ __('patients.hospitalization_refusal') }}
                             </a>
                         @endcan

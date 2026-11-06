@@ -846,11 +846,11 @@ input:-webkit-autofill {
     }
 
     .summary-sidebar-btn-active {
-        @apply bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white
+        @apply bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700
     }
 
     .summary-sidebar-btn-inactive {
-        @apply text-gray-800 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200
+        @apply text-gray-800 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-200
     }
 
     .summary-card-btn {
@@ -858,7 +858,7 @@ input:-webkit-autofill {
     }
 
     .summary-sidebar-btn {
-        @apply w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-colors text-sm font-medium
+        @apply w-full flex cursor-pointer items-center gap-4 px-4 py-3 rounded-lg transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-blue-400
     }
 
     .record-inner-card {
