@@ -4,6 +4,7 @@
 >
     @php
         $submissionPending = ($encounterReferralSubmission['status'] ?? null) === \App\Enums\JobStatus::PENDING->value;
+        $preparingSignature = $prepareReferralForSigning ?? false;
     @endphp
     @if ($submissionPending)
         <div class="mb-6 rounded-lg border border-gray-200 p-4 dark:border-gray-600" role="status">
@@ -19,7 +20,7 @@
         </div>
     @endif
     <form wire:submit.prevent="validateEncounterReferral" class="space-y-6">
-        <fieldset @disabled($submissionPending) class="fieldset-card p-6 sm:p-8">
+        <fieldset @disabled($submissionPending || $preparingSignature || ($referralReadonly ?? false)) class="fieldset-card p-6 sm:p-8">
             <legend class="legend">{{ __('encounters.service') }}</legend>
             <div class="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div class="form-group group md:col-span-2">
@@ -213,24 +214,23 @@
             </div>
         </fieldset>
 
-        <fieldset @disabled($submissionPending) class="fieldset-card p-6 sm:p-8">
+        <fieldset @disabled($submissionPending || $preparingSignature || ($referralReadonly ?? false)) class="fieldset-card p-6 sm:p-8">
             <legend class="legend">{{ __('encounters.referral_drawer.validity_and_quantity') }}</legend>
             <div class="mb-4 grid grid-cols-1 gap-6 md:grid-cols-3">
                 @foreach (['started_at' => 'start', 'ended_at' => 'end'] as $field => $period)
                     <div class="grid grid-cols-1 gap-6">
                         <div class="form-group">
-                            <div class="datepicker-wrapper" wire:key="referral-date-{{ $field }}" x-data>
+                            <div class="datepicker-wrapper" wire:key="referral-date-{{ $field }}">
                                 <input
                                     type="text"
                                     id="encounterReferral-{{ $field }}"
-                                    wire:model.lazy="encounterReferralForm.{{ $field }}"
+                                    wire:model="encounterReferralForm.{{ $field }}"
                                     class="datepicker-input with-leading-icon input peer @error('encounterReferralForm.'.$field) input-error @enderror"
                                     placeholder="{{ __('referrals.period_fields.date_placeholder') }}"
                                     autocomplete="off"
                                     datepicker-autohide
                                     datepicker-format="{{ frontendDateFormat() }}"
                                     datepicker-min-date="{{ today()->format(config('app.date_format')) }}"
-                                    x-on:change-date.camel="$el.dispatchEvent(new Event('change', { bubbles: true }))"
                                 />
                                 <label for="encounterReferral-{{ $field }}" class="wrapped-label required">
                                     {{ $period === 'start' ? __('forms.start_date') : __('forms.end_date') }}
@@ -242,7 +242,7 @@
                             <input
                                 id="encounterReferral-{{ $period }}Time"
                                 type="text"
-                                wire:model.blur="encounterReferralForm.{{ $period }}_time"
+                                wire:model="encounterReferralForm.{{ $period }}_time"
                                 class="timepicker-uk input peer"
                                 autocomplete="off"
                                 placeholder="{{ __('referrals.period_fields.time_placeholder') }}"
@@ -279,16 +279,16 @@
                         class="input-select peer w-full"
                         wire:model="encounterReferralForm.priority"
                     >
-                        <option value="routine">{{ __('encounters.priority_options.routine') }}</option>
-                        <option value="urgent">{{ __('encounters.priority_options.urgent') }}</option>
-                        <option value="asap">{{ __('encounters.priority_options.asap') }}</option>
-                        <option value="stat">{{ __('encounters.priority_options.stat') }}</option>
+                        @foreach ($this->encounterReferralPriorityOptions as $code => $description)
+                            <option value="{{ $code }}">{{ $description }}</option>
+                        @endforeach
                     </select>
+                    <x-input-error for="encounterReferralForm.priority" />
                 </div>
             </div>
         </fieldset>
 
-        <fieldset @disabled($submissionPending) class="fieldset-card p-6 sm:p-8">
+        <fieldset @disabled($submissionPending || $preparingSignature || ($referralReadonly ?? false)) class="fieldset-card p-6 sm:p-8">
             <legend class="legend">{{ __('encounters.referral_drawer.additional') }}</legend>
             <div class="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div class="form-group group">
@@ -339,14 +339,23 @@
         @endif
         <div class="flex justify-start gap-3">
             <a href="{{ $encounterReturnUrl }}" class="button-minor">{{ __('forms.cancel') }}</a>
-            @if (!$submissionPending)
+            @if (!$submissionPending && !$preparingSignature && !($referralReadonly ?? false))
+                <button
+                    type="button"
+                    class="button-primary"
+                    wire:click="saveEncounterReferralDraft"
+                    wire:loading.attr="disabled"
+                    wire:target="saveEncounterReferralDraft,validateEncounterReferral,signEncounterReferral,sign"
+                >
+                    {{ __('forms.save') }}
+                </button>
                 <button
                     type="submit"
                     class="button-primary"
                     wire:loading.attr="disabled"
-                    wire:target="validateEncounterReferral,signEncounterReferral,sign"
+                    wire:target="saveEncounterReferralDraft,validateEncounterReferral,signEncounterReferral,sign"
                 >
-                    {{ __('forms.create_and_sign') }}
+                    {{ __('forms.save_and_sign') }}
                 </button>
             @endif
         </div>

@@ -14,6 +14,7 @@ use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\User;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -138,13 +139,14 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
             })->andReturn($prequalifyResponse);
         });
         $context = $lifecycle->resolveEncounterEmployeeContext($this->encounter, $this->employee->id);
-        $uuid = $lifecycle->createEncounterDraft($this->encounter, [
+        $uuid = $lifecycle->prepareEncounterDraftForSigning($this->encounter, [
+            'quantity' => 1.0,
             'service_id' => (string) Str::uuid(),
             'category' => 'transfer_of_care',
             'performer' => $performer,
             'location_reference' => $division,
             'performer_type' => 'THERAPIST',
-        ], 1, $context);
+        ], $context);
         $record = ServiceRequestRequest::where('uuid', $uuid)->firstOrFail();
 
         $this->assertSame($performer, $record->performer->value);
@@ -156,7 +158,7 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
         $this->assertSame('SPECIALITY_TYPE', $record->performerType->coding->first()->system);
 
         $data = $lifecycle->buildSignDbData($record, null, $this->encounter, $context);
-        $payload = (new \App\Services\MedicalEvents\Mappers\ServiceRequestMapper())->toCreateSignedContent($data, [
+        $payload = (new ServiceRequestMapper())->toCreateSignedContent($data, [
             'person_uuid' => $this->person->uuid,
             'encounter_uuid' => $this->encounter->uuid,
             'employee_uuid' => $this->employee->uuid,
@@ -167,17 +169,16 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
         $this->assertSame('THERAPIST', data_get($payload, 'performer_type.coding.0.code'));
 
         $ids = [$record->performerId, $record->locationReferenceId, $record->performerTypeId];
-        $repository = \App\Repositories\MedicalEvents\Repository::serviceRequest();
-        $repository->store($data + ['status' => 'active'], $this->person->id);
+        $lifecycle->saveServiceRequest($data + ['status' => 'active'], $this->person->id);
         $record = $record->fresh();
         $this->assertSame($ids, [$record->performerId, $record->locationReferenceId, $record->performerTypeId]);
 
         unset($data['performer'], $data['location_reference'], $data['performer_type']);
-        $repository->store($data + ['status' => 'active'], $this->person->id);
+        $lifecycle->saveServiceRequest($data + ['status' => 'active'], $this->person->id);
         $record = $record->fresh();
         $this->assertSame($ids, [$record->performerId, $record->locationReferenceId, $record->performerTypeId]);
 
-        $repository->store($data + ['status' => 'active', 'performer' => null, 'location_reference' => null, 'performer_type' => null], $this->person->id);
+        $lifecycle->saveServiceRequest($data + ['status' => 'active', 'performer' => null, 'location_reference' => null, 'performer_type' => null], $this->person->id);
         $record = $record->fresh();
         $this->assertNull($record->performerId);
         $this->assertNull($record->locationReferenceId);
@@ -242,8 +243,8 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
 
         $lifecycle = app(ReferralRequestLifecycleService::class);
         $uuid = $lifecycle->createEncounterDraft($this->encounter, [
-            'service_id' => (string) Str::uuid(), 'category' => 'diagnostic_procedure',
-        ], 1, $lifecycle->resolveEncounterEmployeeContext($this->encounter, $this->employee->id));
+            'quantity' => 1.0, 'service_id' => (string) Str::uuid(), 'category' => 'diagnostic_procedure',
+        ], $lifecycle->resolveEncounterEmployeeContext($this->encounter, $this->employee->id));
         $draft = ServiceRequestRequest::whereUuid($uuid)->firstOrFail();
         $this->assertNull($draft->performerId);
         $this->assertNull($draft->locationReferenceId);
@@ -284,7 +285,7 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
         $this->assertTrue(Schema::hasColumns('service_request_requests', ['performer_id', 'location_reference_id']));
     }
 
-    public function testCreateEncounterDraftPersistsStandaloneServiceRequestWithProgram(): void
+    public function testPrepareEncounterDraftForSigningPersistsStandaloneServiceRequestWithProgram(): void
     {
         $serviceId = (string) Str::uuid();
         $programId = (string) Str::uuid();
@@ -305,7 +306,7 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
 
         $this->assertSame($this->employee->id, $employeeContext['employee_id']);
 
-        $draftUuid = $lifecycle->createEncounterDraft(
+        $draftUuid = $lifecycle->prepareEncounterDraftForSigning(
             $this->encounter,
             [
                 'kind' => 'service_request',
@@ -319,7 +320,6 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
                 'inform_with' => (string) Str::uuid(),
                 'note' => 'standalone from encounter',
             ],
-            1.0,
             $employeeContext
         );
 

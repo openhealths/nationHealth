@@ -21,12 +21,14 @@ use Tests\TestCase;
 class EncounterStandalonePhase6Test extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\Concerns\MocksBasicDictionaries;
 
     protected Person $person;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->mockBasicDictionaries(['SERVICE_REQUEST_PRIORITY' => ['routine' => 'Планове', 'urgent' => 'Ургентне']]);
 
         $this->person = Person::create([
             'uuid' => (string) Str::uuid(),

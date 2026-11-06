@@ -22,6 +22,13 @@ function attachDateMask(el) {
     el.addEventListener('beforeinput', (e) => {
         lastInputType = e.inputType || '';
 
+        if (e.inputType === 'insertText' && /^[.,\/ \-]$/.test(e.data || '')
+            && el.selectionStart === el.selectionEnd && el.value[el.selectionStart - 1] === '.') {
+            e.preventDefault();
+            lastInputType = '';
+            return;
+        }
+
         if (e.inputType === 'deleteContentBackward') {
             const pos = el.selectionStart;
             const endPos = el.selectionEnd;
@@ -124,7 +131,11 @@ function attachDateMask(el) {
         }
 
         let newCursor = cursorPos;
-        if (lastInputType === 'insertText' && !isSeparatorInsert) {
+        if (isSeparatorInsert) {
+            const separatorCount = (rawVal.substring(0, cursorPos).match(/[.,\/ \-]/g) || []).length;
+            if (separatorCount === 1) newCursor = 3;
+            if (separatorCount === 2) newCursor = 6;
+        } else if (lastInputType === 'insertText') {
             if (cursorPos === 2 && day.length === 2 && formatted.length >= 3 && formatted[2] === '.') {
                 newCursor = 3;
             } else if (cursorPos === 5 && month.length === 2 && formatted.length >= 6 && formatted[5] === '.') {

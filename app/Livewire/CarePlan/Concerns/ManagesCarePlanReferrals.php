@@ -5,23 +5,23 @@ declare(strict_types=1);
 namespace App\Livewire\CarePlan\Concerns;
 
 use App\Classes\eHealth\EHealth as SubmissionApi;
-use App\Livewire\Concerns\SubmitsClinicalOperations;
-use App\Repositories\Repository as BaseRepository;
-use App\Services\MedicalEvents\Fhir;
-
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\CarePlanStatus;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Livewire\Concerns\SubmitsClinicalOperations;
+use App\Livewire\Referral\Forms\ServiceRequestForm;
 use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
-use App\Repositories\CarePlanActivityRepository;
-use App\Repositories\MedicalEvents\Repository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
 use App\Services\MedicalEvents\CarePlanActivityEHealthGuard;
+use App\Services\MedicalEvents\Fhir;
 use App\Services\MedicalEvents\Mappers\DeviceRequestMapper;
+use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Carbon\Carbon;
@@ -32,7 +32,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use RuntimeException;
 use Throwable;
 
@@ -40,7 +43,17 @@ trait ManagesCarePlanReferrals
 {
     use SubmitsClinicalOperations;
 
-    public function initReferralForm(int $activityId, CarePlanActivityRepository $activityRepository): void
+    #[Computed]
+    public function referralPriorityOptions(): array
+    {
+        $name = ($this->referralForm['kind'] ?? '') === 'device_request'
+            ? 'device_request_priority'
+            : 'SERVICE_REQUEST_PRIORITY';
+
+        return dictionary()->basics()->byName($name)->asCodeDescription()->all();
+    }
+
+    public function initReferralForm(int $activityId): void
     {
         $this->authorizeCarePlanActivityWrite();
 
@@ -104,7 +117,7 @@ trait ManagesCarePlanReferrals
         if ($existingDraft) {
             if (app(ReferralRequestLifecycleService::class)->trySyncDraftFromEHealth($this->carePlan, $activity, $existingDraft, $resolvedKind)) {
                 if ($activity->status === 'scheduled') {
-                    BaseRepository::carePlanActivity()->updateById($activity->id, ['status' => 'in-progress']);
+                    Repository::carePlanActivity()->updateById($activity->id, ['status' => 'in-progress']);
                 }
                 $this->refreshCarePlan();
                 $documentLabel = $resolvedKind === 'device_request'
@@ -155,7 +168,7 @@ trait ManagesCarePlanReferrals
 
         $code = $activity->productCodeableConcept ?? $activity->productReference ?? 'од.';
 
-        $activityResource = $activityRepository->getResource($activity);
+        $activityResource = Repository::carePlanActivity()->getResource($activity);
         $this->referralServiceType = data_get($activityResource, 'detail.productReference.identifier.type.coding.0.code', 'service');
         $this->referralCategoryOptions = [];
         if ($this->referralServiceType === 'service_group') {
@@ -188,7 +201,7 @@ trait ManagesCarePlanReferrals
         $this->referralServiceCategory = $category ?? ($this->referralServiceType === 'service_group' ? '' : 'procedure');
 
         $schedule = $activityResource['detail']['scheduledPeriod'] ?? [];
-        $draftData = $existingDraft ? Repository::serviceRequest()->formData($existingDraft) : [];
+        $draftData = $existingDraft ? MedicalEventsRepository::serviceRequest()->formData($existingDraft) : [];
         if ($this->referralServiceType === 'service_group') {
             $this->referralServiceCategory = $draftData['category'] ?? '';
         }
@@ -275,8 +288,25 @@ trait ManagesCarePlanReferrals
         $this->showReferralDrawer = true;
     }
 
-    public function validateReferral(): void
+    public function saveReferralDraft(): void
     {
+        $this->validateReferral(false);
+    }
+
+    public function validateReferral(bool $sign = true): void
+    {
+        $plan = Repository::carePlan()->findById($this->carePlan->id);
+        if (Auth::user()->cannot('manageActivities', $plan)) {
+            Session::flash('error', __('care-plan.policy.manage_activities_denied'));
+
+            return;
+        }
+        if (!$sign && ($this->referralForm['kind'] ?? null) !== 'service_request') {
+            Session::flash('error', __('care-plan.referral_wrong_activity_kind'));
+
+            return;
+        }
+
         $this->referralWarningMessage = '';
         $this->referralShowRemainingQtyWarning = false;
 
@@ -290,7 +320,7 @@ trait ManagesCarePlanReferrals
             'referralForm.start_time' => 'required|date_format:H:i',
             'referralForm.end_time' => 'required|date_format:H:i',
             'referralForm.quantity' => 'required|numeric|min:0.01',
-            'referralForm.priority' => 'required|in:routine,urgent,asap,stat',
+            'referralForm.priority' => ['required', Rule::in(array_keys($this->referralPriorityOptions()))],
         ];
 
         if ($this->referralForm['kind'] === 'service_request') {
@@ -351,7 +381,7 @@ trait ManagesCarePlanReferrals
 
             return;
         }
-        if ($activity) {
+        if ($sign && $activity) {
             $existingDraft = app(ReferralRequestLifecycleService::class)->findDraftByActivity($activity);
             if ($existingDraft && app(ReferralRequestLifecycleService::class)->trySyncDraftFromEHealth(
                 $this->carePlan,
@@ -369,7 +399,7 @@ trait ManagesCarePlanReferrals
         }
 
         try {
-            $this->carePlan = BaseRepository::carePlan()->findById($this->carePlan->id);
+            $this->carePlan = Repository::carePlan()->findById($this->carePlan->id);
 
             $employeeContext = app(ReferralRequestLifecycleService::class)->resolveEmployeeContext(
                 $this->carePlan,
@@ -381,12 +411,29 @@ trait ManagesCarePlanReferrals
                 $this->carePlan,
                 array_replace($this->referralForm, $period),
                 $qty,
-                $employeeContext
+                $employeeContext,
+                prequalify: $sign
             );
+            if (!$sign) {
+                $this->showReferralDrawer = true;
+                $this->showSignatureModal = false;
+                $this->actionType = '';
+                Session::flash('success', __('referrals.draft_saved'));
+
+                return;
+            }
+            $this->assertReferralOccurrencePeriod($period);
             $signAction = $this->referralForm['kind'] === 'service_request'
                 ? 'sign_servicerequest'
                 : 'sign_devicerequest';
             $this->openSignatureModal($signAction);
+        } catch (ValidationException $exception) {
+            $this->showReferralDrawer = true;
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+            $this->flashUserError($exception->validator->errors()->first());
+
+            throw $exception;
         } catch (EHealthValidationException $exception) {
             $exception->report();
             $this->showReferralDrawer = true;
@@ -461,7 +508,7 @@ trait ManagesCarePlanReferrals
             return;
         }
 
-        $this->carePlan = BaseRepository::carePlan()->findById($this->carePlan->id);
+        $this->carePlan = Repository::carePlan()->findById($this->carePlan->id);
 
         try {
             $requestRecord = app(MedicalRequestOwnership::class)
@@ -501,8 +548,8 @@ trait ManagesCarePlanReferrals
             $this->assertReferralOccurrencePeriod($dbData);
 
             if ($kind === 'service_request') {
-                $resource = Fhir::serviceRequest()->toFhir($dbData, $uuids + ['carePlanUuid' => $this->carePlan->uuid, 'resource' => Repository::serviceRequest()->getResource($requestRecord)]);
-                $signPayload = \App\Livewire\Referral\Forms\ServiceRequestForm::buildCreateContent($resource);
+                $resource = Fhir::serviceRequest()->toFhir($dbData, $uuids + ['carePlanUuid' => $this->carePlan->uuid, 'resource' => MedicalEventsRepository::serviceRequest()->getResource($requestRecord)]);
+                $signPayload = ServiceRequestForm::buildCreateContent($resource);
             } else {
                 $signPayload = (new DeviceRequestMapper())->toCreateSignedContent($dbData, $uuids, (string) $this->carePlan->uuid, (string) $activity->uuid);
             }
@@ -515,7 +562,8 @@ trait ManagesCarePlanReferrals
                 Auth::user()->party->taxId
             );
 
-            $requestRecord = \App\Repositories\MedicalEvents\Repository::serviceRequest()->storeResource($resource, $this->carePlan->personId, $requestRecord->employeeId, $requestRecord->divisionId);
+            $this->assertReferralOccurrencePeriod($dbData);
+            $requestRecord = MedicalEventsRepository::serviceRequest()->storeResource($resource, $this->carePlan->personId, $requestRecord->employeeId, $requestRecord->divisionId);
             $finalResponse = $this->submitClinicalOperation($requestRecord, ['status' => 'active'], fn () => SubmissionApi::serviceRequest()->createSigned($this->carePlan->person->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']));
             if ($finalResponse === null) {
                 $this->redirectRoute('care-plans.activities.show', [legalEntity(), $this->carePlan->id, $activity->id], navigate: true);
@@ -539,7 +587,7 @@ trait ManagesCarePlanReferrals
 
         } catch (ValidationException $exception) {
             $this->showSignatureModal = false;
-            $this->initReferralForm($activity->id, BaseRepository::carePlanActivity());
+            $this->initReferralForm($activity->id);
             $this->setErrorBag($exception->validator->errors());
             $this->flashUserError($exception->validator->errors()->first());
         } catch (EHealthValidationException $e) {
@@ -634,8 +682,8 @@ trait ManagesCarePlanReferrals
         try {
             $api = EHealth::serviceRequest();
             $snapshot = $this->fetchServiceRequestSnapshot($this->carePlan->person->uuid, $record->uuid);
-            $record = \App\Repositories\MedicalEvents\Repository::serviceRequest()->storeResource((new \App\Services\MedicalEvents\Mappers\ServiceRequestMapper())->normalize($snapshot), (int) $this->carePlan->personId, $record->employeeId, $record->divisionId);
-            $payload = \App\Livewire\Referral\Forms\ServiceRequestForm::buildStatusContent($snapshot, $this->statusReason, $letter, 'eHealth/service_request_recall_reasons');
+            $record = MedicalEventsRepository::serviceRequest()->storeResource((new ServiceRequestMapper())->normalize($snapshot), (int) $this->carePlan->personId, $record->employeeId, $record->divisionId);
+            $payload = ServiceRequestForm::buildStatusContent($snapshot, $this->statusReason, $letter, 'eHealth/service_request_recall_reasons');
 
             $signedContent = signatureService()->signData(
                 $payload,
@@ -714,8 +762,8 @@ trait ManagesCarePlanReferrals
             if ($kind === 'service_request') {
                 $api = EHealth::serviceRequest();
                 $snapshot = $this->fetchServiceRequestSnapshot($this->carePlan->person->uuid, $record->uuid);
-                $record = \App\Repositories\MedicalEvents\Repository::serviceRequest()->storeResource((new \App\Services\MedicalEvents\Mappers\ServiceRequestMapper())->normalize($snapshot), (int) $this->carePlan->personId, $record->employeeId, $record->divisionId);
-                $payload = \App\Livewire\Referral\Forms\ServiceRequestForm::buildStatusContent($snapshot, $this->statusReason, trim($this->referralExplanatoryLetter), 'eHealth/service_request_cancel_reasons');
+                $record = MedicalEventsRepository::serviceRequest()->storeResource((new ServiceRequestMapper())->normalize($snapshot), (int) $this->carePlan->personId, $record->employeeId, $record->divisionId);
+                $payload = ServiceRequestForm::buildStatusContent($snapshot, $this->statusReason, trim($this->referralExplanatoryLetter), 'eHealth/service_request_cancel_reasons');
             }
 
             $signedContent = signatureService()->signData(
@@ -809,7 +857,7 @@ trait ManagesCarePlanReferrals
                 $dbData
             );
 
-            ($requestRecord instanceof ServiceRequestRequest ? Repository::serviceRequest() : Repository::deviceRequest())->refreshRecord($requestRecord);
+            ($requestRecord instanceof ServiceRequestRequest ? MedicalEventsRepository::serviceRequest() : MedicalEventsRepository::deviceRequest())->refreshRecord($requestRecord);
 
             $after = [
                 'status' => (string) $requestRecord->status,
@@ -828,7 +876,7 @@ trait ManagesCarePlanReferrals
             ]);
 
             if ($activity->status === 'scheduled') {
-                BaseRepository::carePlanActivity()->updateById($activity->id, ['status' => 'in-progress']);
+                Repository::carePlanActivity()->updateById($activity->id, ['status' => 'in-progress']);
             }
 
             $this->refreshCarePlan();
@@ -959,6 +1007,13 @@ trait ManagesCarePlanReferrals
             $this->referralForm['ended_at'].' '.$this->referralForm['end_time'],
             config('app.timezone')
         );
+        foreach (['start_time' => $start, 'end_time' => $end] as $field => $date) {
+            if ($date->format('H:i') !== $this->referralForm[$field]) {
+                throw ValidationException::withMessages([
+                    'referralForm.'.$field => __('referrals.period_fields.nonexistent_time'),
+                ]);
+            }
+        }
         $period = ['started_at' => $start->toIso8601String(), 'ended_at' => $end->toIso8601String()];
         $this->assertReferralOccurrencePeriod($period);
 
@@ -967,18 +1022,35 @@ trait ManagesCarePlanReferrals
 
     protected function assertReferralOccurrencePeriod(array $period): void
     {
-        $start = CarbonImmutable::parse($period['started_at'], 'UTC');
-        $end = CarbonImmutable::parse($period['ended_at'], 'UTC');
-        if ($start->isPast()) {
-            throw ValidationException::withMessages([
-                'referralForm.start_time' => __('errors.ehealth.messages.occurrence_start_in_past'),
+        $serverNow = CarbonImmutable::now();
+        $rules = [
+            'referralForm.start_time' => ['required', 'date', 'after_or_equal:'.$serverNow->toIso8601String()],
+            'referralForm.ended_at' => ['required', 'date', 'after_or_equal:referralForm.start_time'],
+        ];
+        if (array_key_exists('priority', $period)) {
+            $rules['referralForm.priority'] = ['required', Rule::in(array_keys($this->referralPriorityOptions()))];
+        }
+        $validator = Validator::make(['referralForm' => [
+            'start_time' => $period['started_at'] ?? null,
+            'ended_at' => $period['ended_at'] ?? null,
+            'priority' => $period['priority'] ?? null,
+        ]], $rules, [
+            'referralForm.start_time.after_or_equal' => __('errors.ehealth.messages.occurrence_start_in_past').' '.__('referrals.period_fields.comparison_context', [
+                'start' => $period['started_at'] ?? '',
+                'now' => $serverNow->toIso8601String(),
+            ]),
+            'referralForm.ended_at.after_or_equal' => __('errors.ehealth.messages.period_end_before_start'),
+        ]);
+        if ($validator->fails() && isset($validator->failed()['referralForm.start_time']['AfterOrEqual'])) {
+            Log::notice('Care plan referral start is in the past', [
+                'draft_uuid' => $this->referralRequestIdToSign,
+                'start' => $period['started_at'] ?? null,
+                'end' => $period['ended_at'] ?? null,
+                'server_now' => $serverNow->toIso8601String(),
+                'timezone' => config('app.timezone'),
             ]);
         }
-        if ($end->lessThan($start)) {
-            throw ValidationException::withMessages([
-                'referralForm.ended_at' => __('errors.ehealth.messages.period_end_before_start'),
-            ]);
-        }
+        $validator->validate();
     }
 
     /**
@@ -1081,9 +1153,9 @@ trait ManagesCarePlanReferrals
         $resolved = is_string($raw) ? ServiceRequestStatus::resolve($raw) : null;
 
         if ($record instanceof ServiceRequestRequest) {
-            Repository::serviceRequest()->updateClinicalStatus($record, ($resolved ?? $fallback)->value);
+            MedicalEventsRepository::serviceRequest()->updateClinicalStatus($record, ($resolved ?? $fallback)->value);
         } else {
-            Repository::deviceRequest()->saveStatus($record, ($resolved ?? $fallback)->value);
+            MedicalEventsRepository::deviceRequest()->saveStatus($record, ($resolved ?? $fallback)->value);
         }
     }
 
@@ -1139,12 +1211,12 @@ trait ManagesCarePlanReferrals
             if ($kind === 'service_request') {
                 app(ReferralRequestLifecycleService::class)->saveServiceRequest($dbData, $this->carePlan->personId);
             } else {
-                Repository::deviceRequest()->store($dbData, $this->carePlan->person_id);
+                MedicalEventsRepository::deviceRequest()->store($dbData, $this->carePlan->person_id);
             }
         }
 
         if ($activity->status === 'scheduled') {
-            BaseRepository::carePlanActivity()->updateById($activity->id, ['status' => 'in-progress']);
+            Repository::carePlanActivity()->updateById($activity->id, ['status' => 'in-progress']);
         }
 
         $this->showSignatureModal = false;

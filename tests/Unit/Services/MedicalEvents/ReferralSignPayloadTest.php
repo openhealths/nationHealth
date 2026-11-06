@@ -193,10 +193,11 @@ class ReferralSignPayloadTest extends TestCase
         ];
         $lifecycle = app(ReferralRequestLifecycleService::class);
         $uuid = $lifecycle->createEncounterDraft($this->encounter, [
+            'quantity' => 2,
             'kind' => 'service_request', 'service_id' => $groupId, 'service_type' => 'service_group',
             'category' => 'laboratory_procedure', 'started_at' => '2026-11-01T10:00:00Z',
             'ended_at' => '2026-11-02T10:00:00Z',
-        ], 2, $employee);
+        ], $employee);
         $record = Repository::serviceRequest()->findByUuid($uuid);
         $resource = Repository::serviceRequest()->getResource($record);
         $this->assertSame($groupId, data_get($resource, 'code.identifier.value'));
@@ -210,7 +211,7 @@ class ReferralSignPayloadTest extends TestCase
     public function test_encounter_draft_keeps_subsecond_occurrence_before_persistence(): void
     {
         $period = ['start' => '2026-11-01T10:20:30.123456Z', 'end' => '2026-11-02T10:20:30.654321Z'];
-        $uuid = app(ReferralRequestLifecycleService::class)->createEncounterDraft($this->encounter, ['kind' => 'service_request', 'service_id' => (string) Str::uuid(), 'started_at' => $period['start'], 'ended_at' => $period['end'], 'category' => 'diagnostic_procedure'], 1.25, ['employee_id' => $this->employee->id]);
+        $uuid = app(ReferralRequestLifecycleService::class)->createEncounterDraft($this->encounter, ['quantity' => 1.25, 'kind' => 'service_request', 'service_id' => (string) Str::uuid(), 'started_at' => $period['start'], 'ended_at' => $period['end'], 'category' => 'diagnostic_procedure'], ['employee_id' => $this->employee->id]);
         $actual = Repository::serviceRequest()->getResource(Repository::serviceRequest()->findByUuid($uuid));
         $this->assertSame($period, $actual['occurrencePeriod']);
     }
@@ -317,9 +318,10 @@ class ReferralSignPayloadTest extends TestCase
     {
         $this->instance('legalEntity', $this->legalEntity);
         $uuid = app(ReferralRequestLifecycleService::class)->createEncounterDraft($this->encounter, [
+            'quantity' => 1,
             'kind' => 'service_request', 'service_id' => (string) Str::uuid(),
             'category' => 'diagnostic_procedure', 'started_at' => '2026-11-01T10:20:30Z', 'ended_at' => '2026-11-02T10:20:30Z',
-        ], 1, ['employee_uuid' => $this->employee->uuid, 'legal_entity_uuid' => $this->legalEntity->uuid]);
+        ], ['employee_uuid' => $this->employee->uuid, 'legal_entity_uuid' => $this->legalEntity->uuid]);
         $repository = Repository::serviceRequest();
         $record = $repository->findByUuid($uuid);
         $this->assertSame($this->employee->id, $record->employeeId);
@@ -340,9 +342,10 @@ class ReferralSignPayloadTest extends TestCase
         $before = ServiceRequestRequest::count();
         try {
             app(ReferralRequestLifecycleService::class)->createEncounterDraft($this->encounter, [
+                'quantity' => 1,
                 'kind' => 'service_request', 'service_id' => (string) Str::uuid(), 'category' => 'diagnostic_procedure',
                 'started_at' => '2026-11-01T10:20:30Z', 'ended_at' => '2026-11-02T10:20:30Z',
-            ], 1, ['employee_uuid' => (string) Str::uuid(), 'legal_entity_uuid' => $this->legalEntity->uuid]);
+            ], ['employee_uuid' => (string) Str::uuid(), 'legal_entity_uuid' => $this->legalEntity->uuid]);
             $this->fail('Application-created referrals must not silently lose their author.');
         } catch (\InvalidArgumentException $exception) {
             $this->assertSame(__('care-plan.referral_author_unavailable'), $exception->getMessage());

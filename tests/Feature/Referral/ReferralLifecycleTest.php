@@ -7,6 +7,10 @@ namespace Tests\Feature\Referral;
 use App\Classes\eHealth\Api\Patient\ServiceRequest as ServiceRequestApi;
 use App\Classes\eHealth\Api\Patient\DeviceRequest as DeviceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Exceptions\EHealth\EHealthValidationException;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use GuzzleHttp\Psr7\Response;
 use App\Models\CarePlanActivity;
 use App\Models\Person\Person;
 use App\Models\Employee\Employee;
@@ -51,13 +55,13 @@ class ReferralLifecycleTest extends TestCase
             $this->assertSame($division, data_get($payload, 'service_request.location_reference.identifier.value'));
 
             return true;
-        }))->andReturn(new EHealthResponse(new \GuzzleHttp\Psr7\Response(200, [], json_encode(['data' => []]))));
+        }))->andReturn(new EHealthResponse(new Response(200, [], json_encode(['data' => []]))));
         $this->instance(ServiceRequestApi::class, $api);
 
-        $uuid = app(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class)->createEncounterDraft($this->encounter, [
-            'category' => 'transfer_of_care', 'service_id' => (string) Str::uuid(),
+        $uuid = app(ReferralRequestLifecycleService::class)->prepareEncounterDraftForSigning($this->encounter, [
+            'quantity' => 1.0, 'category' => 'transfer_of_care', 'service_id' => (string) Str::uuid(),
             'performer' => $destination, 'location_reference' => $division,
-        ], 1, [
+        ], [
             'employee_id' => $this->employee->id, 'employee_uuid' => $this->employee->uuid,
             'legal_entity_uuid' => legalEntity()->uuid,
         ]);
@@ -71,20 +75,20 @@ class ReferralLifecycleTest extends TestCase
     public function test_transfer_rejected_by_ehealth_is_not_persisted_even_without_program(): void
     {
         $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
-        $api->shouldReceive('prequalify')->once()->andThrow(new \App\Exceptions\EHealth\EHealthValidationException([
+        $api->shouldReceive('prequalify')->once()->andThrow(new EHealthValidationException([
             'error' => ['message' => 'LocationReference is not an active division'],
         ]));
         $this->instance(ServiceRequestApi::class, $api);
-        $count = \App\Models\MedicalEvents\Sql\ServiceRequestRequest::count();
+        $count = ServiceRequestRequest::count();
 
         try {
-            app(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class)->createEncounterDraft($this->encounter, [
-                'category' => 'transfer_of_care', 'service_id' => (string) Str::uuid(),
+            app(ReferralRequestLifecycleService::class)->prepareEncounterDraftForSigning($this->encounter, [
+                'quantity' => 1.0, 'category' => 'transfer_of_care', 'service_id' => (string) Str::uuid(),
                 'performer' => (string) Str::uuid(), 'location_reference' => (string) Str::uuid(),
-            ], 1, ['employee_id' => $this->employee->id, 'employee_uuid' => $this->employee->uuid, 'legal_entity_uuid' => legalEntity()->uuid]);
+            ], ['employee_id' => $this->employee->id, 'employee_uuid' => $this->employee->uuid, 'legal_entity_uuid' => legalEntity()->uuid]);
             $this->fail('eHealth rejection must stop transfer persistence.');
-        } catch (\App\Exceptions\EHealth\EHealthValidationException) {
-            $this->assertSame($count, \App\Models\MedicalEvents\Sql\ServiceRequestRequest::count());
+        } catch (EHealthValidationException) {
+            $this->assertSame($count, ServiceRequestRequest::count());
         }
     }
 
@@ -103,7 +107,12 @@ class ReferralLifecycleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockBasicDictionaries(['eHealth/service_request_cancel_reasons' => ['entered-in-error' => 'Помилка'], 'eHealth/service_request_recall_reasons' => ['synthetic-reason' => 'Причина']]);
+        $this->mockBasicDictionaries([
+            'SERVICE_REQUEST_PRIORITY' => ['routine' => 'Планове', 'urgent' => 'Ургентне'],
+            'device_request_priority' => ['routine' => 'Плановий', 'urgent' => 'Ургентний', 'forced' => 'Примусовий'],
+            'eHealth/service_request_cancel_reasons' => ['entered-in-error' => 'Помилка'],
+            'eHealth/service_request_recall_reasons' => ['synthetic-reason' => 'Причина'],
+        ]);
         $signature = Mockery::mock(\App\Services\SignatureService::class);
         $signature->shouldReceive('getCertificateAuthorities')->andReturn([]);
         $this->instance(\App\Services\SignatureService::class, $signature);
@@ -274,7 +283,7 @@ class ReferralLifecycleTest extends TestCase
         ];
 
         $serviceData = array_replace($serviceData, $serviceRepo->activityContext($this->serviceActivity->uuid, $this->person->id));
-        $serviceId = app(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class)->saveServiceRequest($serviceData, $this->person->id, [
+        $serviceId = app(ReferralRequestLifecycleService::class)->saveServiceRequest($serviceData, $this->person->id, [
             'person_uuid' => $this->person->uuid, 'encounter_uuid' => $this->encounter->uuid,
             'employee_uuid' => $this->employee->uuid, 'legal_entity_uuid' => $this->employee->legalEntity->uuid,
         ])->id;
@@ -299,7 +308,7 @@ class ReferralLifecycleTest extends TestCase
             'based_on_id' => $this->fhirIdentifierId((string) $this->deviceActivity->uuid),
         ]);
 
-        $service = \App\Models\MedicalEvents\Sql\ServiceRequestRequest::findOrFail($serviceId);
+        $service = ServiceRequestRequest::findOrFail($serviceId);
         $device = \App\Models\MedicalEvents\Sql\DeviceRequestRequest::findOrFail($deviceId);
         $this->assertSame($this->serviceActivity->uuid, $service->basedOn->value);
         $this->assertSame($this->deviceActivity->uuid, $device->basedOn->value);
@@ -659,7 +668,7 @@ class ReferralLifecycleTest extends TestCase
             'quantity' => 3.0,
             'based_on_id' => $this->fhirIdentifierId((string) $this->serviceActivity->uuid),
         ]);
-        $referral = \App\Models\MedicalEvents\Sql\ServiceRequestRequest::where('uuid', $draftUuid)->firstOrFail();
+        $referral = ServiceRequestRequest::where('uuid', $draftUuid)->firstOrFail();
         $this->assertSame($this->serviceActivity->uuid, $referral->basedOn->value);
     }
 
@@ -776,7 +785,7 @@ class ReferralLifecycleTest extends TestCase
             ->assertSet('showReferralDrawer', false)
             ->assertSet('showSignatureModal', true);
 
-        $drafts = \App\Models\MedicalEvents\Sql\ServiceRequestRequest::query()
+        $drafts = ServiceRequestRequest::query()
             ->whereHas('basedOn', fn ($query) => $query->whereValue($this->serviceActivity->uuid))->get();
         $this->assertCount(1, $drafts);
         $resource = Repository::serviceRequest()->getResource($drafts->sole());
@@ -846,7 +855,7 @@ class ReferralLifecycleTest extends TestCase
             'status' => 'draft',
             'based_on_id' => $this->fhirIdentifierId((string) $this->serviceActivity->uuid),
         ]);
-        $referral = \App\Models\MedicalEvents\Sql\ServiceRequestRequest::where('uuid', $draftUuid)->firstOrFail();
+        $referral = ServiceRequestRequest::where('uuid', $draftUuid)->firstOrFail();
         $this->assertSame($this->serviceActivity->uuid, $referral->basedOn->value);
     }
 
@@ -864,7 +873,7 @@ class ReferralLifecycleTest extends TestCase
         $mockDeviceApi->shouldReceive('prequalify')->never();
         $this->instance(DeviceRequestApi::class, $mockDeviceApi);
 
-        $service = app(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class);
+        $service = app(ReferralRequestLifecycleService::class);
         $carePlan = $this->deviceActivity->carePlan->loadMissing(['person', 'encounter']);
 
         try {
@@ -923,7 +932,7 @@ class ReferralLifecycleTest extends TestCase
             ->andReturn($prequalifyResponse);
         $this->instance(DeviceRequestApi::class, $mockDeviceApi);
 
-        $service = app(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class);
+        $service = app(ReferralRequestLifecycleService::class);
         $carePlan = $this->deviceActivity->carePlan->loadMissing(['person', 'encounter']);
 
         try {
@@ -961,7 +970,7 @@ class ReferralLifecycleTest extends TestCase
         $this->actingAs($this->user);
 
         $uuid = (string) Str::uuid();
-        \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+        ServiceRequestRequest::create([
             'uuid' => $uuid,
             'employee_id' => $this->employee->id,
             'person_id' => $this->person->id,
@@ -1000,7 +1009,7 @@ class ReferralLifecycleTest extends TestCase
 
         // Create a mock ServiceRequestRequest in the DB
         $uuid = (string) Str::uuid();
-        $serviceRequest = \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+        $serviceRequest = ServiceRequestRequest::create([
             'uuid' => $uuid,
             'employee_id' => $this->employee->id,
             'person_id' => $this->person->id,
@@ -1125,7 +1134,7 @@ class ReferralLifecycleTest extends TestCase
         ]);
 
         // FHIR sync may create new Identifier rows; the referenced UUIDs must survive signing.
-        $signedRequest = \App\Models\MedicalEvents\Sql\ServiceRequestRequest::with(['basedOn', 'context'])
+        $signedRequest = ServiceRequestRequest::with(['basedOn', 'context'])
             ->whereUuid($signedUuid)
             ->firstOrFail();
         $this->assertSame($this->serviceActivity->uuid, $signedRequest->basedOn?->value);
@@ -1176,7 +1185,7 @@ class ReferralLifecycleTest extends TestCase
             ->with($this->person->uuid, $draftUuid)
             ->andReturn($missingResponse, $getResponse);
 
-        $mockServiceApi->shouldReceive('createSigned')->once()->andThrow(new \App\Exceptions\EHealth\EHealthValidationException([
+        $mockServiceApi->shouldReceive('createSigned')->once()->andThrow(new EHealthValidationException([
             'error' => [
                 'message' => 'Validation failed.',
                 'invalid' => [
@@ -1224,7 +1233,7 @@ class ReferralLifecycleTest extends TestCase
         $this->mockActivityRegisteredInEHealth();
 
         $draftUuid = (string) Str::uuid();
-        \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+        ServiceRequestRequest::create([
             'uuid' => $draftUuid,
             'employee_id' => $this->employee->id,
             'person_id' => $this->person->id,
@@ -1275,7 +1284,7 @@ class ReferralLifecycleTest extends TestCase
         $this->actingAs($this->user);
 
         $referralUuid = (string) Str::uuid();
-        \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+        ServiceRequestRequest::create([
             'uuid' => $referralUuid,
             'employee_id' => $this->employee->id,
             'person_id' => $this->person->id,
@@ -1314,7 +1323,7 @@ class ReferralLifecycleTest extends TestCase
         $this->actingAs($this->user);
 
         $referralUuid = (string) Str::uuid();
-        \App\Models\MedicalEvents\Sql\ServiceRequestRequest::create([
+        ServiceRequestRequest::create([
             'uuid' => $referralUuid,
             'employee_id' => $this->employee->id,
             'person_id' => $this->person->id,
@@ -1440,7 +1449,7 @@ class ReferralLifecycleTest extends TestCase
         ]);
     }
 
-    private function createCanonicalReferral(array $data): \App\Models\MedicalEvents\Sql\ServiceRequestRequest
+    private function createCanonicalReferral(array $data): ServiceRequestRequest
     {
         foreach (['based_on_id' => 'based_on_uuid', 'context_id' => 'context_uuid'] as $column => $field) {
             if (isset($data[$column])) {
@@ -1448,9 +1457,9 @@ class ReferralLifecycleTest extends TestCase
             }
         }
         $data += ['quantity_system' => 'SERVICE_UNIT', 'quantity_code' => 'PIECE', 'context_type' => 'encounter'];
-        $id = app(\App\Services\MedicalEvents\ReferralRequestLifecycleService::class)->saveServiceRequest($data, $data['person_id'])->id;
+        $id = app(ReferralRequestLifecycleService::class)->saveServiceRequest($data, $data['person_id'])->id;
 
-        return \App\Models\MedicalEvents\Sql\ServiceRequestRequest::findOrFail($id);
+        return ServiceRequestRequest::findOrFail($id);
     }
 
 }

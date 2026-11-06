@@ -283,6 +283,10 @@ Route::prefix('persons')->whereNumber('person')
                 ->can('createServiceRequest', ['encounter', 'person', 'legalEntity'])
                 ->whereNumber('encounter')
                 ->name('referral.create');
+            Route::get('/encounter/{encounter}/referral/{referral}/edit', EncounterReferralCreate::class)
+                ->can('createServiceRequest', ['encounter', 'person', 'legalEntity'])
+                ->whereNumber(['encounter', 'referral'])
+                ->name('referral.edit');
 
             Route::get('/encounter/create', EncounterPackageCreate::class)
                 ->can('create', Encounter::class)

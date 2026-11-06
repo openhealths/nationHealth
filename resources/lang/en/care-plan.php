@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 return [
+    'policy' => [
+        'manage_activities_denied' => 'You do not have permission to manage activities for this care plan.',
+    ],
     'sync_first_page' => 'The first page of care plans has been received. Details and remaining data are loading in the background. You can continue working.',
     'approval_verified' => 'Access approval confirmed.',
     'prescribing_patient_access_required' => 'Creating and changing activities requires a verified write approval for this care plan.',
