@@ -21,7 +21,7 @@
             <div class="form-group mb-4">
                 <label for="referralCompletionType" class="label">{{ __('care-plan.referral_complete_emz_type') }}</label>
                 <select id="referralCompletionType" wire:model.live="referralCompletionType" class="input">
-                    @foreach (['encounter', 'procedure', 'diagnostic_report'] as $type)
+                    @foreach ($referralCompletionTypes as $type)
                         <option value="{{ $type }}">{{ __('care-plan.emz_type.'.$type) }}</option>
                     @endforeach
                 </select>
@@ -35,7 +35,7 @@
                     @endforeach
                 </select>
                 @if ($this->referralCompletionResources === [])
-                    <p class="text-sm text-amber-700 dark:text-amber-300">{{ __('care-plan.referral_complete_emz_empty') }}</p>
+                    <p class="text-sm text-amber-700 dark:text-amber-300">{{ __('referrals.messages.completion_record_empty', ['type' => __('care-plan.emz_type.'.$referralCompletionType)]) }}</p>
                 @endif
             </div>
 

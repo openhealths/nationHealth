@@ -1,6 +1,6 @@
 <div
     class="record-inner-card overflow-hidden !rounded-[18px] !border-gray-300 dark:!border-gray-700"
-    @if ($referralSubmissionPending) wire:poll.5s="checkReferralCompletion" @endif
+    @if ($referralSubmissionPending) wire:poll.5s="pollReferralCompletion" @endif
 >
     <div class="record-inner-header">
         <div class="record-inner-column min-w-0 flex-1 !px-3 !py-3">

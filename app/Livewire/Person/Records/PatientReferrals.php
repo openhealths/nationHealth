@@ -11,6 +11,11 @@ use App\Enums\Person\ServiceRequestStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Concerns\SubmitsClinicalOperations;
+use App\Jobs\ServiceRequestSync;
+use App\Models\Declaration;
+use App\Models\User;
+use App\Notifications\RemoteEHealthLinksNotification;
+use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
@@ -20,7 +25,12 @@ use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Bus\Batch;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
+use App\Traits\BatchLegalEntityQueries;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
@@ -33,16 +43,23 @@ use Throwable;
 class PatientReferrals extends BasePatientComponent
 {
     use SubmitsClinicalOperations;
+    use BatchLegalEntityQueries;
     use \App\Livewire\Concerns\ReadsClinicalSnapshots;
 
     use WithFileUploads;
 
     public Form $form;
 
+    #[Locked]
+    public ?string $syncBatchId = null;
+
     public bool $showReferralRedeemModal = false;
 
     #[Locked]
     public ?string $referralToRedeemId = null;
+
+    #[Locked]
+    public array $referralCompletionTypes = ['encounter', 'procedure', 'diagnostic_report'];
 
     public string $referralCompletionType = 'encounter';
 
@@ -82,6 +99,8 @@ class PatientReferrals extends BasePatientComponent
     protected function initializeComponent(): void
     {
         $this->loadReferrals();
+        $this->syncBatchId = $this->findRunningBatchesByLegalEntity(legalEntity()->id)
+            ->firstWhere('name', ServiceRequestSync::BATCH_NAME.'_'.$this->uuid)?->id;
     }
 
     public function loadReferrals(): void
@@ -180,7 +199,8 @@ class PatientReferrals extends BasePatientComponent
             return;
         }
         $this->referralToRedeemId = $uuid;
-        $this->referralCompletionType = 'encounter';
+        $this->referralCompletionTypes = MedicalEventsRepository::serviceRequest()->completionTypes($record);
+        $this->referralCompletionType = $this->referralCompletionTypes[0];
         foreach (['diagnostic_report', 'procedure', 'encounter'] as $type) {
             if (MedicalEventsRepository::serviceRequest()->completionResources($this->patient(), $uuid, $type) !== []) {
                 $this->referralCompletionType = $type;
@@ -280,34 +300,116 @@ class PatientReferrals extends BasePatientComponent
             return;
         }
 
+        $token = Session::get(config('ehealth.api.oauth.bearer_token'));
+        if (!is_string($token) || $token === '') {
+            Session::flash('error', __('referrals.messages.sync_session_expired'));
+
+            return;
+        }
+        $legalEntity = legalEntity();
+        $name = ServiceRequestSync::BATCH_NAME.'_'.$this->uuid;
+        $lock = Cache::lock('referral-sync:'.$legalEntity->id.':'.$this->uuid, 120);
+        if (!$lock->get()) {
+            Session::flash('info', __('referrals.messages.sync_running'));
+
+            return;
+        }
         try {
-            foreach (['active', 'completed', 'entered_in_error', 'recalled'] as $status) {
-                $page = 1;
-                do {
-                    $response = SubmissionApi::serviceRequest()->getBySearchParams($this->uuid, [
-                        'status' => $status, 'page' => $page, 'page_size' => 100,
-                    ]);
-                    $resources = $response->validate();
-                    foreach ($resources as $resource) {
-                        $uuid = $resource['id'] ?? ($resource['uuid'] ?? null);
-                        if ($uuid === null) {
-                            continue;
-                        }
-                        $detail = SubmissionApi::serviceRequest()->getById($this->uuid, $uuid, preserveApiKeys: true)->validate();
-                        MedicalEventsRepository::serviceRequest()->importPatientResource($detail[0] ?? $detail, $this->patient());
-                    }
-                    $totalPages = (int) ($response->getPaging()['total_pages'] ?? 1);
-                    $page++;
-                } while ($page <= $totalPages);
+            $running = $this->findRunningBatchesByLegalEntity($legalEntity->id)->firstWhere('name', $name);
+            if ($running !== null) {
+                $this->syncBatchId = $running->id;
+                Session::flash('info', __('referrals.messages.sync_running'));
+
+                return;
             }
-            Session::flash('success', __('referrals.messages.sync_success'));
+            $hasPatientAccess = Declaration::accessGrantedTo(Auth::user(), $this->patient(), $legalEntity)->exists()
+                || Approval::accessGrantedTo(Auth::user(), $this->patient(), $legalEntity)->exists();
+            // ABAC rule 2 requires the requesting organization in the query without full patient access.
+            $query = ['page_size' => 100];
+            if (!$hasPatientAccess) {
+                $query['requester_legal_entity'] = $legalEntity->uuid;
+            }
+            $response = SubmissionApi::serviceRequest()->withToken($token)->getBySearchParams($this->uuid, $query + ['status' => 'active', 'page' => 1]);
+            $jobs = ServiceRequestSync::pageJobs($response, 1, 'active');
+            foreach (['completed', 'entered_in_error', 'recalled'] as $status) {
+                $jobs[] = new ServiceRequestSync(status: $status);
+            }
+            $connection = (string) config('queue.default');
+            if (config('queue.connections.'.$connection.'.driver') === 'sync') {
+                $connection = 'database';
+            }
+            $userId = Auth::id();
+            $this->syncBatchId = Bus::batch($jobs)->name($name)
+                ->withOption('legal_entity_id', $legalEntity->id)
+                ->withOption('patient_uuid', $this->uuid)
+                ->withOption('person_id', $this->personId)
+                ->withOption('query', $query)
+                ->withOption('token', Crypt::encryptString($token))
+                ->withOption('user', Auth::user())
+                ->then(static function (Batch $batch) use ($userId): void {
+                    $denied = (int) Cache::get('referral-sync-denied:'.$batch->id, 0);
+                    User::find($userId)?->notify(new RemoteEHealthLinksNotification(
+                        __($denied > 0 ? 'referrals.messages.sync_partial_access' : 'referrals.messages.sync_success', ['count' => $denied]),
+                        $denied > 0 ? 'warning' : 'success'
+                    ));
+                })
+                ->catch(static function (Batch $batch, Throwable $exception) use ($userId): void {
+                    $error = match ($exception->getCode()) {
+                        401 => 'sync_session_expired',
+                        403 => 'sync_access_denied',
+                        default => 'sync_failed',
+                    };
+                    Cache::put('referral-sync-error:'.$batch->id, $error, now()->addDay());
+                    Log::warning('Patient referral synchronization batch failed', ['batchId' => $batch->id, 'exceptionType' => $exception::class]);
+                    User::find($userId)?->notify(new RemoteEHealthLinksNotification(__('referrals.messages.'.$error), 'error'));
+                })
+                ->onConnection($connection)->onQueue('sync')->dispatch()->id;
+            Session::flash('info', __($hasPatientAccess ? 'referrals.messages.sync_started' : 'referrals.messages.sync_started_own'));
+        } catch (EHealthResponseException $exception) {
+            Session::flash('error', __('referrals.messages.'.match ($exception->getCode()) {
+                401 => 'sync_session_expired',
+                403 => 'sync_access_denied',
+                default => 'sync_failed',
+            }));
         } catch (EHealthValidationException $exception) {
             Session::flash('error', $exception->getFormattedMessage());
         } catch (Throwable $exception) {
             Log::warning('Patient referral synchronization failed', ['exceptionType' => $exception::class]);
             Session::flash('error', __('referrals.messages.sync_failed'));
+        } finally {
+            $lock->release();
         }
         $this->loadReferrals();
+    }
+
+    public function checkSyncStatus(): void
+    {
+        if (Auth::user()->cannot('search', ServiceRequestRequest::class)) {
+            $this->syncBatchId = null;
+            Session::flash('error', __('service-requests.policy.search'));
+
+            return;
+        }
+        if ($this->syncBatchId === null) {
+            return;
+        }
+        $batch = Bus::findBatch($this->syncBatchId);
+        if ($batch !== null && !$batch->finished() && !$batch->cancelled()) {
+            $this->loadReferrals();
+
+            return;
+        }
+        $error = Cache::get('referral-sync-error:'.$this->syncBatchId, 'sync_failed');
+        $denied = (int) Cache::get('referral-sync-denied:'.$this->syncBatchId, 0);
+        $this->syncBatchId = null;
+        $this->loadReferrals();
+        if ($batch === null || $batch->hasFailures() || $batch->cancelled()) {
+            Session::flash('error', __('referrals.messages.'.$error));
+        } elseif ($denied > 0) {
+            Session::flash('warning', __('referrals.messages.sync_partial_access', ['count' => $denied]));
+        } else {
+            Session::flash('success', __('referrals.messages.sync_success'));
+        }
     }
 
     public function resetFilters(): void

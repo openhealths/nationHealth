@@ -12,6 +12,9 @@
     @endassets
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     @include('livewire.encounter-package.parts.referral-redeem-modal')
+    @if ($syncBatchId !== null)
+        <div wire:poll.5s="checkSyncStatus" role="status">{{ __('referrals.messages.sync_running') }}</div>
+    @endif
 
     <x-slot name="headerActions">
         @can('search', ServiceRequestRequest::class)
@@ -20,6 +23,7 @@
                 wire:click="sync"
                 wire:loading.attr="disabled"
                 wire:target="sync"
+                @disabled($syncBatchId !== null)
                 class="button-sync"
             >
                 @icon('refresh', 'w-4 h-4')

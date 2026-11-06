@@ -378,7 +378,7 @@
                                 {{-- A disabled fieldset disables every control inside it, the record cancellation
                                      checkboxes included, so a section holding records to pick is left to the
                                      readonly handling it carries of its own --}}
-                                <fieldset @disabled($isReadonly && !($canCancelRecords && ($item['holdsCancellableRecords'] ?? false)))>
+                                <fieldset @disabled($isReadonly && !($item['id'] === 'referral' && $incomingReferral !== null) && !($canCancelRecords && ($item['holdsCancellableRecords'] ?? false)))>
                                     @include($item['view'])
                                 </fieldset>
                             </div>

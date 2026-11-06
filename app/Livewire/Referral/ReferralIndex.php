@@ -7,6 +7,8 @@ namespace App\Livewire\Referral;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthResponseException;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -64,31 +66,52 @@ class ReferralIndex extends Component
 
             return;
         }
-        $this->validate([
-            'requisition' => 'required|string',
-        ]);
 
+        $this->searchResults = [];
+        $this->pendingCompletions = [];
         $this->errorMessage = null;
-        $this->hasSearched = true;
+        $this->hasSearched = false;
 
         $cleanRequisition = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $this->requisition));
         $formattedRequisition = trim(preg_replace('/(.{4})/', '$1-', $cleanRequisition), '-');
         $this->requisition = $formattedRequisition;
 
+        $this->validate([
+            'requisition' => ['required', 'string', 'max:19'],
+        ], [], [
+            'requisition' => __('referrals.requisition'),
+        ]);
+
         try {
-            $params = ['requisition' => $this->requisition];
-            $response = EHealth::serviceRequest()->searchForServiceRequestsByParams($params)->getData();
+            $results = [];
 
-            $this->searchResults = $response['data'] ?? $response ?? [];
-            $this->restoreCompletionTracking();
+            foreach (['active', 'completed', 'entered_in_error', 'recalled'] as $status) {
+                $page = 1;
 
-            if (empty($this->searchResults)) {
-                $this->errorMessage = __('referrals.messages.not_found');
+                do {
+                    $response = EHealth::serviceRequest()->searchForServiceRequestsByParams([
+                        'requisition' => $this->requisition,
+                        'status' => $status,
+                        'page' => $page,
+                        'page_size' => 100,
+                    ]);
+                    $referrals = $response->validate();
+                    $results = [...$results, ...($referrals['data'] ?? $referrals)];
+                    $totalPages = (int) ($response->getPaging()['total_pages'] ?? 1);
+                    $page++;
+                } while ($page <= $totalPages);
             }
+
+            $this->searchResults = collect($results)->unique('id')->values()->all();
+            $this->hasSearched = true;
+            $this->restoreCompletionTracking();
+        } catch (EHealthConnectionException|EHealthResponseException|EHealthValidationException $e) {
+            $this->errorMessage = __('referrals.messages.search_failed');
+            $e->handle('Search referral error');
         } catch (Exception $e) {
             Log::error('Search referral error: '.$e->getMessage());
             $this->errorMessage = __('referrals.messages.search_failed');
-            $this->searchResults = [];
+            Session::flash('error', $this->errorMessage);
         }
     }
 
@@ -253,6 +276,9 @@ class ReferralIndex extends Component
             return;
         }
 
+        $record = Repository::serviceRequest()->findByUuid($uuid);
+        $this->emzTypes = $record !== null ? Repository::serviceRequest()->completionTypes($record) : ['encounter', 'procedure', 'diagnostic_report'];
+        $this->selectedEmzType = $this->emzTypes[0];
         $this->loadEmzResourcesForComplete($uuid);
         foreach (['diagnostic_report', 'procedure', 'encounter'] as $type) {
             if (Repository::serviceRequest()->completionResources($person, $uuid, $type) !== []) {

@@ -700,8 +700,26 @@ class ServiceRequestRequestRepository extends BaseRepository
         });
     }
 
+    /** ESOZ SERVICE_REQUEST_<CATEGORY>_COMPLETED_WITH_CODES. */
+    public function completionTypes(ServiceRequestRequest $record): array
+    {
+        $category = $record->category?->coding?->firstWhere('system', 'eHealth/SNOMED/service_request_categories')?->code;
+
+        return match ($category) {
+            'imaging', 'laboratory_procedure' => ['diagnostic_report'],
+            'counselling', 'hospitalization', 'transfer_of_care' => ['encounter'],
+            'diagnostic_procedure' => ['encounter', 'diagnostic_report'],
+            'surgical_procedure' => ['encounter', 'procedure'],
+            default => ['encounter', 'procedure', 'diagnostic_report'],
+        };
+    }
+
     public function completionResources(Person $person, string $referralUuid, string $type): array
     {
+        $referral = $this->findByUuid($referralUuid);
+        if ($referral !== null && !in_array($type, $this->completionTypes($referral), true)) {
+            return [];
+        }
         $dictionaries = dictionary()->basics()
             ->getMultipleFormatted(['eHealth/encounter_types', 'eHealth/encounter_classes'], onlyActive: false)->toArray();
         $resources = match ($type) {

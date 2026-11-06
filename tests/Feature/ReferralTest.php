@@ -169,10 +169,11 @@ class ReferralTest extends TestCase
         $this->actingAs($this->user);
         $referrals = [['id' => (string) Str::uuid(), 'status' => 'active']];
         $response = Mockery::mock(EHealthResponse::class);
-        $response->shouldReceive('getData')->once()->andReturn(['data' => $referrals]);
+        $response->shouldReceive('validate')->times(4)->andReturn($referrals);
+        $response->shouldReceive('getPaging')->times(4)->andReturn(['total_pages' => 1]);
         $api = Mockery::mock(PatientServiceRequestApi::class);
-        $api->shouldReceive('searchForServiceRequestsByParams')->once()
-            ->with(['requisition' => 'ABCD-1234-EFGH-5678'])->andReturn($response);
+        $api->shouldReceive('searchForServiceRequestsByParams')->times(4)
+            ->with(Mockery::on(static fn (array $query): bool => $query['requisition'] === 'ABCD-1234-EFGH-5678' && $query['page'] === 1 && in_array($query['status'], ['active', 'completed', 'entered_in_error', 'recalled'], true)))->andReturn($response);
         $this->instance(PatientServiceRequestApi::class, $api);
 
         Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])

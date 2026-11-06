@@ -51,6 +51,9 @@ class EncounterPackageView extends EncounterPackageEdit
     public function showAdditionalActions(): void
     {
         $this->isFinished = Encounter::whereKey($this->encounterId)->value('status') === EncounterStatus::FINISHED;
+        if ($this->isFinished) {
+            $this->promptReferralCompletion();
+        }
     }
 
     /**
