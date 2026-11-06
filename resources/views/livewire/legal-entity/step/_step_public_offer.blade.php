@@ -11,6 +11,23 @@
         <legend x-text="title" class="legend"></legend>
     </template>
 
+    <div class="form-row mb-6 sm:w-1/2 lg:w-1/2">
+        <div class="form-group group w-full">
+            <input
+                type="url"
+                id="legalEntityRedirectUri"
+                name="security.redirect_uri"
+                value="{{ config('ehealth.api.connection_redirect_uri') }}"
+                placeholder=" "
+                class="input peer"
+                readonly
+            />
+            <label for="legalEntityRedirectUri" class="label z-10">
+                {{ __('legal-entity.security.redirect_uri') }}
+            </label>
+        </div>
+    </div>
+
     <div class="form-row sm:w-1/2 lg:w-1/2">
         <div class="form-group group pb-4">
             <select

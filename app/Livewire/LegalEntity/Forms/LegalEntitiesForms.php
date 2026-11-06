@@ -6,11 +6,10 @@ namespace App\Livewire\LegalEntity\Forms;
 
 use App\Core\Arr;
 use Carbon\Carbon;
-use App\Core\BaseForm;
 use App\Rules\Name;
-use App\Models\User;
 use App\Rules\Email;
 use App\Rules\TaxId;
+use App\Core\BaseForm;
 use App\Rules\AgeCheck;
 use App\Rules\BirthDate;
 use App\Rules\DateFormat;
@@ -22,7 +21,7 @@ use App\Models\LegalEntity;
 use App\Rules\DocumentNumber;
 use App\Rules\OnlyOneDocument;
 use App\Rules\PhoneDuplicates;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use App\Enums\License\Type as LicenseType;
 use App\Exceptions\CustomValidationException;
 use Illuminate\Validation\ValidationException;
@@ -145,11 +144,16 @@ class LegalEntitiesForms extends BaseForm
     public function rules(): array
     {
         $rules = [
+            'type' => [
+                'required',
+                'string',
+                Rule::in($this->component->allowedLegalEntityTypeCodes()),
+            ],
             'edrpou' => ['required', "regex:/^([0-9]{8,10}|[А-ЯЁЇІЄҐ]{2}\d{6})$/u", new UniqueEdrpou($this->type)],
             'owner.lastName' => ['required', 'min:3', new Name()],
             'owner.firstName' => ['required', 'min:3', new Name()],
             'owner.secondName' => ['nullable', new Name()],
-            'owner.gender' => 'required|string',
+            'owner.gender' => ['required', 'string', new InDictionary('GENDER')],
             'owner.birthDate' => ['required', new DateFormat(), 'before_or_equal:today', new BirthDate($this->owner['email'] ?? ''), new AgeCheck()],
             'owner.noTaxId' => ['nullable', 'boolean', new TaxId()],
             'owner.taxId' => ['exclude_if:owner.noTaxId,true', 'required', 'string', new TaxId()],
@@ -157,7 +161,8 @@ class LegalEntitiesForms extends BaseForm
             'owner.documents.*.type' => [
                 'required','string',
                 new InDictionary('DOCUMENT_TYPE'),
-                new OnlyOneDocument($this->owner['documents'])
+                Rule::in($this->component->ownerDocumentTypes()),
+                new OnlyOneDocument($this->owner['documents'] ?? [])
             ],
             'owner.documents.*.number' => [
                 'required',
@@ -206,7 +211,10 @@ class LegalEntitiesForms extends BaseForm
                 new PhoneDuplicates($this->owner['phones'])
             ],
             'owner.email' => ['required','email',new Email()],
-            'owner.position' => ['required','string', new InDictionary('POSITION')],
+            'owner.position' => [
+                'required', 'string', new InDictionary('POSITION'),
+                Rule::in(config('ehealth.employee_type.OWNER.position', [])),
+            ],
             'email' => ['required','email',new Email()],
             'website' => ['sometimes', 'regex:/^(https?:\/\/)?(www\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9]))+$/i'],
             'phones' => 'required|array',
@@ -219,7 +227,9 @@ class LegalEntitiesForms extends BaseForm
             ],
             'phones.*.note' => 'nullable|string',
             'accreditation' => 'nullable|array',
-            'accreditation.category' => $this->accreditationShow ? 'required|string' : 'nullable',
+            'accreditation.category' => $this->accreditationShow
+                ? ['required', 'string', new InDictionary('ACCREDITATION_CATEGORY')]
+                : ['nullable'],
             'accreditation.orderNo' => $this->accreditationShow ? 'required|string|min:2' : 'nullable|string',
             'accreditation.orderDate' => ['nullable', new DateFormat(), 'before_or_equal:today'],
             'accreditation.issuedDate' => ['nullable', new DateFormat(), 'before_or_equal:today'],
@@ -230,7 +240,12 @@ class LegalEntitiesForms extends BaseForm
             'license.activeFromDate' => ['required', new DateFormat()],
             'license.expiryDate' => ['nullable', new DateFormat(), new ExpiryDate($this->license['activeFromDate'] ?? '')],
             'license.orderNo' => 'required|string',
-            'license.whatLicensed' => 'required|string',
+            'license.whatLicensed' => [
+                'nullable',
+                'string',
+                'max:255',
+                'regex:/^(?!.*[ЫЪЭЁыъэё@%&$^#])[a-zA-ZА-ЯҐЇІЄа-яґїіє0-9№\"!\^\*)\]\[(._-].*$/u',
+            ],
             'license.licenseNumber' => ['nullable', 'string', 'regex:/^(?!.*[ЫЪЭЁыъэё@$^#])[a-zA-ZА-ЯҐЇІЄа-яґїіє0-9№\"!\^\*)\]\[(&._-].*$/'],
             'receiverFundsCode' => [
                 'nullable',
@@ -302,7 +317,7 @@ class LegalEntitiesForms extends BaseForm
             'license.issuedBy.min' => __('validation.attributes.errors.wrongFieldFormat') . '('. __('validation.attributes.errors.minLen3') . ')',
             'license.issuedBy' => __('validation.attributes.errors.requiredIssuedBy'),
             'license.orderNo' => __('validation.attributes.errors.requiredOrderNumber'),
-            'license.whatLicensed' => __('validation.attributes.errors.requiredWhatLicensed'),
+            'license.whatLicensed.regex' => __('validation.attributes.errors.wrongFieldFormat'),
             'license.licenseNumber.regex' => __('validation.attributes.errors.onlyNumericLatin'),
             'receiverFundsCode' => __('validation.attributes.errors.wrongFieldFormat') . '('. __('validation.attributes.errors.onlyNumeric') . ')',
             'receiverFundsCode.required' => __('validation.attributes.errors.nonEmpty'),
@@ -358,7 +373,7 @@ class LegalEntitiesForms extends BaseForm
      */
     public function rulesForEdrpou(): array
     {
-        return $this->validate($this->rulesForModel('edrpou')->toArray());
+        return $this->validate(Arr::only($this->rules(), ['edrpou', 'type']));
     }
 
     /**
@@ -367,22 +382,6 @@ class LegalEntitiesForms extends BaseForm
     public function rulesForOwner(): void
     {
         $this->validate($this->rulesForModel('owner')->toArray());
-
-        $user = User::where('email', $this->owner['email'])->first();
-
-        $userTaxId = $user?->party?->taxId;
-
-        if ($user &&
-            filled($userTaxId) &&
-            isset($this->owner['taxId']) &&
-            $userTaxId !== $this->owner['taxId']
-        ) {
-            Log::error("rulesForOwner: user with specified email exists and has different tax ID");
-
-            throw ValidationException::withMessages([
-                'legalEntityForm.owner.email' => __('forms.email_restriction'),
-            ]);
-        }
     }
 
     /**

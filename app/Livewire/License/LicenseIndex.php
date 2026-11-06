@@ -54,7 +54,26 @@ class LicenseIndex extends Component
         $licences = $this->normalizeDate($response->validate());
 
         try {
-            License::upsert($response->map($licences), uniqueBy: ['uuid'], update: new License()->getFillable());
+            $licenses = $response->map($licences);
+
+            $primaryLicenseUuid = License::whereLegalEntityId(legalEntity()->id)
+                ->where('is_primary', true)
+                ->whereNull('what_licensed')
+                ->value('uuid');
+
+            // Find the primary license with null 'what_licensed' and set it to null in the local array if exists
+            if ($primaryLicenseUuid !== null) {
+                $primaryLicenseKey = array_find_key(
+                    $licenses,
+                    static fn (array $license): bool => $license['uuid'] === $primaryLicenseUuid
+                );
+
+                if ($primaryLicenseKey !== null) {
+                    $licenses[$primaryLicenseKey]['what_licensed'] = null;
+                }
+            }
+
+            License::upsert($licenses, uniqueBy: ['uuid'], update: new License()->getFillable());
         } catch (Exception $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing licenses with eHealth: ');
 

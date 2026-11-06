@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\License;
 use Livewire\Component;
 use App\Enums\User\Role;
+use App\Rules\TaxId;
 use App\Traits\FormTrait;
 use Illuminate\Support\Str;
 use Livewire\WithFileUploads;
@@ -163,13 +164,10 @@ abstract class LegalEntity extends Component
      */
     protected function getOwnerFields(): void
     {
-        $excludeFromDocuments = ['PERMANENT_RESIDENCE_PERMIT'];
-
         // Get owner dictionary fields
         $fields = [
             'POSITION' => config('ehealth.employee_type.OWNER.position'),
-            // TODO: remove some of the documents not mentioned by docs
-            'DOCUMENT_TYPE' => array_filter(config('ehealth.employee_identity_document_types'), fn ($docType) => !\in_array($docType, $excludeFromDocuments))
+            'DOCUMENT_TYPE' => $this->ownerDocumentTypes(),
         ];
 
         // Get dictionaries
@@ -185,6 +183,22 @@ abstract class LegalEntity extends Component
             ->map(fn ($label) => __($label))
             ->reverse()
             ->toArray();
+    }
+
+    public function allowedLegalEntityTypeCodes(): array
+    {
+        return array_values(array_diff(
+            $this->allowedLegalEntityTypes,
+            [LegalEntityModel::TYPE_MSP_LIMITED]
+        ));
+    }
+
+    public function ownerDocumentTypes(): array
+    {
+        return array_values(array_diff(
+            config('ehealth.employee_identity_document_types', []),
+            ['PERMANENT_RESIDENCE_PERMIT']
+        ));
     }
 
     abstract protected function getLegalEntity(): ?LegalEntityModel;
@@ -279,6 +293,8 @@ abstract class LegalEntity extends Component
         // Prepare security data
         $this->legalEntityForm->security = $this->prepareSecurityData();
 
+        $isWhatLicensedProvided = filled($this->legalEntityForm->license['whatLicensed'] ?? null);
+
         // Convert form data to an array, leaving out the signing credentials
         $data = $this->prepareDataForRequest(Arr::except(
             $this->legalEntityForm->toArray(),
@@ -343,7 +359,11 @@ abstract class LegalEntity extends Component
             throw new Exception();
         }
 
-        return ['response' => $response, 'request' => $data];
+        return [
+            'response' => $response,
+            'request' => $data,
+            'isWhatLicensedProvided' => $isWhatLicensedProvided,
+        ];
     }
 
     /**
@@ -428,7 +448,7 @@ abstract class LegalEntity extends Component
             'data.license.ehealth_inserted_at' => 'required_if:data.license,array|string',
             'data.license.ehealth_inserted_by' => 'required_if:data.license,array|string',
             'data.license.active_from_date' => 'required_if:data.license,array|string',
-            'data.license.what_licensed' => 'required_if:data.license,array|string',
+            'data.license.what_licensed' => 'nullable|string',
             'data.license.order_no' => 'required_if:data.license,array|string',
             'data.license.ehealth_updated_at' => 'required_if:data.license,array|string',
             'data.license.ehealth_updated_by' => 'required_if:data.license,array|string',
@@ -549,6 +569,10 @@ abstract class LegalEntity extends Component
      */
     private function prepareDataForRequest(array $data): array
     {
+        if (blank(Arr::get($data, 'license.whatLicensed'))) {
+            Arr::set($data, 'license.whatLicensed', null);
+        }
+
         $dateReformatArray = [
             'owner.birth_date',
             'owner.documents',
@@ -588,10 +612,18 @@ abstract class LegalEntity extends Component
 
         // If no_tax_id=true its means that taxID should store related document's number
         if (Arr::boolean($data, 'owner.no_tax_id')) {
-            $passportNumber = collect(Arr::get($data, 'owner.documents', []))
-                ->first(fn (array $doc) => \in_array($doc['type'], ['PASSPORT', 'NATIONAL_ID']))['number'];
+            $identityDocument = collect(Arr::get($data, 'owner.documents', []))->first(
+                fn (array $doc) => \in_array($doc['type'] ?? '', TaxId::OWNER_NO_TAX_ID_DOCUMENT_TYPES, true)
+                    && filled($doc['number'] ?? null)
+            );
 
-            Arr::set($data, 'owner.tax_id', $passportNumber);
+            if ($identityDocument === null) {
+                throw ValidationException::withMessages([
+                    'legalEntityForm.owner.noTaxId' => __('forms.owner_no_tax_id_document_required'),
+                ]);
+            }
+
+            Arr::set($data, 'owner.tax_id', $identityDocument['number']);
         }
 
         // Converting documents to array
@@ -635,7 +667,14 @@ abstract class LegalEntity extends Component
             ]
         );
 
+        $whatLicensed = Arr::get($data, 'license.what_licensed');
+
         $data = removeEmptyKeys($data);
+
+        // Keep valid values such as "0", which the generic empty-field filter removes.
+        if (filled($whatLicensed)) {
+            Arr::set($data, 'license.what_licensed', $whatLicensed);
+        }
 
         if (isset($data['license']) && empty($data['license']['id'])) {
             $data['license']['license_number'] ??= null;
@@ -773,8 +812,13 @@ abstract class LegalEntity extends Component
         ]);
     }
 
-    protected function filterUnprovidedFields(array $response, array $requestData): array
+    protected function filterUnprovidedFields(array $response, array $requestData, ?bool $isWhatLicensedProvided = null): array
     {
+        // Keep an intentionally omitted activity empty despite the historical eHealth value.
+        if ($isWhatLicensedProvided === false && isset($response['data']['license'])) {
+            $response['data']['license']['what_licensed'] = null;
+        }
+
         /**
          * This need to check because it's not always present.
          * Only way to determine if it's present is to check if it's not empty.
@@ -986,7 +1030,7 @@ abstract class LegalEntity extends Component
         return $this->legalEntity;
     }
 
-    protected function modifyLegalEntity(array $data): LegalEntityModel|null
+    protected function modifyLegalEntity(array $data, bool $preserveEmptyActivity = true): LegalEntityModel|null
     {
         ['addressData' => $addressData, 'phones' => $phones] = $this->persistLegalEntity($data);
 
@@ -997,7 +1041,7 @@ abstract class LegalEntity extends Component
 
             $this->legalEntity->refresh();
 
-            Repository::legalEntity()->saveLicense($data['data']['license'], $this->legalEntity);
+            Repository::legalEntity()->saveLicense($data['data']['license'], $this->legalEntity, $preserveEmptyActivity);
         } catch (Exception $err) {
             throw new Exception('LegalEntity Create Error: ' . $err->getMessage());
         }
@@ -1121,7 +1165,7 @@ abstract class LegalEntity extends Component
                 setPermissionsTeamId($this->legalEntity->id);
 
                 if (isset($response['data']['license'])) {
-                    Repository::legalEntity()->saveLicense($response['data']['license'], $this->legalEntity);
+                    Repository::legalEntity()->saveLicense($response['data']['license'], $this->legalEntity, preserveEmptyActivity: false);
                 }
 
                 $user = $this->createUser();
@@ -1166,7 +1210,7 @@ abstract class LegalEntity extends Component
 
             $requestData = $result['request'];
 
-            $response = $this->filterUnprovidedFields($result['response'], $requestData);
+            $response = $this->filterUnprovidedFields($result['response'], $requestData, $result['isWhatLicensedProvided'] ?? null);
 
             // Handle successful API response
             $this->handleSuccessResponse($response, $requestData);

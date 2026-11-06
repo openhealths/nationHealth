@@ -88,7 +88,8 @@ class LegalEntityDetailsSync extends EHealthJob
         $this->legalEntity->refresh();
 
         if (!empty($license)) {
-            Repository::legalEntity()->saveLicense($license, $this->legalEntity);
+            // A new connection imports the eHealth state without preserving earlier local choices.
+            Repository::legalEntity()->saveLicense($license, $this->legalEntity, preserveEmptyActivity: false);
         }
 
         if ($data['status'] !== $oldStatus || $this->legalEntity->legal_entity_type_id !== $oldTypeId) {

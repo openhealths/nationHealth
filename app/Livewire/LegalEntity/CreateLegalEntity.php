@@ -479,7 +479,7 @@ class CreateLegalEntity extends LegalEntity
                 $step = match($_step) {
                     'owner', 'accreditation', 'license' => $_step,
                     'significancy' => 'significancy',
-                    'edrpou' => 'edrpou',
+                    'edrpou', 'type' => 'edrpou',
                     'email' => 'contact',
                     'website' => 'contact',
                     'phones' => 'contact',

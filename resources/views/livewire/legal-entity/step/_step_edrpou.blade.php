@@ -60,12 +60,13 @@
                 required
                 id="lealEntityType"
                 wire:model.defer="legalEntityForm.type"
-                class="input-select peer"
+                aria-describedby="@error('legalEntityForm.type') legalEntityTypeErrorHelp @enderror"
+                class="input-select peer @error('legalEntityForm.type') input-error border-red-500 scroll-to-error @enderror"
                 :class="isDisabled ? 'text-gray-400 border-gray-200 dark:text-gray-500 !cursor-default' : 'text-gray-900 border-gray-300'"
                 :disabled="isDisabled"
             >
                 @if($isEdit)
-                    <option value="{{ $legalEntityForm->type}}" selected>{{ $legalEntityTypes[$legalEntityForm->type]}}</option>
+                    <option value="{{ $legalEntityForm->type }}" selected>{{ $legalEntityTypes[$legalEntityForm->type] ?? __('forms.select') }}</option>
                 @endif
 
                 @foreach($legalEntityTypes as $k => $legalEntityType)
@@ -80,6 +81,10 @@
                     @endif
                 @endforeach
             </select>
+
+            @error('legalEntityForm.type')
+                <p id="legalEntityTypeErrorHelp" class="text-error">{{ $message }}</p>
+            @enderror
 
             <label for="lealEntityType" class="label z-10">
                 {{ __('forms.legal_entity_type') }}

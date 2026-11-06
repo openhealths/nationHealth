@@ -35,16 +35,6 @@ class PartyRepository
 
         $employeesWithUser = $partyEmployees->filter(fn(Employee $employee) => $employee->user_id !== null);
 
-        // Users whose own OWNER employee was explicitly stopped (e.g. by disableOldOwner()
-        // during an owner replacement) must not reacquire OWNER through another employee
-        // in the party, even though role sharing is otherwise symmetric for all party users.
-        $stoppedOwnerUserIds = Employee::where('legal_entity_id', $legalEntity->id)
-            ->where('party_id', $party->id)
-            ->where('employee_type', Role::OWNER->value)
-            ->where('status', Status::STOPPED->value)
-            ->whereNotNull('user_id')
-            ->pluck('user_id');
-
         // Get all users that are linked to the party through employees with user_id or through employee_users pivot
         $partyUsers = User::allRelated($party->id, $legalEntity->id)->get();
 
@@ -67,7 +57,8 @@ class PartyRepository
             : $loginedRole;
 
         $loginedEmployee = $loginedEmployeeType
-            ? $partyEmployees->firstWhere('employee_type', $loginedEmployeeType)
+            ? $partyEmployees->first(fn (Employee $employee) => $employee->employeeType === $loginedEmployeeType
+                && ($loginedEmployeeType !== Role::OWNER->value || $employee->userId === Auth::id()))
             : null;
 
         setPermissionsTeamId($legalEntity->id);
@@ -94,13 +85,10 @@ class PartyRepository
 
             // Get all suitable roles based on the employee types of the user's party employees,
             // limited the same way (older users inherit newer employees' roles, not vice versa).
-            // Additionally: a user who was previously stopped as OWNER must not inherit OWNER
-            // from someone else's employee record — their own currently-approved OWNER employee
-            // (if any) is never excluded.
-            $availRoles = $partyEmployees->filter(fn(Employee $employee) => $employee->isCreatedAtOrAfter($user->insertedAt))
-                ->reject(fn(Employee $employee) => $employee->employeeType === Role::OWNER->value
-                    && $employee->user_id !== $user->id
-                    && $stoppedOwnerUserIds->contains($user->id))
+            // OWNER access belongs only to its employee's user, without sharing across party users.
+            $availRoles = $partyEmployees->filter(fn(Employee $employee) => $employee->employeeType === Role::OWNER->value
+                ? $employee->userId === $user->id
+                : $employee->isCreatedAtOrAfter($user->insertedAt))
                 ->map(fn(Employee $employee) => $employee->employeeType)
                 ->unique()
                 ->values()
@@ -126,8 +114,9 @@ class PartyRepository
                     $employeesCandidatesToSync,
                     [['employee_id' => $loginedEmployee->id, 'user_id' => $user->id]],
                     array_map(
-                        fn($userId) => ['employee_id' => $loginedEmployee->id, 'user_id' => $userId],
-                        array_column(array_filter($pivotEmployeeUsers, fn($puser) => $puser['employee_id'] === $loginedEmployee->id), 'user_id')
+                        fn (int $userId): array => ['employee_id' => $loginedEmployee->id, 'user_id' => $userId],
+                        array_column(array_filter($pivotEmployeeUsers, fn (array $puser): bool => $puser['employee_id'] === $loginedEmployee->id
+                            && ($loginedEmployeeType !== Role::OWNER->value || $puser['user_id'] === $user->id)), 'user_id')
                     )
                 );
 

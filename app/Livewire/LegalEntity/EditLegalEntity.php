@@ -142,7 +142,7 @@ class EditLegalEntity extends LegalEntity
     {
         $owner = $this->legalEntity->getOwner();
 
-        if (!$owner->exists()) {
+        if ($owner === null) {
             return;
         }
 
@@ -240,7 +240,7 @@ class EditLegalEntity extends LegalEntity
         $data['owner']['about_myself'] = $this->legalEntityForm->owner['aboutMyself'] ?? null;
         $data['owner']['party_id'] = Arr::pull($this->legalEntityForm->owner, 'party_id') ?? null;
 
-        $response = $this->filterUnprovidedFields($result['response'], $data);
+        $response = $this->filterUnprovidedFields($result['response'], $data, $result['isWhatLicensedProvided'] ?? null);
 
         try {
             /**
@@ -255,7 +255,7 @@ class EditLegalEntity extends LegalEntity
             $legalEntity->refresh();
 
             DB::transaction(function () use ($response, $data) {
-                $this->modifyLegalEntity($response);
+                $this->modifyLegalEntity($response, preserveEmptyActivity: false);
 
                 try {
                     $this->createEmployeeRequest($this->legalEntity, $data, $response['urgent']['employee_request_id']);
