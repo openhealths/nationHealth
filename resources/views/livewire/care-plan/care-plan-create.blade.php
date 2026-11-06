@@ -12,7 +12,7 @@
 
     <x-slot name="headerActions"></x-slot>
 
-    <div class="shift-content mt-6 pl-4">
+    <div data-livewire-background-actions="checkApprovalJobStatus checkSmsResendStatus" class="shift-content mt-6 pl-4">
         <div class="w-full max-w-screen-xl">
             @include('livewire.care-plan.parts.doctors')
             @include('livewire.care-plan.parts.patient_data')

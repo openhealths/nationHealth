@@ -8,6 +8,7 @@ use App\Jobs\ApprovalSync;
 use App\Jobs\ClinicalImpressionFullSync;
 use App\Jobs\ClinicalImpressionSync;
 use App\Jobs\ConditionSync;
+use App\Jobs\CompositionAsyncProcessing;
 use App\Jobs\DetectedIssueSync;
 use App\Jobs\DeviceAssociationSync;
 use App\Jobs\DeviceDispenseSync;
@@ -230,7 +231,7 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for(
             'ehealth-remote-job-get',
-            static fn (RemoteEHealthLinksProcessing $job) => Limit::perMinute(config('ehealth.rate_limit.remote_job'))
+            static fn (RemoteEHealthLinksProcessing|CompositionAsyncProcessing $job) => Limit::perMinute(config('ehealth.rate_limit.remote_job'))
                 ->by($job->user->id)
         );
     }

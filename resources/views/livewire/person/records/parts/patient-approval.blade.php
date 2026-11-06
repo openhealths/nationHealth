@@ -1,6 +1,7 @@
 @use(App\Models\MedicalEvents\Sql\Approval)
 
 <div
+    data-livewire-background-actions="poll"
     x-data="{
         visible: $wire.entangle('open'),
         groupSearch: '',
