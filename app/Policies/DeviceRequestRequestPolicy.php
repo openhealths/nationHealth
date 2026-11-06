@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Models\Employee\Employee;
+use App\Models\Declaration;
+use App\Models\MedicalEvents\Sql\Approval;
+use App\Models\Person\Person;
 use App\Models\User;
 use App\Repositories\Repository;
 use Illuminate\Auth\Access\Response;
@@ -19,6 +22,13 @@ class DeviceRequestRequestPolicy
     public function create(User $user): Response
     {
         return $this->perform($user, 'device_request:write');
+    }
+
+    public function viewAllForPatient(User $user, Person $person): bool
+    {
+        return $this->perform($user, 'device_request:read')->allowed()
+            && (Declaration::accessGrantedTo($user, $person, legalEntity())->exists()
+                || Approval::accessGrantedTo($user, $person, legalEntity())->exists());
     }
 
     public function perform(User $user, string $scope): Response

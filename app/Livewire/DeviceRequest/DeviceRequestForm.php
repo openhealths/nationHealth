@@ -480,7 +480,7 @@ class DeviceRequestForm extends Component
 
             $service->sync($this->person, $remote);
             Session::flash('success', $service->createdMessage($remote['requisition'], !empty($saved['data']['program_id']), $prepared['authType']));
-            $this->redirectRoute('persons.device-requests', ['legalEntity' => $this->legalEntity, 'person' => $this->person]);
+            $this->redirectRoute('persons.device-requests.view', ['legalEntity' => $this->legalEntity, 'person' => $this->person, 'deviceRequest' => $record->uuid]);
         } catch (Throwable $exception) {
             $this->refreshOptions();
             $this->reportError($exception);

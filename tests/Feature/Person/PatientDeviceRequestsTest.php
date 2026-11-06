@@ -8,20 +8,25 @@ use App\Classes\eHealth\Api\DeviceDefinition;
 use App\Classes\eHealth\Api\Patient\DeviceRequest;
 use App\Classes\eHealth\EHealthResponse;
 use App\Livewire\DeviceRequest\DeviceRequestIndex;
+use App\Livewire\DeviceRequest\DeviceRequestForm;
 use App\Livewire\Person\Records\PatientDeviceRequestView;
 use App\Livewire\Person\Records\PatientDeviceRequests;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
+use App\Models\MedicalEvents\Sql\Approval;
+use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\User;
 use App\Repositories\LegalEntityRepository;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
+use App\Services\MedicalEvents\EHealthJobResolver;
 use App\Services\SignatureService;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -83,6 +88,15 @@ class PatientDeviceRequestsTest extends TestCase
         $this->instance(SignatureService::class, $signature);
     }
 
+    private function grantPatientReadAccess(array $attributes = []): Approval
+    {
+        return Approval::create(array_replace([
+            'uuid' => (string) Str::uuid(), 'approvable_type' => Person::class, 'approvable_id' => $this->person->id,
+            'granted_to_id' => Identifier::create(['value' => $this->employee->uuid])->id, 'granted_to_type' => 'employee',
+            'status' => 'active', 'is_verified' => true, 'expires_at' => now()->addHour(), 'access_level' => 'read',
+        ], $attributes));
+    }
+
     private function response(array $data, int $totalPages = 1): EHealthResponse
     {
         return new EHealthResponse(new Response(200, [], json_encode(['data' => $data, 'paging' => ['total_pages' => $totalPages, 'total_entries' => count($data)]], JSON_THROW_ON_ERROR)));
@@ -103,11 +117,49 @@ class PatientDeviceRequestsTest extends TestCase
     public function test_registry_uses_patient_scoped_search_and_links_to_the_new_detail_page(): void
     {
         $api = Mockery::mock(DeviceRequest::class);
-        $api->shouldReceive('getBySearchParams')->once()->with($this->person->uuid, ['page' => 1])->andReturn($this->response([$this->record()]));
+        $api->shouldReceive('getBySearchParams')->once()->with($this->person->uuid, ['requester_legal_entity' => $this->legalEntity->uuid, 'page' => 1])->andReturn($this->response([$this->record()]));
         $this->instance(DeviceRequest::class, $api);
         Livewire::test(PatientDeviceRequests::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person])
             ->assertSee('Ортез')->assertSee('Лікарня №4')->assertSee('28.10.2026')
             ->assertSeeHtml(route('persons.device-requests.view', [$this->legalEntity, 'person' => $this->person, 'deviceRequest' => $this->requestId]));
+    }
+
+    public function test_creation_opens_the_confirmed_request_without_searching_all_patient_requests(): void
+    {
+        $saved = ['data' => ['program_id' => ''], 'carePlanUuid' => null, 'activityUuid' => null];
+        DeviceRequestRequest::create(['uuid' => $this->requestId, 'employeeId' => $this->employee->id,
+            'personId' => $this->person->id, 'deviceId' => (string) Str::uuid(), 'status' => 'draft', 'requestPayload' => $saved]);
+        $remote = $this->record();
+        $api = Mockery::mock(DeviceRequest::class);
+        $api->shouldReceive('createSigned')->once()->andReturn($this->response(['status' => 'processed']));
+        $api->shouldReceive('getById')->once()->with($this->person->uuid, $this->requestId)->andReturn($this->response($remote));
+        $api->shouldNotReceive('getBySearchParams');
+        $this->instance(DeviceRequest::class, $api);
+        $service = Mockery::mock(DeviceRequestLifecycleService::class)->makePartial();
+        $service->shouldReceive('authorizeAction')->once()->andReturn($this->employee);
+        $service->shouldReceive('prepare')->once()->andReturn(['payload' => [], 'authType' => 'OTP']);
+        $service->shouldReceive('details')->once()->andReturn($remote);
+        $service->shouldReceive('sync')->once();
+        $service->shouldReceive('dictionary')->andReturn(['orthosis' => 'Ортез']);
+        $this->instance(DeviceRequestLifecycleService::class, $service);
+        app(SignatureService::class)->shouldReceive('signData')->once()->andReturn('test-signature');
+        $resolver = Mockery::mock(EHealthJobResolver::class);
+        $resolver->shouldReceive('resolve')->once()->andReturn([]);
+        $this->instance(EHealthJobResolver::class, $resolver);
+
+        Livewire::test(DeviceRequestCreationHarness::class, [
+            'legalEntity' => $this->legalEntity, 'person' => $this->person, 'draftId' => $this->requestId,
+        ])->set('form.knedp', 'test')->set('form.password', 'test')
+            ->set('form.keyContainerUpload', UploadedFile::fake()->create('test.dat', 1))
+            ->call('sign')->assertHasNoErrors()
+            ->assertRedirect(route('persons.device-requests.view', [
+                'legalEntity' => $this->legalEntity, 'person' => $this->person, 'deviceRequest' => $this->requestId,
+            ]));
+
+        Livewire::test(PatientDeviceRequestView::class, [
+            'legalEntity' => $this->legalEntity, 'person' => $this->person, 'deviceRequest' => $this->requestId,
+        ])->assertSee($service->createdMessage($remote['requisition'], false, 'OTP'))
+            ->assertSee('Ортез')->assertDontSeeHtml('border-red-200');
     }
 
     public function test_search_validation_preserves_card_dates_and_references(): void
@@ -123,6 +175,7 @@ class PatientDeviceRequestsTest extends TestCase
 
     public function testRequesterFilterChangesClearingResetAndPaginationPreservePatientApiContext(): void
     {
+        $this->grantPatientReadAccess();
         $otherEntityUuid = (string) Str::uuid();
         $episodeUuid = (string) Str::uuid();
         $api = Mockery::mock(DeviceRequest::class);
@@ -160,7 +213,7 @@ class PatientDeviceRequestsTest extends TestCase
     {
         $api = Mockery::mock(DeviceRequest::class);
         $api->shouldReceive('getBySearchParams')->once()
-            ->with($this->person->uuid, ['page' => 1])
+            ->with($this->person->uuid, ['requester_legal_entity' => $this->legalEntity->uuid, 'page' => 1])
             ->andReturn($this->response([]));
         $this->instance(DeviceRequest::class, $api);
         Livewire::test(PatientDeviceRequests::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person])
@@ -168,8 +221,44 @@ class PatientDeviceRequestsTest extends TestCase
             ->assertHasErrors(['filters.parameters.requester_legal_entity' => 'uuid']);
     }
 
+    public function test_search_without_patient_approval_stays_in_the_current_entity_after_clearing_and_reset(): void
+    {
+        $api = Mockery::mock(DeviceRequest::class);
+        $api->shouldReceive('getBySearchParams')->times(3)
+            ->with($this->person->uuid, ['requester_legal_entity' => $this->legalEntity->uuid, 'page' => 1])
+            ->andReturn($this->response([]));
+        $this->instance(DeviceRequest::class, $api);
+
+        Livewire::test(PatientDeviceRequests::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person])
+            ->assertSet('filters.parameters.requester_legal_entity', $this->legalEntity->uuid)
+            ->set('filters.parameters.requester_legal_entity', (string) Str::uuid())->call('search')
+            ->assertHasErrors(['filters.parameters.requester_legal_entity'])
+            ->assertSee(__('device-requests.policy.patient_access_required'))
+            ->set('filters.parameters.requester_legal_entity', '')->call('search')->assertHasNoErrors()
+            ->call('resetFilters')->assertSet('filters.parameters.requester_legal_entity', $this->legalEntity->uuid);
+    }
+
+    public function test_unverified_or_expired_patient_approval_does_not_allow_cross_entity_search(): void
+    {
+        foreach ([['is_verified' => false], ['expires_at' => now()->subMinute()]] as $attributes) {
+            $approval = $this->grantPatientReadAccess($attributes);
+            $api = Mockery::mock(DeviceRequest::class);
+            $api->shouldReceive('getBySearchParams')->once()
+                ->with($this->person->uuid, ['requester_legal_entity' => $this->legalEntity->uuid, 'page' => 1])
+                ->andReturn($this->response([]));
+            $this->instance(DeviceRequest::class, $api);
+
+            Livewire::test(PatientDeviceRequests::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person])
+                ->set('filters.parameters.requester_legal_entity', (string) Str::uuid())->call('search')
+                ->assertHasErrors(['filters.parameters.requester_legal_entity'])
+                ->assertSee(__('device-requests.policy.patient_access_required'));
+            $approval->delete();
+        }
+    }
+
     public function testGeneralRegistryStillResolvesLegalEntityNamesForThePatientApi(): void
     {
+        $this->grantPatientReadAccess();
         $otherEntityUuid = (string) Str::uuid();
         $repository = Mockery::mock(LegalEntityRepository::class)->makePartial();
         $repository->shouldReceive('getLegalEntitiesList')->once()->andReturn([
@@ -244,7 +333,7 @@ class PatientDeviceRequestsTest extends TestCase
         $this->user->unsetRelation('employees');
         $api = Mockery::mock(DeviceRequest::class);
         $api->shouldReceive('getBySearchParams')->once()
-            ->with($this->person->uuid, ['page' => 1])->andReturn($this->response([$this->record()]));
+            ->with($this->person->uuid, ['requester_legal_entity' => $this->legalEntity->uuid, 'page' => 1])->andReturn($this->response([$this->record()]));
         $this->instance(DeviceRequest::class, $api);
 
         Livewire::test(PatientDeviceRequests::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person])
@@ -253,7 +342,7 @@ class PatientDeviceRequestsTest extends TestCase
     public function testPatientRegistryCannotSwitchOrClearThePatient(): void
     {
         $api = Mockery::mock(DeviceRequest::class);
-        $api->shouldReceive('getBySearchParams')->once()->with($this->person->uuid, ['page' => 1])
+        $api->shouldReceive('getBySearchParams')->once()->with($this->person->uuid, ['requester_legal_entity' => $this->legalEntity->uuid, 'page' => 1])
             ->andReturn($this->response([]));
         $this->instance(DeviceRequest::class, $api);
         $otherPerson = Person::create(['uuid' => (string) Str::uuid(), 'gender' => 'MALE']);
@@ -299,4 +388,19 @@ class PatientDeviceRequestsTest extends TestCase
             ->assertSee(__('device-requests.policy.perform'));
     }
 
+}
+
+class DeviceRequestCreationHarness extends DeviceRequestForm
+{
+    public function mount(LegalEntity $legalEntity, Person $person, string $draftId = ''): void
+    {
+        $this->legalEntityId = $legalEntity->id;
+        $this->personId = $person->id;
+        $this->draftId = $this->requestUuid = $draftId;
+    }
+
+    public function render()
+    {
+        return '<div></div>';
+    }
 }
