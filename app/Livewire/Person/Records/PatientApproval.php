@@ -21,6 +21,7 @@ use App\Services\MedicalEvents\Fhir;
 use App\Services\MedicalEvents\PatientApprovalService;
 use App\Livewire\Person\Forms\PatientApprovalForm;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -357,21 +358,22 @@ class PatientApproval extends Component
             return;
         }
 
-        $record = $query->where('uuid', $uuid)->first();
+        $record = $query->with($this->recordRelations($type))->where('uuid', $uuid)->first();
 
         if ($record === null) {
             return;
         }
 
-        if ($this->mode !== 'service_request' && (
-            !PatientApprovalService::approvalStatusAllowed($type, $record->getRawOriginal('status'))
-                || ($this->mode === 'child' && $type === 'condition' && $record->getRawOriginal('verification_status') === 'entered_in_error')
-        )
-        ) {
-            $this->addError(
-                $this->mode === 'child' ? 'childUuid' : 'resourceIds',
-                $type === 'specimen' ? __('approval.create.specimen_not_available') : __('approval.create.invalid_record_status')
-            );
+        if ($this->mode === 'child') {
+            $reason = $this->childUnavailableReason($record, $type, $this->person());
+
+            if ($reason !== null) {
+                $this->addError('childUuid', $reason);
+
+                return;
+            }
+        } elseif (!PatientApprovalService::approvalStatusAllowed($type, $record->getRawOriginal('status'))) {
+            $this->addError('resourceIds', $type === 'specimen' ? __('approval.create.specimen_not_available') : __('approval.create.invalid_record_status'));
 
             return;
         }
@@ -405,23 +407,40 @@ class PatientApproval extends Component
 
         $query->whereNotNull('uuid');
 
-        if (isset(PatientApprovalService::ALLOWED_STATUSES[$type])) {
+        if ($this->mode !== 'child' && isset(PatientApprovalService::ALLOWED_STATUSES[$type])) {
             $query->whereIn('status', PatientApprovalService::ALLOWED_STATUSES[$type]);
-        }
-
-        if ($this->mode === 'child' && $type === 'condition') {
-            $query->where('verification_status', '!=', 'entered_in_error');
         }
 
         $this->applySearchFilter($query, $type);
 
-        return $query
-            ->with($this->recordRelations($type))
-            ->latest('id')
-            ->limit(50)
-            ->get()
-            ->map(fn ($record): array => $this->recordOption($record, $type))
+        $query->with($this->recordRelations($type))->latest('id');
+
+        $person = $this->mode === 'child' ? $this->person() : null;
+
+        return $query->get()
+            ->map(function ($record) use ($type, $person): array {
+                $option = $this->recordOption($record, $type);
+
+                if ($person !== null) {
+                    $reason = $this->childUnavailableReason($record, $type, $person);
+                    $option['selectable'] = $reason === null;
+                    $option['unavailable_reason'] = $reason;
+                }
+
+                return $option;
+            })
+            ->sortByDesc('selectable')
+            ->values()
             ->all();
+    }
+
+    private function childUnavailableReason(Model $record, string $type, Person $person): ?string
+    {
+        if (!PatientApprovalService::approvalStatusAllowed($type, $record->getRawOriginal('status')) || ($type === 'condition' && $record->getRawOriginal('verification_status') === 'entered_in_error')) {
+            return __('approval.create.invalid_record_status');
+        }
+
+        return $this->form->childContext($person, $record, $type) === null ? __('approval.create.missing_context_episode') : null;
     }
 
     private function applySearchFilter(Builder $query, string $type): void
@@ -574,9 +593,9 @@ class PatientApproval extends Component
     {
         return match ($type) {
             'episode_of_care' => ['period'],
-            'diagnostic_report' => ['code', 'effectivePeriod'],
-            'encounter' => ['type.coding', 'period'],
-            'procedure' => ['code', 'performedPeriod'],
+            'diagnostic_report' => ['code', 'effectivePeriod', 'encounter', 'originEpisode'],
+            'encounter' => ['type.coding', 'period', 'episode'],
+            'procedure' => ['code', 'performedPeriod', 'encounter', 'originEpisode'],
             'specimen' => ['type.coding', 'collection.collectedPeriod'],
             'service_request' => ['category.coding'],
             'condition' => ['code.coding', 'context'],
@@ -1000,10 +1019,7 @@ class PatientApproval extends Component
             $this->smsResent = true;
         } catch (ValidationException $exception) {
             $this->addError('smsResend', $exception->errors()['smsResend'][0] ?? __('approval.create.resend_failed'));
-        } catch (EHealthValidationException|EHealthResponseException|EHealthConnectionException $exception) {
-            $this->smsResent = true;
-            $this->addError('smsResend', __('approval.create.resend_failed'));
-        } catch (Throwable $exception) {
+        } catch (Throwable) {
             $this->addError('smsResend', __('approval.create.resend_failed'));
         }
     }

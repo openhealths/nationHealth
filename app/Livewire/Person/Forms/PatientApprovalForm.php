@@ -9,6 +9,7 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\Person\Person;
 use App\Services\MedicalEvents\PatientApprovalService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -170,6 +171,37 @@ class PatientApprovalForm extends BaseForm
             ]);
         }
 
+        $context = $this->childContext($person, $record, $type);
+
+        if ($context === null) {
+            throw ValidationException::withMessages([
+                'childUuid' => __('approval.create.missing_context_episode'),
+            ]);
+        }
+
+        return [
+            'mode' => 'child',
+            'child_type' => $type,
+            'child_uuid' => $record->uuid,
+            'context_type' => $context['type'],
+            'context_uuid' => $context['uuid'],
+            'access_level' => 'read',
+            'grant_to_legal_entity' => false,
+        ];
+    }
+
+    public function childContext(Person $person, Model $record, string $type): ?array
+    {
+        $record->loadMissing(match ($type) {
+            'activity' => ['carePlan'],
+            'encounter' => ['episode'],
+            'diagnostic_report', 'procedure' => ['encounter', 'originEpisode'],
+            'clinical_impression' => ['encounter'],
+            'condition', 'immunization', 'device' => ['context'],
+            'observation' => ['context', 'diagnosticReport'],
+            default => [],
+        });
+
         $contextType = 'episode_of_care';
         $contextUuid = match ($type) {
             'activity' => $record->carePlan?->uuid,
@@ -215,21 +247,7 @@ class PatientApprovalForm extends BaseForm
             }
         }
 
-        if (!$contextUuid) {
-            throw ValidationException::withMessages([
-                'childUuid' => __('approval.create.missing_context_episode'),
-            ]);
-        }
-
-        return [
-            'mode' => 'child',
-            'child_type' => $type,
-            'child_uuid' => $record->uuid,
-            'context_type' => $contextType,
-            'context_uuid' => $contextUuid,
-            'access_level' => 'read',
-            'grant_to_legal_entity' => false,
-        ];
+        return $contextUuid ? ['type' => $contextType, 'uuid' => $contextUuid] : null;
     }
 
     private function validateReferral(Person $person, array $data): array

@@ -54,26 +54,28 @@
         <div
             class="{{ $step === 'form'
                 ? 'w-full'
-                : 'modal-content mx-auto w-full max-w-4xl max-h-[90vh] overflow-y-auto'
+                : ($step === 'code' ? 'modal-content mx-auto w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl sm:p-8 dark:bg-gray-800' : 'modal-content mx-auto w-full max-w-4xl max-h-[90vh] overflow-y-auto')
             }}"
             @click.stop
             x-trap.noscroll.inert="visible && $wire.step !== 'form'"
         >
-                    <div class="{{ $step === 'form' ? '' : 'mb-8 flex items-center justify-between' }}">
-                        <h2 class="{{ $step === 'form' ? 'modal-header' : 'legend !mb-0' }}">
-                            @if($step === 'form')
-                                {{ __('patients.get_data_access') }}
-                            @elseif($step === 'methods')
-                                {{ __('patients.authentication_methods') }}
-                            @elseif($step === 'processing')
-                                {{ __('approval.create.request_title') }}
-                            @elseif($step === 'verifying')
-                                {{ __('approval.create.verification_processing_title') }}
-                            @else
-                                {{ __('approval.create.confirmation_title') }}
-                            @endif
-                        </h2>
-                    </div>
+                    @if($step !== 'code')
+                        <div class="{{ $step === 'form' ? '' : 'mb-8 flex items-center justify-between' }}">
+                            <h2 class="{{ $step === 'form' ? 'modal-header' : 'legend !mb-0' }}">
+                                @if($step === 'form')
+                                    {{ __('patients.get_data_access') }}
+                                @elseif($step === 'methods')
+                                    {{ __('patients.authentication_methods') }}
+                                @elseif($step === 'processing')
+                                    {{ __('approval.create.request_title') }}
+                                @elseif($step === 'verifying')
+                                    {{ __('approval.create.verification_processing_title') }}
+                                @else
+                                    {{ __('approval.create.confirmation_title') }}
+                                @endif
+                            </h2>
+                        </div>
+                    @endif
 
                     @error('approvalCreation')
                         <p class="text-error mt-3 mb-4">
@@ -398,6 +400,12 @@
                                                         </span>
                                                     </span>
                                                 </button>
+
+                                                @if($mode === 'child' && !$record['selectable'])
+                                                    <p class="px-2 text-sm text-red-600 dark:text-red-400">
+                                                        {{ $record['unavailable_reason'] }}
+                                                    </p>
+                                                @endif
                                             @empty
                                                 <p class="text-sm text-gray-500">
                                                     {{ __('approval.create.no_records') }}
@@ -841,131 +849,8 @@
                         </div>
 
                     @elseif($step === 'code')
-                        <form
-                            wire:submit.prevent="verifyCode"
-                            class="space-y-6 max-w-lg"
-                            x-data="{
-                                secondsLeft: 0,
-                                interval: null,
-
-                                updateCountdown() {
-                                    const target = @js($smsResendAvailableAt ?? 0) * 1000;
-
-                                    this.secondsLeft = Math.max(
-                                        0,
-                                        Math.ceil((target - Date.now()) / 1000)
-                                    );
-                                },
-
-                                init() {
-                                    this.updateCountdown();
-
-                                    this.interval = setInterval(() => {
-                                        this.updateCountdown();
-
-                                        if (this.secondsLeft === 0) {
-                                            clearInterval(this.interval);
-                                            this.interval = null;
-                                        }
-                                    }, 1000);
-                                },
-
-                                destroy() {
-                                    if (this.interval !== null) {
-                                        clearInterval(this.interval);
-                                    }
-                                }
-                            }"
-                        >
-
-                            <p class="text-gray-600 dark:text-gray-300">
-                                {{ __('approval.create.enter_code_description') }}
-                            </p>
-
-                            @if($smsPhone)
-                                <p class="text-sm">
-                                    {{ __('approval.create.phone_number') }}: {{ $smsPhone }}
-                                </p>
-                            @endif
-
-                            <div class="form-group group">
-                                <input
-                                    id="approval-verification-code"
-                                    type="text"
-                                    wire:model="verificationCode"
-                                    x-init="$nextTick(() => $el.focus())"
-                                    inputmode="numeric"
-                                    maxlength="4"
-                                    autocomplete="one-time-code"
-                                    class="input peer w-full"
-                                    placeholder=" "
-                                >
-
-                                <label
-                                    for="approval-verification-code"
-                                    class="label"
-                                >
-                                    {{ __('approval.create.verification_code') }}
-                                </label>
-
-                                @error('verificationCode')
-                                    <p class="text-error">{{ $message }}</p>
-                                @enderror
-                            </div>
-
-                            <div class="flex flex-wrap gap-3">
-                                <button
-                                    type="submit"
-                                    class="button-primary"
-                                    wire:loading.attr="disabled"
-                                    wire:submit.prevent="verifyCode"
-                                >
-                                    {{ __('forms.confirm') }}
-                                </button>
-                                
-                                <button
-                                    type="button"
-                                    class="button items-center transition-colors"
-                                    :class="secondsLeft > 0 || $wire.smsResent
-                                        ? 'cursor-not-allowed border border-gray-300 bg-gray-100 text-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                                        : 'button-minor'"
-                                    wire:click="resendSms"
-                                    wire:loading.attr="disabled"
-                                    wire:target="resendSms"
-                                    disabled
-                                    :disabled="secondsLeft > 0 || $wire.smsResent"
-                                >
-
-                                    {{
-                                        $smsResent
-                                            ? __('approval.create.sms_already_resent')
-                                            : __('approval.create.resend_sms')
-                                    }}
-                                </button>
-                            </div>
-
-                            @if($smsResent)
-                                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                                    {{ __('approval.create.sms_request_accepted') }}
-                                </p>
-                            @else
-                                <p
-                                    x-show="secondsLeft > 0"
-                                    x-cloak
-                                    class="mt-2 text-sm text-gray-500 dark:text-gray-400"
-                                >
-                                    {{ __('approval.create.resend_wait') }}
-                                    <span x-text="secondsLeft"></span>
-                                    {{ __('approval.create.seconds_short') }}
-                                </p>
-                            @endif
-
-                            @error('smsResend')
-                                <p class="text-error mt-2">{{ $message }}</p>
-                            @enderror
-                        </form>
-                
-                @endif
+                        @include('livewire.person.records.parts.approval-sms-modal')
+                    @endif
         </div>
     </div>
 
