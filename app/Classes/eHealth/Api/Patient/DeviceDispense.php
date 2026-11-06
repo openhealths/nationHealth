@@ -65,12 +65,7 @@ class DeviceDispense extends PatientApiBase
 
         $mergedQuery = array_merge(
             $this->options['query'],
-            $this->format($query, [
-                'when_handed_over_from',
-                'when_handed_over_to',
-                'inserted_at_from',
-                'inserted_at_to'
-            ])
+            $this->format($query)
         );
 
         return $this->get(self::URL . "/$patientId/device_dispenses", $mergedQuery);

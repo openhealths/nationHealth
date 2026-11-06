@@ -33,6 +33,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
+use Carbon\CarbonImmutable;
 use Throwable;
 
 class DeviceDispenses extends BasePatientComponent
@@ -600,10 +601,26 @@ class DeviceDispenses extends BasePatientComponent
             'performer' => $this->filterPractitioner ?: null,
             'part_of' => $this->filterProcedureId ?: null,
             'origin_episode_id' => $this->filterRelatedEpisodeId ?: null,
-            'when_handed_over_from' => $this->filterDispenseDateFrom ?: null,
-            'when_handed_over_to' => $this->filterDispenseDateTo ?: null,
-            'inserted_at_from' => $this->filterCreatedAtFrom ?: null,
-            'inserted_at_to' => $this->filterCreatedAtTo ?: null,
+            'when_handed_over_from' => $this->filterDispenseDateFrom
+                ? CarbonImmutable::createFromFormat(config('app.date_format'), $this->filterDispenseDateFrom, config('app.timezone'))
+                    ->startOfDay()
+                    ->utc()
+                    ->toIso8601ZuluString() : null,
+            'when_handed_over_to' => $this->filterDispenseDateTo
+                ? CarbonImmutable::createFromFormat(config('app.date_format'), $this->filterDispenseDateTo, config('app.timezone'))
+                    ->endOfDay()
+                    ->utc()
+                    ->toIso8601ZuluString() : null,
+            'inserted_at_from' => $this->filterCreatedAtFrom
+                ? CarbonImmutable::createFromFormat(config('app.date_format'), $this->filterCreatedAtFrom, config('app.timezone'))
+                    ->startOfDay()
+                    ->utc()
+                    ->toIso8601ZuluString() : null,
+            'inserted_at_to' => $this->filterCreatedAtTo
+                ? CarbonImmutable::createFromFormat(config('app.date_format'), $this->filterCreatedAtTo, config('app.timezone'))
+                    ->endOfDay()
+                    ->utc()
+                    ->toIso8601ZuluString() : null,
             'page' => $this->getPage(),
             'page_size' => config('pagination.per_page')
         ], static fn (mixed $value): bool => $value !== null && $value !== '');
