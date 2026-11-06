@@ -184,7 +184,7 @@ class DeclarationRequest extends Request
             '*.status' => ['required', 'string'],
             '*.status_reason' => ['nullable', 'string'],
             '*.channel' => ['required', 'string'],
-            '*.person_id' => ['required', 'uuid'],
+            '*.person_id' => ['nullable', 'uuid'],
             '*.employee_id' => ['required', 'uuid'],
             '*.division_id' => ['nullable', 'uuid'],
             '*.legal_entity_id' => ['required', 'uuid'],

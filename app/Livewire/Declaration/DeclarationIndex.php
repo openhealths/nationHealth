@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
 use Livewire\WithPagination;
 use App\Models\Person\Person;
 use App\Jobs\DeclarationsSync;
+use App\Jobs\DeclarationRequestsSync;
 use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
 use App\Enums\Declaration\Channel;
@@ -276,6 +277,7 @@ class DeclarationIndex extends Component
 
         return DeclarationRequest::forEmployees($this->employeeIds)
             ->filterByLegalEntityId(legalEntity()->id)
+            ->whereNotNull('person_id')
             ->whereStatus(RequestStatus::APPROVED->value)
             ->whereChannel(Channel::PIS->value)
             ->count();
@@ -371,6 +373,8 @@ class DeclarationIndex extends Component
             ])
                 ->forEmployees($this->employeeIds)
                 ->filterByLegalEntityId(legalEntity()->id)
+                // The patient of a request from the list is created and linked by its details sync
+                ->whereNotNull('person_id')
                 ->whereNotIn('status', [RequestStatus::SIGNED->value])
                 ->get()
                 ->each->setAttribute('type', 'request');
@@ -541,6 +545,7 @@ class DeclarationIndex extends Component
                 self::BATCH_NAME,
                 self::SUB_BATCH_NAME,
                 self::DEPENDENT_BATCH_NAME,
+                DeclarationRequestsSync::BATCH_NAME,
                 ConfidantPersonSync::BATCH_NAME,
                 PersonAuthMethodSync::BATCH_NAME,
             ])) {
@@ -608,35 +613,29 @@ class DeclarationIndex extends Component
 
             Session::flash('success', __('declarations.sync.started'));
         } else {
-            if (!empty($declarations['declarations'])) {
-                Bus::batch($this->getDeclarationRequestsStartJob($legalEntity, null, $user))
-                    ->withOption('legal_entity_id', $legalEntity->id)
-                    ->withOption('token', Crypt::encryptString($token))
-                    ->withOption('user', $user)
-                    ->withOption('sync_entity', LegalEntity::ENTITY_DECLARATION)
-                    ->catch(callback: function (Batch $batch, Throwable $err) use ($user) {
-                        $message = __('declarations.sync.failed');
+            // Approved requests wait for the doctor signature, so they are synced even without declarations
+            Bus::batch([new DeclarationRequestsSync(legalEntity: $legalEntity)])
+                ->withOption('legal_entity_id', $legalEntity->id)
+                ->withOption('token', Crypt::encryptString($token))
+                ->withOption('user', $user)
+                ->withOption('sync_entity', LegalEntity::ENTITY_DECLARATION)
+                ->catch(callback: function (Batch $batch, Throwable $err) use ($user) {
+                    $message = __('declarations.sync.failed');
 
-                        Log::error('DeclarationRequest sync batch failed.', [
-                            'batch_id' => $batch->id,
-                            'exception' => $err
-                        ]);
+                    Log::error('DeclarationRequest sync batch failed.', [
+                        'batch_id' => $batch->id,
+                        'exception' => $err
+                    ]);
 
-                        $user->notify(new DeclarationSyncCompleted($message, 'error'));
-                    })
-                    ->onQueue('sync')
-                    ->name(self::DEPENDENT_BATCH_NAME)
-                    ->dispatch();
+                    $user->notify(new DeclarationSyncCompleted($message, 'error'));
+                })
+                ->onQueue('sync')
+                ->name(DeclarationRequestsSync::BATCH_NAME)
+                ->dispatch();
 
-                legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DECLARATION);
+            legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DECLARATION);
 
-                Session::flash('success', __('declarations.sync.started'));
-            } else {
-                // If there were no declarations to sync, mark the status as completed
-                legalEntity()->setEntityStatus(JobStatus::COMPLETED, LegalEntity::ENTITY_DECLARATION);
-
-                Session::flash('success', __('declarations.sync.completed'));
-            }
+            Session::flash('success', __('declarations.sync.started'));
         }
     }
 
@@ -664,6 +663,7 @@ class DeclarationIndex extends Component
                 $batchName === self::BATCH_NAME ||
                 $batchName === self::SUB_BATCH_NAME ||
                 $batchName === self::DEPENDENT_BATCH_NAME ||
+                $batchName === DeclarationRequestsSync::BATCH_NAME ||
                 $batchName === ConfidantPersonSync::BATCH_NAME ||
                 $batchName === PersonAuthMethodSync::BATCH_NAME
             ) {

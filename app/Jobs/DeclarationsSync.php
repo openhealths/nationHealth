@@ -10,15 +10,12 @@ use App\Models\LegalEntity;
 use App\Models\Employee\Employee;
 use App\Classes\eHealth\EHealth;
 use App\Repositories\Repository;
-use App\Traits\BatchLegalEntityQueries;
 use GuzzleHttp\Promise\PromiseInterface;
 use App\Classes\eHealth\EHealthResponse;
 use Illuminate\Queue\Middleware\RateLimited;
 
 class DeclarationsSync extends EHealthJob
 {
-    use BatchLegalEntityQueries;
-
     public const string BATCH_NAME = 'DeclarationsSync';
 
     public const string SCOPE_REQUIRED = 'declaration:read';
@@ -77,7 +74,8 @@ class DeclarationsSync extends EHealthJob
      * Get the next entity job to be scheduled after DeclarationSync completes.
      *
      * If the job is standalone, returns a CompleteSync job for the current legal entity.
-     * Otherwise, returns a chain of DeclarationRequestDetailsSync jobs.
+     * Otherwise, returns a DeclarationRequestsSync job, so that the requests created in the patient cabinet
+     * are stored before the chain of DeclarationRequestDetailsSync jobs is built.
      *
      * @return EHealthJob|null
      */
@@ -85,6 +83,10 @@ class DeclarationsSync extends EHealthJob
     {
         return $this->standalone
             ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
-            : $this->getDeclarationRequestsStartJob($this->legalEntity, $this->nextEntity, $this->user);
+            : new DeclarationRequestsSync(
+                legalEntity: $this->legalEntity,
+                nextEntity: $this->nextEntity,
+                isFirstLogin: $this->isFirstLogin
+            );
     }
 }
