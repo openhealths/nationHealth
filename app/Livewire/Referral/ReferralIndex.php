@@ -4,13 +4,19 @@ declare(strict_types=1);
 
 namespace App\Livewire\Referral;
 
+use App\Classes\eHealth\EHealth;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Procedure;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Exception;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
@@ -51,31 +57,55 @@ class ReferralIndex extends Component
 
     public function search(): void
     {
-        abort_unless(auth()->user()?->can('service_request:read'), 403);
-        $this->validate([
-            'requisition' => 'required|string',
-        ]);
+        if (Auth::user()->cannot('search', ServiceRequestRequest::class)) {
+            Session::flash('error', __('service-requests.policy.search'));
 
+            return;
+        }
+
+        $this->searchResults = [];
         $this->errorMessage = null;
-        $this->hasSearched = true;
+        $this->hasSearched = false;
 
         $cleanRequisition = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $this->requisition));
         $formattedRequisition = trim(preg_replace('/(.{4})/', '$1-', $cleanRequisition), '-');
         $this->requisition = $formattedRequisition;
 
+        $this->validate([
+            'requisition' => ['required', 'string', 'max:19'],
+        ], [], [
+            'requisition' => __('referrals.requisition'),
+        ]);
+
         try {
-            $params = ['requisition' => $this->requisition];
-            $response = \App\Classes\eHealth\EHealth::serviceRequest()->searchForServiceRequestsByParams($params)->getData();
+            $results = [];
 
-            $this->searchResults = $response['data'] ?? $response ?? [];
+            foreach (['active', 'completed', 'entered_in_error', 'recalled'] as $status) {
+                $page = 1;
 
-            if (empty($this->searchResults)) {
-                $this->errorMessage = __('referrals.messages.not_found');
+                do {
+                    $response = EHealth::serviceRequest()->searchForServiceRequestsByParams([
+                        'requisition' => $this->requisition,
+                        'status' => $status,
+                        'page' => $page,
+                        'page_size' => 100,
+                    ]);
+                    $referrals = $response->validate();
+                    $results = [...$results, ...($referrals['data'] ?? $referrals)];
+                    $totalPages = (int) ($response->getPaging()['total_pages'] ?? 1);
+                    $page++;
+                } while ($page <= $totalPages);
             }
+
+            $this->searchResults = collect($results)->unique('id')->values()->all();
+            $this->hasSearched = true;
+        } catch (EHealthConnectionException|EHealthResponseException|EHealthValidationException $e) {
+            $this->errorMessage = __('referrals.messages.search_failed');
+            $e->handle('Search referral error');
         } catch (Exception $e) {
             Log::error('Search referral error: '.$e->getMessage());
             $this->errorMessage = __('referrals.messages.search_failed');
-            $this->searchResults = [];
+            Session::flash('error', $this->errorMessage);
         }
     }
 
