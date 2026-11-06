@@ -12,6 +12,7 @@
                     wire:click="search"
                     wire:loading.attr="disabled"
                     wire:target="search"
+                    @click="patient = ''; status = []"
                     class="button-sync gap-2 whitespace-nowrap disabled:cursor-default disabled:opacity-50"
                     :disabled="! requisition.trim()"
                 >
@@ -22,11 +23,19 @@
         </x-slot>
 
         <x-slot name="navigation">
-            <form wire:submit="search" class="-my-4">
+            <form
+                wire:submit="search"
+                @submit="patient = ''; status = []"
+                class="-my-4"
+            >
                 <div class="mb-6 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
                     @icon('search-outline', 'w-4.5 h-4.5')
                     <span>{{ __('referrals.search') }}</span>
                 </div>
+
+                <p id="requisition-hint" class="mb-6 text-sm text-gray-500 dark:text-gray-400">
+                    {{ __('referrals.search_hint') }}
+                </p>
 
                 <div class="form-row-3">
                     <div class="form-group group">
@@ -41,6 +50,7 @@
                                 $event.target.value = requisition;
                             "
                             autocomplete="off"
+                            aria-describedby="requisition-hint"
                             maxlength="19"
                             required
                         />
@@ -56,51 +66,6 @@
                         @error('requisition')
                             <p class="text-error">{{ $message }}</p>
                         @enderror
-                    </div>
-
-                    <div class="form-group group">
-                        <input
-                            type="text"
-                            id="patient"
-                            placeholder=" "
-                            class="input peer pr-8"
-                            x-model="patient"
-                            autocomplete="off"
-                        />
-                        <label for="patient" class="label">{{ __('referrals.patient') }}</label>
-                        <button
-                            type="button"
-                            @click="patient = ''"
-                            class="absolute top-3 right-0 text-gray-400 hover:text-gray-700 dark:hover:text-white"
-                            aria-label="{{ __('referrals.clear_patient') }}"
-                        >
-                            @icon('close', 'w-4 h-4')
-                        </button>
-                    </div>
-                </div>
-
-                <div
-                    class="form-row-3 mt-4"
-                    x-data="{ statusOpen: false }"
-                    @open-changed.stop="statusOpen = $event.detail.open"
-                    :class="{ 'pb-60': statusOpen }"
-                >
-                    <div class="form-group group">
-                        <x-forms.multiselect
-                            bind="status"
-                            alpine-model="status"
-                            :initial="[]"
-                            :options="[
-                                'active' => __('referrals.statuses.active'),
-                                'completed' => __('referrals.statuses.completed'),
-                                'entered_in_error' => __('referrals.statuses.entered_in_error'),
-                                'revoked' => __('referrals.statuses.revoked'),
-                                'draft' => __('forms.status.drafts'),
-                                'in_progress' => __('referrals.statuses.in_progress'),
-                            ]"
-                            :label="__('referrals.show')"
-                            :placeholder="__('referrals.registry.all')"
-                        />
                     </div>
                 </div>
 
@@ -120,28 +85,88 @@
                         {{ __('referrals.btn_reset') }}
                     </button>
                 </div>
+
+                <div
+                    class="mt-6"
+                    x-show="$wire.searchResults.length > 0"
+                    x-cloak
+                >
+                    <p class="mb-4 font-semibold text-gray-900 dark:text-white">
+                        {{ __('referrals.result_filters') }}
+                    </p>
+                    <div
+                        class="form-row-3"
+                        x-data="{ statusOpen: false }"
+                        @open-changed.stop="statusOpen = $event.detail.open"
+                        :class="{ 'pb-60': statusOpen }"
+                    >
+                        <div class="form-group group">
+                            <input
+                                type="text"
+                                id="patient"
+                                placeholder=" "
+                                class="input peer pr-8"
+                                x-model="patient"
+                                @keydown.enter.prevent
+                                autocomplete="off"
+                                aria-describedby="patient-hint"
+                            />
+                            <label for="patient" class="label">
+                                {{ __('referrals.patient_filter') }}
+                            </label>
+                            <button
+                                type="button"
+                                @click="patient = ''"
+                                class="absolute top-3 right-0 text-gray-400 hover:text-gray-700 dark:hover:text-white"
+                                aria-label="{{ __('referrals.clear_patient') }}"
+                            >
+                                @icon('close', 'w-4 h-4')
+                            </button>
+                        </div>
+
+                        <div class="form-group group">
+                            <x-forms.multiselect
+                                bind="status"
+                                alpine-model="status"
+                                :initial="[]"
+                                :options="[
+                                    'active' => __('referrals.statuses.active'),
+                                    'completed' => __('referrals.statuses.completed'),
+                                    'entered_in_error' => __('referrals.statuses.entered_in_error'),
+                                    'revoked' => __('referrals.statuses.revoked'),
+                                    'in_progress' => __('referrals.statuses.in_progress'),
+                                ]"
+                                :label="__('referrals.show')"
+                                :placeholder="__('referrals.registry.all')"
+                            />
+                        </div>
+                    </div>
+                    <p id="patient-hint" class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        {{ __('referrals.patient_filter_hint') }}
+                    </p>
+                </div>
             </form>
         </x-slot>
     </x-header-navigation>
 
     <div class="shift-content mt-8 min-w-0 px-3.5">
         <div class="max-w-screen-xl">
-            @if ($errorMessage)
-                <div
-                    x-show="$wire.errorMessage"
-                    class="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-gray-800 dark:text-red-400"
-                    role="alert"
-                >
-                    {{ $errorMessage }}
-                </div>
-            @endif
-
             @if (!empty($searchResults))
                 @include('livewire.referral.parts.referrals-table', ['referrals' => $searchResults])
+                <div x-show="visibleCount === 0">
+                    <x-nothing-found :description="__('referrals.no_filtered_results')" />
+                </div>
+            @elseif ($hasSearched)
+                <x-nothing-found
+                    :title="__('referrals.messages.not_found')"
+                    :description="__('referrals.no_search_results')"
+                />
+            @else
+                <x-nothing-found
+                    :title="__('referrals.search_prompt')"
+                    :description="__('referrals.search_hint')"
+                />
             @endif
-            <div x-show="visibleCount === 0">
-                <x-nothing-found />
-            </div>
         </div>
     </div>
 
