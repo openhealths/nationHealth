@@ -211,7 +211,7 @@ return [
             'procedure' => 'Процедура',
             'clinical_impression' => 'Клінічна оцінка',
             'specimen' => 'Зразок',
-            'device_dispense' => 'Видача медичного виробу',
+            'device_dispenses' => 'Видача медичного виробу',
             'device_association' => 'Призначення медичного виробу',
             'detected_issue' => 'Виявлена проблема'
         ]

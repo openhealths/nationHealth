@@ -872,6 +872,7 @@ class EncounterPackageComponent extends Component
 
         $this->patientDevices = Device::forPatient($this->patient())
             ->notEnteredInError()
+            ->notInDraftEncounter($this->patient())
             ->with('names')
             ->get(['id', 'uuid', 'status', 'serial_number'])
             ->map(static fn (Device $device): array => [

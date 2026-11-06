@@ -104,6 +104,7 @@ abstract class BaseRepository
 
     /**
      * Sync coding relationship using updateOrCreate (structure: {code, system}).
+     * A missing value clears the relationship.
      *
      * @param  mixed  $existing
      * @param  array|null  $fromApi
@@ -114,7 +115,7 @@ abstract class BaseRepository
     {
         // Check if API data is valid
         if (empty($fromApi)) {
-            return $existing?->{$relationshipName};
+            return null;
         }
 
         if ($existing && $existing->{$relationshipName}) {
@@ -134,6 +135,7 @@ abstract class BaseRepository
 
     /**
      * Sync codeable concept relationship using updateOrCreate (structure: {text, coding: [{code, system}]}).
+     * A missing value clears the relationship.
      *
      * @param  mixed  $existing
      * @param  array|null  $newData
@@ -143,7 +145,7 @@ abstract class BaseRepository
     protected function syncCodeableConcept(?Model $existing, ?array $newData, string $relationshipName): ?Model
     {
         if (empty($newData)) {
-            return $existing?->{$relationshipName};
+            return null;
         }
 
         if ($existing && $existing->{$relationshipName}) {
@@ -170,6 +172,7 @@ abstract class BaseRepository
 
     /**
      * Sync identifier relationship using updateOrCreate (structure: {identifier: {value, type: [codeableConcept]}}).
+     * A missing value clears the relationship.
      *
      * @param  mixed  $existing
      * @param  array|null  $newData
@@ -179,7 +182,7 @@ abstract class BaseRepository
     protected function syncIdentifier(?Model $existing, ?array $newData, string $relationshipName): ?Model
     {
         if (empty($newData)) {
-            return $existing?->{$relationshipName};
+            return null;
         }
 
         if ($existing && $existing->{$relationshipName}) {

@@ -32,7 +32,7 @@
                 <p>{{ __('devices.search') }}</p>
             </div>
 
-            <div class="form-row-3 mb-6">
+            <div class="form-row-3 mb-6" x-data="{ filterType: $wire.entangle('filterType') }">
                 <div class="form-group group">
                     <input
                         type="text"
