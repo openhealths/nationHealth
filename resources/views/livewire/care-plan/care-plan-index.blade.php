@@ -78,13 +78,9 @@
                             class="input-select peer w-full"
                         >
                             <option value="">{{ __('forms.select') }}</option>
-                            <option value="draft">{{ __('care-plan.status.draft') }}</option>
-                            <option value="new">{{ __('care-plan.status.new') }}</option>
-                            <option value="active">{{ __('care-plan.status.active') }}</option>
-                            <option value="on-hold">{{ __('care-plan.status.on-hold') }}</option>
-                            <option value="completed">{{ __('care-plan.status.completed') }}</option>
-                            <option value="revoked">{{ __('care-plan.status.revoked') }}</option>
-                            <option value="entered-in-error">{{ __('care-plan.status.entered-in-error') }}</option>
+                            @foreach (CarePlanStatus::filterOptions() as $status)
+                                <option value="{{ $status->value }}">{{ $status->label() }}</option>
+                            @endforeach
                         </select>
                         <label for="filterStatus" class="label"> {{ __('forms.status.label') }} </label>
                     </div>
@@ -153,60 +149,6 @@
                                 <label for="filterEndDateRange" class="wrapped-label">
                                     {{ __('care-plan.filter_end_date_range') }}
                                 </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-row-4 mb-6">
-                        <div class="form-group group">
-                            <div class="relative">
-                                <input
-                                    wire:model="filterIsPartOf"
-                                    wire:keydown.enter="search"
-                                    type="text"
-                                    name="filterIsPartOf"
-                                    id="filterIsPartOf"
-                                    class="input peer w-full"
-                                    placeholder=" "
-                                    autocomplete="off"
-                                />
-                                <label for="filterIsPartOf" class="label">
-                                    {{ __('care-plan.is_part_of_care_plan') }}
-                                </label>
-                                <button
-                                    type="button"
-                                    wire:click="$set('filterIsPartOf', '')"
-                                    class="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                    x-show="$wire.filterIsPartOf"
-                                >
-                                    @icon('close', 'w-4 h-4')
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="form-group group">
-                            <div class="relative">
-                                <input
-                                    wire:model="filterIncludes"
-                                    wire:keydown.enter="search"
-                                    type="text"
-                                    name="filterIncludes"
-                                    id="filterIncludes"
-                                    class="input peer w-full"
-                                    placeholder=" "
-                                    autocomplete="off"
-                                />
-                                <label for="filterIncludes" class="label">
-                                    {{ __('care-plan.includes_care_plan') }}
-                                </label>
-                                <button
-                                    type="button"
-                                    wire:click="$set('filterIncludes', '')"
-                                    class="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                    x-show="$wire.filterIncludes"
-                                >
-                                    @icon('close', 'w-4 h-4')
-                                </button>
                             </div>
                         </div>
                     </div>

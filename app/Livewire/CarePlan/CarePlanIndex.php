@@ -30,8 +30,6 @@ class CarePlanIndex extends Component
     public string $filterStatus = '';
     public string $filterStartDateRange = '';
     public string $filterEndDateRange = '';
-    public string $filterIsPartOf = '';
-    public string $filterIncludes = '';
     public bool $showAdditionalParams = false;
 
     public function search(): void
@@ -48,8 +46,6 @@ class CarePlanIndex extends Component
             'filterStatus',
             'filterStartDateRange',
             'filterEndDateRange',
-            'filterIsPartOf',
-            'filterIncludes',
         ]);
     }
 

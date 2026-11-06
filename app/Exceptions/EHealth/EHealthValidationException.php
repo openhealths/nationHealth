@@ -300,8 +300,6 @@ class EHealthValidationException extends EHealthException
                 $translatedMessage = __('Не знайдено відповідних учасників (закладів або підрозділів) для обраної медичної програми');
             } elseif (str_contains($message, 'Code field of daily_amount object should be equal to denumerator_unit of one of medication\'s innms')) {
                 $translatedMessage = __('Код одиниці добової дози (daily_amount) повинен збігатися з denumerator_unit одного з INNM обраного лікарського засобу');
-            } elseif (str_contains($message, 'Activity can be completed only if it has in_progress status')) {
-                $translatedMessage = __('Призначення може бути виконане тільки якщо воно має статус "В процесі" (in_progress)');
             } elseif (str_contains($message, 'Primary diagnosis condition codes and care plan category mismatch')) {
                 // Platform entry points at encounter; the form field to fix is category.
                 $translatedKey = __('care-plan.category');
@@ -417,6 +415,10 @@ class EHealthValidationException extends EHealthException
             return __('errors.ehealth.messages.quantity_unit_activity_mismatch');
         }
 
+        if (str_contains($message, 'Activity can be completed only if it has in_progress status')) {
+            return __('errors.ehealth.messages.activity_complete_requires_in_progress');
+        }
+
         if ($message === 'type mismatch. Expected integer but got number') {
             return __('errors.ehealth.messages.integer_required');
         }
@@ -457,6 +459,7 @@ class EHealthValidationException extends EHealthException
         }
 
         $exactMessages = [
+            'Activity can be completed only if it has in_progress status' => 'activity_complete_requires_in_progress',
             'Care plan has unfinished activities' => 'care_plan_has_unfinished_activities',
             'Confidant Person relationship does not belong to this person' => 'confidant_relationship_not_of_person',
             'Limit of confidant persons with this person is exhausted' => 'confidant_persons_limit_exhausted',

@@ -96,7 +96,7 @@
                         class="input-select peer w-full"
                     >
                         <option value="">{{ __('forms.select') }} ...</option>
-                        @foreach (\App\Enums\CarePlanStatus::cases() as $status)
+                        @foreach (CarePlanStatus::filterOptions() as $status)
                             <option value="{{ $status->value }}">{{ $status->label() }}</option>
                         @endforeach
                     </select>
@@ -129,36 +129,6 @@
                         @icon('adjustments', 'w-4 h-4 text-gray-500')
                         <span>Додаткові параметри пошуку</span>
                     </button>
-                </div>
-
-                <div class="relative" x-data="{ openGroupActions: false }" @click.outside="openGroupActions = false">
-                    <button
-                        type="button"
-                        @click="openGroupActions = ! openGroupActions"
-                        class="button-primary-outline px-5 py-2.5 text-sm"
-                    >
-                        {{ __('forms.group_actions') }}
-                    </button>
-
-                    <div
-                        x-show="openGroupActions"
-                        x-transition
-                        x-cloak
-                        class="absolute top-full right-0 z-10 mt-2 w-[240px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-700"
-                    >
-                        <div class="py-1">
-                            <button
-                                type="button"
-                                @click="openGroupActions = false"
-                                class="dropdown-button !flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                            >
-                                <span class="text-gray-500">
-                                    @icon('close', 'w-4 h-4')
-                                </span>
-                                {{ __('patients.revoke_access') }}
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -194,64 +164,12 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="form-row-3 mb-9">
-                    <div class="form-group group">
-                        <div class="relative">
-                            <input
-                                wire:model="filterIsPartOf"
-                                type="text"
-                                name="filterIsPartOf"
-                                id="filterIsPartOf"
-                                class="input peer w-full"
-                                placeholder=" "
-                                autocomplete="off"
-                            />
-                            <label for="filterIsPartOf" class="label"> Є частиною плана лікування </label>
-                            <button
-                                type="button"
-                                wire:click="$set('filterIsPartOf', '')"
-                                class="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                x-show="$wire.filterIsPartOf"
-                            >
-                                @icon('close', 'w-4 h-4')
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="form-group group">
-                        <div class="relative">
-                            <input
-                                wire:model="filterIncludes"
-                                type="text"
-                                name="filterIncludes"
-                                id="filterIncludes"
-                                class="input peer w-full"
-                                placeholder=" "
-                                autocomplete="off"
-                            />
-                            <label for="filterIncludes" class="label"> Включає в себе план лікування </label>
-                            <button
-                                type="button"
-                                wire:click="$set('filterIncludes', '')"
-                                class="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                x-show="$wire.filterIncludes"
-                            >
-                                @icon('close', 'w-4 h-4')
-                            </button>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div class="space-y-4">
                 @forelse ($carePlans as $plan)
                     <div class="record-inner-card" wire:key="care-plan-{{ $plan['id'] }}">
                         <div class="record-inner-header">
-                            <div class="record-inner-checkbox-col">
-                                <input type="checkbox" class="default-checkbox h-5 w-5" />
-                            </div>
-
                             <div class="record-inner-column flex-1">
                                 <div class="record-inner-label">{{ __('care-plan.name') }}</div>
                                 <div class="record-inner-value text-[17px] font-semibold text-gray-900 dark:text-gray-100">
