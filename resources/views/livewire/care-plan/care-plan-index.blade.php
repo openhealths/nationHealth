@@ -1,5 +1,6 @@
 @use('App\Livewire\CarePlan\CarePlanIndex')
 @use('App\Enums\CarePlanStatus')
+@use('Illuminate\Support\Str')
 
 <div data-livewire-background-actions="checkSyncStatus">
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
@@ -217,6 +218,12 @@
                     @php
                         /** @var \App\Models\CarePlan $plan */
                         $statusEnum = CarePlanStatus::fromStored($plan->status);
+                        $displayTitle = trim((string) $plan->title);
+                        if ($displayTitle === '' || Str::isUuid($displayTitle)) {
+                            $displayTitle = filled($plan->requisition)
+                                ? __('care-plan.care_plan_with_number', ['number' => $plan->requisition])
+                                : __('care-plan.care_plan');
+                        }
 
                         $created = $plan->created_at?->format(config('app.date_format', 'd.m.Y')) ?? '-';
                         $start = $plan->period_start?->format(config('app.date_format', 'd.m.Y')) ?? '-';
@@ -230,14 +237,14 @@
                                 <input
                                     type="checkbox"
                                     class="default-checkbox h-5 w-5"
-                                    aria-label="{{ __('forms.select') }}: {{ $plan->title }}"
+                                    aria-label="{{ __('forms.select') }}: {{ $displayTitle }}"
                                 />
                             </div>
 
                             <div class="record-inner-column min-w-0 flex-1">
                                 <div class="record-inner-label">{{ __('care-plan.name') }}</div>
                                 <div class="record-inner-value text-[20px] font-semibold break-words">
-                                    {{ $plan->title }}
+                                    {{ $displayTitle }}
                                     @if ($plan->requiresFhirImport())
                                         <p class="mt-2 text-sm font-normal text-gray-600 dark:text-gray-300">
                                             {{ $plan->status === 'draft' ? __('care-plan.draft_backfill_required') : __('care-plan.full_sync_required') }}
