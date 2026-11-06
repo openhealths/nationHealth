@@ -27,7 +27,6 @@ use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\User;
 use App\Enums\JobStatus;
-use App\Enums\Person\ApprovalStatus;
 use App\Enums\Person\AuthenticationMethod;
 use App\Enums\Specimen\Status as SpecimenStatus;
 use App\Repositories\MedicalEvents\Repository;
@@ -450,7 +449,7 @@ class PatientApprovalService
 
         Approval::query()
             ->whereUuid($approvalUuid)
-            ->update(['status' => ApprovalStatus::INACTIVE->value]);
+            ->update(['expires_at' => now()]);
     }
 
     private function dispatchJob(EhealthLink $link, User $user, string $token): void
@@ -614,7 +613,7 @@ class PatientApprovalService
             ->where('uuid', $approvalId)
             ->firstOrFail();
 
-        if ($approval->isVerified) {
+        if ($approval->getAttribute('is_verified')) {
             throw ValidationException::withMessages([
                 'smsResend' => __('approval.create.resend_verified'),
             ]);
