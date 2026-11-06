@@ -548,11 +548,13 @@ class StandaloneRequestSigningTest extends TestCase
         $response->shouldReceive('getData')->andReturn([]);
         $response->shouldReceive('getPaging')->andReturn(['total_pages' => 1]);
         $api = Mockery::mock(\App\Classes\eHealth\Api\Patient\DeviceRequest::class);
-        $api->shouldReceive('getBySearchParams')->twice()->with($person->uuid, ['page' => 1])->andReturn($response);
+        $api->shouldReceive('getBySearchParams')->twice()
+            ->with($person->uuid, ['requester_legal_entity' => $this->legalEntity->uuid, 'page' => 1])->andReturn($response);
         $this->instance(\App\Classes\eHealth\Api\Patient\DeviceRequest::class, $api);
         Livewire::test(\App\Livewire\DeviceRequest\DeviceRequestIndex::class, ['legalEntity' => $this->legalEntity, 'person' => $person])
             ->assertSet('legalEntityId', $this->legalEntity->id)
             ->assertSet('personId', $person->id)
+            ->assertSet('filters.parameters.requester_legal_entity', $this->legalEntity->uuid)
             ->call('search', false)
             ->assertSet('drafts', [])
             ->assertHasNoErrors();
