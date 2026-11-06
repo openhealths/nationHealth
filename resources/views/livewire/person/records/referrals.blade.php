@@ -1,4 +1,5 @@
 @use(App\Models\MedicalEvents\Sql\DeviceRequestRequest)
+@use(App\Models\MedicalEvents\Sql\ServiceRequestRequest)
 
 <x-layouts.patient
     :showLegacyMessages="false"
@@ -10,8 +11,25 @@
         <script src="{{ asset('js/print-sandboxed.js') }}"></script>
     @endassets
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
+    @include('livewire.encounter-package.parts.referral-redeem-modal')
+    @if ($syncBatchId !== null)
+        <div wire:poll.5s="checkSyncStatus" role="status">{{ __('referrals.messages.sync_running') }}</div>
+    @endif
 
     <x-slot name="headerActions">
+        @can('search', ServiceRequestRequest::class)
+            <button
+                type="button"
+                wire:click="sync"
+                wire:loading.attr="disabled"
+                wire:target="sync"
+                @disabled($syncBatchId !== null)
+                class="button-sync"
+            >
+                @icon('refresh', 'w-4 h-4')
+                {{ __('forms.synchronise_with_eHealth') }}
+            </button>
+        @endcan
         @can('viewAny', DeviceRequestRequest::class)
             <a
                 href="{{ route('persons.device-requests', ['legalEntity' => legalEntity(), 'person' => $personId]) }}"
@@ -20,7 +38,7 @@
         @endcan
     </x-slot>
 
-    <div class="breadcrumb-form shift-content p-4">
+    <div class="breadcrumb-form shift-content p-4" @if ($pendingCompletions !== []) wire:poll.5s="checkPendingCompletions" @endif>
         <div class="mt-6 w-full">
             <div class="mb-4 flex items-center gap-1 font-semibold text-gray-900 dark:text-gray-100">
                 @icon('search-outline', 'w-4.5 h-4.5')
@@ -225,6 +243,29 @@
                                                 @endif
 
                                             @endif
+
+                                            @can('complete', ServiceRequestRequest::class)
+                                                @if ($referral['canComplete'] ?? false)
+                                                    <button
+                                                        type="button"
+                                                        class="dropdown-item"
+                                                        @click="close($refs.button)"
+                                                        wire:click="openReferralRedeemModal('{{ $referral['uuid'] }}')"
+                                                    >
+                                                        {{ __('encounters.redeem_referral') }}
+                                                    </button>
+                                                @endif
+                                                @if ($referral['hasCompletion'] ?? false)
+                                                    <button
+                                                        type="button"
+                                                        class="dropdown-item"
+                                                        @click="close($refs.button)"
+                                                        wire:click="checkReferralCompletion('{{ $referral['uuid'] }}')"
+                                                    >
+                                                        {{ __('care-plan.submission_check') }}
+                                                    </button>
+                                                @endif
+                                            @endcan
 
                                             @if (!empty($referral['canOperate']))
                                                 @if (!empty($referral['canRecall']))

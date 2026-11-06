@@ -21,6 +21,9 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Throwable;
+use Illuminate\Validation\Rule;
+use Livewire\Attributes\Computed;
+use InvalidArgumentException;
 
 trait ManagesEncounterEPrescription
 {
@@ -53,6 +56,16 @@ trait ManagesEncounterEPrescription
     /** @var array<string, mixed>|null */
     public ?array $encounterEPrescriptionSelectedMedication = null;
 
+    #[Computed]
+    public function encounterEPrescriptionCategories(): array
+    {
+        try {
+            return dictionary()->basics()->byName('MEDICATION_REQUEST_CATEGORY')->asCodeDescription()->all();
+        } catch (InvalidArgumentException) {
+            return [];
+        }
+    }
+
     public function openEncounterEPrescriptionDrawer(): void
     {
         $encounter = $this->resolveEncounterModelForStandalone();
@@ -77,7 +90,9 @@ trait ManagesEncounterEPrescription
         $this->encounterEPrescriptionForm = [
             'medication_id' => '',
             'program_id' => '',
-            'category' => 'community',
+            'category' => array_key_exists('community', $this->encounterEPrescriptionCategories)
+                ? 'community'
+                : (array_key_first($this->encounterEPrescriptionCategories) ?? ''),
             'medication_qty' => '1',
             'medication_unit' => 'од.',
             'signature_text' => '',
@@ -246,7 +261,7 @@ trait ManagesEncounterEPrescription
             $this->validate([
                 'encounterEPrescriptionForm.medication_id' => 'required|string|uuid',
                 'encounterEPrescriptionForm.program_id' => 'nullable|string|uuid',
-                'encounterEPrescriptionForm.category' => 'required|string',
+                'encounterEPrescriptionForm.category' => ['required', 'string', Rule::in(array_keys($this->encounterEPrescriptionCategories))],
                 'encounterEPrescriptionForm.medication_qty' => 'required|numeric|min:0.01',
                 'encounterEPrescriptionForm.signature_text' => 'required|string|min:1',
                 'encounterEPrescriptionForm.max_dose_per_administration' => 'required|numeric|min:0.01',

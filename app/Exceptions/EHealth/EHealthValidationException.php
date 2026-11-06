@@ -122,6 +122,9 @@ class EHealthValidationException extends EHealthException
                     if (str_contains($description, 'At least one of action references, diagnostic reports or procedures should reference the same service')) {
                         return __('errors.ehealth.messages.referral_service_mismatch');
                     }
+                    if (str_contains($entry, 'completed_with') && $description === 'Not allowed for this category') {
+                        return __('referrals.messages.completion_type_not_allowed');
+                    }
                     // eHealth points entry at encounter, but the actionable field is care plan category.
                     if (str_contains($description, 'Primary diagnosis condition codes and care plan category mismatch')) {
                         return __('errors.ehealth.messages.care_plan_category_diagnosis_mismatch');
