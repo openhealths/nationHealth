@@ -25,6 +25,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Livewire\WithFileUploads;
+use App\Enums\JobStatus;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
+use Throwable;
 
 class PatientReferrals extends BasePatientComponent
 {
@@ -34,6 +38,18 @@ class PatientReferrals extends BasePatientComponent
     use WithFileUploads;
 
     public Form $form;
+
+    public bool $showReferralRedeemModal = false;
+
+    #[Locked]
+    public ?string $referralToRedeemId = null;
+
+    public string $referralCompletionType = 'encounter';
+
+    public string $referralCompletionUuid = '';
+
+    #[Locked]
+    public array $pendingCompletions = [];
 
     public bool $showSignatureModal = false;
 
@@ -111,11 +127,186 @@ class PatientReferrals extends BasePatientComponent
             }
         );
 
+        $states = $rows === [] ? [] : MedicalEventsRepository::serviceRequest()->completionStates(array_column($rows, 'uuid'));
+        $this->pendingCompletions = [];
+        foreach ($rows as &$row) {
+            $row['hasCompletion'] = isset($states[$row['uuid']]);
+            if (($states[$row['uuid']] ?? null) === JobStatus::PENDING->value) {
+                $this->pendingCompletions[$row['uuid']] = true;
+            }
+            $row['canComplete'] = $row['kind'] === 'service_request'
+                && !isset($this->pendingCompletions[$row['uuid']])
+                && ($row['canComplete'] ?? false);
+        }
+        unset($row);
         $this->referrals = $rows;
+    }
+
+    #[Computed]
+    public function referralCompletionResources(): array
+    {
+        if ($this->referralToRedeemId === null || $this->personId === null) {
+            return [];
+        }
+        MedicalEventsRepository::serviceRequest()->completionForPerson($this->referralToRedeemId, $this->personId);
+
+        return MedicalEventsRepository::serviceRequest()->completionResources(
+            $this->patient(), $this->referralToRedeemId, $this->referralCompletionType
+        );
+    }
+
+    public function updatedReferralCompletionType(): void
+    {
+        unset($this->referralCompletionResources);
+        $this->referralCompletionUuid = $this->referralCompletionResources[0]['uuid'] ?? '';
+    }
+
+    public function openReferralRedeemModal(string $uuid): void
+    {
+        if (Auth::user()->cannot('complete', ServiceRequestRequest::class)) {
+            Session::flash('error', __('referrals.messages.complete_forbidden'));
+
+            return;
+        }
+        $record = MedicalEventsRepository::serviceRequest()->completionForPerson($uuid, $this->personId);
+        if (!MedicalEventsRepository::serviceRequest()->canComplete($record)) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+
+            return;
+        }
+        if (MedicalEventsRepository::serviceRequest()->hasPendingSubmission($record)) {
+            Session::flash('info', __('care-plan.submission_pending'));
+
+            return;
+        }
+        $this->referralToRedeemId = $uuid;
+        $this->referralCompletionType = 'encounter';
+        foreach (['diagnostic_report', 'procedure', 'encounter'] as $type) {
+            if (MedicalEventsRepository::serviceRequest()->completionResources($this->patient(), $uuid, $type) !== []) {
+                $this->referralCompletionType = $type;
+                break;
+            }
+        }
+        $this->updatedReferralCompletionType();
+        $this->showReferralRedeemModal = true;
+    }
+
+    public function redeemReferral(ReferralRequestLifecycleService $service): void
+    {
+        if (Auth::user()->cannot('complete', ServiceRequestRequest::class)) {
+            Session::flash('error', __('referrals.messages.complete_forbidden'));
+
+            return;
+        }
+        if ($this->referralToRedeemId === null
+            || !in_array($this->referralCompletionUuid, array_column($this->referralCompletionResources, 'uuid'), true)) {
+            Session::flash('error', __('care-plan.referral_complete_emz_not_linked'));
+
+            return;
+        }
+        $record = MedicalEventsRepository::serviceRequest()->completionForPerson($this->referralToRedeemId, $this->personId);
+        if (!MedicalEventsRepository::serviceRequest()->canComplete($record)) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+
+            return;
+        }
+        try {
+            $response = $service->completeReferral($record->uuid, $this->referralCompletionUuid, $this->referralCompletionType);
+            $this->showReferralRedeemModal = false;
+            Session::flash(($response['submissionPending'] ?? false) ? 'info' : 'success', __(
+                ($response['submissionPending'] ?? false) ? 'care-plan.submission_pending' : 'referrals.messages.complete_success'
+            ));
+        } catch (EHealthValidationException $exception) {
+            Session::flash('error', $exception->getFormattedMessage());
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
+        } catch (Throwable $exception) {
+            Session::flash('error', __('referrals.messages.operation_failed'));
+        }
+        $this->loadReferrals();
+    }
+
+    public function checkPendingCompletions(): void
+    {
+        foreach (array_keys($this->pendingCompletions) as $uuid) {
+            $this->checkReferralCompletion($uuid);
+        }
+    }
+
+    public function checkReferralCompletion(string $uuid): void
+    {
+        if (Auth::user()->cannot('complete', ServiceRequestRequest::class)) {
+            $this->pendingCompletions = [];
+            Session::flash('error', __('referrals.messages.complete_forbidden'));
+
+            return;
+        }
+        $record = MedicalEventsRepository::serviceRequest()->completionForPerson($uuid, $this->personId);
+        if (!$record instanceof ServiceRequestRequest) {
+            return;
+        }
+        try {
+            $response = app(ReferralRequestLifecycleService::class)->checkCompletion($record);
+            if ($response['submissionPending']) {
+                return;
+            }
+            if ($response['status'] === 'completed') {
+                Session::flash('success', __('referrals.messages.complete_success'));
+            }
+        } catch (EHealthValidationException $exception) {
+            Session::flash('error', $exception->getFormattedMessage());
+        } catch (Throwable $exception) {
+            unset($this->pendingCompletions[$uuid]);
+            Session::flash('error', __('referrals.messages.operation_failed'));
+
+            return;
+        }
+        $this->loadReferrals();
     }
 
     public function applyFilters(): void
     {
+        $this->loadReferrals();
+    }
+
+    public function sync(): void
+    {
+        if (Auth::user()->cannot('search', ServiceRequestRequest::class)) {
+            Session::flash('error', __('service-requests.policy.search'));
+
+            return;
+        }
+        if ($this->personId === null) {
+            return;
+        }
+
+        try {
+            foreach (['active', 'completed', 'entered_in_error', 'recalled'] as $status) {
+                $page = 1;
+                do {
+                    $response = SubmissionApi::serviceRequest()->getBySearchParams($this->uuid, [
+                        'status' => $status, 'page' => $page, 'page_size' => 100,
+                    ]);
+                    $resources = $response->validate();
+                    foreach ($resources as $resource) {
+                        $uuid = $resource['id'] ?? ($resource['uuid'] ?? null);
+                        if ($uuid === null) {
+                            continue;
+                        }
+                        $detail = SubmissionApi::serviceRequest()->getById($this->uuid, $uuid, preserveApiKeys: true)->validate();
+                        MedicalEventsRepository::serviceRequest()->importPatientResource($detail[0] ?? $detail, $this->patient());
+                    }
+                    $totalPages = (int) ($response->getPaging()['total_pages'] ?? 1);
+                    $page++;
+                } while ($page <= $totalPages);
+            }
+            Session::flash('success', __('referrals.messages.sync_success'));
+        } catch (EHealthValidationException $exception) {
+            Session::flash('error', $exception->getFormattedMessage());
+        } catch (Throwable $exception) {
+            Log::warning('Patient referral synchronization failed', ['exceptionType' => $exception::class]);
+            Session::flash('error', __('referrals.messages.sync_failed'));
+        }
         $this->loadReferrals();
     }
 

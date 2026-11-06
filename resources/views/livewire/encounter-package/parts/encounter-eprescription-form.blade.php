@@ -116,8 +116,13 @@
                                 class="input-select peer w-full"
                                 wire:model="encounterEPrescriptionForm.category"
                             >
-                                <option value="community">{{ __('encounters.eprescription.community') }}</option>
+                                @foreach ($this->encounterEPrescriptionCategories as $code => $label)
+                                    <option value="{{ $code }}">{{ $label }}</option>
+                                @endforeach
                             </select>
+                            @if ($this->encounterEPrescriptionCategories === [])
+                                <p class="text-error">{{ __('medication-requests.category_dictionary_unavailable') }}</p>
+                            @endif
                             @error ('encounterEPrescriptionForm.category')
                                 <p class="text-error">{{ $message }}</p>
                             @enderror

@@ -24,6 +24,12 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
 use Tests\TestCase;
+use Tests\Support\ClinicalEncounterView;
+use Tests\Support\ReferralIndexFixture;
+use App\Policies\EncounterPolicy;
+use App\Services\Dictionary\Dictionaries\BasicDictionary;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Auth\Access\Response;
 
 class ReferralExecutorPhase4Test extends TestCase
 {
@@ -40,8 +46,8 @@ class ReferralExecutorPhase4Test extends TestCase
                 'identity' => ['last_name' => 'Тестовий', 'first_name' => 'Андрій', 'second_name' => 'Іванович', 'age' => 0],
             ];
         }
-        Livewire::test(\App\Livewire\Referral\ReferralIndex::class, ['legalEntity' => $this->legalEntity])
-            ->set('hasSearched', true)->set('searchResults', $rows)
+        Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
+            ->set('hasSearched', true)->call('seedResults', $rows)
             ->assertSee('Тестовий А. І.')->assertSee('0 повних років')
             ->assertSee(__('referrals.priorities.stat'))->assertSee(__('referrals.priorities.routine'));
     }
@@ -124,6 +130,13 @@ class ReferralExecutorPhase4Test extends TestCase
             'patient_signed' => true,
             'process_disclosure_data_consent' => true,
         ]);
+
+        Cache::forever(BasicDictionary::KEY, [
+            ['name' => 'eHealth/encounter_classes', 'values' => [['code' => 'AMB', 'description' => 'Ambulatory']]],
+            ['name' => 'eHealth/encounter_types', 'values' => [['code' => 'AMB', 'description' => 'Ambulatory']]],
+        ]);
+        Cache::forever(BasicDictionary::KEY.':fresh', true);
+        $this->partialMock(EncounterPolicy::class)->shouldReceive('view')->andReturn(Response::allow());
 
         $patientApi = Mockery::mock(PatientServiceRequestApi::class)->makePartial();
         $patientApi->shouldReceive('getById')->andReturnUsing(function (string $patientUuid, string $uuid): EHealthResponse {
@@ -341,15 +354,12 @@ class ReferralExecutorPhase4Test extends TestCase
         $this->assertSame('in_progress', $record->fresh()->status);
 
         // The async submission has been accepted; completion now runs on the encounter view.
-        $view = new \App\Livewire\EncounterPackage\EncounterPackageView();
-        $view->referralToRedeemId = $record->uuid;
-        $view->encounterUuid = $encounter->uuid;
-        $view->showReferralRedeemModal = true;
-        $view->redeemReferral($lifecycle);
+        Livewire::test(ClinicalEncounterView::class, [
+            'legalEntity' => $this->legalEntity, 'person' => $this->person, 'encounter' => $encounter,
+        ])->call('openReferralRedeemModal')->call('redeemReferral')->assertSet('showReferralRedeemModal', false)
+            ->assertSee(__('encounters.messages.referral_redeemed'));
 
-        $this->assertFalse($view->showReferralRedeemModal);
         $this->assertSame('completed', $record->fresh()->status);
-        $this->assertSame(__('encounters.messages.referral_redeemed'), session('success'));
         $this->assertNull(session('error'));
     }
 
@@ -358,20 +368,16 @@ class ReferralExecutorPhase4Test extends TestCase
         $this->actingAs($this->user);
         $record = $this->createActiveReferral();
         $encounter = $this->finishedEncounterForReferral($record);
-        $component = new \App\Livewire\EncounterPackage\EncounterPackageView();
-        $component->referralToRedeemId = $record->uuid;
-        $component->encounterUuid = $encounter->uuid;
-        $component->showReferralRedeemModal = true;
         $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $api->shouldNotReceive('qualify', 'process', 'complete');
         $this->instance(ServiceRequestApi::class, $api);
         app(PatientServiceRequestApi::class)->shouldNotReceive('getById');
 
-        $component->redeemReferral(app(ReferralRequestLifecycleService::class));
-
-        $this->assertFalse($component->showReferralRedeemModal);
+        Livewire::test(ClinicalEncounterView::class, [
+            'legalEntity' => $this->legalEntity, 'person' => $this->person, 'encounter' => $encounter,
+        ])->call('openReferralRedeemModal')->assertSet('showReferralRedeemModal', false)
+            ->assertSee(__('referrals.messages.action_unavailable'));
         $this->assertSame('active', $record->fresh()->status);
-        $this->assertStringContainsString(__('Направлення не було підтверджено перед підписанням взаємодії.'), session('error'));
     }
 
     public function test_failed_selection_clears_previous_confirmation_and_shows_a_field_error(): void
@@ -558,7 +564,9 @@ class ReferralExecutorPhase4Test extends TestCase
 
     public function test_complete_referral_builds_completed_with_for_encounter(): void
     {
-        $referralUuid = (string) Str::uuid();
+        $record = $this->createActiveReferral();
+        $record->update(['status' => 'in_progress']);
+        $referralUuid = $record->uuid;
         $encounterUuid = (string) Str::uuid();
 
         $codingId = \App\Models\MedicalEvents\Sql\Coding::create([
@@ -575,12 +583,11 @@ class ReferralExecutorPhase4Test extends TestCase
             'episode_id' => $episodeId,
             'class_id' => $codingId,
             'type_id' => $ccId,
+            'incoming_referral_id' => Identifier::create(['value' => $referralUuid])->id,
             'ehealth_inserted_at' => now(),
         ]);
 
-        $completeResponse = Mockery::mock(EHealthResponse::class);
-        $completeResponse->shouldReceive('getStatusCode')->andReturn(200);
-        $completeResponse->shouldReceive('getData')->andReturn(['status' => 'completed']);
+        $completeResponse = $this->remoteResponse(['status' => 'completed']);
 
         $mockApi = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $mockApi->shouldReceive('complete')
@@ -679,8 +686,8 @@ class ReferralExecutorPhase4Test extends TestCase
             ->andReturn(['status' => 'completed']);
         $this->instance(ReferralRequestLifecycleService::class, $mockLifecycle);
 
-        Livewire::test(\App\Livewire\Referral\ReferralIndex::class, ['legalEntity' => $this->legalEntity])
-            ->set('searchResults', [[
+        Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
+            ->call('seedResults', [[
                 'id' => $referralUuid,
                 'status' => 'in_progress',
                 'subject' => [
@@ -701,9 +708,9 @@ class ReferralExecutorPhase4Test extends TestCase
     {
         $this->actingAs($this->user);
 
-        Livewire::test(\App\Livewire\Referral\ReferralIndex::class, ['legalEntity' => $this->legalEntity])
+        Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
             ->set('hasSearched', true)
-            ->set('searchResults', [[
+            ->call('seedResults', [[
                 'id' => (string) Str::uuid(),
                 'status' => 'active',
                 'category' => [
@@ -718,7 +725,7 @@ class ReferralExecutorPhase4Test extends TestCase
     {
         $this->actingAs($this->user);
 
-        Livewire::test(\App\Livewire\Referral\ReferralIndex::class, ['legalEntity' => $this->legalEntity])
+        Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
             ->set('showCompleteModal', true)
             ->assertSee(__('care-plan.emz_type.encounter'))
             ->assertSee(__('care-plan.emz_type.procedure'))

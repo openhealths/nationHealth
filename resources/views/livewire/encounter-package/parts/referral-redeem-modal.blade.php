@@ -13,17 +13,44 @@
                     @icon('info-circle', 'w-6 h-6')
                 </div>
                 <h3 class="mb-2 text-lg font-bold text-gray-900 dark:text-gray-100">
-                    {{ __('encounters.messages.package_processed') }}
+                    {{ __('care-plan.referral_complete_title') }}
                 </h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Бажаєте погасити прив'язане направлення?</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('referrals.messages.completion_record_hint') }}</p>
+            </div>
+
+            <div class="form-group mb-4">
+                <label for="referralCompletionType" class="label">{{ __('care-plan.referral_complete_emz_type') }}</label>
+                <select id="referralCompletionType" wire:model.live="referralCompletionType" class="input">
+                    @foreach (['encounter', 'procedure', 'diagnostic_report'] as $type)
+                        <option value="{{ $type }}">{{ __('care-plan.emz_type.'.$type) }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="form-group mb-4">
+                <label for="referralCompletionUuid" class="label">{{ __('care-plan.referral_complete_emz_select') }}</label>
+                <select id="referralCompletionUuid" wire:model="referralCompletionUuid" class="input">
+                    <option value="">{{ __('forms.select') }}</option>
+                    @foreach ($this->referralCompletionResources as $resource)
+                        <option value="{{ $resource['uuid'] }}">{{ $resource['label'] }}</option>
+                    @endforeach
+                </select>
+                @if ($this->referralCompletionResources === [])
+                    <p class="text-sm text-amber-700 dark:text-amber-300">{{ __('care-plan.referral_complete_emz_empty') }}</p>
+                @endif
             </div>
 
             <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button type="button" @click="show = false" class="btn-secondary w-full sm:w-auto">
                     {{ __('forms.close') }}
                 </button>
-                <button type="button" wire:click="redeemReferral" class="btn-primary w-full sm:w-auto">
-                    Погасити направлення
+                <button
+                    type="button"
+                    wire:click="redeemReferral"
+                    wire:loading.attr="disabled"
+                    @disabled($this->referralCompletionResources === [])
+                    class="btn-primary w-full sm:w-auto"
+                >
+                    {{ __('encounters.redeem_referral') }}
                 </button>
             </div>
         </div>

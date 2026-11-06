@@ -1,4 +1,4 @@
-<div x-data="referralIndex($wire)">
+<div x-data="referralIndex($wire)" @if ($pendingCompletions !== []) wire:poll.5s="checkPendingCompletions" @endif>
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <x-forms.loading />
 

@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Referral;
 
 use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\DiagnosticReport;
-use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\Person\Person;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Exception;
@@ -15,6 +12,13 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use App\Classes\eHealth\EHealth;
+use App\Enums\JobStatus;
+use App\Exceptions\EHealth\EHealthValidationException;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Repositories\MedicalEvents\Repository;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class ReferralIndex extends Component
 {
@@ -23,7 +27,11 @@ class ReferralIndex extends Component
 
     public string $requisition = '';
 
+    #[Locked]
     public array $searchResults = [];
+
+    #[Locked]
+    public array $pendingCompletions = [];
 
     public bool $hasSearched = false;
 
@@ -51,7 +59,11 @@ class ReferralIndex extends Component
 
     public function search(): void
     {
-        abort_unless(auth()->user()?->can('service_request:read'), 403);
+        if (Auth::user()->cannot('search', ServiceRequestRequest::class)) {
+            Session::flash('error', __('service-requests.policy.search'));
+
+            return;
+        }
         $this->validate([
             'requisition' => 'required|string',
         ]);
@@ -65,9 +77,10 @@ class ReferralIndex extends Component
 
         try {
             $params = ['requisition' => $this->requisition];
-            $response = \App\Classes\eHealth\EHealth::serviceRequest()->searchForServiceRequestsByParams($params)->getData();
+            $response = EHealth::serviceRequest()->searchForServiceRequestsByParams($params)->getData();
 
             $this->searchResults = $response['data'] ?? $response ?? [];
+            $this->restoreCompletionTracking();
 
             if (empty($this->searchResults)) {
                 $this->errorMessage = __('referrals.messages.not_found');
@@ -200,7 +213,11 @@ class ReferralIndex extends Component
 
     public function openCompleteModal(string $uuid): void
     {
-        abort_unless(auth()->user()?->can('service_request:complete'), 403);
+        if (Auth::user()->cannot('complete', ServiceRequestRequest::class)) {
+            Session::flash('error', __('referrals.messages.complete_forbidden'));
+
+            return;
+        }
         $this->referralToComplete = $uuid;
         $this->availableEmzResources = [];
         $this->selectedEmzUuid = '';
@@ -237,12 +254,23 @@ class ReferralIndex extends Component
         }
 
         $this->loadEmzResourcesForComplete($uuid);
+        foreach (['diagnostic_report', 'procedure', 'encounter'] as $type) {
+            if (Repository::serviceRequest()->completionResources($person, $uuid, $type) !== []) {
+                $this->selectedEmzType = $type;
+                $this->loadEmzResourcesForComplete($uuid);
+                break;
+            }
+        }
         $this->showCompleteModal = true;
     }
 
     public function confirmComplete(ReferralRequestLifecycleService $service): void
     {
-        abort_unless(auth()->user()?->can('service_request:complete'), 403);
+        if (Auth::user()->cannot('complete', ServiceRequestRequest::class)) {
+            Session::flash('error', __('referrals.messages.complete_forbidden'));
+
+            return;
+        }
         $uuid = $this->referralToComplete;
         $resourceUuid = $this->selectedEmzUuid;
         $resourceType = $this->selectedEmzType;
@@ -276,6 +304,8 @@ class ReferralIndex extends Component
             $response = $service->completeReferral($uuid, $resourceUuid, $resourceType);
             if ($response['submissionPending'] ?? false) {
                 Session::flash('info', __('care-plan.submission_pending'));
+                $this->pendingCompletions[$uuid] = true;
+                $this->markCompletionAvailable($uuid);
                 $this->showCompleteModal = false;
 
                 return;
@@ -292,6 +322,69 @@ class ReferralIndex extends Component
     public function render()
     {
         return view('livewire.referral.referral-index');
+    }
+
+    public function checkPendingCompletions(): void
+    {
+        foreach (array_keys($this->pendingCompletions) as $uuid) {
+            $this->checkReferralCompletion($uuid);
+        }
+    }
+
+    public function checkReferralCompletion(string $uuid): void
+    {
+        if (Auth::user()->cannot('complete', ServiceRequestRequest::class)) {
+            $this->pendingCompletions = [];
+            Session::flash('error', __('referrals.messages.complete_forbidden'));
+
+            return;
+        }
+        $referral = collect($this->searchResults)->firstWhere('id', $uuid);
+        $record = $referral === null ? null : Repository::serviceRequest()->findByUuid($uuid);
+        if ($record === null || $record->person?->uuid !== data_get($referral, 'subject.identifier.value')) {
+            unset($this->pendingCompletions[$uuid]);
+
+            return;
+        }
+        try {
+            $response = app(ReferralRequestLifecycleService::class)->checkCompletion($record);
+            if ($response['submissionPending']) {
+                $this->pendingCompletions[$uuid] = true;
+
+                return;
+            }
+            unset($this->pendingCompletions[$uuid]);
+            $this->updateSearchResult($uuid, $response['status'], $response);
+            Session::flash($response['status'] === 'completed' ? 'success' : 'warning', __($response['status'] === 'completed'
+                ? 'referrals.messages.complete_success'
+                : 'referrals.messages.action_unavailable'));
+        } catch (Exception $exception) {
+            unset($this->pendingCompletions[$uuid]);
+            $this->flashOperationError($exception);
+        }
+    }
+
+    private function restoreCompletionTracking(): void
+    {
+        $this->pendingCompletions = [];
+        $states = Repository::serviceRequest()->completionStates(array_column($this->searchResults, 'id'));
+        foreach ($this->searchResults as $index => $referral) {
+            if (isset($states[$referral['id']])) {
+                $this->searchResults[$index]['hasCompletion'] = true;
+            }
+            if (($states[$referral['id']] ?? null) === JobStatus::PENDING->value) {
+                $this->pendingCompletions[$referral['id']] = true;
+            }
+        }
+    }
+
+    private function markCompletionAvailable(string $uuid): void
+    {
+        foreach ($this->searchResults as $index => $referral) {
+            if ($referral['id'] === $uuid) {
+                $this->searchResults[$index]['hasCompletion'] = true;
+            }
+        }
     }
 
     public function canTakeIntoWork(array $referral): bool
@@ -328,7 +421,11 @@ class ReferralIndex extends Component
     private function flashOperationError(Exception $exception): void
     {
         Log::error('ReferralIndex: operation failed', ['exception' => $exception]);
-        Session::flash('error', __('referrals.messages.operation_failed'));
+        Session::flash('error', match (true) {
+            $exception instanceof EHealthValidationException => $exception->getFormattedMessage(),
+            $exception instanceof ValidationException => $exception->validator->errors()->first(),
+            default => __('referrals.messages.operation_failed'),
+        });
     }
 
     private function loadEmzResourcesForComplete(string $referralUuid): void
@@ -347,124 +444,17 @@ class ReferralIndex extends Component
             return;
         }
 
-        match ($this->selectedEmzType) {
-            'procedure' => $this->loadLinkedProcedures($person, $referralUuid),
-            'diagnostic_report' => $this->loadLinkedDiagnosticReports($person, $referralUuid),
-            default => $this->loadLinkedEncounters($person, $referralUuid),
-        };
+        $this->availableEmzResources = Repository::serviceRequest()->completionResources($person, $referralUuid, $this->selectedEmzType);
     }
 
-    private function loadLinkedEncounters(Person $person, string $referralUuid): void
-    {
-        $query = Encounter::query()
-            ->with('incomingReferral.type.coding')
-            ->where('person_id', $person->id)
-            ->whereHas('incomingReferral', static function ($q) use ($referralUuid): void {
-                $q->where('value', $referralUuid);
-            })
-            ->latest('created_at')
-            ->take(50);
-
-        foreach ($query->get(['id', 'uuid', 'created_at', 'status', 'incoming_referral_id']) as $encounter) {
-            $statusMap = [
-                'finished' => 'Завершено',
-                'entered-in-error' => 'Помилково введено',
-                'in_progress' => 'В процесі',
-            ];
-            $statusCode = $encounter->status instanceof \BackedEnum
-                ? $encounter->status->value
-                : (string) $encounter->status;
-            $statusLabel = $statusMap[$statusCode] ?? $statusCode;
-            $date = $encounter->created_at ? $encounter->created_at->format('d.m.Y H:i') : '';
-
-            $this->availableEmzResources[] = [
-                'uuid' => $encounter->uuid,
-                'label' => "Encounter {$encounter->uuid} від {$date} ({$statusLabel})",
-            ];
-        }
-    }
-
-    private function loadLinkedProcedures(Person $person, string $referralUuid): void
-    {
-        $procedures = Procedure::query()
-            ->with('basedOn.type.coding')
-            ->where('person_id', $person->id)
-            ->whereHas('basedOn', static function ($q) use ($referralUuid): void {
-                $q->where('value', $referralUuid);
-            })
-            ->latest('created_at')
-            ->take(50)
-            ->get();
-
-        foreach ($procedures as $procedure) {
-            $date = $procedure->created_at?->format('d.m.Y H:i') ?? '';
-
-            $this->availableEmzResources[] = [
-                'uuid' => $procedure->uuid,
-                'label' => "Procedure {$procedure->uuid} від {$date}",
-            ];
-        }
-    }
-
-    private function loadLinkedDiagnosticReports(Person $person, string $referralUuid): void
-    {
-        $reports = DiagnosticReport::query()
-            ->with('basedOn.type.coding')
-            ->where('person_id', $person->id)
-            ->whereHas('basedOn', static function ($q) use ($referralUuid): void {
-                $q->where('value', $referralUuid);
-            })
-            ->latest('created_at')
-            ->take(50)
-            ->get();
-
-        foreach ($reports as $report) {
-            $date = $report->created_at?->format('d.m.Y H:i') ?? '';
-
-            $this->availableEmzResources[] = [
-                'uuid' => $report->uuid,
-                'label' => "DiagnosticReport {$report->uuid} від {$date}",
-            ];
-        }
-    }
 
     private function assertEmzLinkedToReferral(string $referralUuid, string $resourceType, string $resourceUuid): bool
     {
-        return match ($resourceType) {
-            'encounter' => $this->encounterLinked($referralUuid, $resourceUuid),
-            'procedure' => $this->procedureLinked($referralUuid, $resourceUuid),
-            'diagnostic_report' => $this->diagnosticReportLinked($referralUuid, $resourceUuid),
-            default => false,
-        };
-    }
+        $referral = collect($this->searchResults)->firstWhere('id', $referralUuid);
+        $person = Person::whereUuid(data_get($referral, 'subject.identifier.value'))->first();
 
-    private function encounterLinked(string $referralUuid, string $resourceUuid): bool
-    {
-        $encounter = Encounter::query()
-            ->with('incomingReferral')
-            ->where('uuid', $resourceUuid)
-            ->first();
-
-        return $encounter !== null && $encounter->incomingReferral?->value === $referralUuid;
-    }
-
-    private function procedureLinked(string $referralUuid, string $resourceUuid): bool
-    {
-        $procedure = Procedure::query()
-            ->with('basedOn')
-            ->where('uuid', $resourceUuid)
-            ->first();
-
-        return $procedure !== null && $procedure->basedOn?->value === $referralUuid;
-    }
-
-    private function diagnosticReportLinked(string $referralUuid, string $resourceUuid): bool
-    {
-        $report = DiagnosticReport::query()
-            ->with('basedOn')
-            ->where('uuid', $resourceUuid)
-            ->first();
-
-        return $report !== null && $report->basedOn?->value === $referralUuid;
+        return $person !== null && in_array($resourceUuid, array_column(
+            Repository::serviceRequest()->completionResources($person, $referralUuid, $resourceType), 'uuid'
+        ), true);
     }
 }

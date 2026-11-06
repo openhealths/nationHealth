@@ -10,8 +10,8 @@
     $title = __('encounters.label') . ' - ' . $patientName;
     $isReadonly = $this instanceof EncounterPackageEdit && $this->isReadonly;
     $canCancelRecords = $this instanceof EncounterPackageEdit && $this->canBeCancelled;
-    $incomingReferral = null;
-    if ($isReadonly && ($form->encounter['referralType'] ?? '') === 'electronic' && filled($form->encounter['referralNumber'] ?? '')) {
+    $incomingReferral = $isReadonly ? $this->incomingReferral : null;
+    if ($incomingReferral === null && $isReadonly && ($form->encounter['referralType'] ?? '') === 'electronic' && filled($form->encounter['referralNumber'] ?? '')) {
         $incomingReferralNumber = $form->encounter['referralNumber'];
         $incomingReferralRecord = collect([
             ...$availableReferrals,

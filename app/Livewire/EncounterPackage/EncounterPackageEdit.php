@@ -9,7 +9,6 @@ use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\Person\EncounterStatus;
-use App\Enums\Person\ServiceRequestStatus;
 use App\Livewire\EncounterPackage\Forms\EncounterCancellationForm;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
@@ -47,10 +46,12 @@ use Exception;
 use App\Models\MedicalEvents\Sql\Composition;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
-use RuntimeException;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use Throwable;
+use App\Enums\JobStatus;
+use App\Exceptions\EHealth\EHealthValidationException;
+use Carbon\Carbon;
 
 class EncounterPackageEdit extends EncounterPackageComponent
 {
@@ -108,6 +109,118 @@ class EncounterPackageEdit extends EncounterPackageComponent
     public ?string $referralToRedeemId = null;
 
     public bool $showReferralRedeemModal = false;
+
+    public string $referralCompletionType = 'encounter';
+
+    public string $referralCompletionUuid = '';
+
+    #[Locked]
+    public bool $referralSubmissionPending = false;
+
+    #[Computed]
+    public function incomingReferral(): ?array
+    {
+        if ($this->personId === null) {
+            return null;
+        }
+        $encounter = Repository::encounter()->findForStandaloneDocument($this->encounterId, $this->patient());
+        $record = Repository::serviceRequest()->incomingForEncounter($encounter);
+        if ($record === null) {
+            return null;
+        }
+        $row = Repository::serviceRequest()->toPatientRegistryRow($record);
+        $submission = Repository::serviceRequest()->latestCompletion($record);
+
+        return array_replace($row, [
+            'doctorName' => Repository::serviceRequest()->requesterName($record),
+            'createdLabel' => $record->authoredOn
+                ? Carbon::parse($record->authoredOn, 'UTC')->setTimezone(config('app.timezone'))->format('d.m.Y H:i')
+                : ($record->createdAt?->format('d.m.Y H:i') ?? '—'),
+            'canComplete' => $encounter->status === EncounterStatus::FINISHED
+                && Auth::user()->can('complete', ServiceRequestRequest::class)
+                && Repository::serviceRequest()->canComplete($record),
+            'hasCompletion' => $submission !== null,
+            'submissionPending' => $submission?->status === JobStatus::PENDING->value,
+        ]);
+    }
+
+    #[Computed]
+    public function referralCompletionResources(): array
+    {
+        $referral = $this->incomingReferral;
+
+        return $referral === null ? [] : Repository::serviceRequest()->completionResources(
+            $this->patient(), $referral['uuid'], $this->referralCompletionType
+        );
+    }
+
+    public function updatedReferralCompletionType(): void
+    {
+        unset($this->referralCompletionResources);
+        $this->referralCompletionUuid = $this->referralCompletionResources[0]['uuid'] ?? '';
+    }
+
+    public function openReferralRedeemModal(): void
+    {
+        if (Auth::user()->cannot('complete', ServiceRequestRequest::class)) {
+            Session::flash('error', __('referrals.messages.complete_forbidden'));
+
+            return;
+        }
+        $referral = $this->incomingReferral;
+        if (!($referral['canComplete'] ?? false)) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+
+            return;
+        }
+        if ($referral['submissionPending']) {
+            $this->referralSubmissionPending = true;
+            Session::flash('info', __('care-plan.submission_pending'));
+
+            return;
+        }
+        $this->referralToRedeemId = $referral['uuid'];
+        $this->referralCompletionType = 'encounter';
+        foreach (['diagnostic_report', 'procedure', 'encounter'] as $type) {
+            if (Repository::serviceRequest()->completionResources($this->patient(), $referral['uuid'], $type) !== []) {
+                $this->referralCompletionType = $type;
+                break;
+            }
+        }
+        $this->updatedReferralCompletionType();
+        $this->showReferralRedeemModal = true;
+    }
+
+    public function checkReferralCompletion(ReferralRequestLifecycleService $service): void
+    {
+        if (Auth::user()->cannot('complete', ServiceRequestRequest::class)) {
+            $this->referralSubmissionPending = false;
+            Session::flash('error', __('referrals.messages.complete_forbidden'));
+
+            return;
+        }
+        $encounter = Repository::encounter()->findForStandaloneDocument($this->encounterId, $this->patient());
+        $record = Repository::serviceRequest()->incomingForEncounter($encounter);
+        if ($record === null) {
+            $this->referralSubmissionPending = false;
+
+            return;
+        }
+        try {
+            $response = $service->checkCompletion($record);
+            $this->referralSubmissionPending = $response['submissionPending'];
+            if (!$this->referralSubmissionPending && $response['status'] === 'completed') {
+                Session::flash('success', __('referrals.messages.complete_success'));
+            }
+        } catch (EHealthValidationException $exception) {
+            $this->referralSubmissionPending = false;
+            Session::flash('error', $exception->getFormattedMessage());
+        } catch (Exception $exception) {
+            $this->referralSubmissionPending = false;
+            Session::flash('error', __('referrals.messages.operation_failed'));
+        }
+        unset($this->incomingReferral);
+    }
 
     /**
      * Episode opened along with the package and stored only locally, so it is created in eHealth on signing.
@@ -202,13 +315,10 @@ class EncounterPackageEdit extends EncounterPackageComponent
 
         $referralId = $encounterModel->incomingReferral?->value;
 
-        if (
-            $encounterModel->status === EncounterStatus::FINISHED
-            && $referralId !== null
-            && strtolower((string) Repository::serviceRequest()->findByUuid($referralId)?->status) === ServiceRequestStatus::IN_PROGRESS->value
-        ) {
+        $incomingReferral = Repository::serviceRequest()->incomingForEncounter($encounterModel);
+        if ($encounterModel->status === EncounterStatus::FINISHED && $incomingReferral !== null) {
             $this->referralToRedeemId = $referralId;
-            $this->showReferralRedeemModal = true;
+            $this->referralSubmissionPending = Repository::serviceRequest()->latestCompletion($incomingReferral)?->status === JobStatus::PENDING->value;
         }
 
         $encounter = $encounterModel->toArray();
@@ -582,26 +692,42 @@ class EncounterPackageEdit extends EncounterPackageComponent
      */
     public function redeemReferral(ReferralRequestLifecycleService $service): void
     {
-        $this->showReferralRedeemModal = false;
+        if (Auth::user()->cannot('complete', ServiceRequestRequest::class)) {
+            Session::flash('error', __('referrals.messages.complete_forbidden'));
+
+            return;
+        }
 
         try {
+            $referral = $this->incomingReferral;
             if (
-                $this->referralToRedeemId === null
-                || strtolower((string) Repository::serviceRequest()->findByUuid($this->referralToRedeemId)?->status) !== ServiceRequestStatus::IN_PROGRESS->value
+                !($referral['canComplete'] ?? false)
+                || $referral['uuid'] !== $this->referralToRedeemId
+                || !in_array($this->referralCompletionUuid, array_column($this->referralCompletionResources, 'uuid'), true)
             ) {
-                throw new RuntimeException(__('Направлення не було підтверджено перед підписанням взаємодії.'));
+                Session::flash('error', __('care-plan.referral_complete_emz_not_linked'));
+
+                return;
             }
 
-            $response = $service->completeReferral($this->referralToRedeemId, $this->encounterUuid);
+            $response = $service->completeReferral($referral['uuid'], $this->referralCompletionUuid, $this->referralCompletionType);
+            $this->showReferralRedeemModal = false;
+            unset($this->incomingReferral);
             if ($response['submissionPending'] ?? false) {
+                $this->referralSubmissionPending = true;
                 Session::flash('info', __('care-plan.submission_pending'));
 
                 return;
             }
             Session::flash('success', __('encounters.messages.referral_redeemed'));
+        } catch (EHealthValidationException $exception) {
+            Session::flash('error', $exception->getFormattedMessage());
+        } catch (ValidationException $exception) {
+            Session::flash('error', $exception->validator->errors()->first());
         } catch (Exception $exception) {
             Session::flash('error', __('encounters.messages.referral_redeem_error', ['message' => $exception->getMessage()]));
         }
+        unset($this->incomingReferral);
     }
 
     private function loadSelectedReferralsForView(array $records): void
