@@ -1,6 +1,3 @@
-@use(App\Enums\Person\ApprovalStatus)
-@use(App\Models\Person\Person)
-@use(App\Models\CarePlan)
 @use(Carbon\Carbon)
 
 <section class="section-form">
@@ -31,36 +28,42 @@
     </div>
 
     <div class="shift-content pl-3.5 mt-8">
+        @foreach ($this->resourceGroups as $group)
+            <fieldset class="fieldset mb-8">
+                <legend class="legend">{{ $group['title'] }}</legend>
+
+                @forelse ($group['rows'] as $resource)
+                    <div @class(['form-row-2', 'mt-4' => !$loop->first])>
+                        <div class="form-group group flex flex-col">
+                            <span class="label">{{ __('approval.data') }}</span>
+                            <div class="input flex-1 h-auto min-h-10.5 py-2.5 wrap-break-word whitespace-normal text-sm">
+                                {{ $resource['name'] }}
+
+                                @if ($resource['date'] !== '')
+                                    , {{ $resource['date'] }}
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="form-group group flex flex-col">
+                            <span class="label">{{ __('approval.data_id') }}</span>
+                            <div class="input flex-1 h-auto min-h-10.5 py-2.5 wrap-break-word whitespace-normal text-sm">
+                                {{ $resource['uuid'] }}
+                            </div>
+                        </div>
+                    </div>
+                @empty
+                    <div class="text-sm text-gray-600 dark:text-gray-300">
+                        {{ __('approval.all_records_of_type') }}
+                    </div>
+                @endforelse
+            </fieldset>
+        @endforeach
+
         <fieldset class="fieldset">
+            <legend class="legend">{{ __('approval.additional_information') }}</legend>
+
             <div class="form-row-2">
-                <div class="form-group group">
-                    <span class="label">{{ __('approval.data_id') }}</span>
-                    <div class="input h-auto min-h-10.5 py-2.5 wrap-break-word whitespace-normal text-sm">
-                        {{ $approval->approvable->uuid }}
-                    </div>
-                </div>
-                <div class="form-group group">
-                    <span class="label">{{ __('approval.data_type') }}</span>
-                    <div class="input h-auto min-h-10.5 py-2.5 wrap-break-word whitespace-normal text-sm">
-                        @php
-                            $type = data_get($approval, 'grantedResources.0.grantedTo.identifier.type.coding.0.code')
-                                ?? data_get($approval, 'grantedResourceTypes.0.codeableConcept.coding.0.code');
-
-                            $typeLabel = $type
-                                ? __('approval.resource_types.'.$type)
-                                : match ($approval->approvableType) {
-                                    Person::class => __('patients.data_access_types.all'),
-                                    CarePlan::class => __('care-plan.care_plan'),
-                                    default => '-',
-                                };
-                        @endphp
-
-                        {{ $typeLabel }}
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-row-2 mt-4">
                 <div class="form-group group">
                     <span class="label">{{ __('approval.access_level') }}</span>
                     <div class="input h-auto min-h-10.5 py-2.5 wrap-break-word whitespace-normal text-sm">
@@ -68,9 +71,9 @@
                     </div>
                 </div>
                 <div class="form-group group">
-                    <span class="label">{{ __('forms.status.label') }}</span>
+                    <span class="label">{{ __('approval.is_verified') }}</span>
                     <div class="input h-auto min-h-10.5 py-2.5 wrap-break-word whitespace-normal text-sm">
-                        {{ ApprovalStatus::resolve($approval->status)->label() }}
+                        {{ $approval->getAttribute('is_verified') ? __('forms.yes') : __('forms.no') }}
                     </div>
                 </div>
             </div>
@@ -94,8 +97,14 @@
                 <div class="form-group group">
                     <span class="label">{{ __('approval.access_expires') }}</span>
                     <div class="input h-auto min-h-10.5 py-2.5 wrap-break-word whitespace-normal text-sm flex items-center gap-2">
-                        @icon('calendar', 'w-4 h-4 text-gray-400')
-                        {{ $approval->expiresAt?->format('d.m.Y') ?? '-' }}
+                        @if ($approval->expiresAt !== null && !$approval->expiresAt->isFuture())
+                            <span class="badge-red rounded-lg">
+                                {{ __('approval.expired_short') }}
+                            </span>
+                        @else
+                            @icon('calendar', 'w-4 h-4 text-gray-400')
+                            {{ $approval->expiresAt?->format('d.m.Y') ?? '-' }}
+                        @endif
                     </div>
                 </div>
                 <div class="form-group group">

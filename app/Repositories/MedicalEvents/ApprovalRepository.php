@@ -673,7 +673,7 @@ class ApprovalRepository extends BaseRepository
                 'authorize_with' => $modelData['authorize_with'] ?? $existing?->authorizeWith,
                 'authentication_method_id' => $authMethod?->id,
                 'reason_id' => $reason?->id,
-                'status' => ApprovalStatus::forStorage($modelData['status'] ?? (!empty($modelData['is_verified']) ? ApprovalStatus::ACTIVE->value : ApprovalStatus::PENDING->value)),
+                'status' => isset($modelData['status']) ? ApprovalStatus::forStorage($modelData['status']) : ($existing?->status ?? ApprovalStatus::PENDING->value),// TODO: видалити після видалення з БД
                 'access_level' => $modelData['access_level'] ?? $existing?->accessLevel ?? 'read',
                 'is_verified' => $modelData['is_verified'] ?? false,
                 'expires_at' => isset($modelData['expires_at']) ? convertToLocalTimezone($modelData['expires_at']) : $existing?->expiresAt,

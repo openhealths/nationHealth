@@ -25,7 +25,7 @@ class Approval extends Request
      *
      * Call getPatientApprovals directly whenever the patient UUID is known.
      *
-     * @param  array  $query  query params: granted_resource_type=care_plan, status, etc.
+     * @param  array  $query  query params: granted_resource_type=care_plan, etc.
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
@@ -40,7 +40,7 @@ class Approval extends Request
      * Get approvals for a specific patient.
      *
      * @param  string  $patientId
-     * @param  array  $query  query params: status (e.g. active), limit, etc.
+     * @param  array  $query  query params: granted_to, is_verified, is_expired, etc.
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
@@ -57,7 +57,7 @@ class Approval extends Request
      * Get approvals for a specific patient.
      *
      * @param  string  $patientId
-     * @param  array  $query  query params: status (e.g. active), limit, etc.
+     * @param  array  $query  query params: granted_to, is_verified, is_expired, etc.
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
@@ -231,7 +231,6 @@ class Approval extends Request
             'data.*.is_verified' => ['sometimes', 'boolean:strict'],
             'data.*.access_level' => ['nullable', Rule::in(['read', 'write'])],
             'data.*.expires_at' => ['nullable', 'date'],
-            'data.*.status' => ['nullable', 'string'],
             'paging' => ['required', 'array'],
             'paging.page_number' => ['required_without:paging.page', 'integer', 'min:1'],
             'paging.page' => ['required_without:paging.page_number', 'integer', 'min:1'],
@@ -251,7 +250,6 @@ class Approval extends Request
             'access_level' => ['required', 'string'],
             'is_verified' => ['sometimes', 'boolean:strict'],
             'expires_at' => ['nullable', 'date'],
-            'status' => ['nullable', 'string'],
         ])->validate();
 
         return $data;
@@ -292,7 +290,7 @@ class Approval extends Request
             return [];
         }
         Validator::make($body, [
-            'id' => ['required_without_all:is_verified,status', 'uuid'],
+            'id' => ['required_without:is_verified', 'uuid'],
         ])->validate();
 
         return self::validateResourceData($body, complete: false);
@@ -318,7 +316,6 @@ class Approval extends Request
             [
                 'id' => [$complete ? 'required' : 'sometimes', 'uuid'],
                 'is_verified' => [$complete ? 'required' : 'sometimes', 'boolean:strict'],
-                'status' => ['nullable', 'string'],
                 'access_level' => ['nullable', Rule::in(['read', 'write'])],
                 'authorize_with' => ['nullable', 'uuid'],
                 'expires_at' => ['nullable', 'date'],
