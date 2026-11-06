@@ -13,6 +13,12 @@ use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\Person\Person;
+use App\Models\Employee\Employee;
+use App\Models\LegalEntity;
+use App\Models\User;
+use App\Enums\Person\EncounterStatus;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
@@ -30,13 +36,30 @@ class DeviceRequestRequestRepository extends BaseRepository
         parent::__construct($model);
     }
 
-    public function draftsForPatientEmployee(int $personId, int $employeeId): array
+    public function eligibleEncounters(Person $person, User $user, LegalEntity $legalEntity): Collection
     {
-        return $this->model->newQuery()->wherePersonId($personId)->whereEmployeeId($employeeId)
-            ->whereStatus(DeviceRequestStatus::DRAFT->value)->whereNotNull('request_payload')->latest()->get()
-            ->map(fn (DeviceRequestRequest $draft): array => [
-                'uuid' => $draft->uuid, 'device' => $draft->deviceId, 'updatedAt' => $draft->updatedAt->format('d.m.Y H:i'),
-            ])->all();
+        $employees = Employee::forUserInLegalEntity($user, $legalEntity)
+            ->whereIn('employee_type', ['DOCTOR', 'SPECIALIST'])->pluck('uuid');
+        $today = CarbonImmutable::now((string) config('app.timezone'))->startOfDay();
+
+        return $person->encounters()->whereStatus(EncounterStatus::FINISHED)
+            ->whereHas('performer', fn ($query) => $query->whereIn('value', $employees))
+            ->whereHas('period', fn ($query) => $query->where('end', '>=', $today->utc())
+                ->where('end', '<', $today->addDay()->utc()))
+            ->with(['performer', 'period'])->latest('id')->get();
+    }
+
+    public function encounterForPerson(Person $person, string $uuid): Encounter
+    {
+        return $person->encounters()->whereUuid($uuid)->with(['performer', 'period'])->firstOrFail();
+    }
+
+    public function draftsForPatientUser(int $personId, User $user, LegalEntity $legalEntity): Collection
+    {
+        return $this->model->newQuery()->wherePersonId($personId)
+            ->whereHas('employee', fn ($query) => $query->forUserInLegalEntity($user, $legalEntity)
+                ->whereIn('employee_type', ['DOCTOR', 'SPECIALIST']))
+            ->whereStatus(DeviceRequestStatus::DRAFT->value)->whereNotNull('request_payload')->latest()->get();
     }
 
     /** Submitted patient records that may be referenced as a prescribing reason. */

@@ -57,11 +57,7 @@
             ?? $activity->reasonCode)
         : null;
 
-    $reasonReferences = collect($activity->reasonReference ?? [])
-        ->map(fn ($ref) => is_string($ref) ? $ref : ($ref['uuid'] ?? json_encode($ref)))
-        ->filter()
-        ->values()
-        ->all();
+    $reasonReferences = $activityReasonReferenceLabels;
 
     $goals = collect($activity->goal ?? [])
         ->map(fn ($goal) => is_string($goal) ? $goal : ($goal['code'] ?? ($goal['text'] ?? json_encode($goal))))
@@ -146,7 +142,7 @@
                 @if ($reasonReferences !== [])
                     <ul class="list-inside list-disc space-y-0.5">
                         @foreach ($reasonReferences as $ref)
-                            <li class="font-mono text-xs">{{ $ref }}</li>
+                            <li>{{ $ref }}</li>
                         @endforeach
                     </ul>
                 @else

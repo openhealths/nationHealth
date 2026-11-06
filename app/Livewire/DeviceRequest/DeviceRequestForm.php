@@ -114,10 +114,8 @@ class DeviceRequestForm extends Component
             'ended_at' => today()->addDay()->format('d.m.Y'), 'inform_with' => '', 'phone_confirmed' => false,
             'confirmed_phone' => '', 'reason_reference' => [], 'parameter_values' => [],
         ];
-        $this->encounters = $person->encounters()->with(['period', 'performer'])->whereStatus('finished')->get()
-            ->filter(fn ($encounter): bool => $encounter->performer?->value === $employee->uuid
-                && $encounter->period?->end && CarbonImmutable::parse($encounter->period->end)->isToday())
-            ->map(fn ($encounter): array => ['id' => $encounter->id, 'uuid' => $encounter->uuid, 'label' => $encounter->period->end.' · №'.$encounter->id])->values()->all();
+        $this->encounters = MedicalEventsRepository::deviceRequest()->eligibleEncounters($person, Auth::user(), $legalEntity)
+            ->map(fn ($encounter): array => ['id' => $encounter->id, 'uuid' => $encounter->uuid, 'employee_uuid' => $encounter->performer->value, 'label' => $encounter->period->end.' · №'.$encounter->id])->all();
         $this->request['encounter_uuid'] = $this->encounters[0]['uuid'] ?? '';
 
         try {
@@ -137,6 +135,7 @@ class DeviceRequestForm extends Component
                 }
 
                 $encounterUuid = $encounter['uuid'];
+                $employee = $service->authorizeAction($legalEntity, 'device_request:write', $encounter['employee_uuid']);
                 $service->encounter($person, $employee, $encounterUuid);
                 $this->request['encounter_uuid'] = $encounterUuid;
             }
@@ -148,7 +147,8 @@ class DeviceRequestForm extends Component
             $this->request['inform_with'] = $default['id'] ?? '';
 
             if (request()->filled('draft')) {
-                $record = DeviceRequestRequest::whereUuid(request()->string('draft')->toString())->wherePersonId($person->id)->whereEmployeeId($employee->id)->firstOrFail();
+                $record = DeviceRequestRequest::whereUuid(request()->string('draft')->toString())->wherePersonId($person->id)->with('employee')->firstOrFail();
+                $service->authorizeAction($legalEntity, 'device_request:write', $record->employee->uuid);
                 abort_unless($record->status === 'draft', 409);
 
                 if (!$record->requestPayload) {
@@ -439,9 +439,10 @@ class DeviceRequestForm extends Component
 
     private function ownedDraft(): DeviceRequestRequest
     {
-        $employee = app(DeviceRequestLifecycleService::class)->authorizeAction($this->legalEntity, 'device_request:write');
+        $record = DeviceRequestRequest::whereUuid($this->draftId)->wherePersonId($this->person->id)->with('employee')->firstOrFail();
+        app(DeviceRequestLifecycleService::class)->authorizeAction($this->legalEntity, 'device_request:write', $record->employee->uuid);
 
-        return DeviceRequestRequest::whereUuid($this->draftId)->wherePersonId($this->person->id)->whereEmployeeId($employee->id)->firstOrFail();
+        return $record;
     }
 
     public function openSignatureModal(): void
@@ -479,7 +480,7 @@ class DeviceRequestForm extends Component
 
             $service->sync($this->person, $remote);
             Session::flash('success', $service->createdMessage($remote['requisition'], !empty($saved['data']['program_id']), $prepared['authType']));
-            $this->redirectRoute('persons.device-requests', ['legalEntity' => $this->legalEntity, 'person' => $this->person]);
+            $this->redirectRoute('persons.device-requests.view', ['legalEntity' => $this->legalEntity, 'person' => $this->person, 'deviceRequest' => $record->uuid]);
         } catch (Throwable $exception) {
             $this->refreshOptions();
             $this->reportError($exception);

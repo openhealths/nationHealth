@@ -372,7 +372,7 @@ class DeviceRequestComplianceTest extends TestCase
         $service->shouldReceive('prescribingOptions')->andReturn(['program' => ['medical_program_settings' => $settings], 'packages' => [['count' => 50, 'unit' => 'piece']], 'parameters' => $parameters, 'model' => $model]);
         $service->shouldReceive('authMethods')->andReturn($methods);
         $service->shouldReceive('dictionary')->with('device_unit')->andReturn(['piece' => 'Штука']);
-        $data = ['uuid' => $this->requestId, 'encounter_uuid' => (string) Str::uuid(), 'device_id' => 'test',
+        $data = ['uuid' => $this->requestId, 'encounter_uuid' => $this->encounter((string) Str::uuid(), now()->utc()->toIso8601String())->uuid, 'device_id' => 'test',
             'device_code_type' => 'CLASSIFICATION_TYPE', 'device_code_system' => 'assistive_devices', 'program_id' => '',
             'quantity' => null, 'quantity_code' => 'piece', 'started_at' => now()->addHour()->toIso8601String(),
             'ended_at' => now()->addDays(2)->toIso8601String(), 'phone_confirmed' => false, 'parameter_values' => [], 'inform_with' => ''];

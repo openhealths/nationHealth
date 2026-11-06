@@ -186,8 +186,11 @@ class DeviceRequestIndex extends Component
     {
         $this->drafts = [];
         if (Auth::user()->can('create', DeviceRequestRequest::class)) {
-            $employee = app(DeviceRequestLifecycleService::class)->authorizeAction($this->legalEntity, 'device_request:write');
-            $this->drafts = MedicalEventsRepository::deviceRequest()->draftsForPatientEmployee($this->personId, $employee->id);
+            app(DeviceRequestLifecycleService::class)->authorizeAction($this->legalEntity, 'device_request:write');
+            $this->drafts = MedicalEventsRepository::deviceRequest()->draftsForPatientUser($this->personId, Auth::user(), $this->legalEntity)
+                ->map(fn (DeviceRequestRequest $draft): array => [
+                    'uuid' => $draft->uuid, 'device' => $draft->deviceId, 'updatedAt' => $draft->updatedAt->format('d.m.Y H:i'),
+                ])->all();
         }
     }
 
@@ -246,6 +249,22 @@ class DeviceRequestIndex extends Component
             $this->filters->parameters['requester_legal_entity'] = $matches->first()['uuid'];
         }
         $filters = $this->filters->toQuery();
+
+        if (Auth::user()->cannot('viewAllForPatient', [DeviceRequestRequest::class, $this->person])) {
+            $requesterEntity = $filters['requester_legal_entity'] ?? '';
+            if ($requesterEntity !== '' && $requesterEntity !== $this->legalEntity->uuid) {
+                $message = __('device-requests.policy.patient_access_required');
+                $this->addError('requesterEntitySearch', $message);
+                $this->addError('filters.parameters.requester_legal_entity', $message);
+                Session::flash('error', $message);
+
+                return;
+            }
+
+            $filters['requester_legal_entity'] = $this->legalEntity->uuid;
+            $this->filters->parameters['requester_legal_entity'] = $this->legalEntity->uuid;
+            $this->requesterEntitySearch = $this->legalEntity->uuid;
+        }
 
         if ($resetPage) {
             $this->page = 1;
