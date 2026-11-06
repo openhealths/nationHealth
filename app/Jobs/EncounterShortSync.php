@@ -45,7 +45,7 @@ class EncounterShortSync extends PatientEHealthJob
             return;
         }
 
-        Repository::encounter()->sync($this->patient(), $validatedData);
+        Repository::encounter()->syncShort($this->patient(), $validatedData);
     }
 
     /**

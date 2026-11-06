@@ -334,7 +334,7 @@ class PatientSummary extends BasePatientComponent
 
         try {
             $validatedData = $response->validate();
-            Repository::encounter()->sync($this->patient(), $validatedData);
+            Repository::encounter()->syncShort($this->patient(), $validatedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing encounters');
 

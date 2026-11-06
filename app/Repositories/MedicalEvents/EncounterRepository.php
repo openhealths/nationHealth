@@ -655,6 +655,62 @@ class EncounterRepository extends BaseRepository
     }
 
     /**
+     * Sync encounters of the patient summary, which carries only part of the encounter fields. An encounter stored
+     * before keeps every field the summary leaves out.
+     *
+     * @param  Person|Preperson  $patient
+     * @param  array  $validatedData
+     * @return void
+     * @throws Throwable
+     */
+    public function syncShort(Person|Preperson $patient, array $validatedData): void
+    {
+        [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        DB::transaction(function () use ($ownerColumn, $ownerId, $validatedData): void {
+            $apiUuids = collect($validatedData)->pluck('uuid')->toArray();
+
+            $existingEncounters = $this->model->whereIn('uuid', $apiUuids)
+                ->withRelationships()
+                ->get()
+                ->keyBy('uuid');
+
+            foreach ($validatedData as $data) {
+                $existing = $existingEncounters->get($data['uuid']);
+
+                $class = $this->syncCoding($existing, $data['class'], 'class');
+                $type = $this->syncCodeableConcept($existing, $data['type'], 'type');
+                $performerSpeciality = $this->syncCodeableConcept(
+                    $existing,
+                    $data['performer_speciality'],
+                    'performerSpeciality'
+                );
+                $episode = $this->syncIdentifier($existing, $data['episode'], 'episode');
+
+                $encounterData = [
+                    $ownerColumn => $ownerId,
+                    'status' => $data['status'],
+                    'class_id' => $class->id,
+                    'type_id' => $type->id,
+                    'performer_speciality_id' => $performerSpeciality->id,
+                    'episode_id' => $episode->id
+                ];
+
+                if ($existing) {
+                    $existing->update($encounterData);
+                    $encounter = $existing;
+                } else {
+                    $encounter = $this->model->create(
+                        array_merge(['uuid' => $data['uuid']], $encounterData)
+                    );
+                }
+
+                Repository::period()->sync($encounter, $data['period']);
+            }
+        });
+    }
+
+    /**
      * Sync encounter diagnoses (HasMany) with nested condition identifiers and role codeable concepts.
      *
      * @param  Encounter  $encounter
