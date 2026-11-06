@@ -37,6 +37,20 @@ class EHealthResponseException extends EHealthException
         return $this->response->json() ?? [];
     }
 
+    /** Seconds to wait before retrying a throttled request, including HTTP-date Retry-After values. */
+    public function retryAfter(): int
+    {
+        $value = trim($this->response->header('Retry-After'));
+
+        if (ctype_digit($value)) {
+            return max(1, (int) $value);
+        }
+
+        $timestamp = $value !== '' ? strtotime($value) : false;
+
+        return $timestamp === false ? 60 : max(1, $timestamp - now()->getTimestamp());
+    }
+
     /**
      * Log the exception and flash a user-facing error message.
      *

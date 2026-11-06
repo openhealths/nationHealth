@@ -23,6 +23,8 @@ use App\Traits\BatchLegalEntityQueries;
 use App\Notifications\SyncNotification;
 use Illuminate\Queue\InteractsWithQueue;
 use App\Classes\eHealth\EHealthResponse;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthRateLimitedException;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
 
@@ -65,12 +67,11 @@ abstract class EHealthJob implements ShouldQueue
      */
     public ?User $user = null;
 
-    /**
-     * Amount of times to attempt the job if it fails.
-     *
-     * @var int
-     */
-    public int $tries = 3;
+    /** 0 allows unlimited attempts: quota waits and pending polls release the job without failing it. */
+    public int $tries = 0;
+
+    /** Fail after three unhandled exceptions or worker timeouts, regardless of capacity releases. */
+    public int $maxExceptions = 3;
 
     /**
      * The number of seconds the job can run before timing out.
@@ -124,9 +125,23 @@ abstract class EHealthJob implements ShouldQueue
 
         $this->token = Crypt::decryptString($this->batch()->options['token'] ?? '');
 
-        $response = $this->sendRequest($this->token);
+        try {
+            $response = $this->sendRequest($this->token);
 
-        $this->processResponse($response);
+            $this->processResponse($response);
+        } catch (EHealthRateLimitedException $exception) {
+            $this->release($exception->retryAfter());
+
+            return;
+        } catch (EHealthResponseException $exception) {
+            if ($exception->response->status() !== 429) {
+                throw $exception;
+            }
+
+            $this->release($exception->retryAfter());
+
+            return;
+        }
 
         $rdata = $response?->json();
 

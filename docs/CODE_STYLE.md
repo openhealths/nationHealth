@@ -272,3 +272,18 @@ use label dictionaries as selectable options.
 
 For shared Blade components, prefer a single reactive options provider over
 separate watcher props. Keep domain-specific reactions in the calling form.
+
+## Shared HTTP request quotas
+
+Keep shared request admission and cooldown accounting in an injected limiter,
+separate from HTTP transport and response parsing. Name endpoint groups for the
+quota they share. Define methods, exact path patterns, request counts and window
+durations together in configuration. Keep lock timings as constants. Explain
+admission methods with plain request examples and state their return/waiting behavior.
+Represent local capacity waits with a dedicated exception; do not fabricate an
+upstream response. Count each actual HTTP attempt using the resolved URL and final
+headers, including retries, rather than counting only calls to the client API.
+
+Keep integration classes extensible: do not add `final` without a specific invariant
+that requires it. Use documented `protected` hooks for behavior that an integrating
+service may customize, such as endpoint grouping and quota-key construction.

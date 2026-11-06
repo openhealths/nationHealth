@@ -11,6 +11,7 @@ use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthRateLimitedException;
 use App\Jobs\EmployeeSync;
 use App\Livewire\Actions\Logout;
 use App\Models\Employee\Employee;
@@ -592,7 +593,7 @@ class EmployeeIndex extends EmployeeComponent
             );
 
             return;
-        } catch (EHealthResponseException $e) {
+        } catch (EHealthResponseException|EHealthRateLimitedException $e) {
             Log::error(
                 'Employee sync failed: E-Health API error.',
                 ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]
