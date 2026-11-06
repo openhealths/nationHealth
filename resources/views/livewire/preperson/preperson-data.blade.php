@@ -76,14 +76,14 @@
                                 href="{{ route('prepersons.encounter.create', [legalEntity(), 'preperson' => $preperson->id, 'type' => 'discharge']) }}"
                                 class="dropdown-item"
                             >
-                                @icon('hospital-bed', 'w-4 h-4 text-gray-500 shrink-0')
+                                @icon('hospital-bed', 'w-4 h-4 shrink-0')
                                 {{ __('patients.discharge_patient') }}
                             </a>
                             <a
                                 href="{{ route('prepersons.encounter.create', [legalEntity(), 'preperson' => $preperson->id, 'type' => 'hospitalization_refusal']) }}"
                                 class="dropdown-item"
                             >
-                                @icon('cancel', 'w-4 h-4 text-gray-500 shrink-0')
+                                @icon('cancel', 'w-4 h-4 shrink-0')
                                 {{ __('patients.hospitalization_refusal') }}
                             </a>
                         </div>

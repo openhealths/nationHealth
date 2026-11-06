@@ -6,7 +6,6 @@
     :title="__('encounters.eprescription.title')"
 >
     <x-slot name="headerActions">
-        <a href="{{ $this->encounterUrl }}" class="button-minor">{{ __('forms.back') }}</a>
     </x-slot>
 
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />

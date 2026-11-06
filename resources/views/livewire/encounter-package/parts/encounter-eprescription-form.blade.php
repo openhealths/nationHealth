@@ -314,7 +314,7 @@
                 @endif
 
                 <div class="mt-8 flex w-full justify-start gap-4">
-                    <a href="{{ $encounterReturnUrl }}" class="button-minor">{{ __('forms.cancel') }}</a>
+                    <a href="{{ $encounterReturnUrl }}" class="button-minor">{{ __('forms.back') }}</a>
                     <button type="submit" class="button-primary">
                         {{ $encounterEPrescriptionRequestIdToSign !== null ? __('medication-requests.resume_signing') : __('forms.create_and_sign') }}
                     </button>
