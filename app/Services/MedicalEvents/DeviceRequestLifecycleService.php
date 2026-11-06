@@ -25,13 +25,13 @@ use Illuminate\Validation\ValidationException;
 
 class DeviceRequestLifecycleService extends EHealthRequestLifecycleService implements EHealthRequestLifecycleContract
 {
-    public function authorizeAction(LegalEntity $legalEntity, string $scope): Employee
+    public function authorizeAction(LegalEntity $legalEntity, string $scope, ?string $employeeUuid = null): Employee
     {
         $user = Auth::user();
         abort_unless($legalEntity->is(legalEntity()), 404);
         Gate::authorize('perform', [DeviceRequestRequest::class, $scope]);
 
-        $employee = app(DeviceRequestRequestPolicy::class)->employee($user, $scope);
+        $employee = app(DeviceRequestRequestPolicy::class)->employee($user, $scope, $employeeUuid);
         abort_unless($employee !== null, 404);
 
         return $employee;
@@ -109,7 +109,7 @@ class DeviceRequestLifecycleService extends EHealthRequestLifecycleService imple
 
     public function encounter(Person $person, Employee $employee, string $uuid): Encounter
     {
-        $encounter = $person->encounters()->whereUuid($uuid)->with(['performer', 'period'])->firstOrFail();
+        $encounter = MedicalEventsRepository::deviceRequest()->encounterForPerson($person, $uuid);
         $end = $encounter->period?->end;
         if ($encounter->performer?->value !== $employee->uuid || !$end
             || !CarbonImmutable::parse($end)->isToday()
@@ -414,6 +414,8 @@ class DeviceRequestLifecycleService extends EHealthRequestLifecycleService imple
                 $seen[$key] = true;
             }
         }
+        $encounter = MedicalEventsRepository::deviceRequest()->encounterForPerson($person, $data['encounter_uuid']);
+        $employee = $this->authorizeAction($legalEntity, 'device_request:write', $encounter->performer?->value);
         $this->encounter($person, $employee, $data['encounter_uuid']);
         $options = $this->prescribingOptions($data);
         $period = $this->occurrenceDates($data);

@@ -377,6 +377,13 @@ return [
     */
 
     'attributes' => [
+        'referralForm.category' => 'категорія направлення',
+        'referralForm.started_at' => 'дата початку дії направлення',
+        'referralForm.ended_at' => 'дата завершення дії направлення',
+        'referralForm.start_time' => 'час початку дії направлення',
+        'referralForm.end_time' => 'час завершення дії направлення',
+        'referralForm.quantity' => 'кількість послуг',
+        'referralForm.priority' => 'пріоритет направлення',
         'name' => 'ім\'я',
         'language' => 'мова',
         'phone' => 'телефон',

@@ -34,12 +34,12 @@ class DeviceRequestRequestPolicy
         return $allowed ? Response::allow() : Response::denyAsNotFound();
     }
 
-    public function employee(User $user, string $scope): ?Employee
+    public function employee(User $user, string $scope, ?string $employeeUuid = null): ?Employee
     {
         $types = $scope === 'device_request:write'
             ? ['DOCTOR', 'SPECIALIST']
             : ['DOCTOR', 'SPECIALIST', 'ASSISTANT', 'MED_COORDINATOR', 'MED_ADMIN'];
 
-        return Repository::employee()->activeForLegalEntity($user, legalEntity(), $types);
+        return Repository::employee()->activeForLegalEntity($user, legalEntity(), $types, $employeeUuid);
     }
 }

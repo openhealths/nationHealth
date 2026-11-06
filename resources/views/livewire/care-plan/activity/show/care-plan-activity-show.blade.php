@@ -1,3 +1,5 @@
+@use('App\Enums\JobStatus')
+
 <section
     class="section-form"
     data-livewire-background-actions="checkSubmissionStatus checkPlanSyncStatus checkApprovalJobStatus checkSmsResendStatus event:care-plan-approvals-changed"
@@ -10,9 +12,9 @@
     </x-header-navigation>
 
     @php
-        $activitySubmissionPending = ($submissionStates[$activity->uuid]['status'] ?? null) === \App\Enums\JobStatus::PENDING->value;
-        $activitySubmissionProcessed = ($submissionStates[$activity->uuid]['status'] ?? null) === \App\Enums\JobStatus::PROCESSED->value;
-        $hasPendingSubmission = collect($submissionStates)->contains('status', \App\Enums\JobStatus::PENDING->value);
+        $activitySubmissionPending = in_array($submissionStates[$activity->uuid]['status'] ?? null, [JobStatus::PENDING->value, JobStatus::PROCESSING->value], true);
+        $activitySubmissionProcessed = ($submissionStates[$activity->uuid]['status'] ?? null) === JobStatus::PROCESSED->value;
+        $hasPendingSubmission = collect($submissionStates)->contains(fn ($state) => in_array($state['status'], [JobStatus::PENDING->value, JobStatus::PROCESSING->value], true));
         $resolvedKind = $activity->resolvedKind();
         $activityStatus = is_array($activity->status) ? ($activity->status['coding'][0]['code'] ?? ($activity->status['text'] ?? '')) : $activity->status;
     @endphp

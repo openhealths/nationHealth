@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 return [
+    'referral_request_created' => 'Заявку на електронне направлення створено. Підпишіть КЕП.',
+    'referral_submission_confirmed' => 'Електронне направлення успішно створено та підписано в ЕСОЗ.',
+    'document_number' => 'Номер: :number.',
     'policy' => [
         'manage_activities_denied' => 'У вас немає дозволу на роботу з призначеннями цього плану лікування.',
     ],

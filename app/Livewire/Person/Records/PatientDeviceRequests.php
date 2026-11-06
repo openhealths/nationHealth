@@ -9,6 +9,7 @@ use App\Livewire\DeviceRequest\DeviceRequestIndex;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\Person\Person;
+use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -51,9 +52,8 @@ class PatientDeviceRequests extends DeviceRequestIndex
             return;
         }
 
-        $employee = app(DeviceRequestLifecycleService::class)->authorizeAction($this->legalEntity, 'device_request:write');
-        $this->drafts = DeviceRequestRequest::wherePersonId($this->personId)->whereEmployeeId($employee->id)
-            ->whereStatus('draft')->whereNotNull('request_payload')->latest()->get()
+        app(DeviceRequestLifecycleService::class)->authorizeAction($this->legalEntity, 'device_request:write');
+        $this->drafts = Repository::deviceRequest()->draftsForPatientUser($this->personId, Auth::user(), $this->legalEntity)
             ->map(static fn (DeviceRequestRequest $draft): array => array_merge($draft->requestPayload, [
                 'uuid' => $draft->uuid, 'status' => 'draft', 'isDraft' => true,
                 'authored_on' => $draft->createdAt->toIso8601String(),

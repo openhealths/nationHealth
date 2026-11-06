@@ -11,7 +11,10 @@ use App\Livewire\CarePlan\Concerns\CarePlanManager;
 use App\Livewire\CarePlan\Concerns\ManagesCarePlanReferrals;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
+use App\Enums\JobStatus;
+use App\Repositories\Repository;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
 
 class CarePlanActivityShow extends CarePlanComponent
@@ -49,11 +52,41 @@ class CarePlanActivityShow extends CarePlanComponent
 
     protected function refreshSubmissionStatus(): void
     {
-        $this->submissionStates = app(\App\Repositories\CarePlanActivityRepository::class)->submissionStates($this->activity);
+        $previousStates = $this->submissionStates;
+        $this->submissionStates = Repository::carePlanActivity()->submissionStates($this->activity);
         // Read the activity after its receipt: a committed PROCESSED receipt includes the status update.
         $this->activity = $this->ownedActivity($this->activity->id);
         $this->activityProductLabel = $this->resolveActivityProductLabel($this->activity);
         $this->scopeDocumentsToActivity($this->activity->uuid);
+        $pendingRedirect = Session::get('info') === __('care-plan.submission_pending');
+        $latestSubmissionId = collect($this->submissionStates)->max('id');
+
+        foreach ($this->submissionStates as $uuid => $state) {
+            if ($uuid !== $this->activity->uuid && $this->activity->resolvedKind() !== 'service_request') {
+                continue;
+            }
+            $previous = $previousStates[$uuid] ?? [];
+            $wasPending = ($previous['id'] ?? null) === $state['id']
+                && in_array($previous['status'] ?? null, [JobStatus::PENDING->value, JobStatus::PROCESSING->value], true);
+            if (!$wasPending && !($previous === [] && $pendingRedirect && $state['id'] === $latestSubmissionId)) {
+                continue;
+            }
+
+            if ($pendingRedirect && in_array($state['status'], [JobStatus::FAILED->value, JobStatus::PROCESSED->value], true)) {
+                Session::forget('info');
+            }
+            if ($state['status'] === JobStatus::FAILED->value) {
+                Session::flash('error', $state['error'] ?: __('care-plan.submission_failed_edit_draft'));
+            } elseif ($state['status'] === JobStatus::PROCESSED->value) {
+                $message = $uuid === $this->activity->uuid
+                    ? __($this->activity->status === 'scheduled' ? 'care-plan.activity_signed' : 'care-plan.submission_confirmed')
+                    : __('care-plan.referral_submission_confirmed');
+                if (filled($state['number'])) {
+                    $message .= ' '.__('care-plan.document_number', ['number' => $state['number']]);
+                }
+                Session::flash('success', $message);
+            }
+        }
     }
 
     protected function refreshCarePlan(): void
@@ -64,7 +97,24 @@ class CarePlanActivityShow extends CarePlanComponent
 
     protected function renderCarePlan()
     {
-        return view('livewire.care-plan.activity.show.care-plan-activity-show');
+        return view('livewire.care-plan.activity.show.care-plan-activity-show', [
+            'activityReasonReferenceLabels' => $this->resolveActivityReasonReferenceLabels(),
+        ]);
+    }
+
+    protected function resolveActivityReasonReferenceLabels(): array
+    {
+        $grounds = [
+            'condition' => collect($this->availableConditions)->keyBy('uuid'),
+            'diagnosticreport' => collect($this->availableReports)->keyBy('uuid'),
+            'observation' => collect($this->availableObservations)->keyBy('uuid'),
+        ];
+
+        return collect($this->activity->reasonReference ?? [])->map(function (string $reference) use ($grounds): string {
+            [$type, $uuid] = array_pad(explode('/', $reference, 2), 2, '');
+
+            return $grounds[str_replace('_', '', strtolower($type))][$uuid]['name'] ?? $reference;
+        })->all();
     }
 
     protected function getDeviceSignReadinessWarning(CarePlanActivity $activity): ?string

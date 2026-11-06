@@ -325,7 +325,7 @@ trait ManagesCarePlanReferrals
 
         if ($this->referralForm['kind'] === 'service_request') {
             $rules['referralForm.category'] = $this->referralServiceType === 'service_group'
-                ? ['required', 'string', \Illuminate\Validation\Rule::in(array_keys($this->referralCategoryOptions))]
+                ? ['required', 'string', Rule::in(array_keys($this->referralCategoryOptions))]
                 : 'required|string';
         }
 
@@ -427,6 +427,7 @@ trait ManagesCarePlanReferrals
                 ? 'sign_servicerequest'
                 : 'sign_devicerequest';
             $this->openSignatureModal($signAction);
+            Session::flash('success', __('care-plan.referral_request_created'));
         } catch (ValidationException $exception) {
             $this->showReferralDrawer = true;
             $this->showSignatureModal = false;
@@ -603,7 +604,7 @@ trait ManagesCarePlanReferrals
                         $kind,
                         $dbData
                     );
-                    $this->finalizeSignedReferral($dbData, $kind, $activity, true);
+                    $this->finalizeSignedReferral($dbData, $kind, $activity, alreadyPersisted: true, alreadyExists: true);
                 } catch (Exception $syncException) {
                     Log::error('CarePlanShow: failed to sync referral after duplicate eHealth id: ' . $syncException->getMessage());
                     $this->flashUserError(__('Документ вже існує в ЕСОЗ, але не вдалося синхронізувати локальні дані: ') . $syncException->getMessage());
@@ -1205,7 +1206,7 @@ trait ManagesCarePlanReferrals
     /**
      * @param  array<string, mixed>  $dbData
      */
-    protected function finalizeSignedReferral(array $dbData, string $kind, CarePlanActivity $activity, bool $alreadyPersisted = false): void
+    protected function finalizeSignedReferral(array $dbData, string $kind, CarePlanActivity $activity, bool $alreadyPersisted = false, bool $alreadyExists = false): void
     {
         if (!$alreadyPersisted) {
             if ($kind === 'service_request') {
@@ -1227,10 +1228,14 @@ trait ManagesCarePlanReferrals
         if (in_array($finalStatusCode, ['pending', 'processing'], true)) {
 
             Session::flash('warning', $documentLabel.__(' прийнято в обробку ЕСОЗ. Фінальний статус з’явиться після завершення асинхронної задачі.'));
-        } elseif ($alreadyPersisted) {
+        } elseif ($alreadyExists) {
             $this->flashUserSuccess($documentLabel.__(' вже існував у ЕСОЗ. Локальні дані синхронізовано.'));
         } else {
-            $this->flashUserSuccess($documentLabel.__(' успішно створено та підписано в ЕСОЗ.'));
+            $message = __('care-plan.referral_submission_confirmed');
+            if (filled($dbData['request_number'] ?? null)) {
+                $message .= ' '.__('care-plan.document_number', ['number' => $dbData['request_number']]);
+            }
+            $this->flashUserSuccess($message);
         }
         $this->refreshCarePlan();
     }

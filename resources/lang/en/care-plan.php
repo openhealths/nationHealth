@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 return [
+    'referral_request_created' => 'The electronic referral request has been created. Sign it with your digital signature.',
+    'referral_submission_confirmed' => 'The electronic referral has been successfully created and signed in eHealth.',
+    'document_number' => 'Number: :number.',
     'policy' => [
         'manage_activities_denied' => 'You do not have permission to manage activities for this care plan.',
     ],

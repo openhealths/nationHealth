@@ -186,8 +186,11 @@ class DeviceRequestIndex extends Component
     {
         $this->drafts = [];
         if (Auth::user()->can('create', DeviceRequestRequest::class)) {
-            $employee = app(DeviceRequestLifecycleService::class)->authorizeAction($this->legalEntity, 'device_request:write');
-            $this->drafts = MedicalEventsRepository::deviceRequest()->draftsForPatientEmployee($this->personId, $employee->id);
+            app(DeviceRequestLifecycleService::class)->authorizeAction($this->legalEntity, 'device_request:write');
+            $this->drafts = MedicalEventsRepository::deviceRequest()->draftsForPatientUser($this->personId, Auth::user(), $this->legalEntity)
+                ->map(fn (DeviceRequestRequest $draft): array => [
+                    'uuid' => $draft->uuid, 'device' => $draft->deviceId, 'updatedAt' => $draft->updatedAt->format('d.m.Y H:i'),
+                ])->all();
         }
     }
 

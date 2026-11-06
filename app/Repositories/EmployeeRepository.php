@@ -124,9 +124,11 @@ readonly class EmployeeRepository
         return Arr::toCamelCase($employee->specialities->toArray());
     }
 
-    public function activeForLegalEntity(User $user, LegalEntity $legalEntity, array $employeeTypes): ?Employee
+    public function activeForLegalEntity(User $user, LegalEntity $legalEntity, array $employeeTypes, ?string $employeeUuid = null): ?Employee
     {
-        return $user->employees()->whereLegalEntityId($legalEntity->id)->active()->whereIn('employee_type', $employeeTypes)->first();
+        return Employee::forUserInLegalEntity($user, $legalEntity)->whereIn('employee_type', $employeeTypes)
+            ->when($employeeUuid !== null, fn (Builder $query) => $query->whereUuid($employeeUuid))
+            ->orderBy('id')->first();
     }
 
     /**

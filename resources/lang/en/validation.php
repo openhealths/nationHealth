@@ -188,6 +188,13 @@ return [
     */
 
     'attributes' => [
+        'referralForm.category' => 'referral category',
+        'referralForm.started_at' => 'referral start date',
+        'referralForm.ended_at' => 'referral end date',
+        'referralForm.start_time' => 'referral start time',
+        'referralForm.end_time' => 'referral end time',
+        'referralForm.quantity' => 'service quantity',
+        'referralForm.priority' => 'referral priority',
         'name' => 'name',
         'phone' => 'phone',
         '_token' => 'token CSRF',
