@@ -227,6 +227,7 @@ class PatientDeviceRequestsTest extends TestCase
 
     public function test_read_scope_without_an_active_employee_cannot_fetch_patient_requests(): void
     {
+        $this->employee->update(['is_active' => false]);
         $this->user->employees()->detach();
         $this->user->unsetRelation('employees');
         $api = Mockery::mock(DeviceRequest::class);
@@ -235,6 +236,19 @@ class PatientDeviceRequestsTest extends TestCase
         Livewire::test(PatientDeviceRequests::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person])
             ->assertSee(__('device-requests.patient.tab'))->assertSet('requests', [])
             ->call('search')->assertStatus(200)->assertSee(__('device-requests.policy.perform'));
+    }
+
+    public function test_active_employee_of_the_current_party_can_read_requests_without_a_pivot(): void
+    {
+        $this->user->employees()->detach();
+        $this->user->unsetRelation('employees');
+        $api = Mockery::mock(DeviceRequest::class);
+        $api->shouldReceive('getBySearchParams')->once()
+            ->with($this->person->uuid, ['page' => 1])->andReturn($this->response([$this->record()]));
+        $this->instance(DeviceRequest::class, $api);
+
+        Livewire::test(PatientDeviceRequests::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person])
+            ->assertSee('Ортез')->assertDontSee(__('device-requests.policy.perform'));
     }
     public function testPatientRegistryCannotSwitchOrClearThePatient(): void
     {
