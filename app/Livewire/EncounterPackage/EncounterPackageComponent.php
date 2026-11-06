@@ -1338,9 +1338,9 @@ class EncounterPackageComponent extends Component
      */
     protected function adjustEncounterClasses(): void
     {
-        $keys = $this->getFilteredKeysFromConfig(
-            "legal_entity_encounter_classes.$this->legalEntityType",
-            "performer_employee_encounter_classes.$this->employeeType"
+        $keys = array_intersect(
+            config("ehealth.legal_entity_encounter_classes.$this->legalEntityType", []),
+            config("ehealth.performer_employee_encounter_classes.$this->employeeType", [])
         );
 
         $this->adjustDictionary('eHealth/encounter_classes', $keys);

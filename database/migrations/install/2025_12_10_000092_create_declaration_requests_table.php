@@ -39,7 +39,7 @@ return new class extends Migration
             $table->date('start_date')->nullable();
             $table->date('end_date')->nullable();
             $table->foreignId('legal_entity_id')->constrained();
-            $table->foreignId('person_id')->constrained('persons');
+            $table->foreignId('person_id')->nullable()->constrained('persons');
             // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/18426003727/declaration_request_statuses
             $table->enum(
                 'status',

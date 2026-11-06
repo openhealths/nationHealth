@@ -22,6 +22,9 @@ use App\Models\Relations\Phone;
 use BackedEnum;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\ItemNotFoundException;
+use Throwable;
 
 class DeclarationRequestRepository
 {
@@ -37,6 +40,51 @@ class DeclarationRequestRepository
         $validatedData = $this->mapUuidsToIds($validatedData);
 
         return DeclarationRequest::create($validatedData);
+    }
+
+    /**
+     * Prepare a request from the list of the legal entity requests for storing, so its details are synced next.
+     * A patient who is not in the MIS yet is created and linked by the details sync.
+     *
+     * @param  array  $request
+     * @return array
+     * @throws ItemNotFoundException When the employee is not in the MIS
+     */
+    public function prepareFromList(array $request): array
+    {
+        $request = $this->mapUuidsToIds($request, true);
+        $request['uuid'] = Arr::pull($request, 'id');
+        $request['sync_status'] = JobStatus::PARTIAL->value;
+
+        return $request;
+    }
+
+    /**
+     * Create a patient who is not in the MIS yet from the person data their request is signed with.
+     *
+     * @param  array  $personData
+     * @return Person
+     * @throws Throwable
+     */
+    public function createPerson(array $personData): Person
+    {
+        return DB::transaction(function () use ($personData): Person {
+            $person = Person::create([
+                ...array_intersect_key($personData, array_flip(new Person()->getFillable())),
+                'uuid' => $personData['id']
+            ]);
+
+            $this->syncPersonData([...$personData, 'phones' => $personData['phones'] ?? []]);
+
+            if (!empty($personData['confidant_person'])) {
+                Repository::confidantPerson()->addConfidantPerson([
+                    ...$personData['confidant_person'],
+                    'person_id' => $person->id
+                ]);
+            }
+
+            return $person;
+        });
     }
 
     /**
@@ -454,7 +502,7 @@ class DeclarationRequestRepository
         $data['employee_id'] = Employee::where('uuid', $data['employee_id'])
             ->pluck('id')
             ->firstOrFail();
-        $data['person_id'] = Person::where('uuid', $data['person_id'])->pluck('id')->firstOrFail();
+        $data['person_id'] = Person::where('uuid', $data['person_id'])->value('id');
         $divisionId = !empty($data['division_id'])
             ? Division::where('uuid', $data['division_id'])->value('id')
             : null;

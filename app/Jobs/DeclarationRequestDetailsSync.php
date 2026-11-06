@@ -105,7 +105,10 @@ class DeclarationRequestDetailsSync extends EHealthJob
                 )
         );
 
-        if ($isToBeSaved) {
+        // The list sync stores the request without a patient who is not in the MIS yet
+        if ($personId && !$personModel) {
+            $validatedData['person_id'] = Repository::declarationRequest()->createPerson($person)->id;
+        } elseif ($isToBeSaved) {
             Log::warning('Person with UUID ' . $personId . ' does not exist in the database. It will be created during synchronization.');
 
             $confidantPerson = $person['confidant_person'] ?? [];
