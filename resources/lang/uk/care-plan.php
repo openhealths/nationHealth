@@ -6,6 +6,7 @@ return [
     'referral_request_created' => 'Заявку на електронне направлення створено. Підпишіть КЕП.',
     'referral_submission_confirmed' => 'Електронне направлення успішно створено та підписано в ЕСОЗ.',
     'document_number' => 'Номер: :number.',
+    'care_plan_with_number' => 'План лікування № :number',
     'policy' => [
         'manage_activities_denied' => 'У вас немає дозволу на роботу з призначеннями цього плану лікування.',
     ],
@@ -371,7 +372,7 @@ return [
     'record_name_placeholder' => 'Назва запису...',
 
     'context' => 'Виконання послуг',
-    'encounter' => 'Взаємодія (Encounter)',
+    'encounter' => 'Взаємодія',
     'conditions/diagnoses' => 'Стани/діагнози',
     'observations' => 'Спостереження',
     'no_ehealth_encounters' => 'У пацієнта немає підтверджених ЕСОЗ взаємодій. Спочатку створіть та підпишіть взаємодію.',
