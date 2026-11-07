@@ -256,19 +256,16 @@
                                 {{ __('specimens.sidebar_title') }}
                             </a>
 
-                            <div class="flex-1"></div>
-                        </div>
-                        @if ($personId && Auth::user()->can('viewAny', DeviceRequestRequest::class))
-                            <div class="summary-nav-row">
+                            @if ($personId && Auth::user()->can('viewAny', DeviceRequestRequest::class))
                                 <a
                                     href="{{ route('persons.device-requests', [legalEntity(), 'person' => $personId]) }}"
                                     class="summary-tab {{ ($activeTab === 'device-requests' || $isCurrentRoute('persons.device-requests*')) ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                                 >
                                     {{ __('device-requests.labels.patient_tab') }}
                                 </a>
-                                <div class="flex-1"></div>
-                            </div>
-                        @endif
+                            @endif
+                            <div class="flex-1"></div>
+                        </div>
                     @endcan
                 </div>
             </x-slot>
