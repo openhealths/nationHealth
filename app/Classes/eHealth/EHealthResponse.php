@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth;
 
+use App\Classes\eHealth\Errors\BaseErrorTranslator;
+use App\Contracts\ApiErrorTranslator;
 use Closure;
 use Illuminate\Http\Client\Response;
 use RuntimeException;
@@ -36,10 +38,23 @@ class EHealthResponse extends Response
      */
     protected ?Closure $validator = null;
 
-    public function __construct($response, ?Closure $validator = null, protected ?Closure $mapper = null)
-    {
+    protected readonly ApiErrorTranslator $errorTranslator;
+
+    public function __construct(
+        $response,
+        ?Closure $validator = null,
+        protected ?Closure $mapper = null,
+        ?ApiErrorTranslator $errorTranslator = null
+    ) {
         parent::__construct($response);
         $this->validator = $validator;
+        $this->errorTranslator = $errorTranslator ?? new BaseErrorTranslator();
+    }
+
+    /** Keep business errors in successful HTTP responses in their originating API context. */
+    public function errorTranslator(): ApiErrorTranslator
+    {
+        return $this->errorTranslator;
     }
 
     /**

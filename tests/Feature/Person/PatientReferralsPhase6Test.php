@@ -148,27 +148,35 @@ class PatientReferralsPhase6Test extends TestCase
 
     public function test_encounter_referrals_keep_fhir_categories_and_both_catalog_permissions(): void
     {
+        $this->grantMedicalEventAbilities($this->user);
         $services = [];
         $expected = [];
         foreach ([
-            ['procedure', true, false],
-            ['laboratory', false, true],
-            [null, false, false],
-        ] as [$category, $procedureAllowed, $reportAllowed]) {
+            ['surgical_procedure', 'procedure', true, false],
+            ['laboratory_procedure', 'laboratory', false, true],
+            [null, null, false, false],
+        ] as $index => [$category, $catalogCategory, $procedureAllowed, $reportAllowed]) {
             $uuid = (string) Str::uuid();
             $serviceId = (string) Str::uuid();
-            $categoryId = $category === null ? null : CodeableConcept::create(['text' => $category])->id;
+            $number = sprintf('%04d-1111-2222-3333', $index);
+            $concept = $category === null ? null : CodeableConcept::create(['text' => $category]);
+            $concept?->coding()->create(['system' => 'eHealth/SNOMED/service_request_categories', 'code' => $category]);
             ServiceRequestRequest::create([
                 'uuid' => $uuid, 'person_id' => $this->person->id,
                 'employee_id' => $this->employee->id,
                 'status' => ServiceRequestStatus::ACTIVE->value,
-                'service_id' => $serviceId, 'category_id' => $categoryId,
+                'service_id' => $serviceId, 'category_id' => $concept?->id, 'request_number' => $number,
             ]);
             if ($category !== null) {
-                $services[] = ['id' => $serviceId, 'code' => $category, 'name' => $category, 'category' => $category];
+                $services[] = ['id' => $serviceId, 'code' => $category, 'name' => $category, 'category' => $catalogCategory];
             }
-            $expected[$uuid] = [$category, $procedureAllowed, $reportAllowed];
+            $expected[$uuid] = [$category, $procedureAllowed, $reportAllowed, $number];
         }
+        $missingNumberUuid = (string) Str::uuid();
+        ServiceRequestRequest::create([
+            'uuid' => $missingNumberUuid, 'person_id' => $this->person->id,
+            'status' => ServiceRequestStatus::ACTIVE->value, 'service_id' => (string) Str::uuid(),
+        ]);
 
         $manager = Mockery::mock(DictionaryManager::class);
         $manager->shouldReceive('services')->andReturn(ServiceCollection::make($services));
@@ -184,14 +192,16 @@ class PatientReferralsPhase6Test extends TestCase
 
         $this->assertTrue($component->referralsLoaded);
         $this->assertCount(3, $component->availableReferrals);
+        $this->assertNotContains($missingNumberUuid, array_column($component->availableReferrals, 'id'));
         foreach ($component->availableReferrals as $referral) {
-            [$category, $procedureAllowed, $reportAllowed] = $expected[$referral['id']];
+            [$category, $procedureAllowed, $reportAllowed, $number] = $expected[$referral['id']];
             $this->assertSame($category === null
                 ? __('encounters.electronic_referral')
                 : __('care-plan.referral_category.'.$category), $referral['category']);
             $this->assertSame($procedureAllowed, $referral['isProcedureAllowed']);
             $this->assertSame($reportAllowed, $referral['isDiagnosticReportAllowed']);
-            $this->assertSame($referral['id'], $referral['requisition']);
+            $this->assertSame($number, $referral['requisition']);
+            $this->assertNotSame($referral['id'], $referral['requisition']);
         }
 
         $edit = new DiagnosticReportEdit();
@@ -208,6 +218,21 @@ class PatientReferralsPhase6Test extends TestCase
             $this->assertSame($referral['id'], $edit->availableReferrals[0]['id']);
             $this->assertSame($reportAllowed, $edit->availableReferrals[0]['isDiagnosticReportAllowed']);
         }
+    }
+
+    public function testEncounterReferralsRequireReadPermissionBeforeLoadingTheDictionary(): void
+    {
+        $manager = Mockery::mock(DictionaryManager::class);
+        $manager->shouldNotReceive('services');
+        $this->instance(DictionaryManager::class, $manager);
+        $component = new EncounterPackageComponent();
+        $component->personId = $this->person->id;
+
+        $component->loadAvailableReferrals();
+
+        $this->assertFalse($component->referralsLoaded);
+        $this->assertSame([], $component->availableReferrals);
+        $this->assertSame(__('service-requests.policy.search'), session()->get('error'));
     }
 
     public function test_repository_filters_by_status_and_period(): void

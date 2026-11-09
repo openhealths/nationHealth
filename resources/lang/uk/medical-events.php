@@ -393,6 +393,7 @@ return [
 
     // Names of the parts of a record path the API points its errors at
     'api_fields' => [
+        'completed_with' => 'Медичний запис для погашення направлення',
         'encounter' => 'Взаємодія',
         'episode' => 'Епізод',
         'conditions' => 'Стан',

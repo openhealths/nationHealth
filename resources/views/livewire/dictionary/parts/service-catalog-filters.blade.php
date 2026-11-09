@@ -21,7 +21,7 @@
                     class="input peer w-full"
                     placeholder=" "
                     wire:model="filterCodeOrName"
-                    wire:keydown.enter="search"
+                    wire:keydown.enter.prevent="search"
                 />
 
                 <label for="serviceSearch{{ $componentId }}" class="label">

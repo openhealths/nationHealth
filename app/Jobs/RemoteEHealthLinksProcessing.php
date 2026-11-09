@@ -535,7 +535,7 @@ class RemoteEHealthLinksProcessing extends EHealthJob
         $status = strtolower((string) ($data['status'] ?? ''));
         if (isset($data['error']) || in_array($status, ['failed', 'rejected', 'error'], true)) {
             self::markSubmissionFailed($link);
-            throw new EHealthValidationException($data);
+            throw new EHealthValidationException($data, $response->errorTranslator());
         }
         $jobLink = collect($data['links'] ?? [])->first(static fn (array $candidate): bool => str_contains(strtolower((string) ($candidate['href'] ?? '')), '/jobs/'));
         if ($jobLink !== null) {

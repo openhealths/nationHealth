@@ -51,6 +51,15 @@ Keep additional error details limited to the types supplied by actual callers; d
 support for underlying exceptions unless a caller passes them.
 Keep database lookups and state checks in the repository.
 
+## eHealth response contracts
+
+Validate eHealth responses against the official endpoint documentation at the API
+boundary, and consume them through the configured response validator. Do not use
+raw `getData()` results to map or persist records, change UI state, or decide that
+an operation succeeded. Delegating client methods must preserve validation.
+Test malformed responses and keep pending operations unconfirmed; do not weaken
+the documented contract to make fixtures pass.
+
 ## Livewire
 
 ### User feedback
@@ -312,3 +321,10 @@ use label dictionaries as selectable options.
 
 For shared Blade components, prefer a single reactive options provider over
 separate watcher props. Keep domain-specific reactions in the calling form.
+
+## API error translations
+
+Keep resource-specific error descriptions in the resource translator's `messages()` map.
+Use the existing field-label translations and common error formatter rather than adding
+field-specific translation hooks. Carry the originating API translator with its response
+so jobs can translate business errors without selecting a translator from the model type.

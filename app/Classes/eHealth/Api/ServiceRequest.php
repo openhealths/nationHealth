@@ -6,10 +6,17 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\ServiceRequestErrorTranslator;
+use App\Contracts\ApiErrorTranslator;
 use GuzzleHttp\Promise\PromiseInterface;
 
 class ServiceRequest extends Request
 {
+    protected function errorTranslator(): ApiErrorTranslator
+    {
+        return new ServiceRequestErrorTranslator();
+    }
+
     protected const string ENDPOINT_SERVICE_REQUESTS = '/api/service_requests';
     protected const string ENDPOINT_MEDICAL_EVENTS_SERVICE_REQUESTS = '/api/medical_events/service_requests';
 

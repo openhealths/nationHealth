@@ -169,7 +169,9 @@
                                     <td class="px-4 py-3 whitespace-nowrap">{{ $request['medicationQty'] ?? '—' }}</td>
                                     <td class="px-4 py-3 whitespace-nowrap">{{ $request['periodLabel'] ?? '—' }}</td>
                                     <td class="px-4 py-3">{{ $request['programName'] ?? '—' }}</td>
-                                    <td class="px-4 py-3">{{ $request['basisLabel'] ?? '—' }}</td>
+                                    <td class="px-4 py-3">
+                                        @include('livewire.person.records.parts.medication-request-basis', ['record' => $request])
+                                    </td>
                                     @if ($isSearchMode)
                                         <td class="px-4 py-3">
                                             <button
@@ -214,6 +216,7 @@
                                 <th class="px-4 py-3 text-left font-medium">{{ __('Кількість') }}</th>
                                 <th class="px-4 py-3 text-left font-medium">{{ __('Період') }}</th>
                                 <th class="px-4 py-3 text-left font-medium">{{ __('Програма') }}</th>
+                                <th class="px-4 py-3 text-left font-medium">{{ __('Підстава') }}</th>
                                 @if ($isSearchMode)
                                     <th class="px-4 py-3 text-left font-medium">{{ __('Дія') }}</th>
                                 @endif
@@ -239,6 +242,9 @@
                                     <td class="px-4 py-3 whitespace-nowrap">{{ $prescription['medicationQty'] ?? $prescription['medication_qty'] ?? '—' }}</td>
                                     <td class="px-4 py-3 whitespace-nowrap">{{ $prescription['periodLabel'] ?? '—' }}</td>
                                     <td class="px-4 py-3">{{ $prescription['programName'] ?? data_get($prescription, 'medical_program.name') ?? '—' }}</td>
+                                    <td class="px-4 py-3">
+                                        @include('livewire.person.records.parts.medication-request-basis', ['record' => $prescription])
+                                    </td>
                                     @if ($isSearchMode)
                                         <td class="px-4 py-3">
                                             <button
@@ -253,7 +259,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                                    <td colspan="8" class="px-4 py-8 text-center text-gray-500">
                                         {{ $isSearchMode ? __('Нічого не знайдено за параметрами пошуку.') : __('Рецепти з ЕСОЗ ще не завантажені до картки пацієнта. Скористайтесь пошуком вгорі.') }}
                                     </td>
                                 </tr>

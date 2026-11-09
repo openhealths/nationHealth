@@ -127,6 +127,16 @@
                     @endforeach
                     <td class="index-table-td">
                         {{ $referral['requisition'] ?? $referral['request_number'] ?? $referral['id'] ?? '—' }}
+                        @if ($referral['hasCompletion'] ?? false)
+                            <button
+                                type="button"
+                                wire:click="checkReferralCompletion('{{ $referralId }}')"
+                                wire:loading.attr="disabled"
+                                class="text-link mt-2 text-xs"
+                            >
+                                {{ __('care-plan.submission_check') }}
+                            </button>
+                        @endif
                     </td>
                     <td class="index-table-td-actions">
                         @if ($hasActions)

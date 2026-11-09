@@ -17,6 +17,8 @@ final class MedicalEventsErrorTranslator extends BaseErrorTranslator
     protected function messages(): array
     {
         return [
+            // Job details also report rejected referral completion operations.
+            'Not allowed for this category' => __('referrals.messages.completion_type_not_allowed'),
             'Submitted context is not allowed for the condition' => __('medical-events.api_errors.condition_context_not_allowed'),
             'Onset date must be in past' => __('medical-events.api_errors.onset_date_not_in_past'),
             'Failed to fill up employee value for condition' => __('medical-events.api_errors.condition_employee_fill_failed'),
