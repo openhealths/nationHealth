@@ -160,7 +160,7 @@
 
         <div class="mt-6 flex flex-row items-center gap-4 pt-6">
             <div class="flex items-center space-x-3">
-                <a href="{{ url()->previous() }}" class="button-minor"> {{ __('forms.cancel') }} </a>
+                <a href="{{ url()->previous() }}" class="button-minor"> {{ __('forms.back') }} </a>
 
                 @can('updateStatus', $equipment)
                     @if ($equipment->status !== Status::ENTERED_IN_ERROR)
