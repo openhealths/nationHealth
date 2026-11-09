@@ -124,7 +124,7 @@
                         <x-forms.multiselect
                             bind="availabilityStatusFilter"
                             :options="AvailabilityStatus::options()"
-                            label="{{ __('forms.status.label') }}"
+                            label="{{ __('equipments.availability_status.label') }}"
                             placeholder="{{ __('forms.select') }}"
                         />
                     </div>
