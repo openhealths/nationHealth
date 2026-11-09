@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\CompositionErrorTranslator;
+use App\Contracts\ApiErrorTranslator;
 use App\Enums\Composition\CompositionJobStatus;
 use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Support\Arr;
@@ -34,6 +36,11 @@ use Illuminate\Validation\Rule;
 class Composition extends PatientApiBase
 {
     protected const string SEGMENT_COMPOSITION = 'composition';
+
+    protected function errorTranslator(): ApiErrorTranslator
+    {
+        return new CompositionErrorTranslator();
+    }
 
     protected function sanitizeOptionsForLog(array $options): array
     {
@@ -387,7 +394,9 @@ class Composition extends PatientApiBase
         }
         $errors = array_merge(Arr::wrap($errors), collect($data['links'] ?? [])->pluck('error')->filter()->all());
 
-        return collect($errors)->map(static function (mixed $error): string {
+        $translator = $this->errorTranslator();
+
+        return collect($errors)->map(static function (mixed $error) use ($translator): string {
             if (is_array($error)) {
                 $message = data_get($error, 'message') ?? data_get($error, 'rules.0.description') ?? '';
                 $code = data_get($error, 'code') ?? data_get($error, 'rules.0.code');
@@ -398,7 +407,7 @@ class Composition extends PatientApiBase
                 $message = is_scalar($error) ? (string) $error : '';
             }
 
-            return EHealthException::translate((string) $message);
+            return $translator->translate((string) $message) ?? EHealthException::translate((string) $message);
         })->filter()->unique()->values()->all();
     }
 }

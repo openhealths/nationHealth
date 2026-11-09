@@ -9,8 +9,8 @@ use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\Person\EncounterStatus;
-use App\Enums\Person\ServiceRequestStatus;
 use App\Livewire\EncounterPackage\Forms\EncounterCancellationForm;
+use App\Livewire\EncounterPackage\Concerns\ManagesIncomingReferralCompletion;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\MedicalEvents\Sql\Condition;
@@ -24,13 +24,11 @@ use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Immunization;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\Procedure;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use App\Traits\HandlesEncounterCancellation;
 use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
@@ -43,18 +41,18 @@ use Illuminate\Validation\ValidationException;
 use App\Livewire\EncounterPackage\Concerns\ManagesEncounterEPrescription;
 use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
 use App\Livewire\EncounterPackage\Concerns\ResolvesEncounterStandaloneContext;
-use Exception;
 use App\Models\MedicalEvents\Sql\Composition;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
-use RuntimeException;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use Throwable;
+use App\Enums\JobStatus;
 
 class EncounterPackageEdit extends EncounterPackageComponent
 {
     use HandlesEncounterCancellation;
+    use ManagesIncomingReferralCompletion;
     use ResolvesEncounterStandaloneContext;
     use ManagesEncounterEPrescription;
     use ManagesEncounterReferrals;
@@ -98,16 +96,6 @@ class EncounterPackageEdit extends EncounterPackageComponent
      */
     #[Locked]
     public bool $isFinished;
-
-    /**
-     * Electronic referral the accepted encounter was based on, taken into work but not redeemed yet.
-     *
-     * @var string|null
-     */
-    #[Locked]
-    public ?string $referralToRedeemId = null;
-
-    public bool $showReferralRedeemModal = false;
 
     /**
      * Episode opened along with the package and stored only locally, so it is created in eHealth on signing.
@@ -202,13 +190,10 @@ class EncounterPackageEdit extends EncounterPackageComponent
 
         $referralId = $encounterModel->incomingReferral?->value;
 
-        if (
-            $encounterModel->status === EncounterStatus::FINISHED
-            && $referralId !== null
-            && strtolower((string) Repository::serviceRequest()->findByUuid($referralId)?->status) === ServiceRequestStatus::IN_PROGRESS->value
-        ) {
+        $incomingReferral = Repository::serviceRequest()->incomingForEncounter($encounterModel);
+        if ($encounterModel->status === EncounterStatus::FINISHED && $incomingReferral !== null) {
             $this->referralToRedeemId = $referralId;
-            $this->showReferralRedeemModal = true;
+            $this->referralSubmissionPending = Repository::serviceRequest()->latestCompletion($incomingReferral)?->status === JobStatus::PENDING->value;
         }
 
         $encounter = $encounterModel->toArray();
@@ -290,6 +275,8 @@ class EncounterPackageEdit extends EncounterPackageComponent
                 )
                 ->toArray()
         );
+
+        $this->promptReferralCompletion();
     }
 
     /**
@@ -572,75 +559,6 @@ class EncounterPackageEdit extends EncounterPackageComponent
                 : [legalEntity(), 'person' => $this->personId, 'encounter' => $this->encounterId],
             navigate: true
         );
-    }
-
-    /**
-     * Redeem the electronic referral the accepted encounter was based on.
-     *
-     * @param  ReferralRequestLifecycleService  $service
-     * @return void
-     */
-    public function redeemReferral(ReferralRequestLifecycleService $service): void
-    {
-        $this->showReferralRedeemModal = false;
-
-        try {
-            if (
-                $this->referralToRedeemId === null
-                || strtolower((string) Repository::serviceRequest()->findByUuid($this->referralToRedeemId)?->status) !== ServiceRequestStatus::IN_PROGRESS->value
-            ) {
-                throw new RuntimeException(__('Направлення не було підтверджено перед підписанням взаємодії.'));
-            }
-
-            $response = $service->completeReferral($this->referralToRedeemId, $this->encounterUuid);
-            if ($response['submissionPending'] ?? false) {
-                Session::flash('info', __('care-plan.submission_pending'));
-
-                return;
-            }
-            Session::flash('success', __('encounters.messages.referral_redeemed'));
-        } catch (Exception $exception) {
-            Session::flash('error', __('encounters.messages.referral_redeem_error', ['message' => $exception->getMessage()]));
-        }
-    }
-
-    private function loadSelectedReferralsForView(array $records): void
-    {
-        $referralIds = collect($records)
-            ->pluck('basedOnIdentifier')
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($referralIds->isEmpty()) {
-            $this->referralsLoaded = true;
-
-            return;
-        }
-
-        $referrals = ServiceRequestRequest::query()
-            ->whereIn('uuid', $referralIds->all())
-            ->get(['uuid', 'request_number'])
-            ->keyBy('uuid');
-
-        $this->availableReferrals = $referralIds
-            ->map(static function (string $referralId) use ($referrals): ?array {
-                $referral = $referrals->get($referralId);
-
-                if ($referral === null || blank($referral->requestNumber)) {
-                    return null;
-                }
-
-                return [
-                    'id' => $referral->uuid,
-                    'requisition' => $referral->requestNumber,
-                ];
-            })
-            ->filter()
-            ->values()
-            ->toArray();
-
-        $this->referralsLoaded = true;
     }
 
     /**

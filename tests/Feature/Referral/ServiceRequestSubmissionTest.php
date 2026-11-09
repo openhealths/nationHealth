@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Referral;
 
+use App\Classes\eHealth\Api\Job;
 use App\Classes\eHealth\Api\Patient\ServiceRequest as ServiceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\CompositionErrorTranslator;
 use App\Enums\JobStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Notification;
@@ -35,6 +39,29 @@ class ServiceRequestSubmissionTest extends TestCase
         Bus::fake();
 
         return [$repository, $record, $context['user'], $context['person']];
+    }
+
+    public function test_failed_receipt_uses_its_api_translator_and_preserves_the_resource(): void
+    {
+        [$repository, $record] = $this->context();
+        $before = $repository->getResource($record);
+        $response = new EHealthResponse(
+            new Response(200, [], json_encode(['data' => [
+                'status' => 'failed', 'error' => ['message' => 'Same end date for new and existing composition'],
+            ]], JSON_THROW_ON_ERROR)),
+            Job::validateSubmissionResponse(...),
+            errorTranslator: new CompositionErrorTranslator()
+        );
+
+        // The supplied API response owns the translator, independently of the submitted model type.
+        try {
+            RemoteEHealthLinksProcessing::submitOperation($record, ['status' => 'entered_in_error'], fn () => $response);
+            $this->fail('The rejected receipt must not be treated as a successful submission.');
+        } catch (EHealthValidationException $exception) {
+            $this->assertStringContainsString(__('errors.ehealth.rules.1103'), $exception->getFormattedMessage());
+        }
+        $this->assertSame($before, $repository->getResource($record->fresh()));
+        $this->assertSame(JobStatus::FAILED->value, $record->ehealthLinks()->firstOrFail()->status);
     }
 
     public function test_pending_cancel_is_queued_and_duplicate_send_and_edit_are_blocked(): void

@@ -32,6 +32,9 @@ use InvalidArgumentException;
 use Picqer\Barcode\BarcodeGeneratorPNG;
 use RuntimeException;
 use Throwable;
+use App\Enums\JobStatus;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Session;
 
 class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
 {
@@ -1079,20 +1082,22 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             throw new InvalidArgumentException(__('care-plan.referral_complete_emz_required'));
         }
 
-        $this->assertCompletionResourceOwned($referralUuid, $resourceUuid, $resourceType);
+        $person = Repository::serviceRequest()->assertCompletionResourceOwned($referralUuid, $resourceUuid, $resourceType);
 
         $payload = ServiceRequestForm::buildCompleteContent($resourceUuid, $resourceType, $payload);
 
         $model = Repository::serviceRequest()->findByUuid($referralUuid);
-        if ($model !== null && $model->detailsSyncedAt === null) {
-            $person = Repository::serviceRequest()->person($model->personId);
-            $detail = EHealth::serviceRequest()->getById($person->uuid, $referralUuid)->validate();
+        if ($model !== null && Repository::serviceRequest()->hasPendingSubmission($model)) {
+            throw ValidationException::withMessages(['submission' => __('care-plan.submission_pending')]);
+        }
+        if ($model === null || $model->detailsSyncedAt === null) {
+            $detail = EHealth::serviceRequest()->getById($person->uuid, $referralUuid, preserveApiKeys: true)->validate();
             $detail = (new ServiceRequestMapper())->normalize($detail[0] ?? $detail);
             if (($detail['id'] ?? null) !== $referralUuid) {
                 throw new InvalidArgumentException(__('care-plan.referral_full_details_required'));
             }
-            $localStatus = $model->status;
-            $model = Repository::serviceRequest()->importResource($detail, $model->personId, $model->employeeId, $model->divisionId);
+            $localStatus = $model?->status ?? $detail['status'];
+            $model = Repository::serviceRequest()->importResource($detail, $person->id, $model?->employeeId, $model?->divisionId);
             // Full detail owns the clinical status; omitted execution metadata does not undo an acknowledged local use.
             if ($detail['status'] === 'active' && !isset($detail['programProcessingStatus'])) {
                 Repository::serviceRequest()->saveStatus($model, $localStatus);
@@ -1104,6 +1109,33 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         }
 
         return $response;
+    }
+
+    public function checkCompletion(ServiceRequestRequest $record, string $requiredScope = 'service_request:complete'): array
+    {
+        $link = Repository::serviceRequest()->latestCompletion($record, $requiredScope);
+        if ($link === null) {
+            return ['submissionPending' => false, 'status' => $record->status];
+        }
+        if ($link->status === JobStatus::PENDING->value) {
+            if (!$link->href) {
+                return ['submissionPending' => true];
+            }
+            $job = EHealth::job()->getDetailsByHref($link->href)->validate();
+            if (in_array(strtolower($job['status']), ['pending', 'processing', 'accepted', 'queued'], true)) {
+                return ['submissionPending' => true];
+            }
+            RemoteEHealthLinksProcessing::finishSubmission($link, $job, Auth::user(), legalEntity(), Session::get(config('ehealth.api.oauth.bearer_token')));
+            $link->refresh()->load('job');
+        }
+        if ($link->status === JobStatus::FAILED->value) {
+            $job = $link->job->response_data ?? [];
+            $job['error'] ??= $link->error ?? ['message' => __('referrals.messages.operation_failed')];
+
+            throw EHealth::job()->jobError($job);
+        }
+
+        return ['submissionPending' => false, 'status' => $record->fresh()->status];
     }
 
     /**
@@ -1137,11 +1169,6 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     private function buildTakeIntoWorkPayload(Employee $employee, mixed $programId): array
     {
         return ServiceRequestForm::buildUseContent(Repository::serviceRequest()->executorContext($employee), $programId);
-    }
-
-    private function assertCompletionResourceOwned(string $referralUuid, string $resourceUuid, string $resourceType): void
-    {
-        Repository::serviceRequest()->assertCompletionResourceOwned($referralUuid, $resourceUuid, $resourceType);
     }
 
     private function signedServiceRequestRecord(string $patientUuid, string $referralUuid): ?ServiceRequestRequest

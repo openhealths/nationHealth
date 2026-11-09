@@ -32,4 +32,9 @@ class ServiceRequestRequestPolicy
 
         return Response::allow();
     }
+
+    public function complete(User $user): Response
+    {
+        return $user->can('service_request:complete') ? Response::allow() : Response::denyWithStatus(404);
+    }
 }
