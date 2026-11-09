@@ -216,8 +216,15 @@ class ServiceCatalog extends Component
             return false;
         }
 
-        return mb_stripos((string) ($item['code'] ?? ''), $searchTerm) !== false
-            || mb_stripos((string) ($item['name'] ?? ''), $searchTerm) !== false;
+        $terms = preg_split('/[\s;,]+/u', $searchTerm, flags: PREG_SPLIT_NO_EMPTY) ?: [$searchTerm];
+        foreach ($terms as $term) {
+            if (mb_stripos((string) ($item['code'] ?? ''), $term) === false
+                && mb_stripos((string) ($item['name'] ?? ''), $term) === false) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function filterItemByRequestAllowed(array $item): ?array

@@ -45,27 +45,80 @@
                 <div class="form-row-2">
                     <div
                         class="form-group group"
+                        wire:key="encounter-electronic-referral-selector"
                         x-data="{
                             showReferrals: false,
-                            referralNumber: @js($form->encounter['referralNumber'] ?? ''),
+                            referralNumber: $wire.entangle('form.encounter.referralNumber'),
                             referrals: $wire.entangle('availableReferrals'),
-                            get filteredReferrals() {
-                                const value = this.referralNumber.replaceAll('-', '').toUpperCase();
+                            preparing: false,
+                            pending: false,
+                            timer: null,
+                            selectedNumber: '',
 
-                                if (! value) {
-                                    return this.referrals;
-                                }
+                            get filteredReferrals() {
+                                const value = (this.referralNumber || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
 
                                 return this.referrals.filter(referral =>
-                                    referral.requisition.replaceAll('-', '').toUpperCase().includes(value)
+                                    !value || referral.requisition.replace(/[^A-Z0-9]/gi, '').toUpperCase().includes(value)
                                 );
                             },
-                            selectReferral(referral) {
-                                this.referralNumber = referral.requisition;
-                                this.showReferrals = false;
 
-                                // takeIntoWork / qualify run here — not during KEP signing
-                                $wire.selectElectronicReferral(referral.id);
+                            updateNumber(value, pasted = false) {
+                                const clean = value.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+                                this.referralNumber = clean.match(/.{1,4}/g)?.join('-') || '';
+                                this.selectedNumber = '';
+                                $wire.$set('selectedReferralUuid', null, false);
+                                $wire.$set('preparedElectronicReferralUuid', null, false);
+                                this.showReferrals = true;
+
+                                if (pasted || clean.length === 16) {
+                                    return this.resolveNumber();
+                                }
+                            },
+
+                            async resolveNumber() {
+                                if (this.preparing || this.pending || !this.referralNumber || this.selectedNumber === this.referralNumber) return;
+                                this.preparing = true;
+
+                                try {
+                                    this.applySelectionResult(await $wire.selectElectronicReferralByNumber(this.referralNumber));
+                                } finally {
+                                    this.preparing = false;
+                                }
+                            },
+
+                            async selectReferral(referral) {
+                                if (this.preparing || this.pending) return;
+                                this.referralNumber = referral.requisition;
+                                this.preparing = true;
+
+                                try {
+                                    this.applySelectionResult(await $wire.selectElectronicReferral(referral.id));
+                                } finally {
+                                    this.preparing = false;
+                                }
+                            },
+
+                            applySelectionResult(result) {
+                                this.pending = result === 'pending';
+                                this.selectedNumber = result === true ? this.referralNumber : '';
+                                this.showReferrals = result === false;
+
+                                if (this.pending) {
+                                    this.timer = setTimeout(() => this.checkPreparation(), 3000);
+                                }
+                            },
+
+                            async checkPreparation() {
+                                try {
+                                    this.applySelectionResult(await $wire.checkElectronicReferralPreparation());
+                                } catch (error) {
+                                    this.applySelectionResult(false);
+                                }
+                            },
+
+                            destroy() {
+                                clearTimeout(this.timer);
                             }
                         }"
                         x-init="$wire.loadAvailableReferrals()"
@@ -79,15 +132,12 @@
                                 class="input !pr-7 peer @error('form.encounter.referralNumber') input-error @enderror uppercase"
                                 placeholder=" "
                                 autocomplete="off"
-                                x-mask="****-****-****-****"
                                 x-on:focus="showReferrals = true"
-                                x-on:input="
-                                    referralNumber = $el.value.toUpperCase();
-                                    $wire.$set('form.encounter.referralNumber', referralNumber, false);
-                                    $wire.$set('selectedReferralUuid', null, false);
-                                    $wire.$set('preparedElectronicReferralUuid', null, false);
-                                    showReferrals = true;
-                                "
+                                x-bind:disabled="preparing || pending"
+                                x-on:input="updateNumber($el.value)"
+                                x-on:paste.prevent="updateNumber($event.clipboardData.getData('text'), true)"
+                                x-on:keydown.enter.prevent="resolveNumber()"
+                                x-on:keydown.escape="showReferrals = false"
                             />
 
                             <label for="requisitionNumber" class="label">
@@ -97,52 +147,62 @@
                             <div class="absolute inset-y-0 end-0 flex items-center">
                                 <button
                                     type="button"
-                                    @click="
-                                        referralNumber = '';
-                                        $wire.$set('form.encounter.referralNumber', '', false);
-                                        $wire.$set('selectedReferralUuid', null, false);
-                                        $wire.$set('preparedElectronicReferralUuid', null, false);
-                                        showReferrals = true;
-                                    "
+                                    @click="updateNumber('')"
+                                    x-bind:disabled="preparing || pending"
                                     class="text-gray-400 hover:text-gray-600"
                                 >
                                     @icon('close', 'w-4 h-4')
                                 </button>
                             </div>
 
-                            @if ($referralsLoaded)
-                                <div
-                                    x-show="showReferrals"
-                                    x-cloak
-                                    class="absolute top-full left-0 z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
-                                >
-                                    <template x-for="referral in filteredReferrals" :key="referral.id">
-                                        <button
-                                            type="button"
-                                            @click="selectReferral(referral)"
-                                            class="w-full rounded-md px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700"
-                                        >
-                                            <div
-                                                class="font-medium text-gray-900 dark:text-white"
-                                                x-text="referral.requisition"
-                                            ></div>
-
-                                            <div
-                                                class="text-sm text-gray-500 dark:text-gray-400"
-                                                x-text="referral.category"
-                                            ></div>
-                                        </button>
-                                    </template>
-
-                                    <div
-                                        x-show="filteredReferrals.length === 0"
-                                        class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400"
+                            <div
+                                x-show="showReferrals && !preparing && !pending"
+                                x-cloak
+                                class="absolute top-full left-0 z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                            >
+                                <template x-for="referral in filteredReferrals" :key="referral.id">
+                                    <button
+                                        type="button"
+                                        @click="selectReferral(referral)"
+                                        class="w-full rounded-md px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700"
                                     >
-                                        {{ __('encounters.messages.referral_not_found') }}
-                                    </div>
+                                        <div
+                                            class="font-medium text-gray-900 dark:text-white"
+                                            x-text="referral.requisition"
+                                        ></div>
+
+                                        <div
+                                            class="text-sm text-gray-500 dark:text-gray-400"
+                                            x-text="[referral.serviceName, referral.category, referral.priority, referral.status].filter(Boolean).join(' · ')"
+                                        ></div>
+
+                                        <div class="text-sm text-gray-500 dark:text-gray-400" x-text="[referral.programName, referral.period].filter(Boolean).join(' · ')"></div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400" x-text="referral.identity || ''"></div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400" x-text="'UUID: ' + referral.id"></div>
+                                    </button>
+                                </template>
+
+                                <div
+                                    x-show="filteredReferrals.length === 0"
+                                    class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400"
+                                >
+                                    {{ __('encounters.messages.referral_not_found') }}
                                 </div>
-                            @endif
+                            </div>
                         </div>
+
+                        <button type="button" class="button-primary mt-2" @click="resolveNumber()" x-bind:disabled="preparing || pending" x-show="!selectedNumber" x-cloak>
+                            {{ __('forms.search') }}
+                        </button>
+                        <p class="text-sm text-gray-500 dark:text-gray-400" x-show="preparing || pending" x-cloak>
+                            {{ __('encounters.referral_loading') }}
+                        </p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400" x-show="selectedNumber" x-cloak>
+                            {{ __('encounters.referral_selected') }}
+                        </p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400" x-show="!selectedNumber && !preparing && !pending" x-cloak>
+                            {{ __('encounters.referral_number_hint') }}
+                        </p>
 
                         @error('form.encounter.referralNumber')
                             <p class="text-error">{{ $message }}</p>

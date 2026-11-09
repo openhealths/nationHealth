@@ -6,6 +6,8 @@ namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\Api\ServiceRequest as ServiceRequestExecutorApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\ServiceRequestErrorTranslator;
+use App\Contracts\ApiErrorTranslator;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -16,6 +18,11 @@ use Illuminate\Validation\ValidationException;
 
 class ServiceRequest extends PatientApiBase
 {
+    protected function errorTranslator(): ApiErrorTranslator
+    {
+        return new ServiceRequestErrorTranslator();
+    }
+
     /**
      * Create a signed Service Request in eHealth (PKCS#7).
      *

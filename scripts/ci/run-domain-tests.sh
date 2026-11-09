@@ -26,6 +26,7 @@ DOMAIN_PATHS=(
   tests/Unit/Livewire/CarePlanLockedStateTest.php
   tests/Unit/CarePlan
   tests/Unit/Exceptions/EHealthValidationExceptionCarePlanMessageTest.php
+  tests/Unit/Exceptions/ClinicalErrorTranslationsTest.php
   tests/Unit/Helpers/ClinicalTimezoneConversionTest.php
   tests/Unit/Models/CarePlanActivityResolvedKindTest.php
   tests/Unit/Repositories/CarePlanActivityRepositoryTest.php

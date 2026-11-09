@@ -189,7 +189,7 @@ abstract class EHealthRequest extends PendingRequest
      */
     protected function newResponse($response): HigherOrderTapProxy|EHealthResponse
     {
-        return tap(new EHealthResponse($response, $this->validator, $this->mapper), function (EHealthResponse $laravelResponse) {
+        return tap(new EHealthResponse($response, $this->validator, $this->mapper, $this->errorTranslator()), function (EHealthResponse $laravelResponse) {
 
             if ($this->truncateExceptionsAt === null) {
                 return;

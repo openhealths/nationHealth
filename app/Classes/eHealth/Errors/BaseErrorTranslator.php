@@ -81,6 +81,7 @@ class BaseErrorTranslator implements ApiErrorTranslator
             'Request validation fails' => __('errors.ehealth.messages.validation_error'),
             'Validation error' => __('errors.ehealth.messages.request_parameters_validation_error'),
             'Employee not found' => __('errors.ehealth.messages.employee_not_found'),
+            'Invalid author employee type' => __('errors.ehealth.messages.invalid_author_employee_type'),
             "Employee doesn't match with user" => __('errors.ehealth.messages.employee_user_mismatch'),
             'Employee is not active' => __('errors.ehealth.messages.employee_not_active'),
             'Employee does not belong to legal entity from token' => __('errors.ehealth.messages.employee_of_another_legal_entity'),

@@ -85,9 +85,11 @@
                                         type="button"
                                         wire:click="cancelApproval('{{ $approval['uuid'] }}')"
                                         wire:confirm="{{ __('care-plan.confirm_cancel_approval') }}"
-                                        class="p-1 text-red-500 hover:text-red-700"
+                                        wire:loading.attr="disabled"
+                                        wire:target="cancelApproval"
+                                        class="button-secondary px-3 py-1 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
                                     >
-                                        @icon('close-outline', 'w-4 h-4')
+                                        {{ __('care-plan.revoke_approval') }}
                                     </button>
                                 @elseif ($approvalStatus?->isAwaitingPatient())
                                     <div class="flex items-center justify-end gap-2">
