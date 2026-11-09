@@ -15,7 +15,11 @@
         </x-header-navigation>
     @endif
 
-    <div @class(['flow-root mt-8 pl-3.5', 'shift-content' => !$selectionMode,])>
+    <p wire:dirty wire:target="filterCodeOrName" role="status" class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+        {{ __('dictionaries.service_catalog.search_pending') }}
+    </p>
+
+    <div wire:dirty.remove wire:target="filterCodeOrName" @class(['flow-root mt-8 pl-3.5', 'shift-content' => !$selectionMode,])>
         <div @class(['max-w-screen-xl' => !$selectionMode, 'w-full' => $selectionMode])>
             <div class="index-table-wrapper">
                 <table class="index-table">
@@ -440,7 +444,7 @@
         </div>
     </div>
 
-    <div class="pagination">{{ $this->services->links() }}</div>
+    <div wire:dirty.remove wire:target="filterCodeOrName" class="pagination">{{ $this->services->links() }}</div>
 
     <x-forms.loading />
     <livewire:components.x-message :key="time()" />

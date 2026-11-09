@@ -6,7 +6,8 @@ namespace Tests\Browser;
 
 use App\Classes\eHealth\Api\Patient\ServiceRequest as PatientServiceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
-use App\Livewire\Referral\ReferralIndex;
+use Tests\Support\ReferralIndexFixture;
+use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Livewire\Drawer\Utils;
 use Livewire\Features\SupportTesting\Testable;
@@ -20,6 +21,7 @@ class ReferralIndexBrowserFixture extends ReferralTest
     public function testExportBrowserFixture(): void
     {
         $this->actingAs($this->user);
+        $this->partialMock(ServiceRequestRequestRepository::class)->shouldReceive('completionStates')->andReturn([]);
         $rows = [];
         foreach ([
             'working' => ['in_progress', ''],
@@ -52,7 +54,7 @@ class ReferralIndexBrowserFixture extends ReferralTest
             ->with(['requisition' => 'ABCD-1234-EFGH-5678'])->andReturn($response);
         $this->instance(PatientServiceRequestApi::class, $api);
 
-        $component = Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity]);
+        $component = Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity]);
         $fixtures = ['initial' => $this->capture($component)];
         $component->set('requisition', 'ABCD-1234-EFGH-5678')->call('search')->assertHasNoErrors();
         $fixtures['search'] = $this->capture($component);
@@ -67,7 +69,7 @@ class ReferralIndexBrowserFixture extends ReferralTest
         $fixtures['process'] = $this->capture($component);
 
         // Also exercise the short table where a dropdown cannot fit inside its scroll container.
-        $component->set('searchResults', [$rows[9]]);
+        $component->call('seedResults', [$rows[9]]);
         $fixtures['single'] = $this->capture($component);
         $this->assertNotFalse(file_put_contents(storage_path('referral-browser-fixtures.json'), json_encode($fixtures, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)));
     }

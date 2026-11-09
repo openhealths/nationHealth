@@ -7,6 +7,7 @@ namespace App\Repositories\MedicalEvents;
 use Throwable;
 use Carbon\Carbon;
 use App\Models\User;
+use App\Models\CarePlan;
 use App\Enums\JobStatus;
 use App\Models\EhealthJob;
 use App\Models\LegalEntity;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\Log;
 use App\Enums\Person\ApprovalStatus;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Relations\AuthenticationMethod;
@@ -165,9 +167,11 @@ class ApprovalRepository extends BaseRepository
         });
     }
 
-    public function localForCarePlan(\App\Models\CarePlan $plan): array
+    public function localForCarePlan(CarePlan $plan): array
     {
-        return $plan->approvals()->withAllRelations()->with('ehealthLinks.job')->latest('id')->get()
+        return $plan->approvals()
+            ->where(static fn (Builder $query): Builder => $query->whereNull('expires_at')->orWhereFuture('expires_at'))
+            ->withAllRelations()->with('ehealthLinks.job')->latest('id')->get()
             ->map(function (Approval $approval): array {
                 $row = $approval->toArray();
                 $link = $approval->ehealthLinks->sortByDesc('id')->first();

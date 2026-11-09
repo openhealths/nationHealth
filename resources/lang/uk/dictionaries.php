@@ -83,6 +83,7 @@ return [
     ],
 
     'service_catalog' => [
+        'search_pending' => 'Натисніть «Шукати» або Enter, щоб оновити список послуг за новим запитом.',
         'title' => 'Каталог послуг',
         'search_services' => 'Пошук послуг',
         'search_placeholder' => 'Код / назва',

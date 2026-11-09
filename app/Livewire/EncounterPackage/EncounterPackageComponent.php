@@ -570,11 +570,18 @@ class EncounterPackageComponent extends Component
     }
 
     /**
-     * Load available patient referrals from the local database.
+     * Load patient-scoped referral choices with human numbers and catalog permissions.
+     * The repository owns this mapping; the shared component only exposes the resulting UI state.
      */
     public function loadAvailableReferrals(): void
     {
         if ($this->referralsLoaded) {
+            return;
+        }
+
+        if (Auth::user()->cannot('search', ServiceRequestRequest::class)) {
+            Session::flash('error', __('service-requests.policy.search'));
+
             return;
         }
 
@@ -584,35 +591,15 @@ class EncounterPackageComponent extends Component
             return;
         }
 
-        $services = dictionary()->services()->flattened();
         $procedureCategories = array_keys($this->dictionaries['eHealth/procedure_categories'] ?? []);
         $diagnosticReportCategories = array_keys($this->dictionaries['eHealth/diagnostic_report_categories'] ?? []);
 
-        // category is a CodeableConcept relation (category_id), not a string column
         $this->availableReferrals = MedicalEventsRepository::serviceRequest()
-            ->getByPersonIdAndStatus(
+            ->encounterOptions(
                 $this->personId,
-                [ServiceRequestStatus::ACTIVE->value, ServiceRequestStatus::IN_PROGRESS->value],
-                ['uuid', 'request_number', 'service_id', 'category_id']
-            )
-            ->loadMissing('category')
-            ->map(static function (ServiceRequestRequest $referral) use ($services, $procedureCategories, $diagnosticReportCategories): array {
-                $service = $services->firstWhere('id', $referral->serviceId);
-                $category = strtolower((string) ($referral->category?->text ?? ''));
-
-                return [
-                    'id' => $referral->uuid,
-                    'requisition' => $referral->requestNumber ?: $referral->uuid,
-                    'category' => $category !== ''
-                        ? __('care-plan.referral_category.'.$category)
-                        : __('encounters.electronic_referral'),
-                    'service' => $service,
-                    'isProcedureAllowed' => $service !== null && in_array($service['category'] ?? null, $procedureCategories, true),
-                    'isDiagnosticReportAllowed' => $service !== null && in_array($service['category'] ?? null, $diagnosticReportCategories, true),
-                ];
-            })
-            ->values()
-            ->toArray();
+                $procedureCategories,
+                $diagnosticReportCategories
+            );
 
         $this->referralsLoaded = true;
     }

@@ -15,6 +15,7 @@ use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 class Job extends Request
 {
@@ -48,9 +49,13 @@ class Job extends Request
      */
     public function getDetailsByHref(string $href, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateDetails(...));
+        $path = parse_url($href, PHP_URL_PATH);
+        if (!is_string($path) || preg_match('#^/?(?:api/)?jobs/([A-Za-z0-9_-]+)/?$#', $path, $matches) !== 1) {
+            throw new InvalidArgumentException('Invalid eHealth job link.');
+        }
 
-        return $this->get($href, $query);
+        // Canonicalize the link and reuse getDetails(), which installs validateDetails() before sending the request.
+        return $this->getDetails($matches[1], $query);
     }
 
     /**

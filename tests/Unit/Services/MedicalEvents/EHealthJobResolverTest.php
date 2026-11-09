@@ -164,7 +164,7 @@ class EHealthJobResolverTest extends TestCase
 
         foreach ($statuses as $status) {
             $response = Mockery::mock(EHealthResponse::class);
-            $response->shouldReceive('getData')->andReturn($status);
+            $response->shouldReceive('validate')->andReturn($status);
 
             $jobApi->shouldReceive('getDetails')->once()->with('job-123')->andReturn($response);
         }

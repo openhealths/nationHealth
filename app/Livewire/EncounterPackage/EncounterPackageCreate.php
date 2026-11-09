@@ -13,42 +13,30 @@ use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Livewire\EncounterPackage\Concerns\ManagesIncomingReferralSelection;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\EncounterPackageBuilder;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use App\Traits\EnsuresEntityExists;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use Livewire\Attributes\Locked;
-use RuntimeException;
 use Throwable;
 
 class EncounterPackageCreate extends EncounterPackageComponent
 {
     use EnsuresEntityExists;
+    use ManagesIncomingReferralSelection;
 
     private EncounterPackageBuilder $packageBuilder;
 
     public ?int $prepersonId = null;
-
-    /**
-     * UUID of the electronic referral already taken into work at selection time.
-     * Keeps qualify/process off the KEP signing path.
-     */
-    public ?string $preparedElectronicReferralUuid = null;
-
-    #[Locked]
-    public ?string $confirmedElectronicReferralUuid = null;
 
     public function boot(): void
     {
@@ -73,49 +61,6 @@ class EncounterPackageCreate extends EncounterPackageComponent
         };
 
         $this->setDefaultDate();
-    }
-
-    /**
-     * Called when the doctor picks an electronic referral from the dropdown.
-     * Runs eHealth use/qualify here so signing the encounter stays on Cipher only.
-     */
-    public function selectElectronicReferral(string $referralUuid, ReferralRequestLifecycleService $lifecycle): void
-    {
-        $this->authorize('use', ServiceRequestRequest::class);
-        $this->preparedElectronicReferralUuid = null;
-        $this->confirmedElectronicReferralUuid = null;
-        $this->selectedReferralUuid = null;
-        $this->resetValidation('form.encounter.referralNumber');
-
-        $referralUuid = trim($referralUuid);
-        if ($referralUuid === '' || !Str::isUuid($referralUuid)) {
-            return;
-        }
-
-        $referral = collect($this->availableReferrals)->firstWhere('id', $referralUuid);
-        if ($referral === null) {
-            Session::flash('error', __('encounters.messages.referral_not_found'));
-
-            return;
-        }
-
-        $this->selectedReferralUuid = $referralUuid;
-        $this->form->encounter['referralType'] = 'electronic';
-        $this->form->encounter['referralNumber'] = (string) ($referral['requisition'] ?? $referralUuid);
-
-        try {
-            $this->ensureReferralTakenIntoWork($lifecycle, $referralUuid);
-            $this->preparedElectronicReferralUuid = $referralUuid;
-            $this->confirmedElectronicReferralUuid = $referralUuid;
-        } catch (Throwable $exception) {
-            $this->preparedElectronicReferralUuid = null;
-            $this->selectedReferralUuid = null;
-            $this->addError('form.encounter.referralNumber', $exception->getMessage());
-            Session::flash(
-                'error',
-                __('Не вдалося взяти направлення в роботу: ').$exception->getMessage()
-            );
-        }
     }
 
     /**
@@ -468,54 +413,6 @@ class EncounterPackageCreate extends EncounterPackageComponent
         $this->form->encounter['periodDate'] = $now->format(config('app.date_format'));
         $this->form->encounter['periodStart'] = $now->subMinutes(15)->max($now->startOfDay())->format('H:i');
         $this->form->encounter['periodEnd'] = $now->format('H:i');
-    }
-
-    /**
-     * Take an active electronic referral into work (eHealth use / qualify).
-     * The lifecycle verifies current eHealth processing status and executor.
-     */
-    private function ensureReferralTakenIntoWork(ReferralRequestLifecycleService $service, string $referralUuid): void
-    {
-        $local = Repository::serviceRequest()->findByUuid($referralUuid);
-        if ($local === null || (int) $local->personId !== $this->personId) {
-            throw new RuntimeException(__('Направлення не належить поточному пацієнту.'));
-        }
-
-        $employee = Auth::user()?->employees()
-            ->where('legal_entity_id', legalEntity()->id)
-            ->first();
-
-        if ($employee === null) {
-            throw new RuntimeException(__('Не знайдено співробітника для взяття направлення в роботу.'));
-        }
-
-        $response = $service->takeIntoWork(
-            $referralUuid,
-            $employee,
-            $this->patientUuid ?: null,
-            array_filter([
-                'program_id' => $local?->programId,
-            ])
-        );
-        if ($response['submissionPending'] ?? false) {
-            throw ValidationException::withMessages(['referralNumber' => __('care-plan.submission_pending')]);
-        }
-    }
-
-    protected function resolveAllReferrals(array &$validated, bool $requirePreparation = false): void
-    {
-        parent::resolveAllReferrals($validated);
-
-        if (
-            $requirePreparation
-            && ($validated['encounter']['referralType'] ?? '') === 'electronic'
-            && !empty($validated['encounter']['referralNumber'])
-            && $this->confirmedElectronicReferralUuid !== $validated['encounter']['referralNumber']
-        ) {
-            throw ValidationException::withMessages([
-                'form.encounter.referralNumber' => __('Оберіть направлення зі списку та підтвердьте його взяття в роботу.'),
-            ]);
-        }
     }
 
     /**

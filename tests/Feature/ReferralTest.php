@@ -28,6 +28,11 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\Concerns\GrantsMedicalEventAbilities;
 use Tests\TestCase;
+use Tests\Support\ReferralIndexFixture;
+use App\Policies\EncounterPolicy;
+use App\Services\Dictionary\Dictionaries\BasicDictionary;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Auth\Access\Response;
 
 class ReferralTest extends TestCase
 {
@@ -87,6 +92,12 @@ class ReferralTest extends TestCase
         $this->user->employees()->attach($this->employee->id);
 
         $this->grantMedicalEventAbilities($this->user);
+        Cache::forever(BasicDictionary::KEY, [
+            ['name' => 'eHealth/encounter_classes', 'values' => [['code' => 'AMB', 'description' => 'Ambulatory']]],
+            ['name' => 'eHealth/encounter_types', 'values' => [['code' => 'AMB', 'description' => 'Ambulatory']]],
+        ]);
+        Cache::forever(BasicDictionary::KEY.':fresh', true);
+        $this->partialMock(EncounterPolicy::class)->shouldReceive('view')->andReturn(Response::allow());
     }
 
     public function test_it_can_find_referral_by_requisition(): void
@@ -116,63 +127,31 @@ class ReferralTest extends TestCase
 
     public function test_it_can_complete_referral(): void
     {
-        $uuid = '00000000-0000-4000-8000-000000000123';
-        $encounterUuid = '00000000-0000-4000-8000-000000000456';
-
-        $mockResponse = Mockery::mock(EHealthResponse::class);
-        $mockResponse->shouldReceive('getStatusCode')->andReturn(200);
-        $mockResponse->shouldReceive('getData')->andReturn([
-            'id' => $uuid,
-            'status' => 'completed',
+        $this->actingAs($this->user);
+        [$referral, $person] = $this->createInProgressReferral();
+        $referral = $this->canonicalizeReferral($referral, $person);
+        $uuid = $referral->uuid;
+        $encounterUuid = (string) Str::uuid();
+        Encounter::create([
+            'uuid' => $encounterUuid, 'person_id' => $person->id, 'status' => 'finished',
+            'episode_id' => Identifier::create(['value' => (string) Str::uuid()])->id,
+            'incoming_referral_id' => Identifier::create(['value' => $uuid])->id,
+            'class_id' => Coding::create(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id,
+            'type_id' => CodeableConcept::create()->id,
         ]);
-
-        $payload = [
-            'status' => 'completed',
-            'injected' => 'must-not-reach-ehealth',
-        ];
-
-        $person = \App\Models\Person\Person::create([
-            'uuid' => (string) \Illuminate\Support\Str::uuid(),
-            'first_name' => 'Complete',
-            'last_name' => 'Patient',
-            'birth_date' => '1990-01-01',
-            'gender' => 'MALE',
-            'patient_signed' => true,
-            'process_disclosure_data_consent' => true,
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('getStatusCode')->andReturn(200);
+        $response->shouldReceive('validate')->andReturn(['id' => $uuid, 'status' => 'completed']);
+        $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
+        $api->shouldReceive('complete')->once()->with($uuid, Mockery::on(static function (array $sent) use ($encounterUuid): bool {
+            return !array_key_exists('status', $sent) && !array_key_exists('injected', $sent)
+                && data_get($sent, 'completed_with.identifier.value') === $encounterUuid;
+        }))->andReturn($response);
+        $this->instance(ServiceRequestApi::class, $api);
+        $result = app(ReferralRequestLifecycleService::class)->completeReferral($uuid, $encounterUuid, 'encounter', [
+            'status' => 'completed', 'injected' => 'must-not-reach-ehealth',
         ]);
-
-        $codingId = \App\Models\MedicalEvents\Sql\Coding::create([
-            'code' => 'AMB',
-            'system' => 'eHealth/encounter_classes',
-        ])->id;
-        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
-        $episodeId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => (string) \Illuminate\Support\Str::uuid()])->id;
-
-        \App\Models\MedicalEvents\Sql\Encounter::create([
-            'uuid' => $encounterUuid,
-            'person_id' => $person->id,
-            'status' => 'finished',
-            'episode_id' => $episodeId,
-            'class_id' => $codingId,
-            'type_id' => $ccId,
-            'ehealth_inserted_at' => now(),
-        ]);
-
-        $mockApi = Mockery::mock(ServiceRequestApi::class)->makePartial();
-        $mockApi->shouldReceive('complete')
-            ->once()
-            ->with($uuid, Mockery::on(static function (array $sent) use ($encounterUuid): bool {
-                return !array_key_exists('status', $sent)
-                    && !array_key_exists('injected', $sent)
-                    && data_get($sent, 'completed_with.identifier.value') === $encounterUuid;
-            }))
-            ->andReturn($mockResponse);
-        $this->app->instance(ServiceRequestApi::class, $mockApi);
-
-        $service = app(ReferralRequestLifecycleService::class);
-        $result = $service->completeReferral($uuid, $encounterUuid, 'encounter', $payload);
-
-        $this->assertEquals('completed', $result['status']);
+        $this->assertSame('completed', $result['status']);
     }
 
     public function test_referral_index_component_renders(): void
@@ -190,13 +169,14 @@ class ReferralTest extends TestCase
         $this->actingAs($this->user);
         $referrals = [['id' => (string) Str::uuid(), 'status' => 'active']];
         $response = Mockery::mock(EHealthResponse::class);
-        $response->shouldReceive('getData')->once()->andReturn(['data' => $referrals]);
+        $response->shouldReceive('validate')->times(4)->andReturn($referrals);
+        $response->shouldReceive('getPaging')->times(4)->andReturn(['total_pages' => 1]);
         $api = Mockery::mock(PatientServiceRequestApi::class);
-        $api->shouldReceive('searchForServiceRequestsByParams')->once()
-            ->with(['requisition' => 'ABCD-1234-EFGH-5678'])->andReturn($response);
+        $api->shouldReceive('searchForServiceRequestsByParams')->times(4)
+            ->with(Mockery::on(static fn (array $query): bool => $query['requisition'] === 'ABCD-1234-EFGH-5678' && $query['page'] === 1 && in_array($query['status'], ['active', 'completed', 'entered_in_error', 'recalled'], true)))->andReturn($response);
         $this->instance(PatientServiceRequestApi::class, $api);
 
-        Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
+        Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
             ->assertSet('hasSearched', false)
             ->assertSet('searchResults', [])
             ->call('search')
@@ -216,8 +196,8 @@ class ReferralTest extends TestCase
         $api->shouldReceive('searchForServiceRequestsByParams')->once()->andThrow(new RuntimeException('Search failed'));
         $this->instance(PatientServiceRequestApi::class, $api);
 
-        Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
-            ->set('searchResults', [['id' => (string) Str::uuid(), 'status' => 'active']])
+        Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
+            ->call('seedResults', [['id' => (string) Str::uuid(), 'status' => 'active']])
             ->set('requisition', 'ABCD-1234-EFGH-5678')
             ->call('search')
             ->assertSet('searchResults', [])
@@ -232,8 +212,8 @@ class ReferralTest extends TestCase
         $lifecycle->shouldNotReceive('cancelUsage');
         $this->instance(ReferralRequestLifecycleService::class, $lifecycle);
 
-        Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
-            ->set('searchResults', [$this->searchRow($referral, $person)])
+        Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
+            ->call('seedResults', [$this->searchRow($referral, $person)])
             ->call('openCancelModal', $referral->uuid)
             ->set('cancelExplanatoryLetter', '   ')
             ->call('confirmCancelUsage')
@@ -254,9 +234,9 @@ class ReferralTest extends TestCase
         $api->shouldReceive('cancelUsage')->once()->with($referral->uuid, $person->uuid, [])
             ->andReturn(new EHealthResponse(new \GuzzleHttp\Psr7\Response(202, [], json_encode(['data' => ['job_id' => 'release-job']], JSON_THROW_ON_ERROR)), \App\Classes\eHealth\Api\Job::validateSubmissionResponse(...)));
         $this->instance(ServiceRequestApi::class, $api);
-        Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
+        Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
             ->set('hasSearched', true)
-            ->set('searchResults', [$this->searchRow($referral, $person)])
+            ->call('seedResults', [$this->searchRow($referral, $person)])
             ->call('openCancelModal', $referral->uuid)
             ->set('cancelExplanatoryLetter', 'Synthetic release explanation')
             ->call('confirmCancelUsage')
@@ -277,8 +257,8 @@ class ReferralTest extends TestCase
         $api->shouldReceive('cancelUsage')->once()->andThrow(new RuntimeException('API rejected cancellation'));
         $this->instance(ServiceRequestApi::class, $api);
 
-        Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
-            ->set('searchResults', [$this->searchRow($referral, $person)])
+        Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
+            ->call('seedResults', [$this->searchRow($referral, $person)])
             ->call('openCancelModal', $referral->uuid)
             ->set('cancelExplanatoryLetter', 'Причина відміни використання')
             ->call('confirmCancelUsage')
@@ -300,8 +280,8 @@ class ReferralTest extends TestCase
         }
         $this->actingAs($this->user);
 
-        $component = Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
-            ->set('searchResults', [[
+        $component = Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
+            ->call('seedResults', [[
                 'id' => (string) Str::uuid(),
                 'status' => $status,
                 'program_processing_status' => $programStatus,
@@ -354,9 +334,9 @@ class ReferralTest extends TestCase
 
         foreach (['draft', 'completed', 'entered-in-error', 'revoked'] as $status) {
             $referralUuid = (string) Str::uuid();
-            $component = Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
+            $component = Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
                 ->set('hasSearched', true)
-                ->set('searchResults', [[
+                ->call('seedResults', [[
                     'id' => $referralUuid,
                     'status' => $status,
                     'program_processing_status' => 'in_progress',
@@ -407,14 +387,14 @@ class ReferralTest extends TestCase
         $detailResponse = Mockery::mock(EHealthResponse::class);
         $detailResponse->shouldReceive('validate')->once()->andReturn($detail);
         $patientApi = Mockery::mock(PatientServiceRequestApi::class)->makePartial();
-        $patientApi->shouldReceive('getById')->once()->with($person->uuid, $referral->uuid)->andReturn($detailResponse);
+        $patientApi->shouldReceive('getById')->once()->with($person->uuid, $referral->uuid, [], true)->andReturn($detailResponse);
         $this->instance(PatientServiceRequestApi::class, $patientApi);
         $api = Mockery::mock(ServiceRequestApi::class)->makePartial();
         $api->shouldReceive('complete')->once()->andThrow(new RuntimeException('API rejected completion'));
         $this->instance(ServiceRequestApi::class, $api);
 
-        Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
-            ->set('searchResults', [$this->searchRow($referral, $person)])
+        Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
+            ->call('seedResults', [$this->searchRow($referral, $person)])
             ->call('openCompleteModal', $referral->uuid)
             ->assertSet('availableEmzResources.0.uuid', $encounter->uuid)
             ->call('confirmComplete')
@@ -440,10 +420,10 @@ class ReferralTest extends TestCase
             'password' => 'unused',
         ]);
         $this->actingAs($unauthorizedUser);
-        Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
+        Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
             ->call('openCancelModal', (string) Str::uuid())->assertForbidden();
-        Livewire::test(ReferralIndex::class, ['legalEntity' => $this->legalEntity])
-            ->call('openCompleteModal', (string) Str::uuid())->assertForbidden();
+        Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity])
+            ->call('openCompleteModal', (string) Str::uuid())->assertSee(__('referrals.messages.complete_forbidden'));
     }
 
     private function createInProgressReferral(): array

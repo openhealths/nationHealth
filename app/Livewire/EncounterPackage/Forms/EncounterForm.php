@@ -28,6 +28,8 @@ class EncounterForm extends BaseForm
         'reasons' => [],
         'actions' => [],
         'referralType' => '',
+        // Alpine binds this field before any referral has been selected or searched.
+        'referralNumber' => '',
         'hospitalization' => [],
         'actionReferences' => [],
         'participant' => [],

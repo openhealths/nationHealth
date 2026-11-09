@@ -42,7 +42,7 @@ class PatientReferralRegistryUatTest extends TestCase
     {
         ['person' => $person, 'legalEntity' => $legalEntity] = $this->compositionFixture();
         $encounterId = 987654;
-        $this->mock(ServiceRequestRequestRepository::class)->shouldReceive('searchByPersonId')->once()->andReturn([
+        $this->mock(ServiceRequestRequestRepository::class)->shouldReceive('completionStates')->andReturn([])->getMock()->shouldReceive('searchByPersonId')->once()->andReturn([
             ['uuid' => (string) Str::uuid(), 'id' => 123, 'kind' => 'service_request', 'encounterId' => $encounterId, 'basisLabel' => 'Test encounter', 'canSign' => true],
         ]);
         $this->mock(DeviceRequestRequestRepository::class)->shouldReceive('searchByPersonId')->once()->andReturn([]);

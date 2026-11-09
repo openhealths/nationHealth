@@ -61,14 +61,15 @@ class EHealthJobResolver
             sleep($intervalSeconds);
 
             try {
-                $finalResponse = $jobApi->getDetails($jobId)->getData();
+                // Validate the job envelope before treating its status as a clinical outcome.
+                $finalResponse = $jobApi->getDetails($jobId)->validate();
             } catch (EHealthResponseException $exception) {
                 // Some domains return links as "/jobs/{id}" instead of "/api/jobs/{id}".
                 if ($exception->response->status() !== 404) {
                     throw $exception;
                 }
 
-                $finalResponse = $jobApi->getDetailsByHref($jobHref)->getData();
+                $finalResponse = $jobApi->getDetailsByHref($jobHref)->validate();
             }
 
             $attempts++;

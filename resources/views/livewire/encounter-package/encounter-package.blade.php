@@ -10,8 +10,8 @@
     $title = __('encounters.label') . ' - ' . $patientName;
     $isReadonly = $this instanceof EncounterPackageEdit && $this->isReadonly;
     $canCancelRecords = $this instanceof EncounterPackageEdit && $this->canBeCancelled;
-    $incomingReferral = null;
-    if ($isReadonly && ($form->encounter['referralType'] ?? '') === 'electronic' && filled($form->encounter['referralNumber'] ?? '')) {
+    $incomingReferral = $isReadonly ? $this->incomingReferral : null;
+    if ($incomingReferral === null && $isReadonly && ($form->encounter['referralType'] ?? '') === 'electronic' && filled($form->encounter['referralNumber'] ?? '')) {
         $incomingReferralNumber = $form->encounter['referralNumber'];
         $incomingReferralRecord = collect([
             ...$availableReferrals,
@@ -378,7 +378,7 @@
                                 {{-- A disabled fieldset disables every control inside it, the record cancellation
                                      checkboxes included, so a section holding records to pick is left to the
                                      readonly handling it carries of its own --}}
-                                <fieldset @disabled($isReadonly && !($canCancelRecords && ($item['holdsCancellableRecords'] ?? false)))>
+                                <fieldset @disabled($isReadonly && !($item['id'] === 'referral' && $incomingReferral !== null) && !($canCancelRecords && ($item['holdsCancellableRecords'] ?? false)))>
                                     @include($item['view'])
                                 </fieldset>
                             </div>
@@ -432,6 +432,9 @@
                                     $wire.showSignatureModal = true;
                                 "
                                 class="button-primary"
+                                @disabled(($pendingElectronicReferralUuid ?? null) !== null)
+                                wire:loading.attr="disabled"
+                                wire:target="selectElectronicReferral,selectElectronicReferralByNumber,checkElectronicReferralPreparation"
                             >
                                 {{ __('forms.complete_the_interaction_and_sign') }}
                             </button>
