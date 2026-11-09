@@ -465,6 +465,9 @@ return [
         'doctor.specialities.*.attestationName' => __('forms.issued_by'),
         'doctor.specialities.*.level' => __('forms.speciality_level'),
 
+        'doctor.qualifications.*.issuedDate' => __('forms.issued_date'),
+        'doctor.qualifications.*.validTo' => __('forms.valid_until'),
+
         // Position
         'position' => __('forms.position'),
         'employeeType' => __('forms.employee_type'),
