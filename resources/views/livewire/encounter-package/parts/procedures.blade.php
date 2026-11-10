@@ -455,6 +455,7 @@
                                 "
                                 class="button-primary"
                                 :disabled="! (
+                                    modalProcedure.status.trim() &&
                                     modalProcedure.categoryCode.trim() &&
                                     modalProcedure.codeValue.trim() &&
                                     (modalProcedure.primarySource !== true || modalProcedure.performerEmployeeId) &&

@@ -283,6 +283,8 @@ class ServiceCatalog extends Component
 
     public function selectService(string $serviceId): void
     {
+        $this->skipRender();
+
         if (!$this->selectionMode) {
             return;
         }

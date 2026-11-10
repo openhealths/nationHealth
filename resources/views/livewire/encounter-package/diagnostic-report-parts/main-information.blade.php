@@ -141,7 +141,10 @@
 
             {{-- When referral available --}}
             <template x-if="modalDiagnosticReport.isReferralAvailable">
-                <div class="form-group group">
+                <div
+                    class="form-group group"
+                    :class="{ '!z-30': modalDiagnosticReport.referralType === 'electronic' }"
+                >
                     <div class="form-row-2" x-cloak>
                         <div>
                             <label for="diagnosticReportReferralType" class="sr-only">
@@ -237,13 +240,14 @@
                                     get filteredReferrals() {
                                         const value = this.normalize(this.referralNumber);
 
-                                        if (! value) {
-                                            return this.referrals;
-                                        }
-
-                                        return this.referrals.filter(
-                                            referral => this.normalize(referral.requisition).includes(value)
-                                        );
+                                        return this.referrals
+                                            .filter(referral =>
+                                                ! value || this.normalize(referral.requisition).includes(value)
+                                            )
+                                            .sort((a, b) =>
+                                                Number(! b.isExhausted && b.isDiagnosticReportAllowed) -
+                                                Number(! a.isExhausted && a.isDiagnosticReportAllowed)
+                                            );
                                     },
 
                                     applyReferral(referral) {

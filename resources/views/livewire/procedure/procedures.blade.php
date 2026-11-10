@@ -40,7 +40,14 @@
     </x-slot>
 
     <div class="breadcrumb-form shift-content p-4">
-        <div class="mt-6 w-full" x-data="{ showAdditionalParams: $wire.entangle('showAdditionalParams') }">
+        <div
+            class="mt-6 w-full"
+            x-data="{
+                showAdditionalParams: $wire.entangle('showAdditionalParams'),
+                category: $wire.entangle('filterCategory'),
+                allProcedureServices: []
+            }"
+        >
             <div class="mb-4 flex items-center gap-1 font-semibold text-gray-900 dark:text-gray-100">
                 @icon('search-outline', 'w-4.5 h-4.5')
                 <p>{{ __('procedures.search') }}</p>
@@ -49,7 +56,8 @@
             <div class="form-row-3 mb-6">
                 <div class="form-group group">
                     <select
-                        wire:model.live="filterCategory"
+                        x-model="category"
+                        @change="$dispatch('procedure-category-changed')"
                         id="filterCategory"
                         name="filterCategory"
                         class="input-select peer w-full"
@@ -75,6 +83,9 @@
                     bindValue="id"
                     bindParam="name"
                     :label="__('procedures.code')"
+                    x-init="allProcedureServices = options"
+                    x-effect="options = category ? allProcedureServices.filter(service => service.category === category) : allProcedureServices"
+                    @procedure-category-changed.window="reset()"
                 />
             </div>
 

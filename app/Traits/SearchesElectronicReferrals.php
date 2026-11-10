@@ -99,7 +99,21 @@ trait SearchesElectronicReferrals
 
     protected function getSearchedElectronicReferral(string $uuid): ?array
     {
-        return $this->electronicReferralSearchResults[$uuid] ?? null;
+        if (!isset($this->electronicReferralSearchResults[$uuid])) {
+            return null;
+        }
+
+        $referral = EHealth::serviceRequest()
+            ->getById($this->patientUuid, $uuid, preserveApiKeys: true)
+            ->validate();
+
+        if (($referral['id'] ?? null) !== $uuid) {
+            throw new \InvalidArgumentException(
+                'Service Request details do not match the selected referral.'
+            );
+        }
+
+        return $referral;
     }
 
     /**

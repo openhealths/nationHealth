@@ -30,7 +30,10 @@
 
         {{-- When referral available --}}
         <template x-if="modalProcedure.isReferralAvailable">
-            <div class="form-group group">
+            <div
+                class="form-group group"
+                :class="{ '!z-30': modalProcedure.referralType === 'electronic' }"
+            >
                 <div class="form-row-2" x-cloak>
                     <div>
                         <label
@@ -130,13 +133,14 @@
                                 get filteredReferrals() {
                                     const value = this.normalize(this.referralNumber);
 
-                                    if (! value) {
-                                        return this.referrals;
-                                    }
-
-                                    return this.referrals.filter(
-                                        referral => this.normalize(referral.requisition).includes(value)
-                                    );
+                                    return this.referrals
+                                        .filter(referral =>
+                                            ! value || this.normalize(referral.requisition).includes(value)
+                                        )
+                                        .sort((a, b) =>
+                                            Number(! b.isExhausted && b.isProcedureAllowed) -
+                                            Number(! a.isExhausted && a.isProcedureAllowed)
+                                        );
                                 },
 
                                 applyReferral(referral) {
