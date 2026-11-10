@@ -193,7 +193,8 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
             $this->assertSame(__('Взаємодія #').$otherEpisode->id.' (21.10.2026)', $labels[$otherEpisode->uuid]);
             $this->assertSame(__('Взаємодія #').$invalidEpisode->id.' (-)', $labels[$invalidEpisode->uuid]);
             $this->assertArrayNotHasKey($otherPatient->uuid, $labels);
-            $this->assertLessThanOrEqual(4, $queryCount);
+            // Patient and merge lookups are bounded; resolving episode labels must not add queries per encounter.
+            $this->assertLessThanOrEqual(8, $queryCount);
         } finally {
             DB::disableQueryLog();
             Model::preventAccessingMissingAttributes($wasPreventingMissingAttributes);

@@ -15,7 +15,12 @@ use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use App\Models\Employee\Employee;
+use App\Enums\Person\EncounterStatus;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Episode;
+use App\Models\MedicalEvents\Sql\Condition;
+use App\Models\Person\Person;
+use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 use Illuminate\Support\Str;
 use App\Services\MedicalEvents\Fhir;
@@ -581,11 +586,24 @@ class CarePlanRepository extends \App\Repositories\MedicalEvents\BaseRepository
     public function findEncounter(int|string $key, ?int $personId = null): ?Encounter
     {
         $query = Encounter::with(['period', 'episode', 'diagnoses.condition']);
+        $person = $personId !== null ? Person::find($personId) : null;
         if ($personId !== null) {
-            $query->wherePersonId($personId);
+            if ($person === null) {
+                return null;
+            }
+            $person->filterRecordsWithMerged($query);
         }
 
-        return Str::isUuid((string) $key) ? $query->whereUuid($key)->first() : $query->find((int) $key);
+        $encounter = Str::isUuid((string) $key) ? $query->whereUuid($key)->first() : $query->find((int) $key);
+        if ($encounter !== null && $person !== null && (int) $encounter->getAttribute('person_id') !== $person->id) {
+            // Merging preserves the original owner. Resolve the same eligible, readable record as the selector.
+            if (Auth::user() === null || Auth::user()->cannot('view', [$encounter, $person])
+                || !$this->mergedEncounterIsEligible($encounter, $person)) {
+                return null;
+            }
+        }
+
+        return $encounter;
     }
 
     public function encounterTermsOfService(string $uuid, int $personId): string
@@ -651,33 +669,53 @@ class CarePlanRepository extends \App\Repositories\MedicalEvents\BaseRepository
             ->map(fn ($episode): array => ['uuid' => $episode->uuid, 'name' => $episode->name, 'date' => $episode->period?->start ? \Carbon\Carbon::parse($episode->period->start)->format('d.m.Y') : ''])->all();
     }
 
-    public function findCondition(string $uuid, ?int $personId = null): ?\App\Models\MedicalEvents\Sql\Condition
+    public function findCondition(string $uuid, ?int $personId = null): ?Condition
     {
-        $query = \App\Models\MedicalEvents\Sql\Condition::with('code.coding')->whereUuid($uuid);
+        $query = Condition::with('code.coding')->whereUuid($uuid);
+        $person = $personId !== null ? Person::find($personId) : null;
         if ($personId !== null) {
-            $query->wherePersonId($personId);
+            if ($person === null) {
+                return null;
+            }
+            $person->filterRecordsWithMerged($query);
         }
 
-        return $query->first();
+        $condition = $query->first();
+        if ($condition !== null && $person !== null && (int) $condition->personId !== $person->id
+            && (Auth::user() === null || Auth::user()->cannot('view', [$condition, $person]))) {
+            return null;
+        }
+
+        return $condition;
     }
 
     public function encounterChoices(int $personId): array
     {
+        $person = Person::find($personId);
+        if ($person === null) {
+            return [];
+        }
+
         $legalEntityUuid = legalEntity()?->uuid;
-        $eligibleEpisodes = \App\Models\MedicalEvents\Sql\Episode::wherePersonId($personId)
+        // Include only confirmed MPI merges; medical records keep their original person/preperson owner.
+        $eligibleEpisodes = $person->filterRecordsWithMerged(Episode::query())
             ->whereHas('managingOrganization', fn ($query) => $query->whereValue($legalEntityUuid))
             ->selectRaw(DB::getDriverName() === 'mysql' || DB::getDriverName() === 'mariadb' ? 'CAST(uuid AS CHAR)' : 'CAST(uuid AS TEXT)');
-        $encounters = Encounter::wherePersonId($personId)->whereStatus('finished')
+        $encounters = $person->filterRecordsWithMerged(Encounter::query())->whereStatus('finished')
             ->when($legalEntityUuid !== null, fn ($query) => $query->whereHas(
                 'episode',
                 fn ($episode) => $episode->whereIn('value', $eligibleEpisodes)
             ))
             ->with(['period', 'episode'])->orderByDesc('ehealth_inserted_at')
-            ->get(['id', 'uuid', 'episode_id', 'ehealth_inserted_at']);
+            ->get(['id', 'uuid', 'person_id', 'preperson_id', 'status', 'performer_id', 'episode_id', 'ehealth_inserted_at'])
+            ->reject(fn (Encounter $encounter): bool => (int) $encounter->getAttribute('person_id') !== $person->id
+                && (Auth::user() === null || Auth::user()->cannot('view', [$encounter, $person])
+                    || !$this->mergedEncounterIsEligible($encounter, $person)))
+            ->values();
         $episodeUuids = $encounters->pluck('episode.value')
             ->filter(static fn ($uuid): bool => is_string($uuid) && Str::isUuid($uuid))
             ->unique()->values()->all();
-        $episodeNames = $episodeUuids === [] ? collect() : \App\Models\MedicalEvents\Sql\Episode::wherePersonId($personId)
+        $episodeNames = $episodeUuids === [] ? collect() : $person->filterRecordsWithMerged(Episode::query())
             ->whereIn('uuid', $episodeUuids)->pluck('name', 'uuid');
 
         return $encounters->map(function (Encounter $encounter) use ($episodeNames): array {
@@ -695,6 +733,17 @@ class CarePlanRepository extends \App\Repositories\MedicalEvents\BaseRepository
 
             return ['uuid' => $encounter->uuid, 'label' => $label];
         })->all();
+    }
+
+    private function mergedEncounterIsEligible(Encounter $encounter, Person $person): bool
+    {
+        return legalEntity()?->uuid !== null
+            && $encounter->status === EncounterStatus::FINISHED
+            && $person->filterRecordsWithMerged(Episode::query())
+                ->whereUuid($encounter->episode?->value)
+                ->whereStatus('active')
+                ->whereHas('managingOrganization', static fn ($query) => $query->whereValue(legalEntity()->uuid))
+                ->exists();
     }
 
     public function doctors(int $legalEntityId): array
@@ -766,6 +815,10 @@ class CarePlanRepository extends \App\Repositories\MedicalEvents\BaseRepository
         $data = ['id' => $encounter?->id, 'addresses' => [], 'period_start' => $encounter?->period?->getRawOriginal('start')];
         $conditions = $encounter ? MedicalEventsRepository::encounter()->primaryDiagnosisConditions($encounter) : collect();
         foreach ($conditions as $condition) {
+            // A merged preperson's diagnosis must retain the same original owner as its encounter.
+            if ((int) $condition->prepersonId !== (int) $encounter->getAttribute('preperson_id')) {
+                continue;
+            }
             if ($conditionUuid && $conditionUuid !== $condition->uuid) {
                 continue;
             }
