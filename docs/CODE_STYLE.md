@@ -20,6 +20,10 @@ Conventions for contributors. Link to a specific rule from code review when need
 Import classes with `use` and use their short names in code and type declarations,
 including exceptions, static calls and `::class` references. Do not write fully
 qualified class names inline. Resolve name collisions with explicit aliases.
+Before finishing a change, inspect every PHP and Blade file touched by the PR,
+including existing lines, for inline class references. This includes traits,
+attributes, exceptions, type declarations, static calls and `::class`. Use Blade
+`@use` for template references. A clean added-lines-only scan is insufficient.
 
 ## Repositories
 
@@ -51,6 +55,12 @@ Keep additional error details limited to the types supplied by actual callers; d
 support for underlying exceptions unless a caller passes them.
 Keep database lookups and state checks in the repository.
 
+## Shared values
+
+Use existing enums for domain values such as authentication methods and approval statuses.
+Use enums or named constants for shared filter values, resource codes and workflow steps;
+reference the same values from PHP and Blade instead of duplicating string literals.
+
 ## eHealth response contracts
 
 Validate eHealth responses against the official endpoint documentation at the API
@@ -59,6 +69,8 @@ raw `getData()` results to map or persist records, change UI state, or decide th
 an operation succeeded. Delegating client methods must preserve validation.
 Test malformed responses and keep pending operations unconfirmed; do not weaken
 the documented contract to make fixtures pass.
+Document non-obvious integration branches with English comments explaining
+why the branch is needed and when a result becomes confirmed.
 
 ## Livewire
 

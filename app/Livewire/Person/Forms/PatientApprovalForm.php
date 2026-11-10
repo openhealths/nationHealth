@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person\Forms;
 
+use App\Models\CarePlan;
 use App\Core\BaseForm;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\Person\Person;
 use App\Services\MedicalEvents\PatientApprovalService;
+use App\Repositories\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -20,7 +22,7 @@ class PatientApprovalForm extends BaseForm
         'diagnostic_report',
         'encounter',
         'procedure',
-        'care_plan',
+        CarePlan::RESOURCE_TYPE,
     ];
 
     public function validateSelection(Person $person, array $data): array
@@ -83,10 +85,12 @@ class PatientApprovalForm extends BaseForm
 
         $ids = array_values(array_unique($ids));
         $model = PatientApprovalService::RESOURCE_MODELS[$type];
+        $query = $type === CarePlan::RESOURCE_TYPE
+            ? Repository::carePlan()->approvalQuery($person->id, (int) legalEntity()->id)
+            : $model::query()->where('person_id', $person->id);
 
         if (
-            $model::query()
-                ->where('person_id', $person->id)
+            (clone $query)
                 ->whereIn('uuid', $ids)
                 ->count() !== count($ids)
         ) {
@@ -95,8 +99,7 @@ class PatientApprovalForm extends BaseForm
             ]);
         }
 
-        $invalidRecord = $model::query()
-            ->where('person_id', $person->id)
+        $invalidRecord = (clone $query)
             ->whereIn('uuid', $ids)
             ->get(['uuid', 'status'])
             ->first(fn ($record): bool => !PatientApprovalService::approvalStatusAllowed($type, $record->getRawOriginal('status')));
@@ -210,7 +213,7 @@ class PatientApprovalForm extends BaseForm
         };
 
         if ($type === 'activity') {
-            $contextType = 'care_plan';
+            $contextType = CarePlan::RESOURCE_TYPE;
         }
 
         if ($type === 'observation' && $record->diagnosticReport?->value) {

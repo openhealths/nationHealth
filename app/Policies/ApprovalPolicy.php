@@ -6,6 +6,7 @@ namespace App\Policies;
 
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\User;
+use App\Models\LegalEntity;
 use App\Models\Employee\Employee;
 use App\Models\CarePlan;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Person\Person;
+use App\Enums\User\Role;
 
 class ApprovalPolicy
 {
@@ -68,27 +70,29 @@ class ApprovalPolicy
         $employee = $user->activeDoctorEmployee();
         $isRecipientOrAuthor = $employee && ($approval->grantedTo?->value === $employee->uuid || $approval->createdBy?->value === $employee->uuid);
 
-        return $isRecipientOrAuthor || $this->hasActiveDeclaration($user, $this->patient($approval)) ? Response::allow() : Response::denyWithStatus(404);
+        return $isRecipientOrAuthor || $this->hasActiveDeclaration($user, $this->patient($approval), legalEntity()) ? Response::allow() : Response::denyWithStatus(404);
     }
 
     public function viewAllForPatient(User $user, Person $patient): Response
     {
-        return $user->can('approval:read') && $this->hasActiveDeclaration($user, $patient) ? Response::allow() : Response::denyWithStatus(404);
+        return $user->can('approval:read') && $this->hasActiveDeclaration($user, $patient, legalEntity()) ? Response::allow() : Response::denyWithStatus(404);
     }
 
-    public function cancel(User $user, Approval $approval): Response
+    public function cancel(User $user, Approval $approval, LegalEntity $legalEntity): Response
     {
         if ($user->cannot('approval:cancel') || ($approval->expiresAt !== null && !$approval->expiresAt->isFuture())) {
             return Response::denyWithStatus(404);
         }
 
-        $employee = $user->activeDoctorEmployee();
-
-        if ($employee !== null && $approval->createdBy?->value === $employee->uuid) {
+        $approval->loadMissing('grantedTo');
+        if (Employee::forUserInLegalEntity($user, $legalEntity)
+            ->whereIn('employee_type', [Role::DOCTOR, Role::SPECIALIST, Role::MED_COORDINATOR])
+            ->where('uuid', $approval->grantedTo?->value)
+            ->exists()) {
             return Response::allow();
         }
 
-        return $this->hasActiveDeclaration($user, $this->patient($approval)) ? Response::allow() : Response::denyWithStatus(404);
+        return $this->hasActiveDeclaration($user, $this->patient($approval), $legalEntity) ? Response::allow() : Response::denyWithStatus(404);
     }
 
     protected function patient(Approval $approval): Person
@@ -96,11 +100,11 @@ class ApprovalPolicy
         return $approval->approvable instanceof Person ? $approval->approvable : $approval->approvable->person;
     }
 
-    protected function hasActiveDeclaration(User $user, Person $patient): bool
+    protected function hasActiveDeclaration(User $user, Person $patient, LegalEntity $legalEntity): bool
     {
         return $patient->declarations()
             ->active()
-            ->whereIn('employee_id', Employee::forUserInLegalEntity($user, legalEntity())->doctor()->select('id'))
+            ->whereIn('employee_id', Employee::forUserInLegalEntity($user, $legalEntity)->doctor()->select('id'))
             ->exists();
     }
 

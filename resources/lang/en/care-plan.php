@@ -3,6 +3,24 @@
 declare(strict_types=1);
 
 return [
+    'confirm_cancel_shared_approval' => 'Revoke this shared approval? Access under this approval will end for all plans it covers.',
+    'shared_approval' => 'Shared care plan approval',
+
+    'read_access_partly_covered' => 'Some plans already have valid access. The new request will cover only the remaining plans.',
+    'request_read_access' => 'Request access to care plans',
+    'read_access_description' => 'Request read access to :count plans for this patient. Review the list and choose how the patient will confirm it.',
+    'read_access_pending' => 'An access request for these plans is already awaiting processing or confirmation.',
+    'no_plans_need_access' => 'No incomplete registered care plans need an access request.',
+
+    'current_and_drafts' => 'Current plans and drafts',
+    'all_statuses' => 'All statuses',
+    'list_complete' => 'Complete plans and drafts',
+    'list_all' => 'All plans',
+    'list_incomplete' => 'Require detail import',
+    'list_completeness' => 'Plans to display',
+    'registry_incomplete' => 'Only partial data is available. Open the plan and update it from eHealth; patient approval may be required to read its details.',
+    'approval_cancel_unconfirmed' => 'eHealth has not confirmed the revocation yet. Refresh approvals before trying again.',
+
     'referral_request_created' => 'The electronic referral request has been created. Sign it with your digital signature.',
     'referral_submission_confirmed' => 'The electronic referral has been successfully created and signed in eHealth.',
     'document_number' => 'Number: :number.',

@@ -1,3 +1,4 @@
+@use('App\Livewire\Person\Records\PatientApproval')
 @use(App\Models\MedicalEvents\Sql\Approval)
 
 <div
@@ -8,13 +9,17 @@
         groupExpanded: false
     }"
 >
+    @if($carePlansOnly)
+        <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
+    @endif
+
     @can('create', Approval::class)
         <button
             type="button"
             wire:click="openDrawer"
             class="button-primary-outline px-4 py-2 text-sm shadow-sm"
         >
-            {{ __('patients.data_access') }}
+            {{ $carePlansOnly ? __('care-plan.request_read_access') : __('patients.data_access') }}
         </button>
     @endcan
 
@@ -29,46 +34,46 @@
         x-cloak
         @click="$wire.closeDrawer()"
         class="fixed inset-0 bg-gray-900/50"
-        style="z-index: {{ $step === 'form' ? 45 : 50 }};"
+        style="z-index: {{ $step === PatientApproval::STEP_FORM ? 45 : 50 }};"
     ></div>
 
     <div
         x-show="visible"
         x-transition:enter="transition ease-out duration-300 transform"
-        x-transition:enter-start="{{ $step === 'form' ? 'translate-x-full' : 'opacity-0' }}"
-        x-transition:enter-end="{{ $step === 'form' ? 'translate-x-0' : 'opacity-100' }}"
+        x-transition:enter-start="{{ $step === PatientApproval::STEP_FORM ? 'translate-x-full' : 'opacity-0' }}"
+        x-transition:enter-end="{{ $step === PatientApproval::STEP_FORM ? 'translate-x-0' : 'opacity-100' }}"
         x-transition:leave="transition ease-in duration-200 transform"
-        x-transition:leave-start="{{ $step === 'form' ? 'translate-x-0' : 'opacity-100' }}"
-        x-transition:leave-end="{{ $step === 'form' ? 'translate-x-full' : 'opacity-0' }}"
+        x-transition:leave-start="{{ $step === PatientApproval::STEP_FORM ? 'translate-x-0' : 'opacity-100' }}"
+        x-transition:leave-end="{{ $step === PatientApproval::STEP_FORM ? 'translate-x-full' : 'opacity-0' }}"
         x-cloak
-        class="{{ $step === 'form'
-            ? 'fixed top-0 right-0 h-screen w-4/5 overflow-y-auto bg-white p-4 pt-20 shadow-2xl dark:bg-gray-800'
+        class="{{ $step === PatientApproval::STEP_FORM
+            ? 'fixed top-0 right-0 h-screen w-4/5 overflow-y-auto bg-white p-4 shadow-2xl dark:bg-gray-800 '.($carePlansOnly ? 'pt-28' : 'pt-20')
             : 'fixed inset-0 flex items-center justify-center p-4'
         }}"
-        style="z-index: {{ $step === 'form' ? 46 : 51 }};"
+        style="z-index: {{ $step === PatientApproval::STEP_FORM ? 46 : 51 }};"
         role="dialog"
         aria-modal="true"
         @keydown.escape.prevent.stop="$wire.closeDrawer()"
-        @click.self="if ($wire.step !== 'form') $wire.closeDrawer()"
+        @click.self="if ($wire.step !== @js(PatientApproval::STEP_FORM)) $wire.closeDrawer()"
     >
         <div
-            class="{{ $step === 'form'
+            class="{{ $step === PatientApproval::STEP_FORM
                 ? 'w-full'
-                : ($step === 'code' ? 'modal-content mx-auto w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl sm:p-8 dark:bg-gray-800' : 'modal-content mx-auto w-full max-w-4xl max-h-[90vh] overflow-y-auto')
+                : ($step === PatientApproval::STEP_CODE ? 'modal-content mx-auto w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl sm:p-8 dark:bg-gray-800' : 'modal-content mx-auto w-full max-w-4xl max-h-[90vh] overflow-y-auto')
             }}"
             @click.stop
-            x-trap.noscroll.inert="visible && $wire.step !== 'form'"
+            x-trap.noscroll.inert="visible && $wire.step !== @js(PatientApproval::STEP_FORM)"
         >
-                    @if($step !== 'code')
-                        <div class="{{ $step === 'form' ? '' : 'mb-8 flex items-center justify-between' }}">
-                            <h2 class="{{ $step === 'form' ? 'modal-header' : 'legend !mb-0' }}">
-                                @if($step === 'form')
-                                    {{ __('patients.get_data_access') }}
-                                @elseif($step === 'methods')
+                    @if($step !== PatientApproval::STEP_CODE)
+                        <div class="{{ $step === PatientApproval::STEP_FORM ? '' : 'mb-8 flex items-center justify-between' }}">
+                            <h2 class="{{ $step === PatientApproval::STEP_FORM ? 'modal-header' : 'legend !mb-0' }}">
+                                @if($step === PatientApproval::STEP_FORM)
+                                    {{ $carePlansOnly ? __('care-plan.request_read_access') : __('patients.get_data_access') }}
+                                @elseif($step === PatientApproval::STEP_METHODS)
                                     {{ __('patients.authentication_methods') }}
-                                @elseif($step === 'processing')
+                                @elseif($step === PatientApproval::STEP_PROCESSING)
                                     {{ __('approval.create.request_title') }}
-                                @elseif($step === 'verifying')
+                                @elseif($step === PatientApproval::STEP_VERIFYING)
                                     {{ __('approval.create.verification_processing_title') }}
                                 @else
                                     {{ __('approval.create.confirmation_title') }}
@@ -77,13 +82,19 @@
                         </div>
                     @endif
 
+                    @if($carePlansOnly)
+                        <p class="my-4 text-sm text-gray-700 dark:text-gray-300">
+                            {{ __('care-plan.read_access_description', ['count' => count($resourceIds)]) }}
+                        </p>
+                    @endif
+
                     @error('approvalCreation')
                         <p class="text-error mt-3 mb-4">
                             {{ $message }}
                         </p>
                     @enderror
 
-                    @if($step !== 'form')
+                    @if($step !== PatientApproval::STEP_FORM)
                         @error('resourceIds')
                             <p class="text-error mt-3 mb-4">
                                 {{ $message }}
@@ -91,57 +102,60 @@
                         @enderror
                     @endif
                     
-                    @if($step === 'form')
+                    @if($step === PatientApproval::STEP_FORM)
                         <div class="mt-8 max-w-md space-y-6">
-                            <div class="form-group group max-w-xl">
-                                <select
-                                    wire:model.live="mode"
-                                    @change="groupSearch = ''; groupExpanded = false"
-                                    class="input-select peer w-full"
-                                >
-                                    <option value="" disabled>
-                                        {{ __('forms.select') }}
-                                    </option>
+                            @if(!$carePlansOnly)
+                                <div class="form-group group max-w-xl">
+                                    <select
+                                        wire:model.live="mode"
+                                        @change="groupSearch = ''; groupExpanded = false"
+                                        class="input-select peer w-full"
+                                    >
+                                        <option value="" disabled>
+                                            {{ __('forms.select') }}
+                                        </option>
 
-                                    <option value="patient">
-                                        {{ __('approval.create.mode_patient') }}
-                                    </option>
-                                    <option value="person">
-                                        {{ __('approval.create.mode_person') }}
-                                    </option>
-                                    <option value="resource">
-                                        {{ __('approval.create.mode_resource') }}
-                                    </option>
-                                    <option value="child">
-                                        {{ __('approval.create.mode_child') }}
-                                    </option>
-                                    <option value="service_request">
-                                        {{ __('approval.create.service_request') }}
-                                    </option>
-                                    <option value="service_group">
-                                        {{ __('approval.resource_types.service_group') }}
-                                    </option>
-                                    <option value="diagnoses_group">
-                                        {{ __('approval.resource_types.diagnoses_group') }}
-                                    </option>
-                                    <option value="forbidden_group">
-                                        {{ __('approval.create.mode_forbidden_group') }}
-                                    </option>
-                                    <option value="resource_types">
-                                        {{ __('approval.create.mode_resource_types') }}
-                                    </option>
-                                </select>
+                                        <option value="patient">
+                                            {{ __('approval.create.mode_patient') }}
+                                        </option>
+                                        <option value="person">
+                                            {{ __('approval.create.mode_person') }}
+                                        </option>
+                                        <option value="resource">
+                                            {{ __('approval.create.mode_resource') }}
+                                        </option>
+                                        <option value="child">
+                                            {{ __('approval.create.mode_child') }}
+                                        </option>
+                                        <option value="service_request">
+                                            {{ __('approval.create.service_request') }}
+                                        </option>
+                                        <option value="service_group">
+                                            {{ __('approval.resource_types.service_group') }}
+                                        </option>
+                                        <option value="diagnoses_group">
+                                            {{ __('approval.resource_types.diagnoses_group') }}
+                                        </option>
+                                        <option value="forbidden_group">
+                                            {{ __('approval.create.mode_forbidden_group') }}
+                                        </option>
+                                        <option value="resource_types">
+                                            {{ __('approval.create.mode_resource_types') }}
+                                        </option>
+                                    </select>
 
-                                <label class="label">{{ __('approval.data_type') }}</label>
+                                    <label class="label">{{ __('approval.data_type') }}</label>
 
-                                @error('mode')
-                                    <p class="text-error">{{ $message }}</p>
-                                @enderror
+                                    @error('mode')
+                                        <p class="text-error">{{ $message }}</p>
+                                    @enderror
 
-                            </div>
+                                </div>
+
+                            @endif
 
                             @if(in_array($mode, ['resource', 'child', 'service_request'], true))
-                                @if($mode === 'resource')
+                                @if($mode === 'resource' && !$carePlansOnly)
                                     <div class="form-group group max-w-xl">
                                         <select
                                             wire:model.live="resourceType"
@@ -421,37 +435,39 @@
                                             {{ __('approval.create.selected_records') }}
                                         </p>
 
-                                        @foreach($this->selectedRecords as $record)
-                                            <div
-                                                wire:key="approval-selected-record-{{ $record['uuid'] }}"
-                                                class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-600"
-                                            >
-                                                <span class="min-w-0 space-y-1">
-                                                    <span class="block text-sm text-gray-900 dark:text-gray-100">
-                                                        {{ $record['name'] }}
-                                                    </span>
-
-                                                    @if($record['date'] !== '')
-                                                        <span class="block text-sm text-gray-600 dark:text-gray-300">
-                                                            {{ $record['date'] }}
-                                                        </span>
-                                                    @endif
-
-                                                    <span class="block break-all text-xs text-gray-500 dark:text-gray-400">
-                                                        ID {{ $record['uuid'] }}
-                                                    </span>
-                                                </span>
-
-                                                <button
-                                                    type="button"
-                                                    wire:click="selectRecord('{{ $record['uuid'] }}')"
-                                                    class="shrink-0 text-gray-500 hover:text-red-600 dark:text-gray-400"
-                                                    aria-label="{{ __('approval.create.remove_selection') }}"
+                                        <div class="{{ $carePlansOnly ? 'max-h-64 space-y-2 overflow-y-auto pr-2' : 'space-y-2' }}">
+                                            @foreach($this->selectedRecords as $record)
+                                                <div
+                                                    wire:key="approval-selected-record-{{ $record['uuid'] }}"
+                                                    class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-600"
                                                 >
-                                                    &times;
-                                                </button>
-                                            </div>
-                                        @endforeach
+                                                    <span class="min-w-0 space-y-1">
+                                                        <span class="block text-sm text-gray-900 dark:text-gray-100">
+                                                            {{ $record['name'] }}
+                                                        </span>
+
+                                                        @if($record['date'] !== '')
+                                                            <span class="block text-sm text-gray-600 dark:text-gray-300">
+                                                                {{ $record['date'] }}
+                                                            </span>
+                                                        @endif
+
+                                                        <span class="block break-all text-xs text-gray-500 dark:text-gray-400">
+                                                            ID {{ $record['uuid'] }}
+                                                        </span>
+                                                    </span>
+
+                                                    <button
+                                                        type="button"
+                                                        wire:click="selectRecord('{{ $record['uuid'] }}')"
+                                                        class="shrink-0 text-gray-500 hover:text-red-600 dark:text-gray-400"
+                                                        aria-label="{{ __('approval.create.remove_selection') }}"
+                                                    >
+                                                        &times;
+                                                    </button>
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     </div>
                                 @endif
 
@@ -632,6 +648,7 @@
 
                             @if(
                                 $mode === 'resource'
+                                && !$carePlansOnly
                                 && in_array($resourceType, ['diagnostic_report', 'care_plan'], true)
                             )
                                 <div class="form-group group max-w-xl">
@@ -717,7 +734,7 @@
                             </div>
                         </div>
 
-                    @elseif($step === 'methods')
+                    @elseif($step === PatientApproval::STEP_METHODS)
                         <div class="space-y-4">
                             @forelse($authMethods as $method)
                                 <div
@@ -793,7 +810,7 @@
                                 <button
                                     type="button"
                                     class="button-minor"
-                                    wire:click="$set('step', 'form')"
+                                    wire:click="$set('step', '{{ PatientApproval::STEP_FORM }}')"
                                 >
                                     {{ __('forms.back') }}
                                 </button>
@@ -811,7 +828,7 @@
                             </div>
                         </div>
 
-                    @elseif($step === 'processing')
+                    @elseif($step === PatientApproval::STEP_PROCESSING)
                         <div
                             wire:poll.2s="poll"
                             class="py-12 text-center text-gray-600 dark:text-gray-300"
@@ -819,7 +836,7 @@
                             {{ __('approval.create.processing_request') }}
                         </div>
 
-                    @elseif($step === 'verifying')
+                    @elseif($step === PatientApproval::STEP_VERIFYING)
                         <div
                             wire:poll.2s="poll"
                             class="py-12 text-center text-gray-600 dark:text-gray-300"
@@ -827,7 +844,7 @@
                             {{ __('approval.create.processing_verification') }}
                         </div>
 
-                    @elseif($step === 'confirming')
+                    @elseif($step === PatientApproval::STEP_CONFIRMING)
                         <div class="space-y-4">
                             <p class="text-sm">
                                 {{ __('approval.create.request_created') }}
@@ -848,13 +865,13 @@
                             </button>
                         </div>
 
-                    @elseif($step === 'code')
+                    @elseif($step === PatientApproval::STEP_CODE)
                         @include('livewire.person.records.parts.approval-sms-modal')
                     @endif
         </div>
     </div>
 
-    @if($step === 'form' && $previewSection !== '')
+    @if($step === PatientApproval::STEP_FORM && $previewSection !== '')
         <div
             wire:key="approval-preview-backdrop"
             class="fixed inset-0 bg-gray-900/30"

@@ -13,6 +13,7 @@ use App\Notifications\SyncNotification;
 use App\Notifications\RemoteEHealthLinksNotification;
 use App\Repositories\Repository;
 use Illuminate\Bus\Batch;
+use Illuminate\Bus\BatchRepository;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
@@ -66,6 +67,7 @@ trait HandlesCarePlanSync
                 $connection = 'database';
             }
             $batch = Bus::batch($jobs)
+                ->allowFailures()
                 ->name($name)
                 ->withOption('legal_entity_id', $legalEntity->id)
                 ->withOption('patient_uuid', $person->uuid)
@@ -89,6 +91,12 @@ trait HandlesCarePlanSync
                         return;
                     }
                     $user?->notify(new SyncNotification('care_plan', 'failed'));
+                })
+                ->finally(static function (Batch $batch): void {
+                    // Laravel keeps failed jobs in pendingJobs even after every allowed job was attempted.
+                    if ($batch->hasFailures()) {
+                        app(BatchRepository::class)->markAsFinished($batch->id);
+                    }
                 })
                 ->onConnection($connection)
                 ->onQueue('sync')

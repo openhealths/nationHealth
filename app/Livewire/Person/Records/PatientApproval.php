@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person\Records;
 
+use App\Models\CarePlan;
 use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -12,11 +13,15 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Enums\Person\AuthenticationMethod;
 use App\Enums\Status;
 use App\Enums\User\Role;
+use App\Enums\JobStatus;
+use App\Exceptions\MedicalEvents\ApprovalVerificationException;
 use App\Models\Icd10;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\Employee\Employee;
+use App\Repositories\Repository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Services\MedicalEvents\Fhir;
 use App\Services\MedicalEvents\PatientApprovalService;
 use App\Livewire\Person\Forms\PatientApprovalForm;
@@ -24,6 +29,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -36,8 +42,21 @@ class PatientApproval extends Component
     #[Locked]
     public int $personId;
 
+    #[Locked]
+    public bool $carePlansOnly = false;
+
+    #[Locked]
+    public array $targetCarePlanUuids = [];
+
+    public const string STEP_FORM = 'form';
+    public const string STEP_METHODS = 'methods';
+    public const string STEP_PROCESSING = 'processing';
+    public const string STEP_VERIFYING = 'verifying';
+    public const string STEP_CONFIRMING = 'confirming';
+    public const string STEP_CODE = 'code';
+
     public bool $open = false;
-    public string $step = 'form';
+    public string $step = self::STEP_FORM;
     public string $mode = '';
     public string $resourceType = 'episode_of_care';
     public string $search = '';
@@ -262,16 +281,41 @@ class PatientApproval extends Component
 
     public function openDrawer(): void
     {
-        if (!Auth::user()->can('create', Approval::class)) {
+        if (Auth::user()->cannot('create', Approval::class)) {
+            Session::flash('error', __('approval.create.role_forbidden'));
+
             return;
         }
 
+        if ($this->carePlansOnly && $this->linkId === null && $this->approvalId === null) {
+            $this->targetCarePlanUuids = Repository::carePlan()->incompleteApprovalUuids($this->personId, (int) legalEntity()->id);
+            if ($this->targetCarePlanUuids === []) {
+                Session::flash('info', __('care-plan.no_plans_need_access'));
+
+                return;
+            }
+            $this->mode = 'resource';
+            $this->resourceType = CarePlan::RESOURCE_TYPE;
+            $this->accessLevel = 'read';
+            $this->grantToLegalEntity = false;
+            $this->resourceIds = $this->targetCarePlanUuids;
+            try {
+                if ($this->resumeCarePlanReadRequest($this->employeeForApproval())) {
+                    return;
+                }
+            } catch (ApprovalVerificationException $exception) {
+                Session::flash('error', $exception->getMessage());
+
+                return;
+            }
+        }
+
         if ($this->linkId !== null) {
-            $this->step = $this->approvalId === null ? 'processing' : 'verifying';
+            $this->step = $this->approvalId === null ? self::STEP_PROCESSING : self::STEP_VERIFYING;
         } elseif ($this->approvalId !== null) {
-            $this->step = $this->selectedAuthType === AuthenticationMethod::OFFLINE->value ? 'confirming' : 'code';
+            $this->step = $this->selectedAuthType === AuthenticationMethod::OFFLINE->value ? self::STEP_CONFIRMING : self::STEP_CODE;
         } else {
-            $this->step = 'form';
+            $this->step = self::STEP_FORM;
         }
 
         $this->open = true;
@@ -285,6 +329,11 @@ class PatientApproval extends Component
 
     public function updatedMode(): void
     {
+        if ($this->carePlansOnly) {
+            $this->mode = 'resource';
+
+            return;
+        }
         $this->reset(
             'resourceIds',
             'groupId',
@@ -317,6 +366,11 @@ class PatientApproval extends Component
 
     public function updatedResourceType(): void
     {
+        if ($this->carePlansOnly) {
+            $this->resourceType = CarePlan::RESOURCE_TYPE;
+
+            return;
+        }
         $this->resourceIds = [];
         $this->search = '';
         $this->accessLevel = in_array($this->resourceType, ['encounter', 'procedure'], true) ? 'write' : 'read';
@@ -522,7 +576,7 @@ class PatientApproval extends Component
                     });
                     break;
 
-                case 'care_plan':
+                case CarePlan::RESOURCE_TYPE:
                     $query->orWhereLike('title', $like);
                     break;
 
@@ -567,6 +621,10 @@ class PatientApproval extends Component
 
     private function recordType(): string
     {
+        if ($this->carePlansOnly) {
+            return CarePlan::RESOURCE_TYPE;
+        }
+
         return match ($this->mode) {
             'child' => $this->childType,
             'service_request' => 'service_request',
@@ -577,6 +635,12 @@ class PatientApproval extends Component
     private function recordsQuery(): ?Builder
     {
         $type = $this->recordType();
+
+        if ($this->carePlansOnly || $type === CarePlan::RESOURCE_TYPE) {
+            $query = Repository::carePlan()->approvalQuery($this->personId, (int) legalEntity()->id);
+
+            return $this->carePlansOnly ? $query->whereIn('uuid', $this->targetCarePlanUuids) : $query;
+        }
 
         $model = $this->mode === 'child' ? PatientApprovalService::CHILD_MODELS[$type] ?? null : PatientApprovalService::RESOURCE_MODELS[$type] ?? null;
 
@@ -636,7 +700,7 @@ class PatientApproval extends Component
             'episode_of_care' => $record->name,
             'diagnostic_report', 'procedure' => $record->code?->displayValue ?: $record->code?->value,
             'encounter', 'specimen' => $this->recordTypeNames[$record->type?->coding?->first()?->code] ?? $record->type?->text ?? $record->type?->coding?->first()?->code,
-            'care_plan' => $record->title,
+            CarePlan::RESOURCE_TYPE => $record->displayTitle(),
             'service_request' => $record->requestNumber,
         };
 
@@ -656,7 +720,7 @@ class PatientApproval extends Component
                     $record->performedPeriod?->start,
                     $record->performedPeriod?->end,
                 ])->filter()->map(fn ($date) => formatDisplayDate($date))->implode(' — '),
-            'care_plan' => collect([
+            CarePlan::RESOURCE_TYPE => collect([
                 $record->periodStart,
                 $record->periodEnd,
             ])->filter()->map(fn ($date) => formatDisplayDate($date))->implode(' — '),
@@ -745,20 +809,70 @@ class PatientApproval extends Component
     public function chooseAuthentication(): void
     {
         if (Auth::user()->cannot('create', Approval::class)) {
+            Session::flash('error', __('approval.create.role_forbidden'));
+
             return;
         }
         $this->validatedSelection();
+        if ($this->carePlansOnly) {
+            try {
+                if ($this->resumeCarePlanReadRequest($this->employeeForApproval())) {
+                    return;
+                }
+            } catch (ApprovalVerificationException $exception) {
+                Session::flash('error', $exception->getMessage());
+
+                return;
+            }
+        }
 
         $this->authMethods = app(PatientApprovalService::class)
             ->availableAuthenticationMethods($this->person());
 
         $this->reset('selectedAuthUuid', 'leafletConfirmed');
-        $this->step = 'methods';
+        $this->step = self::STEP_METHODS;
     }
 
     public function create(): void
     {
+        if (!$this->carePlansOnly) {
+            $this->createApprovalRequest();
+
+            return;
+        }
         if (Auth::user()->cannot('create', Approval::class)) {
+            Session::flash('error', __('approval.create.role_forbidden'));
+
+            return;
+        }
+        $this->validatedSelection();
+        try {
+            $employee = $this->employeeForApproval();
+        } catch (ApprovalVerificationException $exception) {
+            Session::flash('error', $exception->getMessage());
+
+            return;
+        }
+        $lock = Cache::lock('care-plan-read-approval:'.legalEntity()->id.':'.$this->personId.':'.$employee->uuid, 300);
+        if (!$lock->get()) {
+            Session::flash('info', __('care-plan.read_access_pending'));
+
+            return;
+        }
+        try {
+            if (!$this->resumeCarePlanReadRequest($employee)) {
+                $this->createApprovalRequest();
+            }
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function createApprovalRequest(): void
+    {
+        if (Auth::user()->cannot('create', Approval::class)) {
+            Session::flash('error', __('approval.create.role_forbidden'));
+
             return;
         }
 
@@ -777,7 +891,7 @@ class PatientApproval extends Component
             ]);
         }
 
-        if ($this->mode === 'person' && $method['type'] === 'OFFLINE') {
+        if ($this->mode === 'person' && $method['type'] === AuthenticationMethod::OFFLINE->value) {
             throw ValidationException::withMessages([
                 'selectedAuthUuid' => __('approval.create.person_requires_otp'),
             ]);
@@ -801,7 +915,7 @@ class PatientApproval extends Component
             }
         }
 
-        if ($method['type'] === 'OFFLINE' && !$this->leafletConfirmed) {
+        if ($method['type'] === AuthenticationMethod::OFFLINE->value && !$this->leafletConfirmed) {
             throw ValidationException::withMessages([
                 'leafletConfirmed' => __('approval.create.leaflet_required'),
             ]);
@@ -829,14 +943,21 @@ class PatientApproval extends Component
             $this->approvalId = $result['approval_id'];
             $this->linkId = $result['link_id'];
             $this->reset('smsResent', 'smsResendAvailableAt');
-            $this->step = $this->linkId !== null ? 'processing' : 'confirming';
+            $this->step = $this->linkId !== null ? self::STEP_PROCESSING : self::STEP_CONFIRMING;
 
-            if ($this->step === 'confirming') {
+            if ($this->step === self::STEP_CONFIRMING) {
                 $this->continueAfterCreation();
             }
-        } catch (EHealthValidationException|EHealthResponseException|EHealthConnectionException) {
+        } catch (EHealthValidationException|EHealthResponseException|EHealthConnectionException $exception) {
+            if ($this->carePlansOnly) {
+                $message = $exception instanceof EHealthValidationException ? $exception->getFormattedMessage() : __('approval.create.create_ehealth_failed');
+                $this->addError('approvalCreation', $message);
+                Session::flash('error', $message);
+
+                return;
+            }
             $this->open = false;
-            $this->step = 'form';
+            $this->step = self::STEP_FORM;
 
             Session::flash('error', __('approval.create.create_ehealth_failed'));
 
@@ -851,7 +972,7 @@ class PatientApproval extends Component
 
     public function poll(): void
     {
-        if ($this->linkId === null || !in_array($this->step, ['processing', 'verifying'], true)) {
+        if ($this->linkId === null || !in_array($this->step, [self::STEP_PROCESSING, self::STEP_VERIFYING], true)) {
             return;
         }
 
@@ -879,12 +1000,18 @@ class PatientApproval extends Component
 
     private function handlePollFailure(string $message): void
     {
-        $wasVerifying = $this->step === 'verifying';
+        $wasVerifying = $this->step === self::STEP_VERIFYING;
         $this->linkId = null;
 
         if (!$wasVerifying) {
             $this->approvalId = null;
-            $this->step = 'form';
+            $this->step = self::STEP_FORM;
+            if ($this->carePlansOnly) {
+                $this->addError('approvalCreation', $message);
+                Session::flash('error', $message);
+
+                return;
+            }
             $this->open = false;
 
             Session::flash('error', __('approval.create.create_ehealth_failed'));
@@ -897,13 +1024,18 @@ class PatientApproval extends Component
             return;
         }
 
-        $this->step = $this->selectedAuthType === 'OFFLINE' ? 'confirming' : 'code';
+        if ($this->carePlansOnly) {
+            $this->step = self::STEP_CONFIRMING;
+            $this->continueAfterCreation();
+        } else {
+            $this->step = $this->selectedAuthType === AuthenticationMethod::OFFLINE->value ? self::STEP_CONFIRMING : self::STEP_CODE;
+        }
         $this->addError('approvalCreation', $message);
     }
 
     private function handlePollSuccess(array $status): void
     {
-        if ($this->step === 'verifying') {
+        if ($this->step === self::STEP_VERIFYING) {
             app(PatientApprovalService::class)->syncVerified($this->person(), $this->approvalId);
 
             $this->linkId = null;
@@ -914,7 +1046,7 @@ class PatientApproval extends Component
 
         $this->approvalId = $status['approval_id'];
         $this->linkId = null;
-        $this->step = 'confirming';
+        $this->step = self::STEP_CONFIRMING;
 
         $this->continueAfterCreation();
     }
@@ -927,20 +1059,27 @@ class PatientApproval extends Component
             return;
         }
 
-        if ($this->step !== 'confirming' || $this->approvalId === null) {
+        if ($this->step !== self::STEP_CONFIRMING || $this->approvalId === null) {
             return;
         }
 
         try {
             $service = app(PatientApprovalService::class);
 
-            if ($this->selectedAuthType !== 'OFFLINE') {
+            if ($this->selectedAuthType !== AuthenticationMethod::OFFLINE->value) {
                 $details = $service->details($this->person(), $this->approvalId);
+                if ($this->carePlansOnly && ($details['is_verified'] ?? false) === true) {
+                    $service->syncVerified($this->person(), $this->approvalId);
+                    $this->finish();
+
+                    return;
+                }
                 $method = $service->resolveConfirmationMethod($details['authentication_method_current'] ?? [], $this->person()->uuid, $this->selectedAuthUuid);
                 if (AuthenticationMethod::confirmationMethod($method) !== AuthenticationMethod::OFFLINE) {
+                    $this->selectedAuthType = $method['type'] ?? $this->selectedAuthType;
                     $this->smsPhone = AuthenticationMethod::confirmationPhone($method) ?? $this->smsPhone;
                     $this->smsResendAvailableAt = $service->smsResendAvailableAt($this->person(), $this->approvalId);
-                    $this->step = 'code';
+                    $this->step = self::STEP_CODE;
 
                     return;
                 }
@@ -954,7 +1093,7 @@ class PatientApproval extends Component
 
             $this->linkId = $service->verify($this->person(), $this->approvalId, null);
             if ($this->linkId !== null) {
-                $this->step = 'verifying';
+                $this->step = self::STEP_VERIFYING;
             } else {
                 $this->finish();
             }
@@ -969,7 +1108,7 @@ class PatientApproval extends Component
             return;
         }
 
-        if ($this->step !== 'code' || $this->approvalId === null || !in_array($this->selectedAuthType, ['OTP', 'THIRD_PERSON'], true)) {
+        if ($this->step !== self::STEP_CODE || $this->approvalId === null || !in_array($this->selectedAuthType, [AuthenticationMethod::OTP->value, AuthenticationMethod::THIRD_PERSON->value], true)) {
             return;
         }
 
@@ -983,7 +1122,7 @@ class PatientApproval extends Component
             );
 
             if ($this->linkId !== null) {
-                $this->step = 'verifying';
+                $this->step = self::STEP_VERIFYING;
 
                 return;
             }
@@ -1007,7 +1146,7 @@ class PatientApproval extends Component
             return;
         }
 
-        if ($this->step !== 'code' || $this->approvalId === null || $this->smsResent) {
+        if ($this->step !== self::STEP_CODE || $this->approvalId === null || $this->smsResent) {
             return;
         }
 
@@ -1027,7 +1166,7 @@ class PatientApproval extends Component
     protected function finish(): void
     {
         $this->open = false;
-        $this->step = 'form';
+        $this->step = self::STEP_FORM;
         $this->approvalId = null;
         $this->linkId = null;
         $this->smsResent = false;
@@ -1035,6 +1174,13 @@ class PatientApproval extends Component
         $this->verificationCode = '';
 
         Session::flash('success', __('approval.create.verified'));
+
+        if ($this->carePlansOnly) {
+            $this->reset('targetCarePlanUuids', 'resourceIds');
+            $this->dispatch('care-plan-read-access-granted')->to(PatientCarePlans::class);
+
+            return;
+        }
 
         $this->redirectRoute('persons.patient-data', [
             legalEntity(),
@@ -1049,6 +1195,10 @@ class PatientApproval extends Component
 
     private function employeeForApproval(): Employee
     {
+        if ($this->carePlansOnly) {
+            // Combined token scopes do not authorize every linked employee to request consent.
+            return Repository::employee()->forApproval(Auth::user(), legalEntity());
+        }
         $allowed = [Role::DOCTOR->value, Role::SPECIALIST->value, Role::ASSISTANT->value];
 
         if ($this->mode !== 'person') {
@@ -1066,6 +1216,21 @@ class PatientApproval extends Component
 
     private function validatedSelection(): array
     {
+        if ($this->carePlansOnly) {
+            $selection = $this->form->validateSelection($this->person(), [
+                'mode' => 'resource',
+                'resourceType' => CarePlan::RESOURCE_TYPE,
+                'resourceIds' => $this->resourceIds,
+                'accessLevel' => 'read',
+                'grantToLegalEntity' => false,
+            ]);
+            if (array_diff($selection['resource_ids'], $this->targetCarePlanUuids) !== []) {
+                throw ValidationException::withMessages(['resourceIds' => __('approval.create.record_patient_mismatch')]);
+            }
+
+            return $selection;
+        }
+
         return $this->form->validateSelection(
             $this->person(),
             [
@@ -1092,6 +1257,82 @@ class PatientApproval extends Component
             $employeeUuid,
             legalEntity()->uuid
         );
+    }
+
+    private function reuseVerifiedCarePlanReadAccess(Employee $employee): bool
+    {
+        $repository = MedicalEventsRepository::approval();
+        $person = $this->person();
+        $candidates = $repository->verifiedCarePlanReadRequests($person, $employee->uuid, $this->resourceIds);
+        if ($candidates->isEmpty()) {
+            return false;
+        }
+        try {
+            foreach ($candidates as $approval) {
+                try {
+                    $details = app(PatientApprovalService::class)->details($person, $approval->uuid);
+                    $repository->sync($details, $person, $approval);
+                } catch (EHealthResponseException $exception) {
+                    if ($exception->response->status() !== 404) {
+                        throw $exception;
+                    }
+                    $repository->markUnavailable($approval);
+                }
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+            Session::flash('error', __('approval.create.confirmation_failed'));
+
+            return true;
+        }
+        // Recheck after the authoritative refresh: expired/revoked or partially covered grants must not hide missing access.
+        $covered = $repository->verifiedCarePlanReadRequests($person, $employee->uuid, $this->resourceIds)
+            ->flatMap(fn (Approval $approval): array => $repository->carePlanReadRequestUuids($approval))->unique()->all();
+        $remaining = array_values(array_diff($this->resourceIds, $covered));
+        if ($remaining === $this->resourceIds) {
+            return false;
+        }
+        $this->resourceIds = $remaining;
+        if ($remaining === []) {
+            $this->finish();
+
+            return true;
+        }
+        Session::flash('info', __('care-plan.read_access_partly_covered'));
+
+        return false;
+    }
+
+    private function resumeCarePlanReadRequest(Employee $employee): bool
+    {
+        if ($this->reuseVerifiedCarePlanReadAccess($employee)) {
+            return true;
+        }
+        $repository = MedicalEventsRepository::approval();
+        // Resume the same recipient's pending request instead of sending another patient challenge.
+        $approval = $repository->pendingCarePlanReadRequest($this->person(), $employee->uuid, $this->resourceIds);
+        if ($approval === null) {
+            return false;
+        }
+        $this->targetCarePlanUuids = $repository->carePlanReadRequestUuids($approval);
+        $this->resourceIds = $this->targetCarePlanUuids;
+        $this->selectedAuthUuid = $approval->authorizeWith ?? '';
+        $this->open = true;
+        $link = $approval->ehealthLinks->sortByDesc('id')->first();
+        if ($link !== null && $link->status !== JobStatus::PROCESSED->value) {
+            $verifying = data_get($link->job?->request_data, 'patientApprovalAction') === 'verify';
+            $this->approvalId = $verifying ? $approval->uuid : null;
+            $this->linkId = $link->id;
+            $this->step = $verifying ? self::STEP_VERIFYING : self::STEP_PROCESSING;
+        } else {
+            $this->approvalId = $approval->uuid;
+            $this->linkId = null;
+            $this->step = self::STEP_CONFIRMING;
+            $this->continueAfterCreation();
+        }
+        Session::flash('info', __('care-plan.read_access_pending'));
+
+        return true;
     }
 
     public function render(): View

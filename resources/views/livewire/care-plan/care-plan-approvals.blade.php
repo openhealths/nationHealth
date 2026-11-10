@@ -1,4 +1,7 @@
+@use('Carbon\Carbon')
+@use('App\Enums\Person\AuthenticationMethod')
 @use('App\Enums\Person\ApprovalStatus')
+@use('Carbon\CarbonImmutable')
 
 <div
     @if (!$skipsPatientOtp) wire:init="loadAuthMethods" @endif
@@ -39,8 +42,11 @@
                     @php
                         $visibleApprovals = collect($approvals)->filter(function (array $approval): bool {
                             $status = ApprovalStatus::resolve($approval['status'] ?? null);
+                            $expiresAt = $approval['expiresAt'] ?? ($approval['expires_at'] ?? null);
 
-                            return ($approval['requestPending'] ?? false) || $status?->isGranted() || $status?->isAwaitingPatient();
+                            return ($approval['requestPending'] ?? false)
+                                || (($expiresAt === null || CarbonImmutable::parse($expiresAt)->isFuture())
+                                    && ($status?->isGranted() || $status?->isAwaitingPatient()));
                         });
                     @endphp
                     @forelse ($visibleApprovals as $approval)
@@ -52,6 +58,9 @@
                                     </span>
                                     <span class="text-xs text-gray-500 dark:text-gray-400">
                                         {{ $approval['grantedToDetails']['description'] ?? $approval['granted_to_details']['description'] ?? '' }}
+                                        @if ($approval['sharedCarePlanApproval'] ?? false)
+                                            {{ __('care-plan.shared_approval') }}
+                                        @endif
                                     </span>
                                 </div>
                             </td>
@@ -67,7 +76,7 @@
                                 </span>
                             </td>
                             <td class="index-table-td">
-                                {{ isset($approval['createdAt']) || isset($approval['created_at']) ? \Carbon\Carbon::parse($approval['createdAt'] ?? $approval['created_at'])->format('d.m.Y H:i') : '-' }}
+                                {{ isset($approval['createdAt']) || isset($approval['created_at']) ? Carbon::parse($approval['createdAt'] ?? $approval['created_at'])->format('d.m.Y H:i') : '-' }}
                             </td>
                             <td class="index-table-td-actions text-right">
                                 @if ($approval['requestPending'] ?? false)
@@ -84,7 +93,7 @@
                                     <button
                                         type="button"
                                         wire:click="cancelApproval('{{ $approval['uuid'] }}')"
-                                        wire:confirm="{{ __('care-plan.confirm_cancel_approval') }}"
+                                        wire:confirm="{{ __(($approval['sharedCarePlanApproval'] ?? false) ? 'care-plan.confirm_cancel_shared_approval' : 'care-plan.confirm_cancel_approval') }}"
                                         wire:loading.attr="disabled"
                                         wire:target="cancelApproval"
                                         class="button-secondary px-3 py-1 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
@@ -96,7 +105,9 @@
                                         <button
                                             type="button"
                                             wire:click="cancelApproval('{{ $approval['uuid'] }}')"
-                                            wire:confirm="{{ __('care-plan.confirm_cancel_approval') }}"
+                                            wire:confirm="{{ __(($approval['sharedCarePlanApproval'] ?? false) ? 'care-plan.confirm_cancel_shared_approval' : 'care-plan.confirm_cancel_approval') }}"
+                                            wire:loading.attr="disabled"
+                                            wire:target="cancelApproval"
                                             class="button-secondary px-3 py-1 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
                                         >
                                             {{ __('care-plan.revoke_approval') }}
@@ -223,7 +234,7 @@
                                             $methodDetails = array_filter([
                                                 $method['alias'] ?? null,
                                                 data_get($method, 'confidantPerson.name', data_get($method, 'confidant_person.name')),
-                                                \App\Enums\Person\AuthenticationMethod::confirmationPhone($method),
+                                                AuthenticationMethod::confirmationPhone($method),
                                             ]);
                                         @endphp
                                         <option
