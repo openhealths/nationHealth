@@ -6,11 +6,15 @@ namespace App\Jobs;
 
 use App\Core\EHealthJob;
 use App\Models\LegalEntity;
+use App\Dto\Division\DivisionGetMany as DivisionListData;
 use App\Classes\eHealth\EHealth;
 use App\Repositories\Repository;
 use GuzzleHttp\Promise\PromiseInterface;
 use App\Classes\eHealth\EHealthResponse;
+use Illuminate\Support\Collection;
 use Illuminate\Queue\Middleware\RateLimited;
+use Symfony\Component\ObjectMapper\ObjectMapper;
+use Symfony\Component\PropertyAccess\PropertyAccess;
 
 class DivisionSync extends EHealthJob
 {
@@ -25,19 +29,33 @@ class DivisionSync extends EHealthJob
     {
         return EHealth::division()
             ->withToken($token)
-            ->getMany(query: ['page' => $this->page]);
+            ->getMany(query: [
+                'page' => $this->page,
+                'page_size' => config('ehealth.api.page_size_max'),
+            ]);
     }
 
     // Store or update data in the database
     protected function processResponse(?EHealthResponse $response): void
     {
-        $divisionsList = $response?->validate();
+        $validated = $response?->validate();
 
-        if (empty($divisionsList)) {
+        if ($validated === null) {
             return;
         }
 
-        Repository::division()->saveDivisionsList($divisionsList, $this->legalEntity);
+        // First-login synchronization runs without a Livewire component.
+        $mapper = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
+            ->disableExceptionOnInvalidPropertyPath()
+            ->getPropertyAccessor());
+
+        $divisions = $mapper->map(new Collection(['divisions' => $validated]), DivisionListData::class);
+
+        if ($divisions->isEmpty()) {
+            return;
+        }
+
+        Repository::division()->saveDivisionsList($divisions, $this->legalEntity);
     }
 
     /**

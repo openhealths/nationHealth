@@ -8,8 +8,6 @@ use App\Models\Division;
 use App\Dto\EhealthMapping;
 use App\Livewire\Division\Forms\DivisionForm;
 use Symfony\Component\ObjectMapper\Attribute\Map;
-use Symfony\Component\ObjectMapper\ObjectMapper;
-use Symfony\Component\PropertyAccess\PropertyAccess;
 
 /**
  * Division payload in the format expected by the eHealth API.
@@ -18,6 +16,14 @@ use Symfony\Component\PropertyAccess\PropertyAccess;
 class Ehealth
 {
     use EhealthMapping;
+
+    #[Map(if: false)]
+    protected bool $registered = false;
+
+    public function __construct(bool $registered = false)
+    {
+        $this->registered = $registered;
+    }
 
     #[Map(source: 'division[name]')]
     public ?string $name = null;
@@ -28,7 +34,7 @@ class Ehealth
     #[Map(source: 'division[email]')]
     public ?string $email = null;
 
-    #[Map(source: 'division[externalId]', transform: [self::class, 'normalizeExternalId'])]
+    #[Map(source: 'division[externalId?]', transform: [self::class, 'normalizeExternalId'])]
     public ?string $externalId = null;
 
     /** @var array<int, array<string, mixed>> */
@@ -40,31 +46,20 @@ class Ehealth
     public array $phones = [];
 
     /** @var array{latitude: float|int|string|null, longitude: float|int|string|null}|null */
-    #[Map(source: 'division[location]')]
+    #[Map(source: 'division[location]', transform: [Location::class, 'normalizeLocation'])]
     public ?array $location = null;
 
     /** @var array<string, array<int, array<int, string>>> */
     #[Map(source: 'division[workingHours]', transform: [self::class, 'transformWorkingHours'])]
     public array $workingHours = [];
 
-    public static function fromForm(DivisionForm $form, ?Division $division = null): self
+    public static function normalizeExternalId(?string $value, DivisionForm $form, self $target): ?string
     {
-        $data = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessor())->map($form, self::class);
-
-        // An explicit empty string clears the external ID of a registered division.
-        if (!empty($division?->uuid) &&
-            \array_key_exists('externalId', $form->division) &&
-            blank($form->division['externalId'])
-        ) {
-            $data->externalId = '';
+        if (filled($value)) {
+            return $value;
         }
 
-        return $data;
-    }
-
-    public static function normalizeExternalId(?string $value): ?string
-    {
-        return $value === '' ? null : $value;
+        return $target->registered && \array_key_exists('externalId', $form->division) ? '' : null;
     }
 
     /**

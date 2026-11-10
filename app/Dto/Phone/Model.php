@@ -22,6 +22,15 @@ class Model implements ModelContract
 
     public function toModel(): PhoneModel
     {
-        return new PhoneModel(get_object_vars($this));
+        return new PhoneModel($this->toArray());
+    }
+
+    /** @return array{type: string, number: string} */
+    public function toArray(): array
+    {
+        return [
+            'type' => $this->type,
+            'number' => $this->number
+        ];
     }
 }

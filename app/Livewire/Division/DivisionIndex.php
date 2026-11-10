@@ -9,13 +9,15 @@ use Exception;
 use App\Models\User;
 use App\Enums\JobStatus;
 use App\Models\Division;
+use App\Repositories\Repository;
+use App\Dto\Division\DivisionGetMany as DivisionListData;
 use Illuminate\Bus\Batch;
 use App\Jobs\DivisionSync;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 use App\Models\LegalEntity;
 use Livewire\WithPagination;
 use App\Classes\eHealth\EHealth;
-use App\Repositories\Repository;
 use Livewire\Attributes\Computed;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
@@ -258,17 +260,17 @@ class DivisionIndex extends DivisionComponent
             }
         }
 
-        $syncQuery = [
-            'page' => 1,
-            'page_size' => config('ehealth.api.page_size_max')
-        ];
-
         try {
-            $response = EHealth::division()->getMany(query: $syncQuery);
+            $response = EHealth::division()->getMany(query: [
+                'page' => 1,
+                'page_size' => config('ehealth.api.page_size_max'),
+            ]);
 
-            $divisions = $response->validate();
+            $validated = $response->validate();
+            $divisions = $this->objectMapperForOptionalProperties()
+                ->map(new Collection(['divisions' => $validated]), DivisionListData::class);
 
-            Repository::division()->saveDivisionsList($divisions);
+            Repository::division()->saveDivisionsList($divisions, legalEntity());
         } catch (EHealthResponseException $err) {
             Log::channel('e_health_errors')->error(self::class . ':createDivision', ['error' => $err->getDetails()]);
             session()->flash('error', __('errors.ehealth.messages.server_error'));

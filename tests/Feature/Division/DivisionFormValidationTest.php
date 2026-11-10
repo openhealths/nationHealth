@@ -7,14 +7,18 @@ namespace Tests\Feature\Division;
 use App\Livewire\Division\DivisionCreate;
 use App\Livewire\Division\DivisionEdit;
 use App\Livewire\Division\Forms\DivisionForm;
+use App\Models\Division;
 use App\Models\LegalEntity;
 use App\Models\LegalEntityType;
+use App\Models\User;
 use App\Services\Dictionary\Collections\BasicDictionaryCollection;
 use App\Services\Dictionary\DictionaryManager;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\Features\SupportFormObjects\FormObjectSynth;
+use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -183,6 +187,7 @@ class DivisionFormValidationTest extends TestCase
         return [
             'arbitrary text' => ['not-a-coordinate', false, 'not-a-coordinate'],
             'comma decimal' => ['30,52', true, '30.52'],
+            'comma decimal with trailing zero' => ['12,90', true, '12.9'],
             'negative comma decimal' => ['-30,52', true, '-30.52'],
             'comma zero' => ['0,0', true, '0'],
             'multiple commas' => ['30,5,2', false, '30,5,2'],
@@ -193,6 +198,7 @@ class DivisionFormValidationTest extends TestCase
             'empty' => ['', false, ''],
             'missing' => [null, false, null],
             'decimal' => ['30.52', true, '30.52'],
+            'decimal with trailing zero' => ['12.90', true, '12.9'],
             'negative decimal' => ['-30.52', true, '-30.52'],
             'zero' => ['0', true, '0'],
             'numeric zero' => [0, true, '0'],
@@ -264,6 +270,50 @@ class DivisionFormValidationTest extends TestCase
                 $this->assertSame($otherValue, $component->divisionForm->division['location'][$otherAxis]);
             }
         }
+    }
+
+    public function test_create_accepts_comma_when_livewire_submits_both_coordinates_together(): void
+    {
+        $user = $this->mock(User::class);
+        $user->shouldReceive('cannot')->with('create', Division::class)->andReturnFalse();
+        Auth::shouldReceive('user')->andReturn($user);
+
+        $form = $this->divisionForm(['location' => ['latitude' => null, 'longitude' => null]]);
+        $component = new class extends DivisionCreate
+        {
+            public array $submittedLocation = [];
+
+            public function mount(LegalEntity $legalEntity): void
+            {
+            }
+
+            protected function saveToDB(?Division $division = null): ?Division
+            {
+                $division->id = 1;
+
+                return $division;
+            }
+
+            protected function divisionCreate(Division $division): void
+            {
+                $this->submittedLocation = $this->divisionForm->division['location'];
+            }
+
+            public function render(): string
+            {
+                return '<div></div>';
+            }
+        };
+
+        Livewire::test($component, ['legalEntity' => legalEntity()])
+            ->set('divisionForm.division', $form->division)
+            ->set('address', $form->getComponent()->address + ['settlementId' => 'adaa4abf-f530-461c-bcbf-a0ac210d955b'])
+            ->update(
+                calls: [['method' => 'create', 'params' => [], 'path' => '']],
+                updates: ['divisionForm.division.location' => ['latitude' => '22.22', 'longitude' => '21,11']]
+            )
+            ->assertHasNoErrors()
+            ->assertSet('submittedLocation', ['latitude' => '22.22', 'longitude' => '21.11']);
     }
 
     public function test_rejects_duplicate_phone_types(): void

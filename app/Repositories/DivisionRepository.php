@@ -7,23 +7,19 @@ namespace App\Repositories;
 use Arr;
 use Exception;
 use App\Models\Division;
-use App\Dto\Division\Model as DivisionData;
 use App\Models\LegalEntity;
 use App\Models\Relations\Phone;
 use App\Models\Relations\Address;
+use App\Dto\Division\DivisionGetMany;
+use App\Dto\Division\Model as DivisionData;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
-use App\Classes\eHealth\Api\Division as DivisionApi;
 
 class DivisionRepository
 {
     /**
-     * Is used as a unify method to save mapped division data object into the database.
-     * Together with addresses and phones relations.
+     * Save a mapped division and replace its relations in one transaction.
      *
-     * @param  DivisionData  $data  Mapped Division Data object. can be mapped from different sources (eHealth response, form data etc.)
-     * @param  Division  $division  The Division model instance to be updated
      * @param  LegalEntity  $legalEntity  The LegalEntity model instance associated with the division
      * @return Division Saved and reloaded Division model instance with updated relations
      * @throws \Throwable
@@ -54,29 +50,43 @@ class DivisionRepository
         });
     }
 
-    /**
-     * Saves a list of divisions to the database.
-     *
-     * @param  array  $divisionsList  The list of divisions to be saved
-     * @param  LegalEntity|null  $legalEntity  Optional legal entity associated with the divisions
-     * @return void
-     */
-    public function saveDivisionsList(array $divisionsList, ?LegalEntity $legalEntity = null): void
+    /** @param list<array<string, mixed>> $rows */
+    public function upsertDivisions(array $rows): void
     {
-        $legalEntity ??= legalEntity();
+        Division::upsert($rows, uniqueBy: ['uuid'], update: [
+            'uuid',
+            'external_id',
+            'name',
+            'type',
+            'mountain_group',
+            'location',
+            'email',
+            'working_hours',
+            'legal_entity_id',
+            'status',
+            'dls_id',
+            'dls_verified',
+            'ehealth_inserted_at',
+            'inserted_by',
+            'ehealth_updated_at',
+            'updated_by',
+        ]);
+    }
 
-        DB::transaction(function () use ($divisionsList, $legalEntity) {
-            $uspertData = app(DivisionApi::class)->normalizeResponseDataForUpsert($divisionsList, $legalEntity);
+    /** Persist a division list and its relationships in one transaction. */
+    public function saveDivisionsList(DivisionGetMany $divisions, LegalEntity $legalEntity): void
+    {
+        if ($divisions->isEmpty()) {
+            return;
+        }
 
-            // At first save all the Divisions to teh DB
-            Division::upsert($uspertData, uniqueBy: ['uuid'], update: new Division()->getFillable());
+        DB::transaction(function () use ($divisions, $legalEntity): void {
+            $this->upsertDivisions($divisions->toUpsertRows($legalEntity->id));
 
-            $divisionIds = $this->getDivisonListIds($divisionsList);
+            $divisionIds = $this->getDivisionIds($divisions->uuids());
+            $relations = $divisions->toRelationshipRows($divisionIds, now()->toDateTimeString());
 
-            $divisionsData = DivisionApi::getRelationshipData($divisionsList, $divisionIds);
-
-            // Then set relations to the Address & Phone and save them to DB too
-            $this->setSynDivisionsRelations($divisionsData);
+            $this->replaceDivisionRelations(array_values($divisionIds), $relations['addresses'], $relations['phones']);
         });
     }
 
@@ -211,18 +221,12 @@ class DivisionRepository
     /**
      * Retrieves a collection of division IDs keyed by their UUIDs.
      *
-     * This method takes a list of division data, extracts the UUIDs,
-     * and queries the database to get the corresponding primary keys (IDs).
-     *
-     * @param  array  $divisionList  An array of division data, where each element must contain a 'uuid' key.
-     * @return Collection A collection where keys are UUIDs and values are the corresponding division IDs.
+     * @param  list<string>  $uuids
+     * @return array<string, int> UUIDs mapped to local primary keys.
      */
-    public function getDivisonListIds(array $divisionList): Collection
+    public function getDivisionIds(array $uuids): array
     {
-        $divisionUuids = array_column($divisionList, 'uuid');
-
-        // Get ids of all the just inserted Divisions.
-        return Division::whereIn('uuid', $divisionUuids)->pluck('id', 'uuid');
+        return Division::whereIn('uuid', $uuids)->pluck('id', 'uuid')->all();
     }
 
     /**
@@ -232,18 +236,12 @@ class DivisionRepository
      * address and phone records for the given divisions and then bulk-inserting
      * the new relational data. It is designed to be used within a transaction.
      *
-     * @param  array  $dvisionsData  An array containing the relational data.
-     *                               Must include 'divisionIds', 'addresses', and 'phones' keys.
-     * @return void
+     * @param  list<int>  $divisionIds
+     * @param  list<array<string, mixed>>  $addressesData
+     * @param  list<array<string, mixed>>  $phonesData
      */
-    protected function setSynDivisionsRelations(array $dvisionsData): void
+    public function replaceDivisionRelations(array $divisionIds, array $addressesData, array $phonesData): void
     {
-        $divisionIds = $dvisionsData['divisionIds'];
-
-        $addressesData = $dvisionsData['addresses'];
-
-        $phonesData = $dvisionsData['phones'];
-
         // Remove all addresses records belongs to specified divisions
         Address::where('addressable_type', Division::class)
             ->whereIn('addressable_id', $divisionIds)

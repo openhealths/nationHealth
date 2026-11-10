@@ -219,34 +219,40 @@
                                 </div>
 
                                 <!-- PHONES -->
-                                <div
-                                    class="space-y-2"
-                                    x-data="{ phones: $wire.entangle('divisionForm.division.phones') }"
-                                    x-init="
-                                        if (! Array.isArray(phones) || phones.length === 0) {
-                                            phones = [{ type: '', number: '' }];
+                                <div class="space-y-2"
+                                    data-phone-errors="{{ json_encode($errors->get('divisionForm.division.phones.*')) }}"
+                                    x-data="{
+                                        phones: $wire.entangle('divisionForm.division.phones'),
+                                        phoneErrors: {},
+                                        unhookMorphed: null,
+                                        init() {
+                                            if (!Array.isArray(this.phones) || this.phones.length === 0) {
+                                                this.phones = [{ type: '', number: '' }];
+                                            }
+                                            this.phoneErrors = JSON.parse(this.$root.dataset.phoneErrors);
+                                            this.unhookMorphed = this.$wire.$hook('morphed', () => {
+                                                this.phoneErrors = JSON.parse(this.$root.dataset.phoneErrors);
+                                            });
+                                        },
+                                        destroy() {
+                                            this.unhookMorphed?.();
+                                        },
+                                        phoneError(index, field) {
+                                            return this.phoneErrors[`divisionForm.division.phones.${index}.${field}`]?.[0] ?? '';
                                         }
-                                    "
+                                    }"
                                     x-id="['phone']"
                                 >
                                     <template x-for="(phone, index) in phones" :key="index">
-                                        <div
-                                            x-data="{ errors: [] }"
-                                            x-init="errors = @js($errors->getMessages())"
-                                            class="grid grid-cols-1 items-center gap-6 md:grid-cols-3"
-                                        >
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
                                             {{-- Phone Type Select --}}
                                             <div class="form-group">
-                                                <select
-                                                    required
-                                                    x-model="phones[index].type"
-                                                    class="input-select"
-                                                    :class="{
-                                                        'input-error':
-                                                            errors[`divisionForm.division.phones.${index}.type`],
-                                                    }"
-                                                    :disabled="isDisabled"
-                                                    :id="$id('phone', '_type_' + index)"
+                                                <select required
+                                                        x-model="phones[index].type"
+                                                        class="input-select"
+                                                        :class="{ 'input-error': phoneError(index, 'type') }"
+                                                        :disabled="isDisabled"
+                                                        :id="$id('phone', '_type_' + index)"
                                                 >
                                                     <option value="_placeholder_" selected hidden>
                                                         -- {{ __('forms.type_mobile') }} --
@@ -264,11 +270,8 @@
                                                     </template>
                                                 </select>
 
-                                                <template x-if="errors[`divisionForm.division.phones.${index}.type`]">
-                                                    <p
-                                                        class="text-error"
-                                                        x-text="errors[`divisionForm.division.phones.${index}.type`]"
-                                                    ></p>
+                                                <template x-if="phoneError(index, 'type')">
+                                                    <p class="text-error" x-text="phoneError(index, 'type')"></p>
                                                 </template>
 
                                                 <label :for="$id('phone', '_type_' + index)" class="label">
@@ -287,10 +290,7 @@
                                                         x-model="phones[index].number"
                                                         x-mask="+380999999999"
                                                         :id="$id('phone', '_number' + index)"
-                                                        :class="{
-                                                            'input-error border-red-500':
-                                                                errors[`divisionForm.division.phones.${index}.number`],
-                                                        }"
+                                                        :class="{ 'input-error border-red-500': phoneError(index, 'number') }"
                                                         :disabled="isDisabled"
                                                     />
 
@@ -299,11 +299,8 @@
                                                     </label>
                                                 </div>
 
-                                                <template x-if="errors[`divisionForm.division.phones.${index}.number`]">
-                                                    <p
-                                                        class="text-error"
-                                                        x-text="errors[`divisionForm.division.phones.${index}.number`]"
-                                                    ></p>
+                                                <template x-if="phoneError(index, 'number')">
+                                                    <p class="text-error" x-text="phoneError(index, 'number')"></p>
                                                 </template>
                                             </div>
 
@@ -341,7 +338,9 @@
 
                                 <!-- LOCATION -->
 
-                                <div class="form-row-3">
+                                <div class="form-row-3"
+                                     @beforeinput="if (/e/i.test($event.data ?? '')) $event.preventDefault()"
+                                >
                                     <div class="form-group">
                                         <input
                                             type="text"
@@ -425,7 +424,7 @@
                                                 class="peer input"
                                                 x-bind:disabled="true"
                                                 name="insertedAt"
-                                                value="{{ $division->ehealthInsertedAt ?? '-' }}"
+                                                value="{{ formatDisplayDate($division->ehealthInsertedAt, 'd.m.Y') ?: '-' }}"
                                             />
                                             <label for="insertedAt" class="label">
                                                 {{ __('forms.inserted_at') }}
@@ -439,7 +438,7 @@
                                                 class="peer input"
                                                 x-bind:disabled="true"
                                                 name="updatedAt"
-                                                value="{{ $division->ehealthUpdatedAt ?? '-' }}"
+                                                value="{{ formatDisplayDate($division->ehealthUpdatedAt, 'd.m.Y') ?: '-' }}"
                                             />
                                             <label for="updatedAt" class="label"> {{ __('forms.updated_at') }} </label>
                                         </div>

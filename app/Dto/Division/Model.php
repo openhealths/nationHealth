@@ -13,6 +13,7 @@ use App\Enums\Status;
 use App\Livewire\Division\Forms\DivisionForm;
 use App\Dto\FormCollection;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Symfony\Component\ObjectMapper\Attribute\Map;
 use Symfony\Component\ObjectMapper\Condition\SourceClass;
 use Symfony\Component\ObjectMapper\Transform\MapCollection;
@@ -93,7 +94,7 @@ class Model implements ModelContract
     public array $phones = [];
 
     #[Map(if: false)]
-    private bool $isForm = false;
+    protected bool $isForm = false;
 
     public static function fromForm(self $value, DivisionForm $source): self
     {
@@ -126,17 +127,68 @@ class Model implements ModelContract
         return collect($items)->map(fn (array $item): FormCollection => new FormCollection($item))->values()->all();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return $this->toModelAttributes() + [
+            'addresses' => array_map(fn (AddressData $address): array => $address->toArray(), $this->addresses),
+            'phones' => array_map(fn (PhoneData $phone): array => $phone->toArray(), $this->phones),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toModelAttributes(): array
+    {
+        return [
+            'uuid' => $this->uuid,
+            'name' => $this->name,
+            'type' => $this->type,
+            'email' => $this->email,
+            'status' => $this->status,
+            'external_id' => $this->externalId,
+            'mountain_group' => $this->mountainGroup,
+            'location' => $this->location,
+            'working_hours' => $this->workingHours,
+            'dls_id' => $this->dlsId,
+            'dls_verified' => $this->dlsVerified,
+            'ehealth_inserted_at' => $this->ehealthInsertedAt,
+            'inserted_by' => $this->insertedBy,
+            'ehealth_updated_at' => $this->ehealthUpdatedAt,
+            'updated_by' => $this->updatedBy,
+        ];
+    }
+
+    /**
+     * Apply the mapped attributes to a Division model in memory.
+     *
+     * Form data preserves the model's existing eHealth license and audit metadata.
+     *
+     * @param  Division|null  $division  Target model. Pass null to create a new instance.
+     * @return Division The populated target model.
+     */
     public function toModel(?Division $division = null): Division
     {
         $division ??= new Division();
 
-        $excluded = ['addresses', 'phones', 'isForm'];
+        $attributes = $this->toModelAttributes();
+
         if ($this->isForm) {
-            $excluded = array_merge($excluded, ['dlsId', 'dlsVerified', 'ehealthInsertedAt', 'insertedBy', 'ehealthUpdatedAt', 'updatedBy']);
+            $attributes = Arr::except($attributes, [
+                'dls_id',
+                'dls_verified',
+                'ehealth_inserted_at',
+                'inserted_by',
+                'ehealth_updated_at',
+                'updated_by',
+            ]);
         }
 
-        foreach (Arr::except(get_object_vars($this), $excluded) as $key => $value) {
-            $division->setAttribute($key, $value);
+        foreach ($attributes as $key => $value) {
+            $division->setAttribute(Str::camel($key), $value);
         }
 
         return $division;

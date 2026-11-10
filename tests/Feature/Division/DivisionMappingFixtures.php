@@ -8,16 +8,25 @@ use App\Classes\eHealth\Api\Division as DivisionApi;
 use App\Classes\eHealth\Api\Responses\Collections\DivisionCreate;
 use App\Classes\eHealth\EHealthResponse;
 use App\Dto\Division\Model;
+use App\Dto\Division\DivisionGetMany;
 use App\Livewire\Division\DivisionComponent;
 use App\Livewire\Division\Forms\DivisionForm;
 use App\Models\Division;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 use Symfony\Component\ObjectMapper\ObjectMapper;
 use Symfony\Component\PropertyAccess\PropertyAccess;
 
 trait DivisionMappingFixtures
 {
+    protected function mapList(array $rows): DivisionGetMany
+    {
+        return new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
+            ->disableExceptionOnInvalidPropertyPath()->getPropertyAccessor())
+            ->map(new Collection(['divisions' => $rows]), DivisionGetMany::class);
+    }
+
     protected function response(array $overrides = []): array
     {
         return array_replace([

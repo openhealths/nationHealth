@@ -84,7 +84,7 @@ class EhealthDivisionMappingTest extends TestCase
                 'settlement_type' => 'CITY',
             ]],
             'phones' => [['type' => 'MOBILE', 'number' => '+380501234567']],
-            'location' => ['latitude' => 50.45, 'longitude' => 30.52],
+            'location' => ['latitude' => '50.45', 'longitude' => '30.52'],
             'working_hours' => ['mon' => [['08.00', '17.30']], 'sun' => []],
         ], $data);
     }
@@ -93,7 +93,28 @@ class EhealthDivisionMappingTest extends TestCase
     {
         $data = $this->map($this->form(['location' => ['latitude' => 0.0, 'longitude' => 0.0]]))->toArray();
 
-        $this->assertSame(['latitude' => 0.0, 'longitude' => 0.0], $data['location']);
+        $this->assertSame(['latitude' => '0', 'longitude' => '0'], $data['location']);
+    }
+
+    public function test_outbound_mapping_normalizes_precise_coordinates_without_changing_the_form(): void
+    {
+        $input = $this->form([
+            'externalId' => '00123',
+            'location' => [
+                'latitude' => '50,324231234567890123456789',
+                'longitude' => '-1.799999999999999999e2',
+            ],
+        ]);
+        $form = $this->divisionForm($input);
+
+        $data = $this->mapForm($form)->toArray();
+
+        $this->assertSame([
+            'latitude' => '50.32423123456789', 'longitude' => '-179.99999999999999',
+        ], $data['location']);
+        $this->assertSame('00123', $data['external_id']);
+        $this->assertSame($input['phones'], $data['phones']);
+        $this->assertSame($input, $form->division);
     }
 
     public function test_ignores_unrelated_form_keys(): void
@@ -179,11 +200,11 @@ class EhealthDivisionMappingTest extends TestCase
     public function test_combined_payloads_preserve_meaningful_zeros_and_remove_empty_fields(): void
     {
         $locations = [
-            ['latitude' => 0, 'longitude' => 0],
-            ['latitude' => 0.0, 'longitude' => 0.0],
-            ['latitude' => -0.0, 'longitude' => 0.0],
-            ['latitude' => 0, 'longitude' => 30.52],
-            ['latitude' => 50.45, 'longitude' => 0],
+            [['latitude' => 0, 'longitude' => 0], ['latitude' => '0', 'longitude' => '0']],
+            [['latitude' => 0.0, 'longitude' => 0.0], ['latitude' => '0', 'longitude' => '0']],
+            [['latitude' => -0.0, 'longitude' => 0.0], ['latitude' => '0', 'longitude' => '0']],
+            [['latitude' => 0, 'longitude' => 30.52], ['latitude' => '0', 'longitude' => '30.52']],
+            [['latitude' => 50.45, 'longitude' => 0], ['latitude' => '50.45', 'longitude' => '0']],
         ];
         $schedules = [
             [[], []],
@@ -193,7 +214,7 @@ class EhealthDivisionMappingTest extends TestCase
 
         foreach (self::externalIds() as [$externalId, $keepExternalId]) {
             foreach (self::optionalAddressValues() as [$addressValue, $keepAddressValue]) {
-                foreach ($locations as $location) {
+                foreach ($locations as [$location, $expectedLocation]) {
                     foreach ($schedules as [$workingHours, $expectedHours]) {
                         $input = $this->form([
                             'externalId' => $externalId,
@@ -212,7 +233,7 @@ class EhealthDivisionMappingTest extends TestCase
                             'email' => 'div@example.com',
                             'addresses' => [['type' => 'RESIDENCE', 'country' => 'UA']],
                             'phones' => [['type' => 'MOBILE', 'number' => '+380501234567']],
-                            'location' => $location,
+                            'location' => $expectedLocation,
                             'working_hours' => $expectedHours,
                         ];
                         if ($keepAddressValue) {
@@ -223,7 +244,7 @@ class EhealthDivisionMappingTest extends TestCase
                         }
 
                         $this->assertEquals($expected, $data);
-                        $this->assertSame($location, $data['location']);
+                        $this->assertSame($expectedLocation, $data['location']);
                         $this->assertSame($input, $form->division);
                         $this->assertEquals($expected, json_decode(json_encode($data, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR));
                     }

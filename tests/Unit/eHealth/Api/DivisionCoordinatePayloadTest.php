@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace Tests\Unit\eHealth\Api;
 
 use App\Classes\eHealth\Api\Division;
+use App\Dto\Division\Location;
+use Illuminate\Support\Collection;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
+use Symfony\Component\ObjectMapper\ObjectMapper;
+use Symfony\Component\PropertyAccess\PropertyAccess;
 
 class DivisionCoordinatePayloadTest extends TestCase
 {
@@ -52,9 +56,12 @@ class DivisionCoordinatePayloadTest extends TestCase
             . '"location":{"latitude":' . $expectedLatitude . ',"longitude":' . $expectedLongitude . '}}';
         $api = $this->fakeApi($expected);
 
-        $api->create($data);
-        $api->update('division-uuid', $data);
-        $api->update(null, $data);
+        $location = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessor())
+            ->map(new Collection($data['location']), Location::class);
+        $payload = array_replace($data, ['location' => $location->toArray()]);
+        $api->create($payload);
+        $api->update('division-uuid', $payload);
+        $api->update(null, $payload);
 
         Http::assertSentCount(3);
     }
@@ -71,6 +78,47 @@ class DivisionCoordinatePayloadTest extends TestCase
         ];
     }
 
+    public function test_http_client_serializes_decimal_numbers_without_applying_precision_rules(): void
+    {
+        $this->fakeApi('{"location":{"latitude":30.1234567890123456789,"longitude":50.324231234567890123456789}}')
+            ->create(['location' => ['latitude' => '30.1234567890123456789', 'longitude' => '50.324231234567890123456789']]);
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_create_and_update_accept_float_coordinates_directly(): void
+    {
+        $data = ['location' => ['latitude' => 0.0, 'longitude' => 30.52]];
+        $api = $this->fakeApi('{"location":{"latitude":0,"longitude":30.52}}');
+
+        $api->create($data);
+        $api->update('division-uuid', $data);
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_create_and_update_accept_both_decimal_separators_directly(): void
+    {
+        $data = ['location' => ['latitude' => '12.90', 'longitude' => '12,90']];
+        $api = $this->fakeApi('{"location":{"latitude":12.9,"longitude":12.9}}');
+
+        $api->create($data);
+        $api->update('division-uuid', $data);
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_create_and_update_accept_decimal_coordinates_with_surrounding_whitespace(): void
+    {
+        $data = ['location' => ['latitude' => ' 30.1234567890123456789 ', 'longitude' => "\t50,45\r\n"]];
+        $api = $this->fakeApi('{"location":{"latitude":30.1234567890123456789,"longitude":50.45}}');
+
+        $api->create($data);
+        $api->update('division-uuid', $data);
+
+        Http::assertSentCount(2);
+    }
+
     #[DataProvider('optionalLocations')]
     public function test_preserves_optional_location_values(array $data, string $expected): void
     {
@@ -79,7 +127,7 @@ class DivisionCoordinatePayloadTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    private function fakeApi(string $expected): Division
+    protected function fakeApi(string $expected): Division
     {
         config(['ehealth.api.domain' => 'https://ehealth.example']);
         Http::fake(function (Request $request) use ($expected) {

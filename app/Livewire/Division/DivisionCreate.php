@@ -7,22 +7,18 @@ namespace App\Livewire\Division;
 use Exception;
 use Throwable;
 use App\Models\Division;
+use App\Repositories\Repository;
 use App\Models\LegalEntity;
 use App\Models\Relations\Phone;
 use Livewire\Attributes\Locked;
 use App\Classes\eHealth\EHealth;
-use App\Repositories\Repository;
 use App\Traits\WorkTimeUtilities;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;
 use App\Dto\Division\Model as DivisionData;
-use App\Dto\Division\Ehealth as EhealthData;
-use Symfony\Component\ObjectMapper\ObjectMapper;
-use App\Dto\Division\Coordinate as CoordinateData;
 use Livewire\Features\SupportRedirects\Redirector;
-use Symfony\Component\PropertyAccess\PropertyAccess;
 
 class DivisionCreate extends DivisionComponent
 {
@@ -63,7 +59,7 @@ class DivisionCreate extends DivisionComponent
      */
     public function updatedDivisionFormDivisionLocationLatitude($value): void
     {
-        $this->divisionForm->division['location']['latitude'] = CoordinateData::fromInput($value)->value;
+        $this->updateLocationCoordinate('latitude', $value);
     }
 
     /**
@@ -78,7 +74,7 @@ class DivisionCreate extends DivisionComponent
      */
     public function updatedDivisionFormDivisionLocationLongitude($value): void
     {
-        $this->divisionForm->division['location']['longitude'] = CoordinateData::fromInput($value)->value;
+        $this->updateLocationCoordinate('longitude', $value);
     }
 
     /**
@@ -172,9 +168,7 @@ class DivisionCreate extends DivisionComponent
     protected function divisionCreate(Division $division): void
     {
         try {
-            $divisionEhealthMapped = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessor())
-                ->map($this->divisionForm, EhealthData::class)
-                ->toArray();
+            $divisionEhealthMapped = $this->prepareRequestData();
 
             $response = EHealth::division()->create(data: $divisionEhealthMapped)->validate();
             // If the response is empty, it means the create failed and uncatched
@@ -191,9 +185,7 @@ class DivisionCreate extends DivisionComponent
         }
 
         try {
-            $divisionModelMapped = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
-                ->disableExceptionOnInvalidPropertyPath()
-                ->getPropertyAccessor())
+            $divisionModelMapped = $this->objectMapperForOptionalProperties()
                 ->map($response, DivisionData::class);
 
             Repository::division()->saveMappedDivision($divisionModelMapped, $division, legalEntity());
