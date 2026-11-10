@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Referral;
 
+use App\Classes\eHealth\Api\Patient\ServiceRequest as PatientServiceRequestApi;
+use App\Classes\eHealth\EHealthResponse;
+use App\Core\Arr;
+use App\Livewire\DiagnosticReport\DiagnosticReportCreate;
+use App\Livewire\EncounterPackage\EncounterPackageComponent;
+use App\Livewire\Procedure\ProcedureCreate;
+use App\Models\Employee\Employee;
 use App\Models\Person\Person;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
@@ -11,6 +18,9 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
+use ReflectionMethod;
 use Tests\TestCase;
 
 class ServiceRequestFhirPersistenceTest extends TestCase
@@ -170,5 +180,146 @@ class ServiceRequestFhirPersistenceTest extends TestCase
         $record->refresh();
         $this->assertSame($resource['occurrencePeriod'], $repo->getResource($record)['occurrencePeriod']);
         $this->assertNull($record->occurrencePeriod->getRawOriginal('start'));
+    }
+
+    public static function clinicalReferralComponents(): array
+    {
+        return [
+            'procedure' => [ProcedureCreate::class],
+            'diagnostic report' => [DiagnosticReportCreate::class],
+            'encounter package' => [EncounterPackageComponent::class],
+        ];
+    }
+
+    #[DataProvider('clinicalReferralComponents')]
+    public function test_selected_referral_import_uses_full_details_in_each_clinical_component(string $componentClass): void
+    {
+        $person = $this->person();
+        $resource = $this->resource();
+        $resource['subject'] = ['identifier' => ['value' => $person->uuid, 'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'patient']]]]];
+        $this->mockReferralDetails($person, $resource['id'], Arr::toSnakeCase($resource));
+        $component = $this->referralSearchComponent($person, $resource['id'], $componentClass);
+
+        $details = (new ReflectionMethod($component, 'getSearchedElectronicReferral'))->invoke($component, $resource['id']);
+        (new ReflectionMethod($component, 'storeElectronicReferralsIfMissing'))->invoke($component, [['referral' => $details, 'employee' => new Employee()]]);
+
+        $repo = app(ServiceRequestRequestRepository::class);
+        $record = $repo->findByUuid($resource['id']);
+        $this->assertNotNull($record);
+        $this->assertEquals($resource, $repo->getResource($record));
+        $this->assertSame('service_group', data_get($repo->getResource($record), 'code.identifier.type.coding.0.code'));
+    }
+
+    public function test_already_local_selected_referral_does_not_require_another_remote_read(): void
+    {
+        $person = $this->person();
+        $resource = $this->resource();
+        $repo = app(ServiceRequestRequestRepository::class);
+        $record = $repo->storeResource($resource, $person->id);
+        $this->mock(PatientServiceRequestApi::class)->shouldNotReceive('getById');
+        $component = $this->referralSearchComponent($person, $resource['id']);
+
+        (new ReflectionMethod($component, 'storeElectronicReferralIfMissing'))->invoke($component, $resource['id'], new Employee());
+
+        $this->assertEquals($resource, $repo->getResource($record));
+        $this->assertSame(1, ServiceRequestRequest::whereUuid($resource['id'])->count());
+    }
+
+    public function test_a_local_referral_of_another_patient_is_not_silently_skipped(): void
+    {
+        $resource = $this->resource();
+        app(ServiceRequestRequestRepository::class)->storeResource($resource, $this->person()->id);
+        $this->mock(PatientServiceRequestApi::class)->shouldNotReceive('getById');
+        $component = $this->referralSearchComponent($this->person(), $resource['id']);
+
+        $this->expectException(InvalidArgumentException::class);
+        (new ReflectionMethod($component, 'getSearchedElectronicReferral'))->invoke($component, $resource['id']);
+    }
+
+    public function test_a_uuid_not_in_the_search_results_cannot_be_imported(): void
+    {
+        $person = $this->person();
+        $uuid = (string) Str::uuid();
+        $this->mock(PatientServiceRequestApi::class)->shouldNotReceive('getById');
+        $component = $this->referralSearchComponent($person, (string) Str::uuid());
+
+        $this->assertNull((new ReflectionMethod($component, 'getSearchedElectronicReferral'))->invoke($component, $uuid));
+        $this->assertDatabaseMissing('service_request_requests', ['uuid' => $uuid]);
+    }
+
+    public function test_single_item_detail_list_is_unwrapped_before_import(): void
+    {
+        $person = $this->person();
+        $resource = $this->resource();
+        $native = Arr::toSnakeCase($resource);
+        $this->mockReferralDetails($person, $resource['id'], [$native]);
+        $component = $this->referralSearchComponent($person, $resource['id']);
+
+        $this->assertSame($native, (new ReflectionMethod($component, 'getSearchedElectronicReferral'))->invoke($component, $resource['id']));
+    }
+
+    public static function mismatchedReferralDetails(): array
+    {
+        return ['referral UUID' => ['id'], 'patient UUID' => ['subject']];
+    }
+
+    #[DataProvider('mismatchedReferralDetails')]
+    public function test_mismatched_remote_details_are_rejected_before_import(string $field): void
+    {
+        $person = $this->person();
+        $resource = $this->resource();
+        $uuid = $resource['id'];
+        if ($field === 'id') {
+            $resource['id'] = (string) Str::uuid();
+        } else {
+            $resource['subject'] = ['identifier' => ['value' => (string) Str::uuid()]];
+        }
+        $this->mockReferralDetails($person, $uuid, Arr::toSnakeCase($resource));
+        $component = $this->referralSearchComponent($person, $uuid);
+
+        try {
+            (new ReflectionMethod($component, 'storeElectronicReferralIfMissing'))->invoke($component, $uuid, new Employee());
+            $this->fail('Mismatched referral identity must block import.');
+        } catch (\Illuminate\Validation\ValidationException) {
+            $this->assertDatabaseMissing('service_request_requests', ['uuid' => $uuid]);
+            $this->assertDatabaseMissing('service_request_requests', ['uuid' => $resource['id']]);
+        }
+    }
+
+    public function test_failed_detail_read_does_not_import_the_display_summary(): void
+    {
+        $person = $this->person();
+        $uuid = $this->resource()['id'];
+        $component = $this->referralSearchComponent($person, $uuid);
+        $this->mock(PatientServiceRequestApi::class)->shouldReceive('getById')->once()
+            ->andThrow(new \App\Exceptions\EHealth\EHealthConnectionException('Synthetic remote failure'));
+
+        try {
+            (new ReflectionMethod($component, 'storeElectronicReferralIfMissing'))->invoke($component, $uuid, new Employee());
+            $this->fail('A failed detail read must block import.');
+        } catch (\App\Exceptions\EHealth\EHealthConnectionException) {
+            $this->assertDatabaseMissing('service_request_requests', ['uuid' => $uuid]);
+        }
+    }
+
+    private function referralSearchComponent(Person $person, string $uuid, string $componentClass = ProcedureCreate::class): object
+    {
+        $component = new $componentClass();
+        $component->personId = $person->id;
+        $component->patientUuid = $person->uuid;
+        $component->electronicReferralSearchResults = [$uuid => [
+            'id' => $uuid, 'requisition' => '0000-1111-2222-3333',
+            'category' => 'Діагностична процедура', 'service' => ['id' => 'display-service'],
+        ]];
+
+        return $component;
+    }
+
+    private function mockReferralDetails(Person $person, string $uuid, array $details): void
+    {
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->once()->andReturn($details);
+        $this->mock(PatientServiceRequestApi::class)->shouldReceive('getById')->once()
+            ->with($person->uuid, $uuid, [], true)->andReturn($response);
     }
 }
