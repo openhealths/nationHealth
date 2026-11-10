@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\EncounterPackage\Concerns;
 
 use App\Classes\eHealth\EHealth;
+use App\Exceptions\EHealth\EHealthValidationException;
 use App\Enums\JobStatus;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
@@ -82,10 +83,14 @@ trait ManagesIncomingReferralSelection
         } catch (Throwable $exception) {
             $this->preparedElectronicReferralUuid = null;
             $this->selectedReferralUuid = null;
-            $this->addError('form.encounter.referralNumber', $exception->getMessage());
+            report($exception);
+            $message = $exception instanceof EHealthValidationException
+                ? $exception->getFormattedMessage()
+                : $exception->getMessage();
+            $this->addError('form.encounter.referralNumber', $message);
             Session::flash(
                 'error',
-                __('encounters.messages.referral_use_failed', ['message' => $exception->getMessage()])
+                __('encounters.messages.referral_use_failed', ['message' => $message])
             );
 
             return false;
@@ -180,8 +185,12 @@ trait ManagesIncomingReferralSelection
         } catch (Throwable $exception) {
             $this->pendingElectronicReferralUuid = null;
             $this->selectedReferralUuid = null;
-            $this->addError('form.encounter.referralNumber', $exception->getMessage());
-            Session::flash('error', __('encounters.messages.referral_use_failed', ['message' => $exception->getMessage()]));
+            report($exception);
+            $message = $exception instanceof EHealthValidationException
+                ? $exception->getFormattedMessage()
+                : $exception->getMessage();
+            $this->addError('form.encounter.referralNumber', $message);
+            Session::flash('error', __('encounters.messages.referral_use_failed', ['message' => $message]));
 
             return false;
         }
