@@ -10,6 +10,7 @@ use App\Exceptions\EHealth\EHealthJobTimeoutException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Services\MedicalEvents\EHealthJobResolver;
 use Mockery;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
@@ -54,7 +55,7 @@ class EHealthJobResolverTest extends TestCase
             ['status' => 'wat'],
         ]);
 
-        $this->expectException(\App\Exceptions\EHealth\EHealthValidationException::class);
+        $this->expectException(EHealthValidationException::class);
 
         (new EHealthJobResolver())->resolve($this->jobResponse());
     }
@@ -126,6 +127,17 @@ class EHealthJobResolverTest extends TestCase
         }
     }
 
+    public function test_invalid_job_response_is_not_used_for_a_processing_decision(): void
+    {
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldNotReceive('getData');
+        $response->shouldReceive('validate')->once()->andThrow(ValidationException::withMessages(['status' => 'Missing job status']));
+        $this->mock(Job::class)->shouldReceive('getDetails')->once()->with('job-123')->andReturn($response);
+        $this->expectException(ValidationException::class);
+
+        (new EHealthJobResolver())->resolve($this->jobResponse());
+    }
+
     public function test_assert_prequalify_valid_rejects_an_invalid_program(): void
     {
         $this->expectException(EHealthValidationException::class);
@@ -164,7 +176,8 @@ class EHealthJobResolverTest extends TestCase
 
         foreach ($statuses as $status) {
             $response = Mockery::mock(EHealthResponse::class);
-            $response->shouldReceive('validate')->andReturn($status);
+            $response->shouldNotReceive('getData');
+            $response->shouldReceive('validate')->once()->andReturn($status);
 
             $jobApi->shouldReceive('getDetails')->once()->with('job-123')->andReturn($response);
         }

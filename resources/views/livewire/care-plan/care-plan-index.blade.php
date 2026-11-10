@@ -1,6 +1,7 @@
+@use('App\Enums\CarePlanStatusFilter')
+@use('App\Enums\CarePlanCompletenessFilter')
 @use('App\Livewire\CarePlan\CarePlanIndex')
 @use('App\Enums\CarePlanStatus')
-@use('Illuminate\Support\Str')
 
 <div data-livewire-background-actions="checkSyncStatus">
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
@@ -77,7 +78,8 @@
                             id="filterStatus"
                             class="input-select peer w-full"
                         >
-                            <option value="">{{ __('forms.select') }}</option>
+                            <option value="{{ CarePlanStatusFilter::CURRENT->value }}">{{ __('care-plan.current_and_drafts') }}</option>
+                            <option value="{{ CarePlanStatusFilter::ALL->value }}">{{ __('care-plan.all_statuses') }}</option>
                             @foreach (CarePlanStatus::filterOptions() as $status)
                                 <option value="{{ $status->value }}">{{ $status->label() }}</option>
                             @endforeach
@@ -155,17 +157,27 @@
                 </div>
             </div>
 
+            <div class="form-group group mb-6">
+                <select
+                    wire:model.live="filterCompleteness"
+                    id="filterCompleteness"
+                    class="input-select peer w-full"
+                >
+                    <option value="{{ CarePlanCompletenessFilter::COMPLETE->value }}">{{ __('care-plan.list_complete') }}</option>
+                    <option value="{{ CarePlanCompletenessFilter::ALL->value }}">{{ __('care-plan.list_all') }}</option>
+                    <option value="{{ CarePlanCompletenessFilter::INCOMPLETE->value }}">{{ __('care-plan.list_incomplete') }}</option>
+                </select>
+                <label for="filterCompleteness" class="label">
+                    {{ __('care-plan.list_completeness') }}
+                </label>
+            </div>
+
             <div class="space-y-4">
-                @forelse ($carePlans as $plan)
+                @forelse ($this->carePlans as $plan)
                     @php
                         /** @var \App\Models\CarePlan $plan */
                         $statusEnum = CarePlanStatus::fromStored($plan->status);
-                        $displayTitle = trim((string) $plan->title);
-                        if ($displayTitle === '' || Str::isUuid($displayTitle)) {
-                            $displayTitle = filled($plan->requisition)
-                                ? __('care-plan.care_plan_with_number', ['number' => $plan->requisition])
-                                : __('care-plan.care_plan');
-                        }
+                        $displayTitle = $plan->displayTitle();
 
                         $created = $plan->created_at?->format(config('app.date_format', 'd.m.Y')) ?? '-';
                         $start = $plan->period_start?->format(config('app.date_format', 'd.m.Y')) ?? '-';
@@ -189,7 +201,7 @@
                                     {{ $displayTitle }}
                                     @if ($plan->requiresFhirImport())
                                         <p class="mt-2 text-sm font-normal text-gray-600 dark:text-gray-300">
-                                            {{ $plan->status === 'draft' ? __('care-plan.draft_backfill_required') : __('care-plan.full_sync_required') }}
+                                            {{ $plan->status === 'draft' ? __('care-plan.draft_backfill_required') : __('care-plan.registry_incomplete') }}
                                         </p>
                                     @endif
                                 </div>

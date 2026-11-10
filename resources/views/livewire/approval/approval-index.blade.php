@@ -251,7 +251,7 @@
                                                         {{ __('forms.view_details') }}
                                                     </button>
                                                 @endif
-                                                @if (!$isExpired && ($remote ? ($local ? Auth::user()->can('cancel', $local) : $this->canCancelSearchedApproval()) : Auth::user()->can('cancel', $approval)))
+                                                @if (!$isExpired && ($remote ? ($local ? Auth::user()->can('cancel', [$local, legalEntity()]) : $this->canCancelSearchedApproval()) : Auth::user()->can('cancel', [$approval, legalEntity()])))
                                                     <button
                                                         type="button"
                                                         wire:click="{{ $remote ? 'confirmCancelSearchedApproval(\''.$approval['id'].'\')' : 'confirmCancelApproval('.$approval->id.')' }}"

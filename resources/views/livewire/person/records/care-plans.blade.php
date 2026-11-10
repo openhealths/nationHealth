@@ -1,3 +1,6 @@
+@use('App\Models\CarePlan')
+@use('App\Enums\CarePlanStatusFilter')
+@use('App\Enums\CarePlanCompletenessFilter')
 @use('App\Enums\CarePlanStatus')
 <x-layouts.patient :showLegacyMessages="false" :personId="$personId" :patientFullName="$patientFullName">
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
@@ -7,7 +10,7 @@
         </div>
     @endif
     <x-slot name="headerActions">
-        @can('create', \App\Models\CarePlan::class)
+        @can('create', CarePlan::class)
             <a
                 href="{{ route('care-plans.create', [legalEntity(), $personId]) }}"
                 class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
@@ -17,9 +20,11 @@
             </a>
         @endcan
 
-        <button type="button" class="button-primary-outline px-5 py-2 text-sm whitespace-nowrap">
-            {{ __('patients.data_access') }}
-        </button>
+        <livewire:person.records.patient-approval
+            :person-id="$personId"
+            :care-plans-only="true"
+            :key="'care-plan-read-approval-'.$personId"
+        />
 
         <button
             wire:click.prevent="sync"
@@ -95,7 +100,8 @@
                         id="filterStatus"
                         class="input-select peer w-full"
                     >
-                        <option value="">{{ __('forms.select') }} ...</option>
+                        <option value="{{ CarePlanStatusFilter::CURRENT->value }}">{{ __('care-plan.current_and_drafts') }}</option>
+                        <option value="{{ CarePlanStatusFilter::ALL->value }}">{{ __('care-plan.all_statuses') }}</option>
                         @foreach (CarePlanStatus::filterOptions() as $status)
                             <option value="{{ $status->value }}">{{ $status->label() }}</option>
                         @endforeach
@@ -166,6 +172,21 @@
                 </div>
             </div>
 
+            <div class="form-group group mb-6">
+                <select
+                    wire:model.live="filterCompleteness"
+                    id="filterCompleteness"
+                    class="input-select peer w-full"
+                >
+                    <option value="{{ CarePlanCompletenessFilter::COMPLETE->value }}">{{ __('care-plan.list_complete') }}</option>
+                    <option value="{{ CarePlanCompletenessFilter::ALL->value }}">{{ __('care-plan.list_all') }}</option>
+                    <option value="{{ CarePlanCompletenessFilter::INCOMPLETE->value }}">{{ __('care-plan.list_incomplete') }}</option>
+                </select>
+                <label for="filterCompleteness" class="label">
+                    {{ __('care-plan.list_completeness') }}
+                </label>
+            </div>
+
             <div class="space-y-4">
                 @forelse ($carePlans as $plan)
                     <div class="record-inner-card" wire:key="care-plan-{{ $plan['id'] }}">
@@ -176,7 +197,7 @@
                                     {{ $plan['title'] }}
                                     @if ($plan['requiresFhirImport'])
                                         <p class="mt-2 text-sm font-normal text-gray-600 dark:text-gray-300">
-                                            {{ $plan['status'] === 'draft' ? __('care-plan.draft_backfill_required') : __('care-plan.full_sync_required') }}
+                                            {{ $plan['status'] === 'draft' ? __('care-plan.draft_backfill_required') : __('care-plan.registry_incomplete') }}
                                         </p>
                                     @endif
                                 </div>

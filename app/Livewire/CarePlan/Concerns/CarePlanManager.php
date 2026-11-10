@@ -16,6 +16,7 @@ use App\Exceptions\EHealth\EHealthJobTimeoutException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Repositories\CarePlanActivityRepository;
+use App\Repositories\Repository;
 use App\Repositories\CarePlanRepository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
 use App\Services\MedicalEvents\PatientApprovalService;
@@ -27,21 +28,29 @@ use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
 use Exception;
 use RuntimeException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Throwable;
+use App\Livewire\Concerns\ReadsClinicalSnapshots;
+use Livewire\Attributes\Locked;
+use App\Services\MedicalEvents\FhirResource;
+use Illuminate\Support\Facades\Bus;
+use App\Jobs\CarePlanFullSync;
+use App\Models\LegalEntity;
+use Illuminate\Support\Facades\Crypt;
 
 trait CarePlanManager
 {
     use HandlesCarePlanApprovalSms;
 
-    use \App\Livewire\Concerns\ReadsClinicalSnapshots;
+    use ReadsClinicalSnapshots;
 
     use SynchronizesCarePlans;
     use SubmitsClinicalOperations;
 
-    #[\Livewire\Attributes\Locked]
+    #[Locked]
     public bool $activateAfterSubmission = false;
 
     public bool $showActivationPrompt = false;
@@ -87,7 +96,7 @@ trait CarePlanManager
         }
 
         try {
-            $this->remotePlanDetails = app(CarePlanRepository::class)->displayedDetails($this->carePlan, $this->dictionaries ?? []);
+            $this->remotePlanDetails = Repository::carePlan()->displayedDetails($this->carePlan, $this->dictionaries ?? []);
         } catch (Throwable $exception) {
             report($exception);
             Session::flash('error', __('device-requests.messages.plan_details_unavailable'));
@@ -478,7 +487,7 @@ trait CarePlanManager
         }
         try {
             $complete = $this->actionType === 'complete_activity';
-            $reason = \App\Services\MedicalEvents\FhirResource::make()->coding($complete ? 'eHealth/care_plan_activity_complete_reasons' : 'eHealth/care_plan_activity_cancel_reasons', $this->statusReason)->toCodeableConcept();
+            $reason = FhirResource::make()->coding($complete ? 'eHealth/care_plan_activity_complete_reasons' : 'eHealth/care_plan_activity_cancel_reasons', $this->statusReason)->toCodeableConcept();
             $api = EHealth::carePlanActivity();
             $outcomes = [];
             if ($complete) {
@@ -488,7 +497,7 @@ trait CarePlanManager
 
                     return;
                 }
-                $outcomes = [\App\Services\MedicalEvents\FhirResource::make()->coding('eHealth/care_plan_activity_outcomes', $this->outcomeCode)->toCodeableConcept()];
+                $outcomes = [FhirResource::make()->coding('eHealth/care_plan_activity_outcomes', $this->outcomeCode)->toCodeableConcept()];
                 $payload = CarePlanActivityForm::buildCompleteContent($reason, $outcomes);
                 $result = $this->submitClinicalOperation($activity, ['status' => 'completed', 'statusReason' => $reason, 'outcomeCodeableConcept' => $outcomes], fn () => $api->complete($this->carePlan->person->uuid, $this->carePlan->uuid, $activity->uuid, $payload));
             } else {
@@ -522,7 +531,7 @@ trait CarePlanManager
         }
 
         try {
-            app(CarePlanRepository::class)->assertApprovalCreationReady($this->carePlan);
+            Repository::carePlan()->assertApprovalCreationReady($this->carePlan);
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
 
@@ -537,7 +546,7 @@ trait CarePlanManager
 
         $service = app(CarePlanApprovalService::class);
         if ($service->skipsPatientOtp($this->carePlan)) {
-            $submission = app(CarePlanRepository::class)->latestSubmissionLink($this->carePlan);
+            $submission = Repository::carePlan()->latestSubmissionLink($this->carePlan);
             if ($submission === null) {
                 $this->createApproval('');
 
@@ -549,7 +558,7 @@ trait CarePlanManager
                 if (!$employeeUuid || !$bearerToken) {
                     throw new RuntimeException(__('care-plan.approval_create_error'));
                 }
-                app(CarePlanRepository::class)->queueInpatientApproval($submission, legalEntity(), Auth::user(), $bearerToken, $employeeUuid);
+                Repository::carePlan()->queueInpatientApproval($submission, legalEntity(), Auth::user(), $bearerToken, $employeeUuid);
                 $this->inpatientApprovalStatus = 'queued';
                 Session::flash('info', __('care-plan.inpatient_access_processing'));
             } catch (Throwable $exception) {
@@ -585,7 +594,7 @@ trait CarePlanManager
 
     protected function redirectAfterCarePlanClosed(): void
     {
-        $this->carePlan = app(CarePlanRepository::class)->findById($this->carePlan->id);
+        $this->carePlan = Repository::carePlan()->findById($this->carePlan->id);
 
         $personId = $this->carePlan->personId;
         $encounterId = $this->carePlan->encounterId;
@@ -769,12 +778,16 @@ trait CarePlanManager
         $this->dispatch('refreshApprovals');
     }
 
-    #[\Livewire\Attributes\Locked]
+    #[Locked]
     public ?string $planSyncBatchId = null;
 
     public function sync(): void
     {
-        $this->authorize('view', $this->carePlan);
+        if (Auth::user()->cannot('view', $this->carePlan)) {
+            Session::flash('error', __('care-plan.sync_access_denied'));
+
+            return;
+        }
         if (empty($this->carePlan->uuid)) {
             Session::flash('error', __('care-plan.care_plan_not_synced'));
 
@@ -792,7 +805,7 @@ trait CarePlanManager
 
             return;
         }
-        $batch = \Illuminate\Support\Facades\Bus::batch([new \App\Jobs\CarePlanFullSync(
+        $batch = Bus::batch([new CarePlanFullSync(
             legalEntity(),
             standalone: true,
             resourceUuid: $this->carePlan->uuid,
@@ -808,10 +821,10 @@ trait CarePlanManager
             ->withOption('person_id', $this->carePlan->personId)
             ->withOption('patient_care_plan_registry', true)
             ->withOption('care_plan_approvals', true)
-            ->withOption('sync_entity', \App\Models\LegalEntity::ENTITY_CARE_PLAN)
-            ->withOption('token', \Illuminate\Support\Facades\Crypt::encryptString($token))
+            ->withOption('sync_entity', LegalEntity::ENTITY_CARE_PLAN)
+            ->withOption('token', Crypt::encryptString($token))
             ->withOption('user', Auth::user())
-            ->name(\App\Jobs\CarePlanFullSync::BATCH_NAME)->onQueue('sync')->dispatch();
+            ->name(CarePlanFullSync::BATCH_NAME)->onQueue('sync')->dispatch();
         $this->planSyncBatchId = $batch->id;
         Session::flash('info', __('care-plan.sync_processing'));
     }
@@ -821,15 +834,17 @@ trait CarePlanManager
         if ($this->planSyncBatchId === null) {
             return;
         }
-        $batch = \Illuminate\Support\Facades\Bus::findBatch($this->planSyncBatchId);
+        $batch = Bus::findBatch($this->planSyncBatchId);
         if ($batch !== null && !$batch->finished() && !$batch->cancelled()) {
             return;
         }
         $this->planSyncBatchId = null;
         $this->refreshCarePlan();
         $this->dispatch('refreshApprovals');
-        if ($batch !== null && (int) \Illuminate\Support\Facades\Cache::get('care-plan-sync-denied:'.$batch->id, 0) > 0) {
-            Session::flash('error', __('care-plan.sync_access_denied'));
+        if ($batch !== null && (int) Cache::get('care-plan-sync-denied:'.$batch->id, 0) > 0) {
+            Session::flash('warning', __('care-plan.sync_partial_access', [
+                'count' => (int) Cache::get('care-plan-sync-denied:'.$batch->id, 0),
+            ]));
 
             return;
         }

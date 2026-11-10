@@ -35,6 +35,7 @@ DOMAIN_PATHS=(
   tests/Unit/Services/Party
   tests/Unit/Services/MedicalEvents/CarePlanActivityLifecycleServiceTest.php
   tests/Unit/Services/MedicalEvents/CarePlanLifecycleServiceTest.php
+  tests/Unit/Services/MedicalEvents/EHealthJobResolverTest.php
   tests/Unit/Services/MedicalEvents/MedicationRequestSignPayloadTest.php
   tests/Unit/Services/MedicalEvents/Mappers/CarePlanMapperTest.php
   tests/Unit/Services/MedicalEvents/Mappers/CarePlanActivityMapperTest.php
@@ -71,6 +72,7 @@ DOMAIN_PATHS=(
   tests/Feature/Person/PatientReferralDateFiltersTest.php
   tests/Feature/Person/PatientReferralRegistryUatTest.php
   tests/Feature/Person/PatientCarePlanRegistryUatTest.php
+  tests/Feature/Person/PatientApprovalConfirmationTest.php
   tests/Feature/Services/MedicalEvents/MedicationRequestLifecycleServiceTest.php
   tests/Feature/Services/MedicalEvents/MedicationRequestFhirStorageTest.php
   tests/Feature/HealthcareService

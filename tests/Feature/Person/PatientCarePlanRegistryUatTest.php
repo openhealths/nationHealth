@@ -21,6 +21,15 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\Feature\Composition\UsesCompositionDictionaries;
 use Tests\TestCase;
+use App\Repositories\CarePlanActivityRepository;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Crypt;
+use App\Jobs\CarePlanFullSync;
+use App\Models\Person\Person;
+use Mockery;
+use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
 
 class PatientCarePlanRegistryUatTest extends TestCase
 {
@@ -68,14 +77,15 @@ class PatientCarePlanRegistryUatTest extends TestCase
 
         foreach ([PatientCarePlans::class, CarePlanIndex::class] as $componentClass) {
             $component = Livewire::test($componentClass, ['legalEntity' => $legalEntity, 'personId' => $person->id])
-                ->assertOk()->assertSee('Legacy registered plan')->assertSee('Legacy local draft')->assertSee('Canonical plan')
-                ->assertSee(__('care-plan.full_sync_required'))->assertSee(__('care-plan.draft_backfill_required'))
+                ->assertOk()->assertDontSee('Legacy registered plan')->assertSee('Legacy local draft')->assertSee('Canonical plan')
+                ->set('filterCompleteness', 'all')->assertSee('Legacy registered plan')
+                ->assertSee(__('care-plan.registry_incomplete'))->assertSee(__('care-plan.draft_backfill_required'))
                 ->assertSee(route('care-plans.show', [$legalEntity, $legacy->id]), false)
                 ->assertDontSee(route('care-plans.edit', [$legalEntity, $draft->id]))
                 ->assertSee(route('care-plans.show', [$legalEntity, $canonical->id]), false);
             if ($componentClass === PatientCarePlans::class) {
                 $component->set('filterName', 'Canonical')->call('search')->assertDontSee('Legacy registered plan')
-                    ->call('resetFilters')->assertSee('Legacy registered plan');
+                    ->call('resetFilters')->assertDontSee('Legacy registered plan')->assertSee('Legacy local draft');
             }
         }
 
@@ -95,16 +105,17 @@ class PatientCarePlanRegistryUatTest extends TestCase
         CarePlanActivity::forceCreate(['carePlanId' => $plan->id, 'uuid' => (string) Str::uuid(), 'status' => 'scheduled', 'kind' => 'medication_request']);
 
         Livewire::test(PatientCarePlans::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])
-            ->assertOk()->assertSee('Partially imported plan')->assertSee(__('care-plan.full_sync_required'))
+            ->assertOk()->assertDontSee('Partially imported plan')
+            ->set('filterCompleteness', 'all')->assertSee('Partially imported plan')->assertSee(__('care-plan.registry_incomplete'))
             ->assertSee(route('care-plans.show', [$legalEntity, $plan->id]), false)
             ->set('showAdditionalParams', true)
-            ->assertSee(__('care-plan.full_sync_required'))
+            ->assertSee(__('care-plan.registry_incomplete'))
             ->assertSee(route('care-plans.show', [$legalEntity, $plan->id]), false);
 
         $this->assertTrue($repository->findById($plan->id)->requiresFhirImport());
         $activity = CarePlanActivity::whereCarePlanId($plan->id)->firstOrFail();
         $this->expectException(InvalidArgumentException::class);
-        app(\App\Repositories\CarePlanActivityRepository::class)->getResource($activity->id);
+        app(CarePlanActivityRepository::class)->getResource($activity->id);
     }
 
     public function test_full_import_unlocks_the_existing_legacy_plan_without_creating_a_duplicate(): void
@@ -123,14 +134,14 @@ class PatientCarePlanRegistryUatTest extends TestCase
         $this->assertFalse($repository->findById($imported->id)->requiresFhirImport());
 
         Livewire::test(PatientCarePlans::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])
-            ->assertOk()->assertDontSee(__('care-plan.full_sync_required'))
+            ->assertOk()->assertDontSee(__('care-plan.registry_incomplete'))
             ->assertSee(route('care-plans.show', [$legalEntity, $imported->id]), false);
     }
 
     public function test_sync_reads_first_page_queues_details_and_prevents_duplicates(): void
     {
         ['person' => $person, 'legalEntity' => $legalEntity] = $this->compositionFixture(scopes: ['care_plan:read']);
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
         $this->mockSyncFirstPage($person);
         session()->put(config('ehealth.api.oauth.bearer_token'), 'synthetic-token');
         $component = Livewire::test(PatientCarePlans::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])
@@ -138,13 +149,13 @@ class PatientCarePlanRegistryUatTest extends TestCase
             ->assertDontSee(__('care-plan.sync_success'))->assertNotDispatched('flashMessage');
         $batchId = $component->get('syncBatchId');
         $this->assertNotNull($batchId);
-        $batch = \Illuminate\Support\Facades\Bus::findBatch($batchId);
+        $batch = Bus::findBatch($batchId);
         $this->assertSame($person->uuid, $batch->options['patient_uuid']);
         $this->assertSame($person->id, $batch->options['person_id']);
         $this->assertSame($legalEntity->id, DB::table('job_batches')->where('id', $batchId)->value('legal_entity_id'));
-        $this->assertSame('synthetic-token', \Illuminate\Support\Facades\Crypt::decryptString($batch->options['token']));
+        $this->assertSame('synthetic-token', Crypt::decryptString($batch->options['token']));
         $component->call('sync')->assertSee(__('care-plan.sync_running'));
-        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\CarePlanFullSync::class, 1);
+        Queue::assertPushed(CarePlanFullSync::class, 1);
         Http::assertNothingSent();
 
         DB::table('job_batches')->where('id', $batchId)->update(['pending_jobs' => 0, 'finished_at' => time()]);
@@ -156,7 +167,7 @@ class PatientCarePlanRegistryUatTest extends TestCase
     public function test_failed_sync_reports_an_error_without_success_or_clinic_status_changes(): void
     {
         ['person' => $person, 'legalEntity' => $legalEntity] = $this->compositionFixture(scopes: ['care_plan:read']);
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
         $this->mockSyncFirstPage($person);
         session()->put(config('ehealth.api.oauth.bearer_token'), 'synthetic-token');
         $component = Livewire::test(PatientCarePlans::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])->call('sync');
@@ -167,15 +178,15 @@ class PatientCarePlanRegistryUatTest extends TestCase
         Http::assertNothingSent();
     }
 
-    private function mockSyncFirstPage(\App\Models\Person\Person $person): void
+    private function mockSyncFirstPage(Person $person): void
     {
-        $response = \Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn([['id' => (string) Str::uuid(), 'status' => 'active', 'title' => 'Queued plan']]);
         $response->shouldReceive('isNotLast')->once()->andReturn(false);
-        $api = \Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class);
+        $api = Mockery::mock(CarePlanApi::class);
         $api->shouldReceive('withToken')->once()->andReturnSelf();
         $api->shouldReceive('getBySearchParams')->once()->with($person->uuid, ['page' => 1])->andReturn($response);
-        $this->instance(\App\Classes\eHealth\Api\CarePlan::class, $api);
+        $this->instance(CarePlanApi::class, $api);
     }
 
     public static function clinicContexts(): array

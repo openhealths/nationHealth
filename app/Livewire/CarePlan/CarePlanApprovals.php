@@ -9,10 +9,12 @@ use App\Enums\CarePlanStatus;
 use App\Enums\Person\ApprovalStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\EHealth\EHealthJobTimeoutException;
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
-use App\Repositories\Repository as GeneralRepository;
+use App\Repositories\Repository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
 use App\Services\MedicalEvents\PatientApprovalService;
 use App\Services\MedicalEvents\MedicalRequestOwnership;
@@ -28,12 +30,13 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Throwable;
+use App\Livewire\CarePlan\Concerns\HandlesCarePlanApprovalSms;
 
 class CarePlanApprovals extends Component
 {
     use FormTrait;
     use InteractsWithApprovals;
-    use \App\Livewire\CarePlan\Concerns\HandlesCarePlanApprovalSms;
+    use HandlesCarePlanApprovalSms;
 
     #[Locked]
     public int $carePlanId;
@@ -94,7 +97,7 @@ class CarePlanApprovals extends Component
         // that the granted employee belongs to the requesting clinic.
         $legalEntityId = legalEntity()?->id ?? $legalEntity->id;
         if ($legalEntityId) {
-            $this->employees = app(\App\Repositories\CarePlanRepository::class)->approvalEmployees($legalEntityId);
+            $this->employees = Repository::carePlan()->approvalEmployees($legalEntityId);
 
             $writerUuid = Auth::user()?->getCarePlanWriterEmployee($carePlan->termsOfServiceCode())?->uuid;
             if ($writerUuid && collect($this->employees)->contains(fn (array $employee): bool => $employee['uuid'] === $writerUuid)) {
@@ -136,7 +139,7 @@ class CarePlanApprovals extends Component
         try {
             $carePlan = $this->currentCarePlan();
             $this->skipsPatientOtp = app(CarePlanApprovalService::class)->skipsPatientOtp($carePlan);
-            $this->approvals = \App\Repositories\MedicalEvents\Repository::approval()->localForCarePlan($carePlan);
+            $this->approvals = MedicalEventsRepository::approval()->localForCarePlan($carePlan);
         } catch (Exception $e) {
             if (!$notifyErrors) {
                 throw $e;
@@ -290,7 +293,7 @@ class CarePlanApprovals extends Component
             return;
         }
 
-        $link = \App\Repositories\MedicalEvents\Repository::approval()->creationLinkFor($approval);
+        $link = MedicalEventsRepository::approval()->creationLinkFor($approval);
         if ($link !== null) {
             $this->pollingLinkId = $link->id;
             $this->isPolling = true;
@@ -309,7 +312,7 @@ class CarePlanApprovals extends Component
             }
             $this->currentAuthMethod = $result->authMethod;
             $this->openAuthModal();
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Session::flash('error', __('care-plan.approval_result_unavailable'));
         }
     }
@@ -320,7 +323,7 @@ class CarePlanApprovals extends Component
             return;
         }
         $approval = app(MedicalRequestOwnership::class)->approvalForCarePlan($this->currentCarePlan(), $approvalUuid);
-        $link = \App\Repositories\MedicalEvents\Repository::approval()->creationLinkFor($approval);
+        $link = MedicalEventsRepository::approval()->creationLinkFor($approval);
         if ($link === null) {
             return;
         }
@@ -346,7 +349,7 @@ class CarePlanApprovals extends Component
             $oldApproval = app(MedicalRequestOwnership::class)
                 ->approvalForCarePlan($this->currentCarePlan(), $oldApprovalUuid)
                 ->loadMissing(['grantedTo', 'createdBy']);
-            if (Auth::user()->cannot('cancel', $oldApproval)) {
+            if (Auth::user()->cannot('cancel', [$oldApproval, legalEntity()])) {
                 Session::flash('error', __('approval.messages.cancel_forbidden'));
 
                 return;
@@ -365,7 +368,7 @@ class CarePlanApprovals extends Component
             if (!$this->skipsPatientOtp) {
                 $this->currentAuthMethod = $this->selectedApprovalAuthMethod($this->selectedAuthMethodUuid ?? '');
             }
-            GeneralRepository::carePlan()->assertApprovalRecipient($employeeUuid, legalEntity()->id);
+            Repository::carePlan()->assertApprovalRecipient($employeeUuid, legalEntity()->id);
             try {
                 app(PatientApprovalService::class)->cancel($oldApproval);
             } catch (EHealthResponseException $e) {
@@ -477,7 +480,7 @@ class CarePlanApprovals extends Component
             Log::error('CarePlanApprovals: failed to verify: ' . $e->getMessage());
 
             if ($e->getCode() === 404 || str_contains($e->getMessage(), '404')) {
-                app(\App\Repositories\CarePlanRepository::class)->removeApproval($this->currentCarePlan(), $this->approvalId);
+                Repository::carePlan()->removeApproval($this->currentCarePlan(), $this->approvalId);
                 Session::flash('error', __('care-plan.approval_expired_404'));
                 $this->closeAuthModal();
                 $this->fetchApprovals();
@@ -527,17 +530,17 @@ class CarePlanApprovals extends Component
     public function cancelApproval(string $approvalUuid): void
     {
         $carePlan = $this->currentCarePlan();
-        if (Auth::user()->cannot('manage', $carePlan)) {
+        if (Auth::user()->cannot('view', $carePlan)) {
             Session::flash('error', __('care-plan.approval_access_denied'));
 
             return;
         }
 
         try {
-            $approval = app(MedicalRequestOwnership::class)
-                ->approvalForCarePlan($carePlan, $approvalUuid)
+            $approval = MedicalEventsRepository::approval()
+                ->carePlanApprovalForCancellation($carePlan, $approvalUuid)
                 ->loadMissing('createdBy');
-            if (Auth::user()->cannot('cancel', $approval)) {
+            if (Auth::user()->cannot('cancel', [$approval, legalEntity()])) {
                 Session::flash('error', __('approval.messages.cancel_forbidden'));
 
                 return;
@@ -546,6 +549,8 @@ class CarePlanApprovals extends Component
             Session::flash('success', __('care-plan.approval_cancelled'));
             $this->fetchApprovals();
             $this->dispatch('care-plan-approvals-changed');
+        } catch (EHealthJobTimeoutException) {
+            Session::flash('warning', __('care-plan.approval_cancel_unconfirmed'));
         } catch (Exception $e) {
             Log::error('CarePlanApprovals: failed to cancel: ' . $e->getMessage());
             Session::flash('error', __('care-plan.approval_cancel_error'));
@@ -571,7 +576,7 @@ class CarePlanApprovals extends Component
 
     protected function currentCarePlan(): CarePlan
     {
-        return app(\App\Repositories\CarePlanRepository::class)->findById($this->carePlanId) ?? abort(404);
+        return Repository::carePlan()->findById($this->carePlanId) ?? abort(404);
     }
 
     protected function guardReadOnlyApprovals(): bool
