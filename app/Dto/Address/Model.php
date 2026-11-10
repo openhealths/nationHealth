@@ -56,6 +56,25 @@ class Model implements ModelContract
 
     public function toModel(): AddressModel
     {
-        return new AddressModel(get_object_vars($this));
+        return new AddressModel($this->toArray());
+    }
+
+    /** @return array<string, string|null> */
+    public function toArray(): array
+    {
+        return [
+            'type' => $this->type,
+            'country' => $this->country,
+            'area' => $this->area,
+            'region' => $this->region,
+            'settlement' => $this->settlement,
+            'settlement_id' => $this->settlementId,
+            'settlement_type' => $this->settlementType,
+            'street_type' => $this->streetType,
+            'street' => $this->street,
+            'building' => $this->building,
+            'apartment' => $this->apartment,
+            'zip' => $this->zip,
+        ];
     }
 }

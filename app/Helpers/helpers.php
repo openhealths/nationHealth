@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Classes\eHealth\Services\SchemaService;
 use App\Contracts\SignatureProvider;
+use App\Providers\AppServiceProvider;
 use App\Services\Dictionary\DictionaryManager;
 use Carbon\CarbonImmutable;
 use App\Models\LegalEntity;
@@ -172,13 +173,27 @@ if (!function_exists('dictionary')) {
 
 if (!function_exists('objectMapper')) {
     /**
-     * The object mapper configured in AppServiceProvider.
+     * Use for DTOs whose mapped source properties are expected to exist.
+     * A misspelled object property in #[Map] raises an exception.
      *
      * @return ObjectMapperInterface
      */
     function objectMapper(): ObjectMapperInterface
     {
         return app(ObjectMapperInterface::class);
+    }
+}
+
+if (!function_exists('propertyObjectMapper')) {
+    /**
+     * Use when a mapped object property can be absent from the source.
+     * The accessor reads a missing property as null, so the mapping must accept that value.
+     *
+     * @return ObjectMapperInterface
+     */
+    function propertyObjectMapper(): ObjectMapperInterface
+    {
+        return app(AppServiceProvider::PROPERTY_OBJECT_MAPPER);
     }
 }
 

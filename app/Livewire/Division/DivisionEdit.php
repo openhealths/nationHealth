@@ -7,22 +7,18 @@ namespace App\Livewire\Division;
 use Exception;
 use Throwable;
 use App\Models\Division;
+use App\Repositories\Repository;
 use App\Models\LegalEntity;
 use App\Models\Relations\Phone;
 use Livewire\Attributes\Locked;
 use App\Classes\eHealth\EHealth;
-use App\Repositories\Repository;
 use App\Traits\WorkTimeUtilities;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use App\Livewire\Division\Trait\HasAction;
 use App\Dto\Division\Model as DivisionData;
-use App\Dto\Division\Ehealth as EhealthData;
-use Symfony\Component\ObjectMapper\ObjectMapper;
-use App\Dto\Division\Coordinate as CoordinateData;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use Symfony\Component\PropertyAccess\PropertyAccess;
 
 class DivisionEdit extends DivisionComponent
 {
@@ -67,7 +63,7 @@ class DivisionEdit extends DivisionComponent
      */
     public function updatedDivisionFormDivisionLocationLatitude($value): void
     {
-        $this->divisionForm->division['location']['latitude'] = CoordinateData::fromInput($value)->value;
+        $this->updateLocationCoordinate('latitude', $value);
     }
 
     /**
@@ -82,7 +78,7 @@ class DivisionEdit extends DivisionComponent
      */
     public function updatedDivisionFormDivisionLocationLongitude($value): void
     {
-        $this->divisionForm->division['location']['longitude'] = CoordinateData::fromInput($value)->value;
+        $this->updateLocationCoordinate('longitude', $value);
     }
 
     /**
@@ -167,8 +163,7 @@ class DivisionEdit extends DivisionComponent
         }
 
         try {
-            $divisionEhealthMapped = EhealthData::fromForm($this->divisionForm, $division)
-                ->toArray();
+            $divisionEhealthMapped = $this->prepareRequestData($division);
 
             $response = EHealth::division()->update(
                 uuid: $division->uuid,
@@ -195,9 +190,7 @@ class DivisionEdit extends DivisionComponent
         }
 
         try {
-            $divisionModelMapped = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
-                ->disableExceptionOnInvalidPropertyPath()
-                ->getPropertyAccessor())
+            $divisionModelMapped = propertyObjectMapper()
                 ->map($response, DivisionData::class);
 
             Repository::division()->saveMappedDivision($divisionModelMapped, $division, legalEntity());

@@ -13,10 +13,8 @@ use App\Repositories\Repository;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use App\Dto\Division\Model as DivisionData;
-use Symfony\Component\ObjectMapper\ObjectMapper;
 use App\Enums\Division\Status as DivisionStatus;
 use App\Enums\Equipment\Status as EquipmentStatus;
-use Symfony\Component\PropertyAccess\PropertyAccess;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -120,10 +118,7 @@ trait HasAction
                     throw new Exception('eHealth returned an unexpected division status after deactivation.');
                 }
 
-                $divisionData = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
-                    ->disableExceptionOnInvalidPropertyPath()
-                    ->getPropertyAccessor())
-                    ->map($actualDivision, DivisionData::class);
+                $divisionData = propertyObjectMapper()->map($actualDivision, DivisionData::class);
             }
         } catch (EHealthResponseException $err) {
             $message = __('divisions.errors.deactivate');

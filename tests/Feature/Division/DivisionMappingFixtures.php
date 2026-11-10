@@ -8,16 +8,21 @@ use App\Classes\eHealth\Api\Division as DivisionApi;
 use App\Classes\eHealth\Api\Responses\Collections\DivisionCreate;
 use App\Classes\eHealth\EHealthResponse;
 use App\Dto\Division\Model;
+use App\Dto\Division\DivisionGetMany;
 use App\Livewire\Division\DivisionComponent;
 use App\Livewire\Division\Forms\DivisionForm;
 use App\Models\Division;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Str;
-use Symfony\Component\ObjectMapper\ObjectMapper;
-use Symfony\Component\PropertyAccess\PropertyAccess;
+use Illuminate\Support\Collection;
 
 trait DivisionMappingFixtures
 {
+    protected function mapList(array $rows): DivisionGetMany
+    {
+        return propertyObjectMapper()->map(new Collection(['divisions' => $rows]), DivisionGetMany::class);
+    }
+
     protected function response(array $overrides = []): array
     {
         return array_replace([
@@ -63,10 +68,7 @@ trait DivisionMappingFixtures
 
         $this->assertInstanceOf(DivisionCreate::class, $validated);
 
-        return (new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
-            ->disableExceptionOnInvalidPropertyPath()
-            ->getPropertyAccessor()))
-            ->map($validated, Model::class);
+        return propertyObjectMapper()->map($validated, Model::class);
     }
 
     protected function formComponent(array $overrides = []): DivisionComponent
@@ -97,8 +99,6 @@ trait DivisionMappingFixtures
 
     protected function mapForm(DivisionForm $form): Model
     {
-        return (new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
-            ->disableExceptionOnInvalidPropertyPath()->getPropertyAccessor()))
-            ->map($form, Model::class);
+        return propertyObjectMapper()->map($form, Model::class);
     }
 }

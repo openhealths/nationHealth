@@ -50,6 +50,8 @@ use Symfony\Component\PropertyAccess\PropertyAccess;
 
 class AppServiceProvider extends ServiceProvider
 {
+    public const string PROPERTY_OBJECT_MAPPER = 'propertyObjectMapper';
+
     /**
      * Register any application services.
      */
@@ -75,10 +77,23 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-        // The strict property accessor makes a wrong #[Map] property name fail; an index path ([key]) reads a missing key as null.
+        // objectMapper() expects mapped object properties to exist. For example, with #[Map(source: 'email')],
+        // reading a missing email property throws an exception, which also exposes typos in the mapping.
+        // Both mappers read a missing array key such as [email] as null.
         $this->app->singleton(
             ObjectMapperInterface::class,
             static fn (): ObjectMapper => new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessor())
+        );
+
+        // With the same #[Map(source: 'email')], propertyObjectMapper() reads a missing email property
+        // as null. Use it when the source may omit that property and the mapping accepts null.
+        $this->app->singleton(
+            self::PROPERTY_OBJECT_MAPPER,
+            static fn (): ObjectMapper => new ObjectMapper(
+                propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
+                    ->disableExceptionOnInvalidPropertyPath()
+                    ->getPropertyAccessor()
+            )
         );
     }
 

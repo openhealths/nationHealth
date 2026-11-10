@@ -9,6 +9,7 @@ use App\Classes\eHealth\Api\Responses\Collections\AddressCreate;
 use App\Classes\eHealth\Api\Responses\Collections\PhoneCreate;
 use App\Contracts\Dto\Model as ModelContract;
 use App\Dto\Address\Model as AddressData;
+use App\Dto\Division\Model as DivisionData;
 use App\Dto\Phone\Model as PhoneData;
 use App\Enums\Status;
 use App\Models\Division;
@@ -117,6 +118,26 @@ class DivisionResponseMappingTest extends TestCase
         $this->assertNotContains('addresses', $division->receivedKeys);
         $this->assertNotContains('phones', $division->receivedKeys);
         $this->assertSame('123', $division->getAttributes()['external_id']);
+    }
+
+    public function test_to_model_exports_only_declared_division_attributes(): void
+    {
+        $data = new class extends DivisionData
+        {
+            public int $legalEntityId = 999;
+
+            protected string $mappingContext = 'helper';
+        };
+        $data->name = 'Mapped division';
+        $data->type = 'CLINIC';
+        $data->email = 'division@example.com';
+        $data->status = Status::ACTIVE->value;
+        $division = new Division(['legal_entity_id' => 7]);
+
+        $this->assertSame($division, $data->toModel($division));
+        $this->assertSame('Mapped division', $division->name);
+        $this->assertSame(7, $division->legalEntityId);
+        $this->assertArrayNotHasKey('mapping_context', $division->getAttributes());
     }
 
     public function test_invalid_response_is_rejected_before_mapping(): void
