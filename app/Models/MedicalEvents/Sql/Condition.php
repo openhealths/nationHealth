@@ -196,6 +196,18 @@ class Condition extends Model
     }
 
     /**
+     * Filter conditions fetched from eHealth. A condition stored from the data sent from here lacks the insertion date.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function fetchedFromEHealth(Builder $query): Builder
+    {
+        return $query->whereNotNull('ehealth_inserted_at');
+    }
+
+    /**
      * Filter the patient's conditions of the current legal entity. Of the managing organizations the rule names,
      * only the episode's one is stored for a condition, through the encounter it was created within.
      *

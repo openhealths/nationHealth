@@ -122,12 +122,14 @@ readonly class EpisodePolicy
     /**
      * Determine whether the user can delete the episode. Only a draft that never reached eHealth can be deleted.
      * An episode without a managing organization came from the short sync and is treated as our own.
+     * A draft opened along with an encounter draft goes together with that encounter, so it is not deleted on its own.
      */
     public function delete(User $user, Episode $episode): Response
     {
         $managingOrganization = $episode->managingOrganization?->value;
 
-        if ($user->cannot('episode:write')
+        if ($episode->encounterId !== null
+            || $user->cannot('episode:write')
             || ($managingOrganization !== null && $managingOrganization !== legalEntity()->uuid)) {
             return Response::denyWithStatus(404);
         }

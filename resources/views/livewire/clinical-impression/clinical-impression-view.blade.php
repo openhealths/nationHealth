@@ -165,52 +165,86 @@
             <fieldset class="fieldset mt-8">
                 <legend class="legend">{{ __('clinical-impressions.problems') }}</legend>
 
-                @forelse ($clinicalImpression->problems as $problem)
-                    <p class="text-sm text-gray-900 dark:text-gray-100" wire:key="problem-{{ $loop->index }}">
-                        {{ $problem->displayValue ?? $problem->value }}
-                    </p>
-                @empty
+                @if ($problems === [])
                     <div class="text-sm text-gray-500 italic">{{ __('forms.no_data') }}</div>
-                @endforelse
+                @else
+                    <table class="table-input w-inherit">
+                        <thead class="thead-input">
+                            <tr>
+                                <th scope="col" class="th-input">{{ __('forms.date') }}</th>
+                                <th scope="col" class="th-input">{{ __('medical-events.code_and_name') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($problems as $problem)
+                                <tr wire:key="problem-{{ $loop->index }}">
+                                    <td class="td-input">{{ $problem['ehealthInsertedAt'] ?: '-' }}</td>
+                                    <td class="td-input">{{ $problem['name'] }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
             </fieldset>
 
             <fieldset class="fieldset mt-8">
                 <legend class="legend">{{ __('clinical-impressions.findings') }}</legend>
 
-                @forelse ($clinicalImpression->findings as $finding)
-                    @php($findingType = $finding->itemReference?->type->first()?->coding->first()?->code)
-                    <div
-                        class="mb-3 space-y-1 text-sm text-gray-900 last:mb-0 dark:text-gray-100"
-                        wire:key="finding-{{ $loop->index }}"
-                    >
-                        <p>
-                            <span class="font-semibold">{{ $findingType ? $dictionaries['eHealth/resources'][$findingType] : '' }}:</span>
-                            {{ $finding->itemReference?->displayValue ?? $finding->itemReference?->value }}
-                        </p>
-                        @if ($finding->basis)
-                            <p>
-                                <span class="font-semibold">{{ __('clinical-impressions.findings_basis') }}:</span>
-                                {{ $finding->basis }}
-                            </p>
-                        @endif
-                    </div>
-                @empty
+                @if ($findings === [])
                     <div class="text-sm text-gray-500 italic">{{ __('forms.no_data') }}</div>
-                @endforelse
+                @else
+                    <table class="table-input w-inherit">
+                        <thead class="thead-input">
+                            <tr>
+                                <th scope="col" class="th-input">{{ __('forms.date') }}</th>
+                                <th scope="col" class="th-input">{{ __('forms.type') }}</th>
+                                <th scope="col" class="th-input">{{ __('medical-events.code_and_name') }}</th>
+                                <th scope="col" class="th-input">{{ __('clinical-impressions.findings_basis') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($findings as $finding)
+                                <tr wire:key="finding-{{ $loop->index }}">
+                                    <td class="td-input">{{ $finding['ehealthInsertedAt'] ?: '-' }}</td>
+                                    <td class="td-input">
+                                        {{ $dictionaries['eHealth/resources'][$finding['type']] ?? '-' }}
+                                    </td>
+                                    <td class="td-input">{{ $finding['name'] }}</td>
+                                    <td class="td-input">{{ $finding['basis'] ?: '-' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
             </fieldset>
 
             <fieldset class="fieldset mt-8">
                 <legend class="legend">{{ __('clinical-impressions.supporting_info') }}</legend>
 
-                @forelse ($clinicalImpression->supportingInfo as $supportingInfo)
-                    @php($supportingInfoType = $supportingInfo->type->first()?->coding->first()?->code)
-                    <p class="text-sm text-gray-900 dark:text-gray-100" wire:key="supporting-info-{{ $loop->index }}">
-                        <span class="font-semibold">{{ $supportingInfoType ? $dictionaries['eHealth/resources'][$supportingInfoType] : '' }}:</span>
-                        {{ $supportingInfo->displayValue ?? $supportingInfo->value }}
-                    </p>
-                @empty
+                @if ($supportingInfo === [])
                     <div class="text-sm text-gray-500 italic">{{ __('forms.no_data') }}</div>
-                @endforelse
+                @else
+                    <table class="table-input w-inherit">
+                        <thead class="thead-input">
+                            <tr>
+                                <th scope="col" class="th-input">{{ __('forms.date') }}</th>
+                                <th scope="col" class="th-input">{{ __('forms.type') }}</th>
+                                <th scope="col" class="th-input">{{ __('medical-events.code_and_name') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($supportingInfo as $supporting)
+                                <tr wire:key="supporting-info-{{ $loop->index }}">
+                                    <td class="td-input">{{ $supporting['ehealthInsertedAt'] ?: '-' }}</td>
+                                    <td class="td-input">
+                                        {{ $dictionaries['eHealth/resources'][$supporting['type']] ?? '-' }}
+                                    </td>
+                                    <td class="td-input">{{ $supporting['name'] }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
             </fieldset>
 
             <fieldset class="fieldset mt-8">

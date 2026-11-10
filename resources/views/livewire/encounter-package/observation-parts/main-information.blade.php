@@ -124,7 +124,7 @@
                     type="text"
                     required
                 >
-                    <option selected>{{ __('forms.select') }}</option>
+                    <option value="" selected>{{ __('forms.select') }}</option>
                     <template
                         x-for="
                             (label, key) in modalObservation.codingSystem === 'icf'
@@ -133,7 +133,7 @@
                         "
                         :key="key"
                     >
-                        <option :value="key" x-text="label"></option>
+                        <option :value="key" :selected="key === modalObservation.categoryCode" x-text="label"></option>
                     </template>
                 </select>
 

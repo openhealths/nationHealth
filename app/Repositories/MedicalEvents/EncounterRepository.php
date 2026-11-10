@@ -8,6 +8,7 @@ use App\Enums\DetectedIssue\Status as DetectedIssueStatus;
 use App\Enums\Device\Status as DeviceStatus;
 use App\Enums\DeviceAssociation\Status as DeviceAssociationStatus;
 use App\Enums\ClinicalImpression\Status as ClinicalImpressionStatus;
+use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\Person\ConditionVerificationStatus;
 use App\Enums\Person\DiagnosticReportStatus;
 use App\Enums\Person\EncounterStatus;
@@ -20,16 +21,22 @@ use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\DetectedIssue;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\DeviceAssociation;
+use App\Models\MedicalEvents\Sql\DeviceDispense;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Encounter as EncounterSql;
 use App\Models\MedicalEvents\Sql\EncounterDiagnose;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Immunization;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Throwable;
@@ -446,6 +453,85 @@ class EncounterRepository extends BaseRepository
     }
 
     /**
+     * Delete a draft encounter with the records of its package and the draft episode opened along with it, together
+     * with every row they refer to: identifiers, codeable concepts, codings, quantities, periods and eHealth jobs.
+     * The draft never reached eHealth, so none of these records exists there.
+     *
+     * @param  Encounter  $encounter
+     * @return void
+     * @throws Throwable
+     */
+    public function deleteDraft(Encounter $encounter): void
+    {
+        DB::transaction(function () use ($encounter): void {
+            $rows = collect([
+                Condition::forEncounter($encounter->uuid)->withAllRelations()->get(),
+                Immunization::forEncounter($encounter->uuid)->withAllRelations()->get(),
+                DiagnosticReport::forEncounter($encounter->uuid)->withAllRelations()->get(),
+                Observation::forEncounter($encounter->uuid)->withAllRelations()->get(),
+                Procedure::forEncounter($encounter->uuid)->withAllRelations()->get(),
+                Device::forEncounter($encounter->uuid)->withAllRelations()->get(),
+                DeviceAssociation::forEncounter($encounter->uuid)->withAllRelations()->get(),
+                DetectedIssue::forEncounter($encounter->uuid)->withAllRelations()->get(),
+                DeviceDispense::forEncounter($encounter->uuid)->withAllRelations()->get(),
+                Specimen::forEncounter($encounter->uuid)->withAllRelations()->get(),
+                ClinicalImpression::forEncounter($encounter->uuid)->withAllRelations()->get(),
+                Episode::whereEncounterId($encounter->id)->whereStatus(EpisodeStatus::DRAFT)->withRelationships()->get()
+            ])
+                ->collapse()
+                ->push(
+                    Encounter::withRelationships()
+                        ->with(['ehealthLinks.job', 'ehealthLinks.processingData'])
+                        ->findOrFail($encounter->id)
+                );
+
+            // An episode eHealth accepted while rejecting the package stays, only its link to the draft goes
+            Episode::whereEncounterId($encounter->id)->update(['encounter_id' => null]);
+
+            $this->deleteWithLoadedRows($rows);
+        });
+    }
+
+    /**
+     * Delete the given records together with every row loaded under them, each of which belongs to its record alone.
+     * The rows go level by level, from the records down to the rows they refer to: a row refers to the level below
+     * by a foreign key, while the level below refers back to it only by a cascading foreign key or by a morph link
+     * without one.
+     *
+     * @param  Collection  $rows  Records loaded with the relations that are deleted along with them
+     * @return void
+     */
+    public function deleteWithLoadedRows(Collection $rows): void
+    {
+        while ($rows->isNotEmpty()) {
+            foreach ($rows->groupBy(static fn (Model $row): string => $row::class) as $levelRows) {
+                new EloquentCollection($levelRows)->toQuery()->delete();
+            }
+
+            $rows = $rows->flatMap(static fn (Model $row): array => array_values(Arr::except($row->getRelations(), 'pivot')))
+                ->flatMap(static fn (mixed $related): Collection => Collection::wrap($related))
+                ->filter();
+        }
+    }
+
+    /**
+     * Get the condition UUIDs of the encounters' primary diagnoses.
+     *
+     * @param  array  $uuids  Encounter UUIDs
+     * @return array
+     */
+    public function primaryConditionUuids(array $uuids): array
+    {
+        return EncounterSql::whereIn('uuid', $uuids)
+            ->with('diagnoses')
+            ->get()
+            ->map($this->primaryConditionUuid(...))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
      * Get the encounter for the clinical impression based on the provided UUID to display the selected supporting info.
      *
      * @param  array  $uuids
@@ -457,27 +543,21 @@ class EncounterRepository extends BaseRepository
             ->with(['period', 'diagnoses'])
             ->get();
 
-        $conditionUuids = $encounters
-            ->map(fn (EncounterSql $encounter) => data_get($encounter->toArray(), 'diagnoses.0.condition.identifier.value'))
-            ->filter()
-            ->unique()
-            ->values()
-            ->toArray();
-
-        $conditions = Condition::whereIn('uuid', $conditionUuids)
+        // An encounter is named by its primary diagnosis, whose code is kept in the condition
+        $conditions = Condition::whereIn('uuid', $encounters->map($this->primaryConditionUuid(...))->filter()->values())
             ->with('code.coding')
             ->get()
             ->keyBy('uuid');
 
         return $encounters
-            ->mapWithKeys(function (EncounterSql $encounter) use ($conditions) {
-                $conditionUuid = data_get($encounter->toArray(), 'diagnoses.0.condition.identifier.value');
-                $condition = $conditionUuid ? $conditions->get($conditionUuid) : null;
+            ->mapWithKeys(function (EncounterSql $encounter) use ($conditions): array {
+                $coding = $conditions->get($this->primaryConditionUuid($encounter))?->code?->coding->first();
 
                 return [
                     $encounter->uuid => [
                         'ehealthInsertedAt' => convertToAppDateFormat($encounter->period?->start),
-                        'codeCode' => $condition?->code?->coding?->first()?->code,
+                        'codeCode' => $coding?->code,
+                        'codeSystem' => $coding?->system,
                         'type' => 'encounter'
                     ]
                 ];
@@ -818,5 +898,19 @@ class EncounterRepository extends BaseRepository
         } else {
             $encounter->hospitalization()->create($hospitalizationData);
         }
+    }
+
+    /**
+     * Get the condition UUID of the encounter's primary diagnosis, with the diagnoses loaded.
+     *
+     * @param  Encounter  $encounter
+     * @return string|null
+     */
+    private function primaryConditionUuid(Encounter $encounter): ?string
+    {
+        return $encounter->diagnoses
+            ->first(static fn (EncounterDiagnose $diagnosis): bool => $diagnosis->role->coding->first()?->code === 'primary')
+            ?->condition
+            ->value;
     }
 }

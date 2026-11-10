@@ -648,7 +648,7 @@
 
             <div class="mt-8">
                 <a
-                    href="{{ $personId ? route('persons.encounters', [legalEntity(), 'person' => $personId]) : route('prepersons.encounters', [legalEntity(), 'preperson' => $prepersonId]) }}"
+                    href="{{ $personId ? route('persons.encounters.index', [legalEntity(), 'person' => $personId]) : route('prepersons.encounters.index', [legalEntity(), 'preperson' => $prepersonId]) }}"
                     class="button-minor px-6 py-2"
                 >{{ __('forms.back') }}</a>
             </div>

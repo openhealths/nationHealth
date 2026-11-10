@@ -56,6 +56,29 @@ class ClinicalImpressionForm extends Form
     }
 
     /**
+     * Get the records the clinical impressions refer to as problems, findings and supporting info.
+     *
+     * @return array
+     */
+    public function referencedRecords(): array
+    {
+        return collect($this->clinicalImpressions)
+            ->flatMap(static fn (array $impression): array => [
+                // A problem is always a condition, so it comes without a type
+                ...array_map(
+                    static fn (array $problem): array => ['id' => $problem['id'], 'type' => 'condition'],
+                    $impression['problems'] ?? []
+                ),
+                ...($impression['findings'] ?? []),
+                ...array_map(
+                    static fn (array $supportingInfo): array => ['id' => $supportingInfo['uuid'], 'type' => $supportingInfo['type']],
+                    $impression['supportingInfo'] ?? []
+                )
+            ])
+            ->all();
+    }
+
+    /**
      * Get the clinical impression a nested attribute such as "clinicalImpressions.0.effectiveDate" belongs to.
      *
      * @param  string  $attribute

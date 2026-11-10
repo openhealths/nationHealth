@@ -752,6 +752,7 @@ function initUkDateRangePickers(root = document) {
             mode: "range",
             showMonths: 2,
             dateFormat: "d.m.Y",
+            maxDate: el.getAttribute('datepicker-max-date') || undefined,
             locale: {
                 ...Ukrainian,
                 rangeSeparator: " — "

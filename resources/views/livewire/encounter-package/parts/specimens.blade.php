@@ -71,9 +71,13 @@
             const parents = [...this.specimens, ...$wire.patientSpecimens];
 
             return specimen.parentIds
-                .map((parentId) => this.specimenTypesDictionary[parents.find((parent) => parent.uuid === parentId)?.typeCode])
+                .map((parentId) => {
+                    const parent = parents.find((candidate) => candidate.uuid === parentId);
+
+                    return parent?.name || this.specimenTypesDictionary[parent?.typeCode];
+                })
                 .filter(Boolean)
-                .join(', ') || '-';
+                .join('; ') || '-';
         },
 
         changeCollectorType() {
