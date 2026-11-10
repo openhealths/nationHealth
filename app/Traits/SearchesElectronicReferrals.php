@@ -11,6 +11,8 @@ use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Exceptions\EHealth\EHealthResponseException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Validator;
+use InvalidArgumentException;
 use Livewire\Attributes\Locked;
 use Throwable;
 
@@ -99,7 +101,32 @@ trait SearchesElectronicReferrals
 
     protected function getSearchedElectronicReferral(string $uuid): ?array
     {
-        return $this->electronicReferralSearchResults[$uuid] ?? null;
+        if (!isset($this->electronicReferralSearchResults[$uuid])) {
+            return null;
+        }
+
+        $existing = MedicalEventsRepository::serviceRequest()->findByUuid($uuid);
+        if ($existing !== null) {
+            if ((int) $existing->personId !== $this->personId) {
+                throw new InvalidArgumentException('A Service Request UUID already belongs to another patient.');
+            }
+
+            return null;
+        }
+
+        // Search results contain display labels, not the complete clinical resource.
+        $referral = EHealth::serviceRequest()
+            ->getById($this->patientUuid, $uuid, preserveApiKeys: true)
+            ->validate();
+        if (array_is_list($referral) && count($referral) === 1) {
+            $referral = $referral[0];
+        }
+        Validator::make($referral, [
+            'id' => ['required', 'in:'.$uuid],
+            'subject.identifier.value' => ['sometimes', 'required', 'in:'.$this->patientUuid],
+        ])->validate();
+
+        return $referral;
     }
 
     /**
