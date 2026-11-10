@@ -175,7 +175,7 @@
     <!-- Cancel Usage Modal -->
     @if ($showCancelModal)
         <div
-            class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-gray-900"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50"
             aria-modal="true"
             role="dialog"
         >
@@ -237,7 +237,7 @@
     <!-- Complete Referral Modal -->
     @if ($showCompleteModal)
         <div
-            class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-gray-900"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50"
             aria-modal="true"
             role="dialog"
         >
