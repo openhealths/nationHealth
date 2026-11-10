@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Core\EHealthJob;
 use App\Core\PatientEHealthJob;
+use App\Enums\CarePlanStatus;
 use App\Models\LegalEntity;
 use App\Classes\eHealth\EHealth;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -20,11 +21,14 @@ use DateTimeInterface;
 use Throwable;
 use App\Core\Arr;
 use App\Repositories\Repository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use Illuminate\Validation\ValidationException;
+use App\Traits\SynchronizesCarePlans;
+use App\Enums\JobStatus;
 
 class CarePlanFullSync extends PatientEHealthJob
 {
-    use \App\Traits\SynchronizesCarePlans;
+    use SynchronizesCarePlans;
 
     public const string BATCH_NAME = 'CarePlanFullSync';
 
@@ -63,7 +67,12 @@ class CarePlanFullSync extends PatientEHealthJob
     public static function detailJobs(array $summaries, LegalEntity $legalEntity, array $patientContext = []): array
     {
         $jobs = [];
-        foreach ($summaries as $summary) {
+        foreach (collect($summaries)->sortBy(static fn (array $summary): int => match (CarePlanStatus::fromStored($summary['status'] ?? null)) {
+            CarePlanStatus::ACTIVE => 0,
+            CarePlanStatus::PENDING => 1,
+            CarePlanStatus::ON_HOLD => 2,
+            default => 3,
+        }) as $summary) {
             $jobs[] = new self($legalEntity, standalone: true, resourceUuid: Arr::toCamelCase($summary)['id'], patientContext: $patientContext);
         }
 
@@ -164,10 +173,10 @@ class CarePlanFullSync extends PatientEHealthJob
             $patient = Repository::carePlan()->resolvePatientContext($this->personId, $this->patientUuid);
             try {
                 $activities = $this->fetchAllActivityResources($patient['uuid'], $this->resourceUuid, token: $this->token);
-                Repository::carePlan()->storeAggregate($validatedData, $activities, $patient['id'], $this->legalEntity->id);
+                $plan = Repository::carePlan()->storeAggregate($validatedData, $activities, $patient['id'], $this->legalEntity->id);
                 if ((($this->batch()?->options ?? []) + $this->patientContext)['care_plan_approvals'] ?? false) {
-                    \App\Repositories\MedicalEvents\Repository::approval()->syncApprovals(
-                        Repository::carePlan()->findByUuid($this->resourceUuid),
+                    MedicalEventsRepository::approval()->syncApprovals(
+                        $plan,
                         'care_plan',
                         [],
                         $this->token
@@ -202,7 +211,7 @@ class CarePlanFullSync extends PatientEHealthJob
             && $batch?->name === self::BATCH_NAME.'_'.$options['patient_uuid'];
     }
 
-    protected function setEntityStatus(\App\Enums\JobStatus $status): void
+    protected function setEntityStatus(JobStatus $status): void
     {
         if (!$this->isPatientRegistrySync()) {
             parent::setEntityStatus($status);

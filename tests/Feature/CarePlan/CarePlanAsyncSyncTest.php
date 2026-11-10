@@ -21,14 +21,17 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionProperty;
+use RuntimeException;
 use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\Feature\Composition\UsesCompositionDictionaries;
 use Tests\TestCase;
+use Illuminate\Database\Eloquent\Collection;
 
 class CarePlanAsyncSyncTest extends TestCase
 {
@@ -54,7 +57,8 @@ class CarePlanAsyncSyncTest extends TestCase
 
         $component = Livewire::test(PatientCarePlans::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])
             ->call('sync')->assertSee(__('care-plan.sync_first_page'))->assertDontSee(__('care-plan.sync_success'))
-            ->assertSee('First page summary')->assertNotDispatched('flashMessage');
+            ->assertDontSee('First page summary')->assertNotDispatched('flashMessage')
+            ->set('filterCompleteness', 'all')->assertSee('First page summary');
 
         $plan = CarePlan::whereUuid($summary['id'])->firstOrFail();
         $this->assertNull($plan->detailsSyncedAt);
@@ -63,6 +67,7 @@ class CarePlanAsyncSyncTest extends TestCase
         $this->assertSame($person->id, $batch->options['person_id']);
         $this->assertTrue($batch->options['patient_care_plan_registry']);
         $this->assertSame('database', $batch->options['connection']);
+        $this->assertTrue($batch->allowsFailures());
         Queue::assertPushed(CarePlanFullSync::class, 2);
         Queue::assertPushed(CarePlanFullSync::class, fn ($job): bool => $job->resourceUuid === $summary['id'] && $job->patientContext['patient_uuid'] === $person->uuid);
         Queue::assertPushed(CarePlanFullSync::class, fn ($job): bool => $job->resourceUuid === null && (new ReflectionProperty($job, 'page'))->getValue($job) === 2);
@@ -100,6 +105,7 @@ class CarePlanAsyncSyncTest extends TestCase
         foreach ($batches as $batch) {
             $this->assertTrue($batch->options['patient_care_plan_registry']);
             $this->assertSame('database', $batch->options['connection']);
+            $this->assertTrue($batch->allowsFailures());
         }
         Queue::assertPushed(CarePlanFullSync::class, 3);
         $component->call('sync')->assertSee(__('care-plan.sync_running'));
@@ -118,7 +124,7 @@ class CarePlanAsyncSyncTest extends TestCase
     public function test_index_continues_after_a_patient_failure_and_never_reports_full_success(bool $firstPatientFails): void
     {
         ['person' => $person, 'legalEntity' => $legalEntity, 'user' => $user] = $this->compositionFixture(scopes: ['care_plan:read']);
-        $patients = new \Illuminate\Database\Eloquent\Collection([$person]);
+        $patients = new Collection([$person]);
         for ($index = 0; $index < 2; $index++) {
             $patients->push(Person::create(['uuid' => (string) Str::uuid(), 'birth_date' => '2000-01-01', 'gender' => 'MALE']));
         }
@@ -202,7 +208,7 @@ class CarePlanAsyncSyncTest extends TestCase
     {
         ['person' => $person, 'legalEntity' => $legalEntity] = $this->compositionFixture(scopes: ['care_plan:read']);
         $this->firstPage($person, [$this->summary()], false);
-        Bus::partialMock()->shouldReceive('batch')->once()->andThrow(new \RuntimeException('Synthetic dispatch failure'));
+        Bus::partialMock()->shouldReceive('batch')->once()->andThrow(new RuntimeException('Synthetic dispatch failure'));
 
         Livewire::test(PatientCarePlans::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])
             ->call('sync')->assertSet('syncBatchId', null)->assertSee(__('care-plan.sync_failed'))
@@ -214,16 +220,50 @@ class CarePlanAsyncSyncTest extends TestCase
         return ['id' => (string) Str::uuid(), 'title' => 'First page summary', 'status' => 'active'];
     }
 
+    #[DataProvider('partialFailureOrder')]
+    public function test_a_failed_plan_does_not_cancel_other_imports_or_leave_the_sync_button_disabled(bool $failureFirst): void
+    {
+        ['person' => $person, 'legalEntity' => $legalEntity] = $this->compositionFixture(scopes: ['care_plan:read']);
+        Notification::fake();
+        $this->firstPage($person, [$this->summary(), $this->summary()], false);
+        $component = Livewire::test(PatientCarePlans::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])->call('sync');
+        $batch = Bus::findBatch($component->get('syncBatchId'));
+        if ($failureFirst) {
+            $batch->recordFailedJob('failed-plan', new RuntimeException('Synthetic failure'));
+        } else {
+            $batch->recordSuccessfulJob('successful-plan');
+        }
+        $this->assertFalse($batch->fresh()->cancelled());
+        $this->assertFalse($batch->fresh()->finished());
+        $component->call('checkSyncStatus')->assertSet('syncBatchId', $batch->id);
+
+        if ($failureFirst) {
+            $batch->recordSuccessfulJob('successful-plan');
+        } else {
+            $batch->recordFailedJob('failed-plan', new RuntimeException('Synthetic failure'));
+        }
+        $this->assertTrue($batch->fresh()->finished());
+        $component->call('checkSyncStatus')->assertSet('syncBatchId', null)
+            ->assertSee(__('care-plan.sync_failed'))->assertDontSee(__('care-plan.sync_success'));
+        $this->assertFalse($batch->fresh()->cancelled());
+    }
+
+    public static function partialFailureOrder(): array
+    {
+        return ['failure first' => [true], 'failure last' => [false]];
+    }
+
     public function test_a_summary_does_not_replace_an_existing_complete_resource(): void
     {
         ['person' => $person, 'legalEntity' => $legalEntity] = $this->compositionFixture(scopes: ['care_plan:read']);
         $resource = json_decode(file_get_contents(base_path('tests/Fixtures/CarePlan/plan.json')), true, flags: JSON_THROW_ON_ERROR);
-        $repository = app(\App\Repositories\CarePlanRepository::class);
+        $repository = app(CarePlanRepository::class);
         $plan = $repository->storeResource($resource, $person->id, $legalEntity->id);
         $repository->storeSummaries([['id' => $plan->uuid, 'title' => 'Incomplete summary', 'status' => 'completed']], $person->id, $legalEntity->id);
 
         $this->assertSame($resource['title'], $plan->fresh()->title);
-        $this->assertSame($resource['status'], $plan->fresh()->status);
+        $this->assertSame('completed', $plan->fresh()->status);
+        $this->assertSame($resource['category'], $repository->getResource($plan->fresh())['category']);
         $this->assertNotNull($plan->fresh()->detailsSyncedAt);
         $this->assertSame(1, CarePlan::wherePersonId($person->id)->whereUuid($plan->uuid)->count());
     }

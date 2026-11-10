@@ -29,6 +29,7 @@ use App\Models\Relations\AuthenticationMethod as AuthenticationMethodModel;
 use App\Models\User;
 use App\Enums\JobStatus;
 use App\Enums\Person\AuthenticationMethod;
+use App\Enums\Person\ApprovalStatus;
 use App\Enums\Specimen\Status as SpecimenStatus;
 use App\Repositories\MedicalEvents\Repository;
 use Carbon\CarbonImmutable;
@@ -47,7 +48,7 @@ class PatientApprovalService
         'diagnostic_report' => DiagnosticReport::class,
         'encounter' => Encounter::class,
         'procedure' => Procedure::class,
-        'care_plan' => CarePlan::class,
+        CarePlan::RESOURCE_TYPE => CarePlan::class,
         'specimen' => Specimen::class,
         'service_request' => ServiceRequestRequest::class,
     ];
@@ -119,7 +120,7 @@ class PatientApprovalService
             'encounter', 'specimen' => $this->resourceTypeNames()[$type][$record->type?->coding?->first()?->code]
                 ?? $record->type?->text
                 ?? $record->type?->coding?->first()?->code,
-            'care_plan' => $record->title,
+            CarePlan::RESOURCE_TYPE => $record->title,
             'service_request' => $record->requestNumber,
             'condition', 'observation', 'clinical_impression' => $record->code?->text
                 ?: $record->code?->coding?->first()?->code,
@@ -155,7 +156,7 @@ class PatientApprovalService
                     $record->performedPeriod?->end,
                 ])->filter()->map(fn ($date) => formatDisplayDate($date))->implode(' - '),
 
-            'care_plan' => collect([
+            CarePlan::RESOURCE_TYPE => collect([
                 $record->periodStart,
                 $record->periodEnd,
             ])->filter()->map(fn ($date) => formatDisplayDate($date))->implode(' - '),
@@ -398,7 +399,7 @@ class PatientApprovalService
             throw $exception;
         }
 
-        $data = $response->getData();
+        $data = $response->validate();
 
         if ($response->getStatusCode() !== 202) {
             Repository::approval()->sync($data, $person);
@@ -421,6 +422,7 @@ class PatientApprovalService
         );
 
         $link = Repository::approval()->attachEhealthLink($approval, ['href' => $data['links'][0]['href']]);
+        Repository::approval()->recordPatientRequest($link, $payload + ['patientApprovalAction' => 'create']);
         $this->dispatchJob($link, $user, Session::get(config('ehealth.api.oauth.bearer_token')));
 
         return [
@@ -441,8 +443,13 @@ class PatientApprovalService
     {
         $response = EHealth::approval()->cancelApproval($patient->uuid, $approvalUuid);
         $data = $response->validate();
+        $status = $response->status();
 
-        if ($response->status() === 202) {
+        if ($status !== 202 && ($data['id'] ?? null) !== $approvalUuid) {
+            throw new EHealthValidationException(['error' => ['message' => 'Cancellation result does not match the requested approval.']]);
+        }
+
+        if ($status === 202) {
             if (empty($data['links'][0]['href'])) {
                 throw new EHealthValidationException([
                     'error' => ['message' => 'Missing cancellation job link.'],
@@ -452,9 +459,7 @@ class PatientApprovalService
             app(EHealthJobResolver::class)->resolve($data);
         }
 
-        Approval::query()
-            ->whereUuid($approvalUuid)
-            ->update(['expires_at' => now()]);
+        Repository::approval()->markCancelled($approvalUuid);
     }
 
     private function dispatchJob(EhealthLink $link, User $user, string $token): void
@@ -520,7 +525,12 @@ class PatientApprovalService
                 throw new EHealthResponseException($response);
             }
 
-            return $response->getData();
+            $data = $response->validate();
+            if (($data['id'] ?? null) !== $approvalId) {
+                throw new EHealthValidationException(['error' => ['message' => 'Approval details do not match the requested approval.']]);
+            }
+
+            return $data;
         } catch (EHealthConnectionException|EHealthValidationException|EHealthResponseException $exception) {
             throw $exception;
         }
@@ -549,7 +559,9 @@ class PatientApprovalService
 
             $data = $this->details($person, $approvalId);
 
-            if (($data['is_verified'] ?? false) !== true) {
+            if (($data['is_verified'] ?? false) !== true
+                || (isset($data['status']) && ApprovalStatus::resolve($data['status'])?->isGranted() !== true)
+                || (isset($data['expires_at']) && !CarbonImmutable::parse($data['expires_at'])->isFuture())) {
                 throw $exception;
             }
 
@@ -558,14 +570,18 @@ class PatientApprovalService
             return null;
         }
 
+        $data = $response->validate();
+
         if ($response->getStatusCode() === 202) {
+            // An accepted verification job is pending, not evidence of patient consent.
             $approval = Approval::query()
                 ->where('approvable_type', Person::class)
                 ->where('approvable_id', $person->id)
                 ->where('uuid', $approvalId)
                 ->firstOrFail();
 
-            $link = Repository::approval()->attachEhealthLink($approval, ['href' => $response->getData()['links'][0]['href']]);
+            $link = Repository::approval()->attachEhealthLink($approval, ['href' => $data['links'][0]['href']]);
+            Repository::approval()->recordPatientRequest($link, ['patientApprovalAction' => 'verify']);
 
             $this->dispatchJob(
                 $link,
@@ -585,8 +601,10 @@ class PatientApprovalService
     {
         $data = $this->details($person, $approvalId);
 
-        if (($data['is_verified'] ?? false) !== true) {
-            throw new RuntimeException('eHealth has not verified this approval.');
+        if (($data['is_verified'] ?? false) !== true
+            || (isset($data['status']) && ApprovalStatus::resolve($data['status'])?->isGranted() !== true)
+            || (isset($data['expires_at']) && !CarbonImmutable::parse($data['expires_at'])->isFuture())) {
+            throw new RuntimeException('eHealth has not confirmed an active approval.');
         }
 
         Repository::approval()->sync($data, $person);

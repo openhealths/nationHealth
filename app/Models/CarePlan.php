@@ -20,11 +20,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Str;
+use App\Repositories\Repository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 
 class CarePlan extends Model implements SubmittedToEHealth
 {
     use HasFactory;
     use HasCamelCasing;
+    public const string RESOURCE_TYPE = 'care_plan';
 
     protected $fillable = [
         'uuid',
@@ -69,6 +73,18 @@ class CarePlan extends Model implements SubmittedToEHealth
         'details_synced_at' => 'datetime',
     ];
 
+    public function displayTitle(): string
+    {
+        $title = trim((string) $this->title);
+        if ($title !== '' && !Str::isUuid($title)) {
+            return $title;
+        }
+
+        return filled($this->requisition)
+            ? __('care-plan.care_plan_with_number', ['number' => $this->requisition])
+            : __('care-plan.care_plan');
+    }
+
     public function requiresFhirImport(): bool
     {
         // Local conversion marker: legacy rows need a detail import before they can be edited or signed.
@@ -110,7 +126,7 @@ class CarePlan extends Model implements SubmittedToEHealth
 
     public function episodeUuid(): ?string
     {
-        return app(\App\Repositories\CarePlanRepository::class)->episodeUuid($this);
+        return Repository::carePlan()->episodeUuid($this);
     }
 
     public function activities(): HasMany
@@ -180,7 +196,7 @@ class CarePlan extends Model implements SubmittedToEHealth
 
     public function hasGrantedApprovalForEmployeeUuid(?string $employeeUuid): bool
     {
-        return app(\App\Repositories\CarePlanRepository::class)->hasGrantedApproval($this, $employeeUuid);
+        return Repository::carePlan()->hasGrantedApproval($this, $employeeUuid);
     }
 
     public function termsOfServiceCode(): ?string
@@ -248,7 +264,7 @@ class CarePlan extends Model implements SubmittedToEHealth
         if (!$this->relationLoaded('encounter') || $this->encounter === null) {
             return '—';
         }
-        $condition = app(\App\Repositories\MedicalEvents\EncounterRepository::class)
+        $condition = MedicalEventsRepository::encounter()
             ->primaryDiagnosisConditions($this->encounter)->first();
         $concept = $condition?->code;
         $coding = $concept?->coding->first();
