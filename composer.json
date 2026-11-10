@@ -1,8 +1,8 @@
 {
-    "name": "open-health/mis",
+    "name": "nation-health/mis",
     "type": "project",
     "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["open", "health", "laravel", "framework"],
+    "keywords": ["nation", "health", "laravel", "framework"],
     "license": "GPL-3.0-or-later",
     "require": {
         "php": "^8.4",
@@ -12,6 +12,7 @@
         "laravel/fortify": "^1.37.3",
         "laravel/framework": "^12.64.0",
         "laravel/jetstream": "^5.5.3",
+        "laravel/passport": "^13.10",
         "laravel/tinker": "^2.11.1",
         "livewire/livewire": "^3.8.3",
         "picqer/php-barcode-generator": "^3.2.4",
