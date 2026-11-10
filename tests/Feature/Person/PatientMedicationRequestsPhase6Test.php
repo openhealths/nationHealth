@@ -416,4 +416,119 @@ class PatientMedicationRequestsPhase6Test extends TestCase
         Livewire::test(PatientMedicationRequests::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person, 'preperson' => null])
             ->call('searchInEHealth')->assertForbidden();
     }
+
+    public function test_local_filters_and_reset_work_on_both_tabs(): void
+    {
+        $repo = app(MedicationRequestRepository::class);
+        $matching = [
+            'request_number' => '0000-FILTER-1234',
+            'status' => 'active',
+            'started_at' => '2026-01-10',
+            'ended_at' => '2026-02-10',
+        ];
+        $variants = [
+            [],
+            ['request_number' => '0000-OTHER-1234'],
+            ['status' => 'draft'],
+            ['started_at' => '2026-01-09'],
+            ['started_at' => '2026-01-11'],
+            ['ended_at' => '2026-02-09'],
+            ['ended_at' => '2026-02-11'],
+        ];
+
+        foreach ([
+            'requests' => MedicationRequestRequest::TYPE_REQUEST,
+            'prescriptions' => MedicationRequestRequest::TYPE_PRESCRIPTION,
+        ] as $tab => $resourceType) {
+            $matchingUuid = (string) Str::uuid();
+            foreach ($variants as $index => $override) {
+                $repo->upsertFromEHealth(array_replace($matching, $override, [
+                    'id' => $index === 0 ? $matchingUuid : (string) Str::uuid(),
+                ]), $this->person->id, $resourceType);
+            }
+
+            $property = $tab === 'requests' ? 'medicationRequests' : 'prescriptions';
+            Livewire::test(PatientMedicationRequests::class, [
+                'legalEntity' => $this->legalEntity, 'person' => $this->person, 'preperson' => null,
+            ])
+                ->call('switchTab', $tab)
+                ->set('searchRequestNumber', 'FILTER')
+                ->set('filterStatus', 'ACTIVE')
+                ->set('filterStartedAtFrom', '2026-01-10')
+                ->set('filterStartedAtTo', '2026-01-10')
+                ->set('filterEndedAtFrom', '2026-02-10')
+                ->set('filterEndedAtTo', '2026-02-10')
+                ->set('isSearchMode', true)
+                ->call('applyFilters')
+                ->assertSet('isSearchMode', false)
+                ->assertSet($property, fn ($rows) => count($rows) === 1 && $rows[0]['uuid'] === $matchingUuid)
+                ->call('resetFilters')
+                ->assertSet('searchRequestNumber', '')
+                ->assertSet('filterStatus', '')
+                ->assertSet('filterStartedAtFrom', '')
+                ->assertSet('filterStartedAtTo', '')
+                ->assertSet('filterEndedAtFrom', '')
+                ->assertSet('filterEndedAtTo', '')
+                ->assertSet($property, fn ($rows) => count($rows) === count($variants));
+        }
+    }
+
+    public function test_search_button_uses_visible_filters_and_imports_on_both_tabs(): void
+    {
+        $this->grantMedicalEventAbilities($this->user, ['medication_request:read']);
+
+        foreach (['requests' => 'getRequestsBySearchParams', 'prescriptions' => 'getBySearchParams'] as $tab => $method) {
+            $uuid = (string) Str::uuid();
+            $response = Mockery::mock(EHealthResponse::class);
+            $response->shouldReceive('getData')->once()->andReturn([[
+                'id' => $uuid, 'status' => 'active', 'request_number' => '0000-API-1234',
+            ]]);
+            $api = Mockery::mock(MedicationRequestApi::class);
+            $api->shouldReceive($method)->once()->with($this->person->uuid, [
+                'request_number' => '0000-API-1234', 'status' => 'active',
+            ])->andReturn($response);
+            $this->instance(MedicationRequestApi::class, $api);
+
+            $property = $tab === 'requests' ? 'medicationRequests' : 'prescriptions';
+            Livewire::test(PatientMedicationRequests::class, [
+                'legalEntity' => $this->legalEntity, 'person' => $this->person, 'preperson' => null,
+            ])
+                ->call('switchTab', $tab)
+                ->assertSeeHtml('wire:click="searchInEHealth"')
+                ->assertSee(__('medication-requests.search_in_ehealth'))
+                ->assertDontSeeHtml('openGroupActions')
+                ->set('searchRequestNumber', '0000-API-1234')
+                ->set('filterStatus', 'active')
+                ->call('searchInEHealth')
+                ->assertSet('isSearchMode', true)
+                ->assertSee('0000-API-1234')
+                ->assertSeeHtml('wire:click="saveFromEHealth(\''.$uuid.'\')"')
+                ->call('saveFromEHealth', $uuid)
+                ->assertSet('isSearchMode', false)
+                ->assertSet($property.'.0.uuid', $uuid)
+                ->assertSee(__('medication-requests.import_saved'));
+        }
+    }
+
+    public function test_basis_links_are_visible_without_expanding_on_both_tabs(): void
+    {
+        $rows = [
+            ['uuid' => (string) Str::uuid(), 'basisLabel' => 'План лікування', 'carePlanId' => 7],
+            ['uuid' => (string) Str::uuid(), 'basisLabel' => 'Взаємодія', 'encounterId' => 9],
+        ];
+        $repo = Mockery::mock(MedicationRequestRepository::class);
+        $repo->shouldReceive('searchByPersonId')->andReturn($rows);
+        $repo->shouldReceive('searchEHealthPrescriptionsByPersonId')->andReturn($rows);
+        $this->instance(MedicationRequestRepository::class, $repo);
+
+        $component = Livewire::test(PatientMedicationRequests::class, [
+            'legalEntity' => $this->legalEntity, 'person' => $this->person, 'preperson' => null,
+        ]);
+        foreach (['requests', 'prescriptions'] as $tab) {
+            $component->call('switchTab', $tab)
+                ->assertSet('expandedUuid', null)
+                ->assertSeeHtml('href="'.route('care-plans.show', [$this->legalEntity, 7]).'"')
+                ->assertSeeHtml('href="'.route('encounter.view', [$this->legalEntity, 'person' => $this->person->id, 'encounter' => 9]).'"');
+        }
+    }
 }

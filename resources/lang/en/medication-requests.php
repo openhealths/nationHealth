@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 return [
+    'search_local' => 'Search patient card',
+    'search_in_ehealth' => 'Search eHealth',
     'signed_details_pending' => 'ESOZ accepted the signature. Full details are pending. Use Synchronize signed prescriptions in the patient registry; do not sign again.',
     'signed_details_synchronized' => 'Signed prescription details synchronized.',
     'synchronize_signed_details' => 'Synchronize signed prescriptions',

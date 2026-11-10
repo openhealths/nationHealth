@@ -9,7 +9,8 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
-use App\Repositories\MedicalEvents\MedicationRequestRepository;
+use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -36,7 +37,6 @@ class PatientMedicationRequests extends BasePatientComponent
     public bool $isSearchMode = false;
 
     public string $searchRequestNumber = '';
-    public string $searchStatus = '';
     public bool $searchLoading = false;
     public ?string $searchError = null;
 
@@ -62,13 +62,14 @@ class PatientMedicationRequests extends BasePatientComponent
             return;
         }
 
-        $repo = app(MedicationRequestRepository::class);
+        $repo = Repository::medicationRequest();
 
         // Resource kind, rather than origin, determines the registry tab.
         $this->medicationRequests = $repo->searchByPersonId(
             $this->personId,
             [
                 'status' => $this->filterStatus !== '' ? $this->filterStatus : null,
+                'request_number' => $this->searchRequestNumber !== '' ? $this->searchRequestNumber : null,
                 'started_at_from' => $this->filterStartedAtFrom !== '' ? $this->filterStartedAtFrom : null,
                 'started_at_to' => $this->filterStartedAtTo !== '' ? $this->filterStartedAtTo : null,
                 'ended_at_from' => $this->filterEndedAtFrom !== '' ? $this->filterEndedAtFrom : null,
@@ -83,6 +84,10 @@ class PatientMedicationRequests extends BasePatientComponent
             [
                 'status' => $this->filterStatus !== '' ? $this->filterStatus : null,
                 'request_number' => $this->searchRequestNumber !== '' ? $this->searchRequestNumber : null,
+                'started_at_from' => $this->filterStartedAtFrom !== '' ? $this->filterStartedAtFrom : null,
+                'started_at_to' => $this->filterStartedAtTo !== '' ? $this->filterStartedAtTo : null,
+                'ended_at_from' => $this->filterEndedAtFrom !== '' ? $this->filterEndedAtFrom : null,
+                'ended_at_to' => $this->filterEndedAtTo !== '' ? $this->filterEndedAtTo : null,
             ]
         );
     }
@@ -104,19 +109,23 @@ class PatientMedicationRequests extends BasePatientComponent
 
     public function applyFilters(): void
     {
+        $this->isSearchMode = false;
+        $this->eHealthResults = [];
+        $this->searchError = null;
         $this->loadLocalData();
     }
 
     public function resetFilters(): void
     {
         $this->reset([
+            'searchRequestNumber',
             'filterStatus',
             'filterStartedAtFrom',
             'filterStartedAtTo',
             'filterEndedAtFrom',
             'filterEndedAtTo',
         ]);
-        $this->loadLocalData();
+        $this->applyFilters();
     }
 
     /**
@@ -138,7 +147,7 @@ class PatientMedicationRequests extends BasePatientComponent
         try {
             $params = array_filter([
                 'request_number' => $this->searchRequestNumber !== '' ? $this->searchRequestNumber : null,
-                'status' => $this->searchStatus !== '' ? strtolower($this->searchStatus) : null,
+                'status' => $this->filterStatus !== '' ? strtolower($this->filterStatus) : null,
             ]);
 
             if ($this->activeTab === 'requests') {
@@ -192,7 +201,7 @@ class PatientMedicationRequests extends BasePatientComponent
         }
 
         try {
-            app(MedicationRequestRepository::class)->upsertFromEHealth(
+            Repository::medicationRequest()->upsertFromEHealth(
                 (array) $record,
                 $this->personId,
                 $this->activeTab === 'requests'
@@ -222,8 +231,8 @@ class PatientMedicationRequests extends BasePatientComponent
             return;
         }
         try {
-            foreach (app(MedicationRequestRepository::class)->pendingSignedPrescriptions($this->personId) as $request) {
-                app(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class)->synchronizeSignedPrescription($request);
+            foreach (Repository::medicationRequest()->pendingSignedPrescriptions($this->personId) as $request) {
+                app(MedicationRequestLifecycleService::class)->synchronizeSignedPrescription($request);
             }
             Session::flash('success', __('medication-requests.signed_details_synchronized'));
         } catch (Throwable $exception) {
@@ -239,7 +248,6 @@ class PatientMedicationRequests extends BasePatientComponent
         $this->eHealthResults = [];
         $this->searchError = null;
         $this->searchRequestNumber = '';
-        $this->searchStatus = '';
         $this->loadLocalData();
     }
 

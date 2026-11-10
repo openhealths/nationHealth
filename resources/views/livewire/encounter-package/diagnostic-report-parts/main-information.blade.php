@@ -539,7 +539,7 @@
                     placeholder=""
                     autocomplete="off"
                 />
-                <label for="conclusionCode" class="label"> {{ __('diagnostic-reports.conclusion_code') }} </label>
+                <label for="conclusionCode" class="label"> {{ __('diagnostic-reports.conclusion_code') }} * </label>
 
                 @error($diagnosticReportErrorPath . '.conclusionCode')
                     <p class="text-error">{{ $message }}</p>
@@ -577,7 +577,7 @@
         {{-- Conclusion --}}
         <div class="form-row">
             <div>
-                <label for="conclusion" class="label-modal"> {{ __('diagnostic-reports.conclusion') }} </label>
+                <label for="conclusion" class="label-modal"> {{ __('diagnostic-reports.conclusion') }} * </label>
                 <textarea
                     rows="4"
                     x-model="modalDiagnosticReport.conclusion"
