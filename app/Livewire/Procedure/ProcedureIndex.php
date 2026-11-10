@@ -19,6 +19,7 @@ use App\Livewire\Procedure\Forms\ProcedureCancellationForm as Form;
 use App\Models\Declaration;
 use App\Models\Equipment;
 use App\Models\LegalEntity;
+use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\Identifier;
@@ -30,7 +31,6 @@ use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
@@ -150,18 +150,6 @@ class ProcedureIndex extends BasePatientComponent
     }
 
     /**
-     * Narrow the service list down to the picked category and drop the service that no longer belongs to it.
-     *
-     * @return void
-     */
-    public function updatedFilterCategory(): void
-    {
-        $this->filterCode = '';
-
-        $this->getServices();
-    }
-
-    /**
      * Procedures for the current page, either from the eHealth search or from the local database.
      *
      * @return LengthAwarePaginator
@@ -196,8 +184,6 @@ class ProcedureIndex extends BasePatientComponent
             'filterDeviceId',
             'isSearching'
         ]);
-
-        $this->getServices();
 
         $this->resetPage();
     }
@@ -513,17 +499,13 @@ class ProcedureIndex extends BasePatientComponent
             ->paginate(config('pagination.per_page'));
 
         $paginator->setCollection(
-            collect($this->formatDatesForDisplay(
-                $paginator
-                    ->getCollection()
-                    ->map(static function (Procedure $procedure): array {
-                        $data = Arr::toCamelCase($procedure->toArray());
-                        $data['createdAt'] = $procedure->created_at?->toDateTimeString();
+            $paginator->getCollection()
+                ->map(static function (Procedure $procedure): array {
+                    $data = Arr::toCamelCase($procedure->toArray());
+                    $data['createdAt'] = $procedure->created_at?->toDateTimeString();
 
-                        return $data;
-                    })
-                    ->toArray()
-            ))
+                    return $data;
+                })
         );
 
         return $paginator;
@@ -541,7 +523,40 @@ class ProcedureIndex extends BasePatientComponent
 
         try {
             $response = EHealth::procedure()->getBySearchParams($this->uuid, $this->buildSearchParams());
-            $procedures = Arr::toCamelCase($response->validate());
+
+            $procedures = collect(Arr::toCamelCase($response->validate()));
+
+            $performerUuids = $procedures
+                ->pluck('performer.0.identifier.value')
+                ->filter()
+                ->unique()
+                ->all();
+
+            $employeeNames = Employee::query()
+                ->whereIn('uuid', $performerUuids)
+                ->with('party:id,last_name,first_name,second_name')
+                ->get(['uuid', 'party_id'])
+                ->mapWithKeys(static fn (Employee $employee): array => [
+                    $employee->uuid => $employee->fullName
+                ])
+                ->filter();
+
+            $procedures = $procedures->map(static function (array $procedure) use ($employeeNames): array {
+                $performer = data_get($procedure, 'performer.0');
+
+                if ($performer !== null) {
+                    $performerUuid = data_get($performer, 'identifier.value');
+
+                    if ($performerUuid && empty($performer['displayValue']) && isset($employeeNames[$performerUuid])) {
+                        $performer['displayValue'] = $employeeNames[$performerUuid];
+                    }
+
+                    $procedure['performer'] = $performer;
+                }
+
+                return $procedure;
+            });
+
             $total = $response->getPaging()['total_entries'];
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while loading procedures');
@@ -590,10 +605,6 @@ class ProcedureIndex extends BasePatientComponent
             ->toArray();
 
         $this->services = $services
-            ->when(
-                $this->filterCategory !== '',
-                fn (Collection $services): Collection => $services->where('category', $this->filterCategory)
-            )
             ->map(static function (array $service): ?array {
                 $serviceId = data_get($service, 'id');
 
@@ -608,7 +619,8 @@ class ProcedureIndex extends BasePatientComponent
                     'id' => $serviceId,
                     'name' => $serviceCode
                         ? $serviceCode . ' | ' . $serviceName
-                        : $serviceName
+                        : $serviceName,
+                    'category' => $service['category'] ?? null
                 ];
             })
             ->filter()
