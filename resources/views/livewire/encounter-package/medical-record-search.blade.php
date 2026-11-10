@@ -92,8 +92,9 @@
                 <button
                     type="button"
                     wire:click="resetFilters"
+                    data-onset-date-id="{{ $this->getId() }}-onset-date"
                     @click="
-                        const onsetDate = document.getElementById('{{ $this->getId() }}-onset-date');
+                        const onsetDate = document.getElementById($el.dataset.onsetDateId);
                         onsetDate.value = '';
                         onsetDate._flatpickr?.clear();
                     "
@@ -146,12 +147,16 @@
                         @endunless
                         <td
                             class="td-input text-[14px] text-gray-900 dark:text-white"
+                            data-code="{{ $record['codeCode'] }}"
                             x-text="
-                                `{{ $record['codeCode'] }} - ${
-                                    $wire.icd10Descriptions['{{ $record['codeCode'] }}'] ||
-                                    $wire.$parent.dictionaries['eHealth/LOINC/observation_codes']['{{ $record['codeCode'] }}'] ||
-                                    $wire.$parent.dictionaries['eHealth/ICF/classifiers']['{{ $record['codeCode'] }}'] ||
-                                    $wire.$parent.dictionaries['eHealth/ICPC2/condition_codes']['{{ $record['codeCode'] }}'] ||
+                                `${$el.dataset.code} - ${
+                                    $wire.icd10Descriptions[$el.dataset.code] ||
+                                    $wire.$parent.dictionaries['eHealth/LOINC/observation_codes'][$el.dataset.code] ||
+                                    $wire.$parent.dictionaries['eHealth/ICF/classifiers'][$el.dataset.code] ||
+                                    $wire.$parent.dictionaries['eHealth/ICPC2/condition_codes'][$el.dataset.code] ||
+                                    $wire.$parent.dictionaries['eHealth/custom/observation_codes']?.[
+                                        $el.dataset.code
+                                    ] ||
                                     ''
                                 }`
                             "

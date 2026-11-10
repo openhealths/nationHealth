@@ -35,6 +35,7 @@ final class MedicalEventsErrorTranslator extends BaseErrorTranslator
             "Code doesn't match observation category" => __('medical-events.api_errors.code_category_mismatch'),
             'Components required' => __('medical-events.api_errors.components_required'),
             'Specimen not found' => __('medical-events.api_errors.specimen_not_found'),
+            'Immunization with such id is not found' => __('medical-events.api_errors.immunization_not_found'),
             'Specimen should be in available status' => __('medical-events.api_errors.specimen_not_available'),
             'Your scope does not allow to access this resource. Missing allowances: observation:practical_monitor' => __('medical-events.api_errors.practical_monitor_not_allowed'),
             'Access denied. Justification required' => __('medical-events.api_errors.justification_required'),

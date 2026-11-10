@@ -55,6 +55,39 @@ class ConditionForm extends Form
         return $attributes;
     }
 
+    /**
+     * Get the records eHealth holds that the conditions refer to: the previously registered conditions the diagnoses
+     * reference and the evidences.
+     *
+     * @return array
+     */
+    public function referencedRecords(): array
+    {
+        $conditions = collect($this->conditions);
+
+        return $conditions
+            ->filter(static fn (array $condition): bool => ($condition['isRegistered'] ?? false) === true)
+            ->map(static fn (array $condition): array => ['id' => $condition['uuid'], 'type' => 'condition'])
+            ->concat($conditions->flatMap(static fn (array $condition): array => $condition['evidenceDetails'] ?? [])->all())
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Get the UUIDs of the conditions first recorded in this package, which eHealth does not hold yet.
+     *
+     * @return array
+     */
+    public function newConditionIds(): array
+    {
+        return collect($this->conditions)
+            ->reject(static fn (array $condition): bool => ($condition['isRegistered'] ?? false) === true)
+            ->pluck('uuid')
+            ->filter()
+            ->values()
+            ->all();
+    }
+
     protected function rules(): array
     {
         return [
@@ -200,14 +233,16 @@ class ConditionForm extends Form
     }
 
     /**
-     * The default wording only names the forbidden value, not why the condition has to stay active.
+     * The default wording names raw values: the forbidden status instead of why the condition has to stay active,
+     * and `false` instead of the source the user picked.
      *
      * @return array
      */
     protected function messages(): array
     {
         return [
-            'conditions.*.verificationStatus.not_in' => __('conditions.validation.verification_status_not_in')
+            'conditions.*.verificationStatus.not_in' => __('conditions.validation.verification_status_not_in'),
+            'conditions.*.reportOriginCode.required_if' => __('conditions.validation.report_origin_required')
         ];
     }
 
