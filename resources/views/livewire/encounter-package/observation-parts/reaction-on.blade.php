@@ -117,6 +117,7 @@
             <x-forms.loading />
         </div>
 
+        <div class="table-scroll">
         <table class="table-input w-inherit">
             <thead class="thead-input">
                 <tr>
@@ -157,6 +158,7 @@
                 </template>
             </tbody>
         </table>
+        </div>
 
         <div
             x-show="reactionHasSearched && ! reactionLoading && reactionCandidates().length === 0"

@@ -27,6 +27,7 @@
                                 {{ trans_choice('patients.emergency_contact_request.no_evidences', config('ehealth.emergency_contact_medical_event_max_days_passed') + 1) }}
                             </p>
                         @else
+                            <div class="table-scroll">
                             <table class="table-input w-full">
                                 <thead class="thead-input">
                                     <tr>
@@ -59,6 +60,7 @@
                                     @endforeach
                                 </tbody>
                             </table>
+                            </div>
                         @endif
                     @else
                         <dl class="mb-6 grid gap-4">

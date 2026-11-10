@@ -401,6 +401,7 @@
                                 <h3 class="mb-4 text-base font-semibold text-gray-900 dark:text-white">
                                     {{ __('patients.person_documents') }}
                                 </h3>
+                                <div class="table-scroll">
                                 <table class="table-input w-full">
                                     <thead class="thead-input">
                                         <tr>
@@ -441,6 +442,7 @@
                                         @endif
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
 
                             <div class="mt-8">
@@ -822,6 +824,7 @@
                                 </button>
                             </div>
 
+                            <div class="table-scroll">
                             <table class="table-input w-full">
                                 <thead class="thead-input">
                                     <tr>
@@ -973,6 +976,7 @@
                                     @endif
                                 </tbody>
                             </table>
+                            </div>
 
                             @can('create', ConfidantPerson::class)
                                 @if (!$this->hasLegalCapacityDocument())
@@ -1010,6 +1014,7 @@
                                     </button>
                                 </div>
 
+                                <div class="table-scroll">
                                 <table class="table-input w-full">
                                     <thead class="thead-input">
                                         <tr>
@@ -1094,6 +1099,7 @@
                                         @endif
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         @endcan
                     </div>

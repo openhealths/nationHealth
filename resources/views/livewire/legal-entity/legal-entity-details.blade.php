@@ -48,7 +48,8 @@
             <legend class="legend">{{ __('forms.verification_NSZU') }}</legend>
             <div class="flow-root mt-4">
                 <div class="max-w-screen-xl">
-                    <table class="table-input w-full table-fixed min-w-[600px] text-sm">
+                    <div class="table-scroll">
+                    <table class="table-input hidden w-full table-fixed min-w-[600px] text-sm md:table">
                         <thead class="thead-input">
                         <tr>
                             <th scope="col" class="px-3 py-3 th-input w-[25%]">{{__('forms.verified_NHS')}}</th>
@@ -58,26 +59,49 @@
                         </thead>
                         <tbody>
                         <tr>
-                            <td class="td-input break-words whitespace-nowrap align-top">
+                            <td class="td-input break-words whitespace-nowrap max-lg:whitespace-normal align-top">
                                 @if($le->nhs_verified)
                                     <span class="badge-green">{{__('forms.verified_NHS')}}</span>
                                 @else
                                     <span class="badge-red">{{__('forms.not_verified')}}</span>
                                 @endif
                             </td>
-                            <td class="td-input break-words whitespace-nowrap align-top">
+                            <td class="td-input break-words whitespace-nowrap max-lg:whitespace-normal align-top">
                                 @if($le->nhs_reviewed)
                                     <span class="badge-green">{{__('forms.yes')}}</span>
                                 @else
                                     <span class="badge-red">{{__('forms.no')}}</span>
                                 @endif
                             </td>
-                            <td>
+                            <td class="max-lg:px-6 max-lg:py-4 max-lg:break-words max-lg:whitespace-normal max-lg:align-top">
                                 {{ $le->nhs_comment }}
                             </td>
                         </tr>
                         </tbody>
                     </table>
+                    <dl class="space-y-4 md:hidden">
+                        <div>
+                            <dt class="default-label">{{ __('forms.verified_NHS') }}</dt>
+                            <dd>
+                                <span class="{{ $le->nhs_verified ? 'badge-green' : 'badge-red' }}">
+                                    {{ $le->nhs_verified ? __('forms.verified_NHS') : __('forms.not_verified') }}
+                                </span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="default-label">{{ __('forms.reviewed_NHS') }}</dt>
+                            <dd>
+                                <span class="{{ $le->nhs_reviewed ? 'badge-green' : 'badge-red' }}">
+                                    {{ $le->nhs_reviewed ? __('forms.yes') : __('forms.no') }}
+                                </span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="default-label">{{ __('forms.comment_NSZU') }}</dt>
+                            <dd class="text-sm text-gray-700 dark:text-gray-300">{{ $le->nhs_comment ?? '-' }}</dd>
+                        </div>
+                    </dl>
+                    </div>
                 </div>
             </div>
         </fieldset>

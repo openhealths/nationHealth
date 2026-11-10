@@ -9,6 +9,7 @@
         </button>
     </div>
 
+    <div class="table-scroll">
     <table class="table-input w-full">
         <thead class="thead-input">
             <tr>
@@ -76,4 +77,5 @@
             @endnonempty
         </tbody>
     </table>
+    </div>
 </div>

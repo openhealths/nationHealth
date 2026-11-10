@@ -1,5 +1,6 @@
 @props(['headers', 'align' => 'center'])
 
+<div class="table-scroll">
 <table {{ $attributes->merge(['class' => 'min-w-full divide-y divide-gray-200 table-fixed dark:divide-gray-600']) }}>
     <thead class="bg-gray-100 dark:bg-gray-700">
     <tr>
@@ -12,3 +13,4 @@
     {{ $tbody }}
     </tbody>
 </table>
+</div>

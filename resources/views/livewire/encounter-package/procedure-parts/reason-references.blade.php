@@ -23,6 +23,7 @@
             <h2>{{ __('procedures.reason_for_performing') }}</h2>
         </legend>
 
+        <div class="table-scroll">
         <table class="table-input w-inherit">
             <thead class="thead-input">
                 <tr>
@@ -133,6 +134,7 @@
                 </template>
             </tbody>
         </table>
+        </div>
 
         <div>
             {{-- Button to trigger the modal --}}
