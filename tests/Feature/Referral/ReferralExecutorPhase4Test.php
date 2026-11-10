@@ -1018,4 +1018,44 @@ class ReferralExecutorPhase4Test extends TestCase
 
         return array_replace(\App\Core\Arr::toSnakeCase($resource), ['program_processing_status' => 'new'], $overrides);
     }
+
+    public static function incomingReferralValidationPhases(): array
+    {
+        return ['selection' => [false], 'asynchronous confirmation' => [true]];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('incomingReferralValidationPhases')]
+    public function test_incoming_referral_validation_failure_preserves_details_and_clears_confirmation(bool $checking): void
+    {
+        $record = $this->createActiveReferral();
+        $component = $this->encounterCreateComponent($record);
+        $exception = new EHealthValidationException(['error' => [
+            'type' => 'validation_failed', 'message' => 'Validation failed',
+            'invalid' => [['entry' => 'used_by_division.identifier.value', 'rules' => [['description' => 'Synthetic unavailable division']]]],
+        ]]);
+        $lifecycle = Mockery::mock(ReferralRequestLifecycleService::class);
+        if ($checking) {
+            $component->pendingElectronicReferralUuid = $record->uuid;
+            $lifecycle->shouldNotReceive('takeIntoWork');
+            $lifecycle->shouldReceive('checkCompletion')->once()->andThrow($exception);
+        } else {
+            $lifecycle->shouldReceive('takeIntoWork')->once()->andThrow($exception);
+        }
+        \Illuminate\Support\Facades\Log::spy();
+
+        $result = $checking
+            ? $component->checkElectronicReferralPreparation($lifecycle)
+            : $component->selectElectronicReferral($record->uuid, $lifecycle);
+
+        $this->assertFalse($result);
+        $this->assertNull($component->confirmedElectronicReferralUuid);
+        $this->assertNull($component->selectedReferralUuid);
+        $this->assertNull($component->pendingElectronicReferralUuid);
+        $this->assertSame($exception->getFormattedMessage(), $component->getErrorBag()->first('form.encounter.referralNumber'));
+        $this->assertSame(__('encounters.messages.referral_use_failed', ['message' => $exception->getFormattedMessage()]), Session::get('error'));
+        $this->assertStringContainsString('Synthetic unavailable division', Session::get('error'));
+        \Illuminate\Support\Facades\Log::shouldHaveReceived('error')->once()->with('eHealth API Validation Error Detail', [
+            'message' => $exception->getMessage(), 'details' => $exception->getDetails(),
+        ]);
+    }
 }
