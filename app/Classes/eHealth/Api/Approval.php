@@ -13,6 +13,7 @@ use GuzzleHttp\Promise\PromiseInterface;
 use App\Classes\eHealth\ValidationRuleBuilder;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Http\Client\Response;
 
 class Approval extends Request
 {
@@ -217,7 +218,19 @@ class Approval extends Request
             throw new EHealthResponseException($response);
         }
 
-        return $response->status() === 202 ? Job::validateSubmissionResponse($response) : $response->getData();
+        return $response->status() === 202 ? $this->validatePendingRequest($response) : $this->validateApproval($response);
+    }
+
+    private function validatePendingRequest(EHealthResponse $response): array
+    {
+        $data = Job::validateSubmissionResponse($response);
+        Validator::make($data, [
+            'status' => ['required', 'string'],
+            'links' => ['required', 'array', 'min:1'],
+            'links.0.href' => ['required', 'string', 'regex:/\/jobs\/[^\/]+/i'],
+        ])->validate();
+
+        return $data;
     }
 
     protected function validateApprovalList(EHealthResponse $response): array
@@ -242,15 +255,25 @@ class Approval extends Request
 
     protected function validateApproval(EHealthResponse $response): array
     {
-        $data = $response->getData();
+        return $this->validatePatientResource($response, withCreator: true);
+    }
 
-        Validator::make($data, [
-            'id' => ['required', 'uuid'],
-            'granted_to.identifier.value' => ['required', 'uuid'],
-            'access_level' => ['required', 'string'],
-            'is_verified' => ['sometimes', 'boolean:strict'],
-            'expires_at' => ['nullable', 'date'],
-        ])->validate();
+    private function validatePatientResource(EHealthResponse $response, bool $withCreator): array
+    {
+        $data = self::validateResourceData($response->json() ?? []);
+        $rules = [
+            'granted_resources' => ['present', 'array', 'list'],
+            'granted_resource_types' => ['present', 'array', 'list'],
+            'granted_to' => ['required', 'array'],
+            'access_level' => ['required', Rule::in(['read', 'write'])],
+            'expires_at' => ['required', 'date'],
+            'authentication_method_current' => ['required', 'array'],
+            'authentication_method_current.type' => ['required', Rule::in(['OTP', 'OFFLINE', 'THIRD_PERSON'])],
+        ];
+        if ($withCreator) {
+            $rules['created_by'] = ['required', 'array'];
+        }
+        Validator::make($data, $rules)->validate();
 
         return $data;
     }
@@ -258,12 +281,16 @@ class Approval extends Request
     protected function validateCreate(EHealthResponse $response): array
     {
         return $response->status() === 202
-            ? Job::validateSubmissionResponse($response)
-            : self::validateResourceData($response->json() ?? []);
+            ? $this->validatePendingRequest($response)
+            : $this->validatePatientResource($response, withCreator: false);
     }
 
     protected function validateVerification(EHealthResponse $response): array
     {
+        if ($response->status() === 202) {
+            return $this->validatePendingRequest($response);
+        }
+
         // Verification acknowledges the PATCH; it need not return an Approval resource.
         Validator::make(['status' => $response->status()], [
             'status' => ['required', Rule::in([200, 204])],
@@ -316,6 +343,7 @@ class Approval extends Request
             [
                 'id' => [$complete ? 'required' : 'sometimes', 'uuid'],
                 'is_verified' => [$complete ? 'required' : 'sometimes', 'boolean:strict'],
+                'status' => ['sometimes', 'string'],
                 'access_level' => ['nullable', Rule::in(['read', 'write'])],
                 'authorize_with' => ['nullable', 'uuid'],
                 'expires_at' => ['nullable', 'date'],
@@ -347,7 +375,7 @@ class Approval extends Request
         return Validator::make($data, $rules)->validate();
     }
 
-    public static function errorMessage(\Illuminate\Http\Client\Response $response): ?string
+    public static function errorMessage(Response $response): ?string
     {
         $data = Validator::make($response->json() ?? [], [
             'error' => ['nullable', 'array'],

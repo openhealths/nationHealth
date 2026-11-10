@@ -7,7 +7,6 @@ namespace Tests\Feature\CarePlan;
 use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Livewire\CarePlan\CarePlanApprovals;
-use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Services\MedicalEvents\CarePlanApprovalService;
 use GuzzleHttp\Psr7\Response;
@@ -15,6 +14,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use ReflectionMethod;
 use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\Feature\Composition\UsesCompositionDictionaries;
@@ -52,7 +52,20 @@ class CarePlanRevokeApprovalTest extends TestCase
     public function test_visible_revoke_button_calls_the_backend_and_refreshes_the_granted_approvals(): void
     {
         $context = $this->context();
-        $response = new EHealthResponse(new Response(200, [], json_encode(['data' => []])), static fn ($response): array => $response->getData());
+        $identifier = ['identifier' => [
+            'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'employee']]],
+            'value' => $context['employee']->uuid,
+        ]];
+        $response = new EHealthResponse(
+            new Response(201, [], json_encode(['data' => [
+                'id' => $context['approval']->uuid,
+                'granted_resources' => [], 'granted_resource_types' => [],
+                'granted_to' => $identifier, 'created_by' => $identifier,
+                'expires_at' => now()->toIso8601String(), 'is_verified' => true, 'access_level' => 'read',
+                'authentication_method_current' => ['type' => 'OFFLINE'],
+            ]], JSON_THROW_ON_ERROR)),
+            (new ReflectionMethod(ApprovalApi::class, 'validateCancellation'))->getClosure(new ApprovalApi()),
+        );
         $this->mock(ApprovalApi::class)->shouldReceive('cancelApproval')->once()
             ->with($context['person']->uuid, $context['approval']->uuid)->andReturn($response);
         Livewire::test(CarePlanApprovals::class, ['legalEntity' => $context['legalEntity'], 'carePlan' => $context['plan']])

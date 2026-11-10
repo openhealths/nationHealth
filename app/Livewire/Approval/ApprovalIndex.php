@@ -95,15 +95,14 @@ class ApprovalIndex extends Component
     #[Computed]
     public function localApprovalsByUuid(): Collection
     {
-        return Approval::query()
+        return Approval::query()->withAllRelations()
             ->with([
-                'createdBy',
                 'approvable' => static fn (MorphTo $morphTo) => $morphTo->morphWith([
                     CarePlan::class => ['person'],
                 ]),
             ])
             ->whereIn('uuid', collect($this->paginatedApprovals->items())->pluck('id'))
-            ->get(['id', 'uuid', 'status', 'expires_at', 'created_by_id', 'approvable_id', 'approvable_type'])
+            ->get()
             ->keyBy('uuid');
     }
 
@@ -267,7 +266,7 @@ class ApprovalIndex extends Component
             ])
             ->findOrFail($approvalId);
 
-        if (Auth::user()->cannot('cancel', $approval)) {
+        if (Auth::user()->cannot('cancel', [$approval, legalEntity()])) {
             Session::flash('error', $approval->expiresAt !== null && !$approval->expiresAt->isFuture() ? __('approval.messages.cancel_expired') : __('approval.messages.cancel_forbidden'));
 
             return;

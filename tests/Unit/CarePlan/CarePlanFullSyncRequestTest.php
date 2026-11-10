@@ -12,9 +12,23 @@ use Illuminate\Validation\ValidationException;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
+use ReflectionClass;
 
 class CarePlanFullSyncRequestTest extends TestCase
 {
+    public function test_active_plans_are_queued_before_new_and_terminal_plans(): void
+    {
+        $summaries = array_map(static fn (string $status): array => ['id' => $status, 'status' => $status], [
+            'terminated', 'new', 'active', 'completed', 'on-hold',
+        ]);
+        $jobs = CarePlanFullSync::detailJobs($summaries, new LegalEntity());
+
+        $this->assertSame(['active', 'new', 'on-hold', 'terminated', 'completed'], array_map(
+            static fn (CarePlanFullSync $job): string => $job->resourceUuid,
+            $jobs
+        ));
+    }
+
     public static function searchContexts(): array
     {
         return [
@@ -25,7 +39,7 @@ class CarePlanFullSyncRequestTest extends TestCase
 
     public function test_older_job_payloads_have_an_empty_patient_context_default(): void
     {
-        $job = (new \ReflectionClass(CarePlanFullSync::class))->newInstanceWithoutConstructor();
+        $job = (new ReflectionClass(CarePlanFullSync::class))->newInstanceWithoutConstructor();
 
         $this->assertSame([], $job->patientContext);
     }

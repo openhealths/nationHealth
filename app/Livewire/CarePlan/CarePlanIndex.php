@@ -4,30 +4,39 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan;
 
+use App\Enums\CarePlanStatusFilter;
+use App\Enums\CarePlanCompletenessFilter;
 use App\Traits\SynchronizesCarePlans;
+use Livewire\Attributes\Computed;
+use Illuminate\Database\Eloquent\Collection;
 
 use App\Models\CarePlan;
 use App\Repositories\Repository;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
+use App\Traits\HandlesCarePlanSync;
+use Livewire\Attributes\Locked;
+use Throwable;
+use App\Jobs\CarePlanFullSync;
 
 class CarePlanIndex extends Component
 {
     use SynchronizesCarePlans;
-    use \App\Traits\HandlesCarePlanSync;
+    use HandlesCarePlanSync;
 
-    #[\Livewire\Attributes\Locked]
+    #[Locked]
     public array $syncBatchIds = [];
 
-    #[\Livewire\Attributes\Locked]
+    #[Locked]
     public bool $syncInitiationFailed = false;
 
     public string $searchRequisition = '';
 
     public string $filterName = '';
     public string $filterEncounterId = '';
-    public string $filterStatus = '';
+    public string $filterStatus = CarePlanStatusFilter::CURRENT->value;
+    public string $filterCompleteness = CarePlanCompletenessFilter::COMPLETE->value;
     public string $filterStartDateRange = '';
     public string $filterEndDateRange = '';
     public bool $showAdditionalParams = false;
@@ -44,6 +53,7 @@ class CarePlanIndex extends Component
             'filterName',
             'filterEncounterId',
             'filterStatus',
+            'filterCompleteness',
             'filterStartDateRange',
             'filterEndDateRange',
         ]);
@@ -60,7 +70,11 @@ class CarePlanIndex extends Component
 
         try {
             $this->synchronizeSearch(['requisition' => $this->searchRequisition], (int) legalEntity()->id);
-        } catch (\Throwable $e) {
+            $this->filterCompleteness = CarePlanCompletenessFilter::ALL->value;
+            if ($this->filterStatus === CarePlanStatusFilter::CURRENT->value) {
+                $this->filterStatus = CarePlanStatusFilter::ALL->value;
+            }
+        } catch (Throwable $e) {
             Log::error('CarePlan search error: ' . $e->getMessage());
             session()->flash('error', __('care-plan.search_error') . ': ' . $e->getMessage());
         }
@@ -69,7 +83,7 @@ class CarePlanIndex extends Component
     public function mount(): void
     {
         $this->syncBatchIds = $this->findRunningBatchesByLegalEntity(legalEntity()->id)
-            ->filter(static fn ($batch): bool => str_starts_with($batch->name, \App\Jobs\CarePlanFullSync::BATCH_NAME.'_'))
+            ->filter(static fn ($batch): bool => str_starts_with($batch->name, CarePlanFullSync::BATCH_NAME.'_'))
             ->pluck('id')->all();
     }
 
@@ -95,12 +109,12 @@ class CarePlanIndex extends Component
                     if ($batchId !== null) {
                         $this->syncBatchIds[] = $batchId;
                     }
-                } catch (\Throwable $exception) {
+                } catch (Throwable $exception) {
                     $this->syncInitiationFailed = true;
                     Log::error('Could not start patient CarePlan synchronization', ['exceptionType' => $exception::class]);
                 }
             }
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             $this->syncInitiationFailed = true;
             Log::error('Could not start CarePlan index synchronization', ['exceptionType' => $exception::class]);
         }
@@ -128,10 +142,14 @@ class CarePlanIndex extends Component
         $this->flashCarePlanSyncOutcome($outcome);
     }
 
+    #[Computed]
+    public function carePlans(): Collection
+    {
+        return Repository::carePlan()->listing(legalEntity()->id, ['status' => $this->filterStatus, 'completeness' => $this->filterCompleteness, 'name' => $this->filterName, 'startDate' => $this->filterStartDateRange, 'endDate' => $this->filterEndDateRange, 'encounterId' => $this->filterEncounterId, 'requisition' => $this->searchRequisition]);
+    }
+
     public function render()
     {
-        $carePlans = Repository::carePlan()->listing(legalEntity()->id, ['status' => $this->filterStatus, 'name' => $this->filterName, 'startDate' => $this->filterStartDateRange, 'endDate' => $this->filterEndDateRange, 'encounterId' => $this->filterEncounterId, 'requisition' => $this->searchRequisition]);
-
-        return view('livewire.care-plan.care-plan-index', ['carePlans' => $carePlans]);
+        return view('livewire.care-plan.care-plan-index');
     }
 }

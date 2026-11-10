@@ -4,19 +4,26 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person\Records;
 
+use App\Enums\CarePlanStatusFilter;
+use App\Enums\CarePlanCompletenessFilter;
 use App\Jobs\CarePlanFullSync;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 
 use App\Repositories\Repository;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Session;
 use Throwable;
+use App\Traits\HandlesCarePlanSync;
+use App\Services\Dictionary\DictionaryManager;
+use Exception;
 
 class PatientCarePlans extends BasePatientComponent
 {
-    use \App\Traits\HandlesCarePlanSync;
+    use HandlesCarePlanSync;
 
     #[Locked]
     public ?string $syncBatchId = null;
@@ -26,7 +33,8 @@ class PatientCarePlans extends BasePatientComponent
 
     public string $filterName = '';
     public string $filterEncounterId = '';
-    public string $filterStatus = '';
+    public string $filterStatus = CarePlanStatusFilter::CURRENT->value;
+    public string $filterCompleteness = CarePlanCompletenessFilter::COMPLETE->value;
     public string $filterStartDateRange = '';
     public string $filterEndDateRange = '';
     public bool $showAdditionalParams = false;
@@ -38,14 +46,17 @@ class PatientCarePlans extends BasePatientComponent
     {
         $this->loadCarePlans();
         $this->syncBatchId = $this->runningSyncBatchId();
+        if ($this->syncBatchId === null && Cache::has($this->accessSyncKey())) {
+            $this->sync();
+        }
 
         try {
-            $basics = app(\App\Services\Dictionary\DictionaryManager::class)->basics();
+            $basics = app(DictionaryManager::class)->basics();
             $this->dictionaries['care_plan_categories'] = $basics->byName('eHealth/care_plan_categories')
                 ?->asCodeDescription()
                 ?->toArray() ?? [];
-        } catch (\Exception $exception) {
-            \Illuminate\Support\Facades\Log::warning('PersonCarePlans: failed to load dictionaries: ' . $exception->getMessage());
+        } catch (Exception $exception) {
+            Log::warning('PersonCarePlans: failed to load dictionaries: ' . $exception->getMessage());
         }
     }
 
@@ -57,6 +68,7 @@ class PatientCarePlans extends BasePatientComponent
         $this->carePlans = Repository::carePlan()->patientListing($this->personId, [
             'name' => $this->filterName,
             'status' => $this->filterStatus,
+            'completeness' => $this->filterCompleteness,
             'encounter_id' => $this->filterEncounterId,
             'start_date' => $this->filterStartDateRange,
             'end_date' => $this->filterEndDateRange,
@@ -89,6 +101,10 @@ class PatientCarePlans extends BasePatientComponent
         }
         try {
             $this->syncBatchId = $this->startCarePlanPatientSync($this->patient(), firstPageSynchronously: true);
+            // Keep the intent while a concurrent caller returns the pre-grant batch.
+            if (Cache::get($this->accessSyncKey()) !== $this->syncBatchId) {
+                Cache::forget($this->accessSyncKey());
+            }
             $this->loadCarePlans();
             Session::flash($this->syncBatchId === null ? 'success' : 'info', __($this->syncBatchId === null ? 'care-plan.sync_success' : 'care-plan.sync_first_page'));
         } catch (Throwable $exception) {
@@ -109,8 +125,41 @@ class PatientCarePlans extends BasePatientComponent
             return;
         }
         $this->syncBatchId = null;
+        if (Cache::has($this->accessSyncKey())) {
+            $this->sync();
+
+            return;
+        }
         $this->loadCarePlans();
         $this->flashCarePlanSyncOutcome($outcome);
+    }
+
+    public function updatedFilterCompleteness(): void
+    {
+        $this->loadCarePlans();
+    }
+
+    #[On('care-plan-read-access-granted')]
+    public function synchronizeGrantedPlans(): void
+    {
+        if (Auth::user()->cannot('care_plan:read')) {
+            Session::flash('error', __('care-plan.sync_access_denied'));
+
+            return;
+        }
+        $runningBatch = $this->runningSyncBatchId();
+        if ($runningBatch !== null) {
+            // The old batch may already have exhausted detail reads before consent was granted.
+            // Persist the retry across reloads; never interrupt jobs already in flight.
+            Cache::put($this->accessSyncKey(), $runningBatch, now()->addDay());
+            $this->syncBatchId = $runningBatch;
+        }
+        $this->sync();
+    }
+
+    private function accessSyncKey(): string
+    {
+        return 'care-plan-sync-after-access:'.legalEntity()->id.':'.$this->uuid;
     }
 
     public function search(): void
@@ -124,6 +173,7 @@ class PatientCarePlans extends BasePatientComponent
             'filterName',
             'filterEncounterId',
             'filterStatus',
+            'filterCompleteness',
             'filterStartDateRange',
             'filterEndDateRange',
         ]);

@@ -26,6 +26,8 @@ enum ApprovalStatus: string
     case INACTIVE = 'inactive';
     case TERMINATED = 'terminated';
 
+    public const array PENDING_OR_GRANTED_VALUES = [self::PENDING->value, self::NEW->value, self::ACTIVE->value, self::APPROVED->value];
+
     /**
      * Canonical spelling to persist on `approvals.status`.
      * Explicit remote statuses take precedence over historical is_verified. Preserve
