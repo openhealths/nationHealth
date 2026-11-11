@@ -284,7 +284,7 @@ trait CompositionTestFixtures
     }
 
     /**
-     * An encounter shaped the way the Encounter API validator insists on.
+     * Complete native Medical Events encounter, including required list/detail fields.
      *
      * @return array<string, mixed>
      */
@@ -302,6 +302,8 @@ trait CompositionTestFixtures
             'class' => ['system' => 'eHealth/encounter_classes', 'code' => 'AMB'],
             'type' => ['coding' => [['system' => 'eHealth/encounter_types', 'code' => 'service_delivery_location']]],
             'period' => ['start' => now()->startOfDay()->addHours(9)->toIso8601String(), 'end' => now()->startOfDay()->addHours(9)->addMinutes(30)->toIso8601String()],
+            'reasons' => [],
+            'actions' => [],
             'performer' => $this->compositionReference('employee', $performerUuid),
             'episode' => $this->compositionReference('episode_of_care', $episodeUuid ?? (string) Str::uuid()),
             'visit' => $this->compositionReference('visit', (string) Str::uuid()),
@@ -314,6 +316,7 @@ trait CompositionTestFixtures
     protected function compositionReference(string $resource, string $uuid): array
     {
         return [
+            'display_value' => 'Test reference',
             'identifier' => [
                 'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => $resource]]],
                 'value' => $uuid,
