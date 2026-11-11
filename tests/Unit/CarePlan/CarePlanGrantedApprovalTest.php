@@ -62,7 +62,23 @@ class CarePlanGrantedApprovalTest extends TestCase
     public function test_ignores_unconfirmed_approval(): void
     {
         [$carePlan, $employee] = $this->makePlanWithEmployee();
-        $this->grantApproval($carePlan, $employee, ApprovalStatus::NEW->value);
+        $this->grantApproval($carePlan, $employee, ApprovalStatus::ACTIVE->value, false);
+
+        $this->assertFalse($carePlan->hasGrantedApprovalForEmployeeUuid($employee->uuid));
+    }
+
+    public function test_verified_approval_does_not_depend_on_a_legacy_status(): void
+    {
+        [$carePlan, $employee] = $this->makePlanWithEmployee();
+        $this->grantApproval($carePlan, $employee, null);
+
+        $this->assertTrue($carePlan->hasGrantedApprovalForEmployeeUuid($employee->uuid));
+    }
+
+    public function test_expired_verified_approval_does_not_grant_access(): void
+    {
+        [$carePlan, $employee] = $this->makePlanWithEmployee();
+        $this->grantApproval($carePlan, $employee, ApprovalStatus::ACTIVE->value, true, now()->subSecond()->toIso8601String());
 
         $this->assertFalse($carePlan->hasGrantedApprovalForEmployeeUuid($employee->uuid));
     }
@@ -127,7 +143,7 @@ class CarePlanGrantedApprovalTest extends TestCase
         return [$carePlan, $employee];
     }
 
-    private function grantApproval(CarePlan $carePlan, Employee $employee, string $status): void
+    private function grantApproval(CarePlan $carePlan, Employee $employee, ?string $status, bool $verified = true, ?string $expiry = null): void
     {
         $identifier = Identifier::create(['value' => $employee->uuid]);
 
@@ -138,9 +154,9 @@ class CarePlanGrantedApprovalTest extends TestCase
             'granted_to_id' => $identifier->id,
             'granted_to_type' => 'employee',
             'status' => $status,
-            'is_verified' => true,
+            'is_verified' => $verified,
             'access_level' => 'write',
-            'expires_at' => now()->addYear(),
+            'expires_at' => $expiry ?? now()->addYear(),
         ]);
     }
 }

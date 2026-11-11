@@ -11,7 +11,6 @@ use App\Enums\CarePlanStatus;
 use App\Enums\CarePlanStatusFilter;
 use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
 use App\Enums\JobStatus;
-use App\Enums\Person\ApprovalStatus;
 use App\Enums\Person\EncounterStatus;
 use App\Enums\Person\ObservationStatus;
 use App\Enums\Status;
@@ -1167,8 +1166,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         // getAttribute('is_verified') avoids the camelCase collision with Approval::isVerified().
         return $plan->approvals->contains(fn ($approval): bool => $approval->grantedTo?->value === $employeeUuid
             && $approval->getAttribute('is_verified') && $approval->accessLevel === 'write'
-            && $approval->expiresAt !== null && $approval->expiresAt->isFuture()
-            && ApprovalStatus::resolve($approval->status)?->isGranted() === true);
+            && $approval->expiresAt !== null && $approval->expiresAt->isFuture());
     }
 
     public function displayedDetails(CarePlan $plan, array $dictionaries): array

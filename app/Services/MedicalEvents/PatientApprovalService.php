@@ -5,38 +5,38 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents;
 
 use App\Classes\eHealth\EHealth;
+use App\Enums\JobStatus;
+use App\Enums\Person\ApprovalStatus;
+use App\Enums\Person\AuthenticationMethod;
+use App\Enums\Specimen\Status as SpecimenStatus;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Jobs\RemoteEHealthLinksProcessing;
-use App\Models\EhealthLink;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
+use App\Models\EhealthLink;
+use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Device;
-use App\Models\MedicalEvents\Sql\Immunization;
-use App\Models\MedicalEvents\Sql\Observation;
-use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
+use App\Models\MedicalEvents\Sql\Immunization;
+use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Relations\AuthenticationMethod as AuthenticationMethodModel;
 use App\Models\User;
-use App\Enums\JobStatus;
-use App\Enums\Person\AuthenticationMethod;
-use App\Enums\Person\ApprovalStatus;
-use App\Enums\Specimen\Status as SpecimenStatus;
 use App\Repositories\MedicalEvents\Repository;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -208,7 +208,7 @@ class PatientApprovalService
                 ['page' => $page]
             );
 
-            foreach ($response->getData() as $referral) {
+            foreach ($response->validate() as $referral) {
                 $uuid = $referral['id'];
 
                 $referrals[$uuid] = [
@@ -381,7 +381,7 @@ class PatientApprovalService
     {
         return EHealth::serviceRequest()
             ->getById($person->uuid, $uuid)
-            ->getData();
+            ->validate();
     }
 
     /** @return array{approval_id: ?string, link_id: ?int} */

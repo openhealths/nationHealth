@@ -5,16 +5,12 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents;
 
 use App\Classes\eHealth\Api\Approval as ApprovalApi;
+
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
-use App\EHealth;
-use App\EHealthResponse;
 use App\Enums\CarePlanTermsOfService;
-use App\Enums\Person\ApprovalStatus;
 use App\Enums\Person\AuthenticationMethod;
-
 use App\Exceptions\EHealth\EHealthResponseException;
-
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Models\CarePlan;
@@ -94,7 +90,7 @@ class CarePlanApprovalService
 
         $terms = $carePlan->termsOfServiceCode();
         if (is_array($terms)) {
-            $terms = $terms['coding'][0]['code'] ?? $terms['code'] ?? '';
+            $terms = $terms['coding'][0]['code'] ?? ($terms['code'] ?? '');
         }
 
         if (strtoupper(trim((string) $terms)) !== CarePlanTermsOfService::INPATIENT->value) {
@@ -162,7 +158,7 @@ class CarePlanApprovalService
         try {
             $existing = $repository->reusableForCarePlan($carePlan, $employeeUuid, $accessLevel);
             if ($existing !== null) {
-                if ($existing->getAttribute('is_verified') && ApprovalStatus::resolve($existing->status)?->isGranted()) {
+                if ($existing->getAttribute('is_verified') && $existing->expiresAt?->isFuture() === true) {
                     return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Granted, $existing->uuid);
                 }
                 $existingLink = $existing->ehealthLinks->filter(fn ($candidate): bool => data_get($candidate->job?->request_data, 'operation') !== 'resendSms')->sortByDesc('id')->first();
@@ -175,16 +171,17 @@ class CarePlanApprovalService
                     if ($exception->response->status() !== 404) {
                         throw $exception;
                     }
-                    $data = ['id' => $existing->uuid, 'status' => ApprovalStatus::INACTIVE->value, 'is_verified' => false];
+                    $repository->markUnavailable($existing);
+                    $data = []; // A missing remote resource expires local access without inventing approval fields.
                 }
-                $repository->sync($data, $carePlan, $existing);
+                if ($data !== []) {
+                    $repository->sync($data, $carePlan, $existing);
+                }
                 $existing->refresh();
                 if ($this->approvalIsGranted($data)) {
                     return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Granted, $existing->uuid);
                 }
-                $status = ApprovalStatus::resolve($existing->status);
-                if (($status?->isAwaitingPatient() || $status?->isGranted())
-                    && ($existing->expiresAt === null || $existing->expiresAt->isFuture())
+                if (!$existing->getAttribute('is_verified') && $existing->expiresAt?->isFuture() === true
                     && ($confirmWithoutOtp || $authorizeWith === null || $existing->authorizeWith === $authorizeWith)) {
                     if ($confirmWithoutOtp) {
                         $this->confirmWithoutOtp($patientUuid, $existing->uuid, $bearerToken);
@@ -258,7 +255,7 @@ class CarePlanApprovalService
         }
         $result = $this->resultFromData($data, $patientUuid, $authorizeWith);
         if ($result->isGranted()) {
-            MedicalEventsRepository::approval()->storePatientResponse($patientUuid, $approvalId, $data, ApprovalStatus::ACTIVE->value);
+            MedicalEventsRepository::approval()->storePatientResponse($patientUuid, $approvalId, $data);
         }
 
         return $result;
@@ -268,6 +265,10 @@ class CarePlanApprovalService
     {
         if ($this->approvalIsGranted($data)) {
             return new CarePlanApprovalCreateResult(CarePlanApprovalCreateOutcome::Granted, $data['id']);
+        }
+        if (($data['is_verified'] ?? null) !== false || empty($data['expires_at'])
+            || !CarbonImmutable::parse($data['expires_at'])->isFuture()) {
+            throw new RuntimeException(__('care-plan.approval_result_unavailable'));
         }
         $method = $this->extractAuthMethod($data);
         $method = app(PatientApprovalService::class)->resolveConfirmationMethod($method ?? [], $patientUuid, $data['authorize_with'] ?? $authorizeWith);
@@ -284,8 +285,8 @@ class CarePlanApprovalService
     private function approvalIsGranted(array $data): bool
     {
         return ($data['is_verified'] ?? false) === true
-            && ApprovalStatus::resolve($data['status'] ?? 'active')?->isGranted()
-            && (empty($data['expires_at']) || CarbonImmutable::parse($data['expires_at'])->isFuture());
+            && !empty($data['expires_at'])
+            && CarbonImmutable::parse($data['expires_at'])->isFuture();
     }
 
     public function verify(string $patientUuid, string $approvalId, ?int $code, ?string $bearerToken = null): EHealthResponse
@@ -321,11 +322,18 @@ class CarePlanApprovalService
             }
             $response = $confirmedResponse;
         }
-        if ((array_key_exists('is_verified', $data) && $data['is_verified'] !== true)
-            || (isset($data['status']) && ApprovalStatus::resolve($data['status'])?->isGranted() !== true)) {
+        if (array_key_exists('is_verified', $data) && $data['is_verified'] !== true) {
             throw new RuntimeException(__('care-plan.approval_verify_error'));
         }
-        MedicalEventsRepository::approval()->storePatientResponse($patientUuid, $approvalId, $data, ApprovalStatus::ACTIVE->value);
+        // A successful PATCH may contain only an acknowledgement. Read the verified flag and expiry before granting access.
+        if ($data === [] || !isset($data['id'], $data['is_verified'], $data['expires_at'])) {
+            $response = $this->requireSuccessfulResponse($api->getApprovalDetails($patientUuid, $approvalId));
+            $data = $response->validate();
+        }
+        if (($data['id'] ?? null) !== $approvalId || !$this->approvalIsGranted($data)) {
+            throw new RuntimeException(__('care-plan.approval_verify_error'));
+        }
+        MedicalEventsRepository::approval()->storePatientResponse($patientUuid, $approvalId, $data);
 
         return $response;
     }
@@ -384,9 +392,11 @@ class CarePlanApprovalService
         $patientUuid = $plan->person->uuid;
         $api = EHealth::approval()->withToken($bearerToken);
         $approval = MedicalEventsRepository::approval()->carePlanApproval($plan, $approvalId);
-        if ($approval->getAttribute('is_verified') && ApprovalStatus::resolve($approval->status)?->isGranted()
-            && ($approval->expiresAt === null || $approval->expiresAt->isFuture())) {
+        if ($approval->getAttribute('is_verified') && $approval->expiresAt?->isFuture() === true) {
             return ['status' => 'granted'];
+        }
+        if ($approval->expiresAt?->isFuture() !== true) {
+            throw new RuntimeException(__('care-plan.approval_result_unavailable'));
         }
         if ($this->skipsPatientOtp($plan, $legalEntity)) {
             throw new RuntimeException(__('care-plan.sms_not_required'));
@@ -402,7 +412,7 @@ class CarePlanApprovalService
             if (($confirmed['id'] ?? null) !== $approvalId || !$this->approvalIsGranted($confirmed)) {
                 throw $exception;
             }
-            MedicalEventsRepository::approval()->storePatientResponse($patientUuid, $approvalId, $confirmed, ApprovalStatus::ACTIVE->value);
+            MedicalEventsRepository::approval()->storePatientResponse($patientUuid, $approvalId, $confirmed);
 
             return ['status' => 'granted'];
         }
@@ -446,9 +456,11 @@ class CarePlanApprovalService
             return new CarePlanApprovalJobStatusResult(CarePlanApprovalJobOutcome::Failed, errorMessage: $this->formatJobError($link->job->response_data ?? []));
         }
         $approval = $link->linkable;
-        if ($approval->getAttribute('is_verified') && ApprovalStatus::resolve($approval->status)?->isGranted()
-            && ($approval->expiresAt === null || $approval->expiresAt->isFuture())) {
+        if ($approval->getAttribute('is_verified') && $approval->expiresAt?->isFuture() === true) {
             return new CarePlanApprovalJobStatusResult(CarePlanApprovalJobOutcome::Granted, $approval->uuid);
+        }
+        if ($approval->expiresAt !== null && !$approval->expiresAt->isFuture()) {
+            return new CarePlanApprovalJobStatusResult(CarePlanApprovalJobOutcome::Failed, errorMessage: __('care-plan.approval_result_unavailable'));
         }
         if (!empty($link->job->response_data['confirmationError'])) {
             return new CarePlanApprovalJobStatusResult(CarePlanApprovalJobOutcome::Failed, errorMessage: __('care-plan.approval_verify_error'));
@@ -485,10 +497,9 @@ class CarePlanApprovalService
     private function extractAuthMethod(array $data): ?array
     {
         $method = $data['response_data']['authentication_method_current']
-            ?? $data['data']['authentication_method_current']
-            ?? $data['authentication_method_current']
-            ?? $data['urgent']['authentication_method_current']
-            ?? null;
+            ?? ($data['data']['authentication_method_current']
+                ?? ($data['authentication_method_current']
+                    ?? ($data['urgent']['authentication_method_current'] ?? null)));
 
         return is_array($method) ? $method : null;
     }

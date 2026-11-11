@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
-use App\Classes\eHealth\Api\Approval as ApprovalApi;
-use App\Classes\eHealth\Api\Person as PersonApi;
+use App\Classes\eHealth\Api\Approval;
+use App\Classes\eHealth\Api\Person as ApiPerson;
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\Status;
 use App\Enums\User\Role;
@@ -13,7 +13,7 @@ use App\Livewire\CarePlan\CarePlanApprovals;
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\Approval;
+use App\Models\MedicalEvents\Sql\Approval as SqlApproval;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
@@ -146,8 +146,8 @@ class CarePlanApprovalsTest extends TestCase
         ]);
 
         // Mock dependencies for Livewire mount
-        $mockPatientApi = Mockery::mock(PersonApi::class);
-        $this->instance(PersonApi::class, $mockPatientApi);
+        $mockPatientApi = Mockery::mock(ApiPerson::class);
+        $this->instance(ApiPerson::class, $mockPatientApi);
 
         $authResponse = Mockery::mock(EHealthResponse::class);
         $authResponse->shouldReceive('getData', 'validate')->andReturn([
@@ -160,9 +160,9 @@ class CarePlanApprovalsTest extends TestCase
         $authResponse->shouldReceive('getStatusCode')->andReturn(200);
         $mockPatientApi->shouldReceive('getAuthMethods')->andReturn($authResponse);
 
-        $mockApprovalApi = Mockery::mock(ApprovalApi::class);
+        $mockApprovalApi = Mockery::mock(Approval::class);
         $mockApprovalApi->shouldReceive('withToken')->andReturnSelf();
-        $this->instance(ApprovalApi::class, $mockApprovalApi);
+        $this->instance(Approval::class, $mockApprovalApi);
 
         $approvalsResponse = Mockery::mock(EHealthResponse::class);
         $approvalsResponse->shouldReceive('getData', 'validate')->andReturn([]);
@@ -251,8 +251,8 @@ class CarePlanApprovalsTest extends TestCase
         ]);
 
         // Mock dependencies
-        $mockPatientApi = Mockery::mock(PersonApi::class);
-        $this->instance(PersonApi::class, $mockPatientApi);
+        $mockPatientApi = Mockery::mock(ApiPerson::class);
+        $this->instance(ApiPerson::class, $mockPatientApi);
 
         $authResponse = Mockery::mock(EHealthResponse::class);
         $authResponse->shouldReceive('getData', 'validate')->andReturn([
@@ -265,9 +265,9 @@ class CarePlanApprovalsTest extends TestCase
         $authResponse->shouldReceive('getStatusCode')->andReturn(200);
         $mockPatientApi->shouldReceive('getAuthMethods')->andReturn($authResponse);
 
-        $mockApprovalApi = Mockery::mock(ApprovalApi::class);
+        $mockApprovalApi = Mockery::mock(Approval::class);
         $mockApprovalApi->shouldReceive('withToken')->andReturnSelf();
-        $this->instance(ApprovalApi::class, $mockApprovalApi);
+        $this->instance(Approval::class, $mockApprovalApi);
 
         $approvalsResponse = Mockery::mock(EHealthResponse::class);
         $approvalsResponse->shouldReceive('getData', 'validate')->andReturn([]);
@@ -301,7 +301,7 @@ class CarePlanApprovalsTest extends TestCase
         ];
 
         $approvalCreateResponse = Mockery::mock(EHealthResponse::class);
-        $approvalCreateResponse->shouldReceive('getData', 'validate')->andReturn(['id' => (string) Str::uuid(), 'status' => 'new', 'is_verified' => false, 'authentication_method_current' => ['type' => 'OTP']]);
+        $approvalCreateResponse->shouldReceive('getData', 'validate')->andReturn(['id' => (string) Str::uuid(), 'is_verified' => false, 'expires_at' => now()->addDay()->toIso8601String(), 'authentication_method_current' => ['type' => 'OTP']]);
         $approvalCreateResponse->shouldReceive('successful')->andReturnTrue();
         $approvalCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
 
@@ -404,7 +404,7 @@ class CarePlanApprovalsTest extends TestCase
     }
 
     #[DataProvider('approvalVisibility')]
-    public function test_granted_and_awaiting_approvals_are_visible(string $status, bool $visible, bool $verified, bool $awaiting): void
+    public function test_granted_and_awaiting_approvals_are_visible(?string $status, bool $visible, bool $verified, bool $awaiting, bool $expired = false): void
     {
         $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
@@ -470,7 +470,7 @@ class CarePlanApprovalsTest extends TestCase
         ]);
 
         $identifier = Identifier::create(['value' => $employee->uuid]);
-        Approval::create([
+        SqlApproval::create([
             'uuid' => (string) Str::uuid(),
             'approvable_type' => CarePlan::class,
             'approvable_id' => $carePlan->id,
@@ -478,6 +478,7 @@ class CarePlanApprovalsTest extends TestCase
             'granted_to_type' => 'employee',
             'status' => $status,
             'is_verified' => $verified,
+            'expires_at' => $expired ? now()->subSecond() : now()->addDay(),
         ]);
 
         $approvalService = Mockery::mock(CarePlanApprovalService::class)->makePartial();
@@ -485,8 +486,8 @@ class CarePlanApprovalsTest extends TestCase
         $approvalService->shouldReceive('skipsPatientOtp')->andReturn(true);
         $this->instance(CarePlanApprovalService::class, $approvalService);
 
-        $mockPatientApi = Mockery::mock(PersonApi::class);
-        $this->instance(PersonApi::class, $mockPatientApi);
+        $mockPatientApi = Mockery::mock(ApiPerson::class);
+        $this->instance(ApiPerson::class, $mockPatientApi);
         $authResponse = Mockery::mock(EHealthResponse::class);
         $authResponse->shouldReceive('getData', 'validate')->andReturn([]);
         $mockPatientApi->shouldReceive('getAuthMethods')->andReturn($authResponse);
@@ -497,8 +498,8 @@ class CarePlanApprovalsTest extends TestCase
         $component = Livewire::test(CarePlanApprovals::class, [
             'legalEntity' => $legalEntity,
             'carePlan' => $carePlan->fresh(),
-        ])
-            ->assertSet('approvals.0.status', $status);
+        ]);
+        $this->assertFalse(array_key_exists('status', $component->get('approvals')[0] ?? []));
 
         if ($visible) {
             $component->assertSeeHtml('wire:click="cancelApproval')
@@ -525,8 +526,11 @@ class CarePlanApprovalsTest extends TestCase
             'legacy approved awaiting confirmation' => ['APPROVED', true, false, true],
             'pending' => ['pending', true, false, true],
             'new' => ['NEW', true, false, true],
-            'inactive' => ['inactive', false, false, false],
-            'terminated' => ['terminated', false, true, false],
+            'inactive legacy value ignored' => ['inactive', true, false, true],
+            'no local status' => [null, true, true, false],
+            'expired verified' => ['active', false, true, false, true],
+            'expired pending' => ['pending', false, false, false, true],
+            'terminated legacy value ignored' => ['terminated', true, true, false],
         ];
     }
 }
