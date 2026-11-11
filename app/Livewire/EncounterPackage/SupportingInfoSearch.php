@@ -9,6 +9,7 @@ use App\Enums\MedicalEvents\RecordType;
 use App\Enums\Person\ConditionVerificationStatus;
 use App\Enums\Person\DiagnosticReportStatus;
 use App\Enums\Person\ObservationStatus;
+use App\Enums\Person\ProcedureStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
@@ -96,7 +97,7 @@ class SupportingInfoSearch extends Component
     public array $records = [];
 
     /**
-     * ICD-10 AM descriptions of the found condition codes, keyed by code.
+     * ICD-10 AM descriptions of the found condition codes and encounter diagnosis codes, keyed by code.
      *
      * @var array
      */
@@ -199,7 +200,7 @@ class SupportingInfoSearch extends Component
             return;
         }
 
-        $this->icd10Descriptions = $recordType === RecordType::CONDITION
+        $this->icd10Descriptions = in_array($recordType, [RecordType::CONDITION, RecordType::ENCOUNTER], true)
             ? Icd10::whereIn('code', collect($this->records)->pluck('code')->filter()->unique())
                 ->pluck('description', 'code')
                 ->all()
@@ -273,7 +274,7 @@ class SupportingInfoSearch extends Component
     }
 
     /**
-     * Procedures of the patient.
+     * Procedures of the patient, except those not done or entered in error, since they cannot be referenced.
      *
      * @param  array  $params
      * @return array
@@ -282,6 +283,11 @@ class SupportingInfoSearch extends Component
     private function procedureRecords(array $params): array
     {
         return collect(EHealth::procedure()->getBySearchParams($this->patientUuid, $params)->validate())
+            ->reject(static fn (array $procedure): bool => in_array(
+                data_get($procedure, 'status'),
+                [ProcedureStatus::NOT_DONE->value, ProcedureStatus::ENTERED_IN_ERROR->value],
+                true
+            ))
             ->map(static fn (array $procedure): array => [
                 'uuid' => data_get($procedure, 'uuid'),
                 'ehealthInsertedAt' => convertToAppDateFormat(data_get($procedure, 'ehealth_inserted_at')),

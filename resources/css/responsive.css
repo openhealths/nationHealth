@@ -1,0 +1,273 @@
+/* Table wrappers have no layout box on desktop. */
+.table-scroll {
+    display: contents;
+}
+
+/* Keep adaptations below the desktop breakpoint. */
+@media (width < 1024px) {
+    .responsive-content,
+    .modal-content {
+        container-type: inline-size;
+    }
+
+    /* General defaults must yield to intentional Tailwind utilities. */
+    @layer components {
+        :is(.responsive-content, .modal-content) fieldset {
+            min-inline-size: 0;
+        }
+
+        :is(.responsive-content, .modal-content)
+            :where(div, section, article, form, header, nav, ul, li, dl, dd) {
+            min-width: 0;
+        }
+
+        :is(.responsive-content, .modal-content)
+            :where(
+                h1,
+                h2,
+                h3,
+                p,
+                dd,
+                .default-p,
+                .record-inner-value,
+                .record-inner-subvalue,
+                .alert-message
+            ) {
+            overflow-wrap: anywhere;
+        }
+
+        :is(.responsive-content, .modal-content)
+            :where(
+                input,
+                select,
+                textarea,
+                .form-group
+            ) {
+            max-width: 100%;
+        }
+
+        :is(.responsive-content, .modal-content) :is(button, [class*="button-"]) {
+            min-width: 0;
+            max-width: 100%;
+            white-space: normal;
+        }
+
+        .label {
+            max-width: 100%;
+        }
+
+        /* Grid columns define field width; legacy half-width utilities must not shrink it again. */
+        :is(.responsive-content, .modal-content) .form-group {
+            width: 100% !important;
+        }
+
+        :is(.responsive-content, .modal-content) :is(button, a, label) {
+            overflow-wrap: break-word;
+        }
+
+        /* Menu width follows its content or utilities, never the icon-sized anchor. */
+        :is(.responsive-content, .modal-content) :is(.dropdown-panel, .dropdown-menu) {
+            max-width: calc(100vw - 2rem);
+            overflow-wrap: normal;
+        }
+
+        :is(.responsive-content, .modal-content)
+            :is(.dropdown-panel, .dropdown-menu) :is(button, a, label) {
+            overflow-wrap: normal;
+        }
+    }
+
+    .table-scroll,
+    .index-table-wrapper,
+    .table-container,
+    .show-fieldset-table-wrapper,
+    :is(.responsive-content, .modal-content)
+        div:has(> table.table-input:only-child) {
+        min-width: 0;
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    .table-scroll {
+        display: block;
+    }
+
+    .table-scroll > table,
+    .index-table {
+        table-layout: auto;
+    }
+
+    :is(.responsive-content, .modal-content) .index-table {
+        min-width: 0;
+        table-layout: auto;
+    }
+
+    :is(
+        .table-scroll,
+        .index-table-wrapper,
+        .table-container,
+        .show-fieldset-table-wrapper,
+        :is(.responsive-content, .modal-content)
+            div:has(> table.table-input:only-child)
+    ).table-scroll-fits {
+        overflow: visible;
+    }
+
+    @layer components {
+        :is(
+                .button-group,
+                .form-header-actions,
+                .navigation-actions,
+                .form-button-group
+            )
+            > * {
+            min-width: 0;
+            max-width: 100%;
+            white-space: normal;
+        }
+    }
+
+    :is(
+            .button-group,
+            .form-header-actions,
+            .navigation-actions,
+            .form-button-group
+        )
+        svg,
+    :is(.breadcrumb-link, .breadcrumb-separator) svg {
+        flex-shrink: 0;
+    }
+
+    .file-input-wrapper,
+    .file-input-text {
+        min-width: 0;
+    }
+
+    :is(.responsive-content, .modal-content) .inline-block.min-w-full {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .navigation-actions,
+    .form-header-actions,
+    .button-group {
+        min-width: 0;
+        max-width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .navigation-breadcrumb-list,
+    .breadcrumb-list {
+        min-width: 0;
+        flex-wrap: wrap;
+        row-gap: 0.5rem;
+        white-space: normal;
+    }
+
+    :is(.responsive-content, .modal-content) .navigation-description {
+        white-space: normal;
+    }
+
+    .page-title {
+        overflow: visible;
+        text-overflow: clip;
+        white-space: normal;
+    }
+
+    .breadcrumb-separator {
+        min-width: 0;
+        flex-shrink: 1;
+    }
+
+    .summary-nav-row {
+        min-width: 0;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        overflow: visible;
+    }
+
+    #drawer-navigation .menu-item > span,
+    #drawer-navigation .menu-item-simple > span,
+    #drawer-navigation .submenu-item > span {
+        min-width: 0;
+        white-space: normal;
+    }
+
+    /* A viewport breakpoint alone leaves three columns in a narrow desktop drawer. */
+    @container (max-width: 36rem) {
+        /* Only defaults for generic grids/flexes; explicit utility classes win. */
+        @layer components {
+            :is(.responsive-content, .modal-content) .grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            :is(.responsive-content, .modal-content) .grid > * {
+                grid-column: auto;
+            }
+
+            :is(.responsive-content, .modal-content) .flex:not(.flex-col) {
+                flex-wrap: wrap;
+            }
+        }
+
+        :is(.responsive-content, .modal-content)
+            :is(.form-row-2, .form-row-3, .form-row-4, .form-row-modal) {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        :is(.responsive-content, .modal-content)
+            :is(.form-row-2, .form-row-3, .form-row-4, .form-row-modal)
+            > * {
+            grid-column: auto;
+        }
+
+        .form-header,
+        .page-header {
+            flex-wrap: wrap;
+        }
+
+        .summary-tab {
+            white-space: normal;
+            text-align: left;
+        }
+    }
+
+    @container (min-width: 36rem) and (max-width: 48rem) {
+        :is(.responsive-content, .modal-content) :is(.form-row-3, .form-row-4) {
+            grid-template-columns: repeat(
+                auto-fit,
+                minmax(min(100%, 14rem), 1fr)
+            );
+        }
+    }
+}
+
+@media (width < 640px) {
+    .notification-panel {
+        position: fixed;
+        inset-inline: 1rem;
+        top: 4rem;
+        margin-top: 0;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+    }
+
+    body .flatpickr-calendar {
+        width: calc(100vw - 2rem) !important;
+        max-width: calc(100vw - 2rem);
+    }
+
+    body .flatpickr-days,
+    body .flatpickr-calendar .dayContainer {
+        width: 100% !important;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    body .flatpickr-calendar .flatpickr-day {
+        max-width: none;
+        flex-basis: calc(100% / 7);
+    }
+}

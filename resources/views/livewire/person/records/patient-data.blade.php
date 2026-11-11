@@ -15,7 +15,7 @@
         <div class="flex flex-wrap items-center gap-2">
             @can('create', Encounter::class)
                 <a
-                    href="{{ route('encounter.create', [legalEntity(), 'person' => $personId]) }}"
+                    href="{{ route('persons.encounters.create', [legalEntity(), 'person' => $personId]) }}"
                     class="button-primary flex items-center gap-2 px-4 py-2 text-sm shadow-sm"
                 >
                     @icon('plus', 'w-4 h-4')
@@ -84,7 +84,7 @@
                         @endcan
                         @can('create', Encounter::class)
                             <a
-                                href="{{ route('encounter.create', [legalEntity(), 'person' => $personId, 'type' => 'discharge']) }}"
+                                href="{{ route('persons.encounters.create', [legalEntity(), 'person' => $personId, 'type' => 'discharge']) }}"
                                 class="dropdown-item"
                             >
                                 @icon('hospital-bed', 'w-4 h-4 shrink-0')
@@ -93,7 +93,7 @@
                         @endcan
                         @can('create', Encounter::class)
                             <a
-                                href="{{ route('encounter.create', [legalEntity(), 'person' => $personId, 'type' => 'hospitalization_refusal']) }}"
+                                href="{{ route('persons.encounters.create', [legalEntity(), 'person' => $personId, 'type' => 'hospitalization_refusal']) }}"
                                 class="dropdown-item"
                             >
                                 @icon('cancel', 'w-4 h-4 shrink-0')
@@ -401,6 +401,7 @@
                                 <h3 class="mb-4 text-base font-semibold text-gray-900 dark:text-white">
                                     {{ __('patients.person_documents') }}
                                 </h3>
+                                <div class="table-scroll">
                                 <table class="table-input w-full">
                                     <thead class="thead-input">
                                         <tr>
@@ -441,6 +442,7 @@
                                         @endif
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
 
                             <div class="mt-8">
@@ -822,6 +824,7 @@
                                 </button>
                             </div>
 
+                            <div class="table-scroll">
                             <table class="table-input w-full">
                                 <thead class="thead-input">
                                     <tr>
@@ -973,6 +976,7 @@
                                     @endif
                                 </tbody>
                             </table>
+                            </div>
 
                             @can('create', ConfidantPerson::class)
                                 @if (!$this->hasLegalCapacityDocument())
@@ -1010,6 +1014,7 @@
                                     </button>
                                 </div>
 
+                                <div class="table-scroll">
                                 <table class="table-input w-full">
                                     <thead class="thead-input">
                                         <tr>
@@ -1094,6 +1099,7 @@
                                         @endif
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         @endcan
                     </div>

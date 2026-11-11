@@ -38,7 +38,8 @@ readonly class PastDateTime implements ValidationRule
         }
 
         if ($datetime->isFuture()) {
-            $fail(__('validation.before_or_equal', ['date' => __('validation.values.now')]));
+            // The field may hold only the time, while its date sits in another field, so the whole moment is named
+            $fail(__('validation.before_or_equal_now_date_time', ['value' => $this->date . ' ' . $value]));
         }
     }
 }

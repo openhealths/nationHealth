@@ -23,6 +23,7 @@
             <h2>{{ __('clinical-impressions.supporting_info') }}</h2>
         </legend>
 
+        <div class="table-scroll">
         <table class="table-input w-inherit">
             <thead class="thead-input">
                 <tr>
@@ -40,9 +41,11 @@
                             x-text="
                                 (() => {
                                     const dictName =
+                                        $wire.dictionaries['eHealth/ICD10_AM/condition_codes']?.[supporting.code] ||
                                         $wire.dictionaries['eHealth/LOINC/observation_codes'][supporting.code] ||
                                         $wire.dictionaries['eHealth/ICF/classifiers'][supporting.code] ||
                                         $wire.dictionaries['eHealth/ICPC2/condition_codes'][supporting.code] ||
+                                        $wire.dictionaries['eHealth/custom/observation_codes']?.[supporting.code] ||
                                         supporting.description;
 
                                     if (dictName) {
@@ -141,6 +144,7 @@
                 </template>
             </tbody>
         </table>
+        </div>
 
         <div>
             {{-- Button to trigger the modal --}}

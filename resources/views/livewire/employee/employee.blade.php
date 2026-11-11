@@ -42,8 +42,8 @@
             </template>
 
             {{-- Action Buttons --}}
-            <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6">
-                <div class="flex items-center space-x-4">
+            <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6 max-lg:flex-wrap max-lg:items-start">
+                <div class="flex items-center space-x-4 max-lg:flex-wrap max-lg:gap-4 max-lg:space-x-0">
                     <a href="{{ route('employee.index', ['legalEntity' => legalEntity()->id]) }}" class="button-minor">
                         {{ __('forms.cancel') }}
                     </a>
@@ -52,7 +52,7 @@
                         {{ __('forms.complete_the_interaction_and_sign') }}
                     </button>
                 </div>
-                <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-4 max-lg:flex-wrap max-lg:gap-4 max-lg:space-x-0">
                     <button
                         type="submit"
                         class="button-primary-outline flex items-center gap-2 px-4 py-2"

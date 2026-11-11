@@ -31,7 +31,7 @@
                 <div class="record-inner-action-col">
                     <x-patient.record-actions
                         :href="route(
-                            $prepersonId !== null ? 'prepersons.encounters.view' : 'persons.encounters.view',
+                            $prepersonId !== null ? 'prepersons.encounters.show' : 'persons.encounters.show',
                             [legalEntity(), $prepersonId !== null ? 'preperson' : 'person' => $prepersonId ?? $personId, 'encounter' => data_get($encounter, 'id')]
                         )"
                     />

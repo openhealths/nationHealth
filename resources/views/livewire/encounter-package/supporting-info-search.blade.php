@@ -8,7 +8,8 @@
                 $wire.icd10Descriptions[code] ||
                 dictionaries['eHealth/LOINC/observation_codes']?.[code] ||
                 dictionaries['eHealth/ICF/classifiers']?.[code] ||
-                dictionaries['eHealth/ICPC2/condition_codes']?.[code];
+                dictionaries['eHealth/ICPC2/condition_codes']?.[code] ||
+                dictionaries['eHealth/custom/observation_codes']?.[code];
 
             if (dictionaryName) {
                 return `${code} - ${dictionaryName}`;
@@ -66,6 +67,7 @@
             <x-forms.loading />
         </div>
 
+        <div class="table-scroll">
         <table class="table-input w-inherit">
             <thead class="thead-input">
                 <tr>
@@ -108,6 +110,7 @@
                 @endforeach
             </tbody>
         </table>
+        </div>
 
         @if ($records === [])
             <div class="py-8 text-center text-gray-500 dark:text-gray-400">{{ __('forms.nothing_found') }}</div>

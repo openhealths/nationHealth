@@ -49,7 +49,7 @@ class PatientReferralRegistryUatTest extends TestCase
 
         Livewire::test(PatientReferrals::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])
             ->assertOk()
-            ->assertSee(route('encounter.edit', ['legalEntity' => $legalEntity, 'person' => $person->id, 'encounter' => $encounterId]), false);
+            ->assertSee(route('persons.encounters.edit', ['legalEntity' => $legalEntity, 'person' => $person->id, 'encounter' => $encounterId]), false);
     }
 
     public function test_device_cancel_uses_the_device_module_even_with_a_service_kind_argument(): void

@@ -38,7 +38,10 @@
         @endcan
     </x-slot>
 
-    <div class="breadcrumb-form shift-content p-4" @if ($pendingCompletions !== []) wire:poll.5s="checkPendingCompletions" @endif>
+    <div
+        class="breadcrumb-form shift-content p-4"
+        @if ($pendingCompletions !== []) wire:poll.5s="checkPendingCompletions" @endif
+    >
         <div class="mt-6 w-full">
             <div class="mb-4 flex items-center gap-1 font-semibold text-gray-900 dark:text-gray-100">
                 @icon('search-outline', 'w-4.5 h-4.5')
@@ -228,7 +231,7 @@
 
                                                 @if (!empty($referral['encounterId']) && $personId)
                                                     <a
-                                                        href="{{ route('encounter.edit', [legalEntity(), 'person' => $personId, 'encounter' => $referral['encounterId']]) }}"
+                                                        href="{{ route('persons.encounters.edit', [legalEntity(), 'person' => $personId, 'encounter' => $referral['encounterId']]) }}"
                                                         class="dropdown-item"
                                                     >
                                                         @icon('edit', 'w-5 h-5 text-gray-500')
@@ -370,7 +373,7 @@
 
                                             @elseif (!empty($referral['encounterId']) && $personId)
                                                 <a
-                                                    href="{{ route('encounter.edit', [legalEntity(), 'person' => $personId, 'encounter' => $referral['encounterId']]) }}"
+                                                    href="{{ route('persons.encounters.edit', [legalEntity(), 'person' => $personId, 'encounter' => $referral['encounterId']]) }}"
                                                     class="text-link"
                                                 >
                                                     {{ $referral['basisLabel'] }}
@@ -384,7 +387,9 @@
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label">{{ __('care-plan.program') }}</div>
-                                        <div class="record-inner-value break-words">{{ $referral['programName'] ?? '—' }}</div>
+                                        <div class="record-inner-value break-words">
+                                            {{ $referral['programName'] ?? '—' }}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -406,7 +411,9 @@
                                             'identifierValue' => $referral['requestNumber'] ?? null,
                                         ])
                                         @if ($referral['kind'] === 'service_request')
-                                            <p class="mt-1 text-sm text-gray-500">{{ __('referrals.registry.number_hint') }}</p>
+                                            <p class="mt-1 text-sm text-gray-500">
+                                                {{ __('referrals.registry.number_hint') }}
+                                            </p>
                                         @endif
                                     </div>
                                     <div>

@@ -28,7 +28,7 @@
     class="fixed inset-0 z-50 overflow-y-auto px-4 py-6 sm:px-0"
     style="display: none"
 >
-    <div class="fixed inset-0 flex items-center justify-center">
+    <div class="fixed inset-0 flex items-center justify-center p-4 sm:p-6 lg:p-0">
         <!-- Overlay -->
         <div
             x-show="show"
@@ -46,7 +46,7 @@
         <div
             x-show="show"
             x-on:click.stop
-            class="relative z-10 w-full bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-auto transform transition-all {{ $maxWidth }}"
+            class="responsive-content relative z-10 max-lg:min-w-0 w-full max-lg:max-h-full bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-auto transform transition-all {{ $maxWidth }}"
             x-trap.inert.noscroll="show"
             x-transition:enter="ease-out duration-300"
             x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"

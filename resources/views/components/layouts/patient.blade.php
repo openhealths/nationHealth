@@ -41,7 +41,7 @@
         @elseif ($personId)
             @can('create', Encounter::class)
                 <a
-                    href="{{ route('encounter.create', [legalEntity(), 'person' => $personId]) }}"
+                    href="{{ route('persons.encounters.create', [legalEntity(), 'person' => $personId]) }}"
                     class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
                 >
                     @icon('plus', 'w-4 h-4')
@@ -211,8 +211,8 @@
                             @endif
 
                             <a
-                                href="{{ route("$routePrefix.encounters", [legalEntity(), $routeParamKey => $recordId]) }}"
-                                class="summary-tab {{ $isCurrentRoute("$routePrefix.encounters") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                                href="{{ route("$routePrefix.encounters.index", [legalEntity(), $routeParamKey => $recordId]) }}"
+                                class="summary-tab {{ $isCurrentRoute("$routePrefix.encounters.index") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                             >
                                 {{ __('encounters.plural') }}
                             </a>

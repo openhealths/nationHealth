@@ -15,7 +15,7 @@
 
 <aside
     id="drawer-navigation"
-    class="fixed top-0 left-0 z-40 h-screen w-78 -translate-x-full border-r border-gray-200 bg-white pt-14 transition-transform md:translate-x-0 dark:border-gray-700 dark:bg-gray-800"
+    class="fixed top-0 left-0 z-40 h-screen max-lg:h-dvh w-78 max-lg:max-w-[calc(100%-1rem)] -translate-x-full border-r border-gray-200 bg-white pt-14 transition-transform lg:translate-x-0 dark:border-gray-700 dark:bg-gray-800"
     aria-label="Sidebar"
 >
     <div class="h-full overflow-y-auto bg-white px-3 py-5 scheme-light dark:bg-gray-800 dark:scheme-dark">

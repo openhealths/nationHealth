@@ -12,6 +12,7 @@ export default defineConfig({
                 'resources/css/home.css',
 
                 'resources/js/app.js',
+                'resources/js/responsive.js',
                 'resources/js/index.js',
                 'resources/js/base.js',
                 'resources/js/home.js',

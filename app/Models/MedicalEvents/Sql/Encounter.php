@@ -388,8 +388,8 @@ class Encounter extends Model implements SubmittedToEHealth
     }
 
     /**
-     * Order by most recently updated in eHealth first, keeping records without a timestamp last. Drafts lead the list,
-     * by their local update time, as they are not in eHealth yet.
+     * Order by the latest update first: the one in eHealth, or the local one for a record eHealth has not updated yet,
+     * such as a draft, so that an old draft does not stay above the encounters updated after it.
      *
      * @param  Builder  $query
      * @return Builder
@@ -397,10 +397,8 @@ class Encounter extends Model implements SubmittedToEHealth
     #[Scope]
     protected function recentlyUpdatedFirst(Builder $query): Builder
     {
-        return $query->orderByRaw('CASE WHEN status = ? THEN 0 ELSE 1 END', [EncounterStatus::DRAFT->value])
-            ->orderByRaw('CASE WHEN ehealth_updated_at IS NULL THEN 1 ELSE 0 END')
-            ->orderByDesc('ehealth_updated_at')
-            ->orderByDesc('updated_at');
+        return $query->orderByRaw('COALESCE(ehealth_updated_at, updated_at) DESC')
+            ->orderByDesc('id');
     }
 
     /**

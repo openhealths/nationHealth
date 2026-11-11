@@ -32,6 +32,7 @@
             <h2>{{ __('clinical-impressions.findings') }}</h2>
         </legend>
 
+        <div class="table-scroll">
         <table class="table-input w-inherit">
             <thead class="thead-input">
                 <tr>
@@ -53,6 +54,7 @@
                                     $wire.dictionaries['eHealth/ICF/classifiers'][finding.codeCode] ||
                                     $wire.dictionaries['eHealth/ICD10_AM/condition_codes'][finding.codeCode] ||
                                     $wire.dictionaries['eHealth/ICPC2/condition_codes'][finding.codeCode] ||
+                                    $wire.dictionaries['eHealth/custom/observation_codes']?.[finding.codeCode] ||
                                     finding.description ||
                                     ''
                                 }`
@@ -156,6 +158,7 @@
                 </template>
             </tbody>
         </table>
+        </div>
 
         <div>
             {{-- Button to trigger the modal --}}

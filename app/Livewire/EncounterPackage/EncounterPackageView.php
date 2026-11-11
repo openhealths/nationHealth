@@ -75,7 +75,7 @@ class EncounterPackageView extends EncounterPackageEdit
     private function editPageUrl(): string
     {
         return route(
-            $this->prepersonId !== null ? 'prepersons.encounter.edit' : 'encounter.edit',
+            $this->prepersonId !== null ? 'prepersons.encounters.edit' : 'persons.encounters.edit',
             $this->prepersonId !== null
                 ? [legalEntity(), 'preperson' => $this->prepersonId, 'encounter' => $this->encounterId]
                 : [legalEntity(), 'person' => $this->personId, 'encounter' => $this->encounterId]

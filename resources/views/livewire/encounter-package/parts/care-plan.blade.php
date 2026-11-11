@@ -8,14 +8,14 @@
         @php
             $encounterLocalId = $this->encounterId ?? null;
         @endphp
-        @if($personId !== null && $encounterLocalId !== null)
-        <a
-            href="{{ route('care-plans.create-by-encounter', ['legalEntity' => legalEntity(), 'person' => $personId, 'encounter' => $encounterLocalId]) }}"
-            class="button-primary-outline flex items-center gap-2"
-        >
-            @icon('plus', 'w-4 h-4')
-            {{ __('care-plan.new_care_plan') }}
-        </a>
+        @if ($personId !== null && $encounterLocalId !== null)
+            <a
+                href="{{ route('persons.encounters.care-plans.create', ['legalEntity' => legalEntity(), 'person' => $personId, 'encounter' => $encounterLocalId]) }}"
+                class="button-primary-outline flex items-center gap-2"
+            >
+                @icon('plus', 'w-4 h-4')
+                {{ __('care-plan.new_care_plan') }}
+            </a>
         @endif
     </div>
 
@@ -29,6 +29,7 @@
     @endphp
 
     @if ($linkedCarePlans->count() > 0)
+        <div class="table-scroll">
         <table class="table-input w-inherit">
             <thead class="thead-input">
                 <tr>
@@ -61,6 +62,7 @@
                 @endforeach
             </tbody>
         </table>
+        </div>
     @else
         <div class="rounded-lg border border-dashed border-gray-200 py-6 text-center text-gray-400">
             {{ __('care-plan.no_care_plans') }}
