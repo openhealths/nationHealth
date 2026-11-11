@@ -72,24 +72,14 @@
 
                 <div class="form-group group">
                     <div class="relative">
-                        <input
-                            wire:model="filterEncounterId"
-                            type="text"
-                            name="filterEncounterId"
-                            id="filterEncounterId"
-                            class="input peer w-full"
-                            placeholder=" "
-                            autocomplete="off"
-                        />
-                        <label for="filterEncounterId" class="label"> ID взаємодії </label>
-                        <button
-                            type="button"
-                            wire:click="$set('filterEncounterId', '')"
-                            class="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            x-show="$wire.filterEncounterId"
-                        >
-                            @icon('close', 'w-4 h-4')
-                        </button>
+                        <select wire:model="filterEncounterId" id="filterEncounterId" class="input-select peer w-full">
+                            <option value="">{{ __('care-plan.select_encounter') }}</option>
+                            @foreach ($this->encounterChoices as $choice)
+                                <option value="{{ $choice['uuid'] }}">{{ $choice['label'] }}</option>
+                            @endforeach
+                        </select>
+                        <label for="filterEncounterId" class="label">{{ __('care-plan.encounter') }}</label>
+                        @error('filterEncounterId') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
 
@@ -139,6 +129,30 @@
             </div>
 
             <div x-show="showAdditionalParams" x-transition x-cloak wire:key="care-plans-search-filters">
+                <div class="form-row-3 mb-6">
+                    @foreach (['filterBasedOn' => 'based_on', 'filterPartOf' => 'part_of'] as $field => $label)
+                        <div class="form-group group">
+                            <select wire:model="{{ $field }}" id="{{ $field }}" class="input-select peer w-full">
+                                <option value="">{{ __('forms.select') }}</option>
+                                @foreach ($this->relatedCarePlanChoices as $choice)
+                                    <option value="{{ $choice['uuid'] }}">{{ $choice['label'] }}</option>
+                                @endforeach
+                            </select>
+                            <label for="{{ $field }}" class="label">{{ __('care-plan.'.$label) }}</label>
+                            @error($field) <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    @endforeach
+                    <div class="form-group group">
+                        <input wire:model="filterPeriodDate" id="filterPeriodDate" type="date" class="input peer w-full" />
+                        <label for="filterPeriodDate" class="label">{{ __('care-plan.period_date') }}</label>
+                        @error('filterPeriodDate') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                    <div class="form-group group">
+                        <input wire:model="filterManagingOrganization" id="filterManagingOrganization" type="text" class="input peer w-full" placeholder=" " />
+                        <label for="filterManagingOrganization" class="label">{{ __('care-plan.managing_organization_uuid') }}</label>
+                        @error('filterManagingOrganization') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                </div>
                 <div class="form-row-3 mb-6">
                     <div class="form-group group">
                         <div class="datepicker-wrapper">

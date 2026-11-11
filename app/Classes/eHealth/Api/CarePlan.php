@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
-use App\Core\Arr;
-
 use App\Classes\eHealth\EHealthRequest as Request;
+
 use App\Classes\eHealth\EHealthResponse;
+use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class CarePlan extends Request
@@ -30,7 +30,7 @@ class CarePlan extends Request
      */
     public function create(string $patientId, array $payload): PromiseInterface|EHealthResponse
     {
-        $this->setValidator(\App\Classes\eHealth\Api\Job::validateSubmissionResponse(...));
+        $this->setValidator(Job::validateSubmissionResponse(...));
 
         return $this->post("/api/patients/{$patientId}/care_plans", $payload);
     }
@@ -44,7 +44,7 @@ class CarePlan extends Request
      */
     public function getMany(array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateMany(...));
+        $this->setValidator(fn (EHealthResponse $response): array => $this->validateMany($response, 'requisition'));
 
         return $this->get(self::URL, $query);
     }
@@ -78,7 +78,7 @@ class CarePlan extends Request
      */
     public function cancel(string $personId, string $id, array $payload): PromiseInterface|EHealthResponse
     {
-        $this->setValidator(\App\Classes\eHealth\Api\Job::validateSubmissionResponse(...));
+        $this->setValidator(Job::validateSubmissionResponse(...));
 
         return $this->patch("/api/patients/$personId/care_plans/$id/actions/cancel", $payload);
     }
@@ -96,7 +96,7 @@ class CarePlan extends Request
      */
     public function complete(string $personId, string $id, array $payload): PromiseInterface|EHealthResponse
     {
-        $this->setValidator(\App\Classes\eHealth\Api\Job::validateSubmissionResponse(...));
+        $this->setValidator(Job::validateSubmissionResponse(...));
 
         return $this->patch("/api/patients/$personId/care_plans/$id/actions/complete", $payload);
     }
@@ -141,50 +141,30 @@ class CarePlan extends Request
         if (array_is_list($native) && count($native) === 1) {
             $native = $native[0];
         }
-        $data = Arr::toCamelCase($native);
+        $this->validateResource($native, 'details');
 
-        $validator = Validator::make($data, [
-            'id' => 'required|uuid',
-            'status' => 'required|string',
-            'title' => 'required|string',
-        ]);
-
-        if ($validator->fails()) {
-            Log::channel('e_health_errors')->error(
-                'CarePlan details validation failed: ' . implode(', ', $validator->errors()->all())
-            );
-            throw new ValidationException($validator);
-        }
-
-        // Signed snapshots retain the API's keys; both forms pass the same validator.
-        return $preserveApiKeys ? $native : $data;
+        // Signed snapshots retain API keys; both projections use the identical full validator.
+        return $preserveApiKeys ? $native : Arr::toCamelCase($native);
     }
 
-    protected function validateMany(EHealthResponse $response): array
+    protected function validateMany(EHealthResponse $response, string $contract = 'summary'): array
     {
-        $transformedData = [];
-        foreach ($response->getData() as $item) {
-            $transformedData[] = Arr::toCamelCase($item);
+        $native = $response->getData();
+        Validator::make(['data' => $native], ['data' => ['present', 'array', 'list'], 'data.*' => ['required', 'array']])->validate();
+        foreach ($native as $item) {
+            $this->validateResource($item, $contract);
         }
 
-        $validator = Validator::make($transformedData, [
-            '*' => 'array',
-            '*.id' => 'required|uuid',
-            '*.status' => 'required|string',
-            '*.title' => 'nullable|string',
-            '*.managingOrganization' => ['required', 'array'],
-            '*.managingOrganization.identifier.value' => ['required', 'uuid'],
-            '*.managingOrganization.displayValue' => ['required', 'string']
-        ]);
-
-        if ($validator->fails()) {
-            Log::channel('e_health_errors')->error(
-                'CarePlan validation failed: ' . implode(', ', $validator->errors()->all())
-            );
-            throw new ValidationException($validator);
-        }
-
-        return $transformedData;
+        return Arr::toCamelCase($native);
     }
 
+    private function validateResource(array $native, string $contract): void
+    {
+        $contracts = require resource_path('ehealth/care-plan-response-rules.php');
+        $validator = Validator::make(['resource' => $native], $contracts[$contract]);
+        if ($validator->fails()) {
+            Log::channel('e_health_errors')->error('CarePlan response validation failed', ['contract' => $contract, 'fields' => $validator->errors()->keys()]);
+            throw new ValidationException($validator);
+        }
+    }
 }

@@ -4,26 +4,31 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person\Records;
 
-use App\Enums\CarePlanStatusFilter;
+use App\Classes\eHealth\EHealth;
 use App\Enums\CarePlanCompletenessFilter;
+use App\Enums\CarePlanStatusFilter;
 use App\Jobs\CarePlanFullSync;
-use Illuminate\Support\Facades\Cache;
+use App\Models\CarePlan;
+use App\Repositories\Repository;
+use App\Services\Dictionary\DictionaryManager;
+use App\Traits\HandlesCarePlanSync;
+use App\Traits\SynchronizesCarePlans;
+use Exception;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
-
-use App\Repositories\Repository;
-use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Session;
 use Throwable;
-use App\Traits\HandlesCarePlanSync;
-use App\Services\Dictionary\DictionaryManager;
-use Exception;
 
 class PatientCarePlans extends BasePatientComponent
 {
     use HandlesCarePlanSync;
+    use SynchronizesCarePlans;
 
     #[Locked]
     public ?string $syncBatchId = null;
@@ -37,6 +42,10 @@ class PatientCarePlans extends BasePatientComponent
     public string $filterCompleteness = CarePlanCompletenessFilter::COMPLETE->value;
     public string $filterStartDateRange = '';
     public string $filterEndDateRange = '';
+    public string $filterBasedOn = '';
+    public string $filterPartOf = '';
+    public string $filterPeriodDate = '';
+    public string $filterManagingOrganization = '';
     public bool $showAdditionalParams = false;
 
     /**
@@ -72,6 +81,10 @@ class PatientCarePlans extends BasePatientComponent
             'encounter_id' => $this->filterEncounterId,
             'start_date' => $this->filterStartDateRange,
             'end_date' => $this->filterEndDateRange,
+            'based_on' => $this->filterBasedOn,
+            'part_of' => $this->filterPartOf,
+            'period_date' => $this->filterPeriodDate,
+            'managing_organization_id' => $this->filterManagingOrganization,
         ], (int) legalEntity()->id);
     }
 
@@ -162,9 +175,50 @@ class PatientCarePlans extends BasePatientComponent
         return 'care-plan-sync-after-access:'.legalEntity()->id.':'.$this->uuid;
     }
 
+    #[Computed]
+    public function encounterChoices(): array
+    {
+        return Repository::carePlan()->encounterChoices($this->personId);
+    }
+
+    #[Computed]
+    public function relatedCarePlanChoices(): array
+    {
+        return Repository::carePlan()->relatedPlanChoices($this->personId);
+    }
+
     public function search(): void
     {
-        $this->loadCarePlans();
+        if (Auth::user()->cannot('search', CarePlan::class)) {
+            Session::flash('error', __('care-plan.sync_access_denied'));
+
+            return;
+        }
+        $this->validate([
+            'filterEncounterId' => ['nullable', 'uuid'],
+            'filterBasedOn' => ['nullable', 'uuid'],
+            'filterPartOf' => ['nullable', 'uuid'],
+            'filterManagingOrganization' => ['nullable', 'uuid'],
+            'filterPeriodDate' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+        $query = array_filter([
+            'encounter_id' => $this->filterEncounterId,
+            'based_on' => $this->filterBasedOn,
+            'part_of' => $this->filterPartOf,
+            'period_date' => $this->filterPeriodDate,
+            'managing_organization_id' => $this->filterManagingOrganization,
+            'status' => in_array($this->filterStatus, [CarePlanStatusFilter::ALL->value, CarePlanStatusFilter::CURRENT->value], true) ? '' : $this->filterStatus,
+        ], static fn (string $value): bool => $value !== '');
+        try {
+            // Search returns the registry even where patient consent still blocks detail reads.
+            $summaries = $this->collectSummaries(fn (int $page) => EHealth::carePlan()->getBySearchParams($this->uuid, array_replace($query, ['page' => $page])));
+            Repository::carePlan()->storeSummaries($summaries, $this->personId, (int) legalEntity()->id);
+            $this->filterCompleteness = CarePlanCompletenessFilter::ALL->value;
+            $this->loadCarePlans();
+        } catch (Throwable $exception) {
+            Log::error('Care Plan patient search failed', ['exceptionType' => $exception::class]);
+            Session::flash('error', __('care-plan.search_error'));
+        }
     }
 
     public function resetFilters(): void
@@ -176,6 +230,10 @@ class PatientCarePlans extends BasePatientComponent
             'filterCompleteness',
             'filterStartDateRange',
             'filterEndDateRange',
+            'filterBasedOn',
+            'filterPartOf',
+            'filterPeriodDate',
+            'filterManagingOrganization',
         ]);
         $this->loadCarePlans();
     }

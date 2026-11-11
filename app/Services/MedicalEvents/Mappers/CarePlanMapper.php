@@ -25,7 +25,7 @@ class CarePlanMapper implements FhirMapperContract
         $data = Arr::toCamelCase($data);
         $options = $context[0] ?? [];
         $resource = $options['resource'] ?? [];
-        $resource['id'] = $data['uuid'] ?? $options['id'] ?? $resource['id'] ?? null;
+        $resource['id'] = $data['uuid'] ?? ($options['id'] ?? ($resource['id'] ?? null));
 
         if (!is_string($resource['id']) || $resource['id'] === '') {
             throw new InvalidArgumentException('Care Plan mapping requires an allocated resource UUID.');
@@ -46,7 +46,7 @@ class CarePlanMapper implements FhirMapperContract
         }
 
         if (array_key_exists('author', $data) || !array_key_exists('author', $resource)) {
-            $value = $data['author'] ?? $options['authorUuid'] ?? $options['employeeUuid'] ?? null;
+            $value = $data['author'] ?? ($options['authorUuid'] ?? ($options['employeeUuid'] ?? null));
             if ($value === null || $value === '') {
                 unset($resource['author']);
             } elseif (!is_string($value) || $value !== data_get($resource, 'author.identifier.value')) {
@@ -56,7 +56,7 @@ class CarePlanMapper implements FhirMapperContract
             }
         }
         if (array_key_exists('encounter', $data) || !array_key_exists('encounter', $resource)) {
-            $value = $data['encounter'] ?? $options['encounterUuid'] ?? null;
+            $value = $data['encounter'] ?? ($options['encounterUuid'] ?? null);
             if ($value === null || $value === '') {
                 unset($resource['encounter']);
             } elseif (!is_string($value) || $value !== data_get($resource, 'encounter.identifier.value')) {
@@ -66,7 +66,7 @@ class CarePlanMapper implements FhirMapperContract
             }
         }
         if (array_key_exists('careManager', $data) || !array_key_exists('careManager', $resource)) {
-            $value = $data['careManager'] ?? $options['careManagerUuid'] ?? null;
+            $value = $data['careManager'] ?? ($options['careManagerUuid'] ?? null);
             if ($value === null || $value === '') {
                 unset($resource['careManager']);
             } elseif (!is_string($value) || $value !== data_get($resource, 'careManager.identifier.value')) {
@@ -76,7 +76,7 @@ class CarePlanMapper implements FhirMapperContract
             }
         }
         if (array_key_exists('managingOrganization', $data) || !array_key_exists('managingOrganization', $resource)) {
-            $value = $data['managingOrganization'] ?? $options['managingOrganizationUuid'] ?? null;
+            $value = $data['managingOrganization'] ?? ($options['managingOrganizationUuid'] ?? null);
             if ($value === null || $value === '') {
                 unset($resource['managingOrganization']);
             } elseif (!is_string($value) || $value !== data_get($resource, 'managingOrganization.identifier.value')) {
@@ -86,11 +86,24 @@ class CarePlanMapper implements FhirMapperContract
             }
         }
 
-        foreach (['addresses', 'supportingInfo', 'contributor', 'basedOn', 'partOf'] as $field) {
+        foreach (['addresses', 'supportingInfo', 'contributor'] as $field) {
             if (array_key_exists($field, $data)) {
                 $resource[$field] = $data[$field];
             } elseif (array_key_exists($field, $options) && !array_key_exists($field, $resource)) {
                 $resource[$field] = $options[$field];
+            }
+        }
+
+        foreach (['basedOn', 'partOf'] as $field) {
+            if (!array_key_exists($field, $data)) {
+                continue;
+            }
+            $value = $data[$field];
+            if ($value === null || $value === '') {
+                unset($resource[$field]);
+            } else {
+                // Preserve the original display metadata when an unchanged link is reopened.
+                $resource[$field] = $this->existingReference($value, 'care_plan', isset($resource[$field]) ? [$resource[$field]] : []);
             }
         }
 
@@ -102,7 +115,7 @@ class CarePlanMapper implements FhirMapperContract
         if (array_key_exists('episodes', $data)) {
             $otherInfo = array_values(array_filter($resource['supportingInfo'] ?? [], static fn (array $reference): bool => data_get($reference, 'identifier.type.coding.0.code') !== 'episode_of_care'));
             $existing = $resource['supportingInfo'] ?? [];
-            $episodes = array_map(fn (mixed $episode): array => $this->existingReference(is_array($episode) && !isset($episode['identifier']) ? ($episode['uuid'] ?? $episode['id'] ?? '') : $episode, 'episode_of_care', $existing), $data['episodes']);
+            $episodes = array_map(fn (mixed $episode): array => $this->existingReference(is_array($episode) && !isset($episode['identifier']) ? ($episode['uuid'] ?? ($episode['id'] ?? '')) : $episode, 'episode_of_care', $existing), $data['episodes']);
             $resource['supportingInfo'] = [...$otherInfo, ...$episodes];
         }
 
@@ -140,7 +153,7 @@ class CarePlanMapper implements FhirMapperContract
         foreach (['category', 'termsOfService'] as $field) {
             $form[$field] = data_get($data, $field.'.coding.0.code', '');
         }
-        foreach (['author', 'encounter', 'careManager', 'managingOrganization'] as $field) {
+        foreach (['author', 'encounter', 'careManager', 'managingOrganization', 'basedOn', 'partOf'] as $field) {
             $form[$field] = data_get($data, $field.'.identifier.value', '');
         }
         $form['coAuthors'] = array_map(static fn (array $reference): string => $reference['identifier']['value'], $data['contributor'] ?? []);
