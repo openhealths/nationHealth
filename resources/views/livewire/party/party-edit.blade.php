@@ -50,6 +50,7 @@
                 {{-- BLOCK 3: Position Table --}}
                 <fieldset class="fieldset">
                     <legend class="legend"><h2>{{ __('forms.positions') }}</h2></legend>
+                    <div class="table-scroll">
                     <table class="table-input w-inherit">
                         <thead class="thead-input">
                         <tr>
@@ -93,6 +94,7 @@
                         @endforelse
                         </tbody>
                     </table>
+                    </div>
                 </fieldset>
 
                 {{-- BOX 4: Buttons --}}

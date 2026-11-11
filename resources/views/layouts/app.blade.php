@@ -35,7 +35,7 @@
 
             @livewire('components.sidebar')
 
-            <main id="main-content" class="p-4 md:ml-78 h-auto pt-20">
+            <main id="main-content" class="responsive-content max-lg:min-w-0 p-4 lg:ml-78 h-auto pt-20">
                 @hasSection('content')
                     @yield('content')
                 @else
@@ -52,7 +52,7 @@
 
             @livewire('components.x-message', ['listenAsync' => true])
 
-            @vite(['resources/js/index.js', 'resources/js/app.js'])
+            @vite(['resources/js/index.js', 'resources/js/app.js', 'resources/js/responsive.js'])
 
             @yield('scripts')
         </div>

@@ -237,6 +237,7 @@
                             {{ __('device-dispenses.supporting_info') }}
                         </legend>
 
+                        <div class="table-scroll">
                         <table class="table-input w-inherit">
                             <thead class="thead-input">
                                 <tr>
@@ -281,6 +282,7 @@
                                 @endforelse
                             </tbody>
                         </table>
+                        </div>
                     </fieldset>
                 </div>
             </fieldset>

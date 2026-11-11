@@ -114,6 +114,7 @@
             <x-forms.loading />
         </div>
 
+        <div class="table-scroll">
         <table class="table-input w-inherit">
             <thead class="thead-input">
                 <tr>
@@ -182,6 +183,7 @@
                 @endforeach
             </tbody>
         </table>
+        </div>
 
         @if ($records === [] && ($hasSearched || !$withConditionFilters))
             <div class="py-8 text-center text-gray-500 dark:text-gray-400">{{ __('forms.nothing_found') }}</div>

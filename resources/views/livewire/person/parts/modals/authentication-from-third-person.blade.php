@@ -29,6 +29,7 @@
 >
     <legend class="legend">{{ __('patients.add_auth_method_third_person') }}</legend>
 
+    <div class="table-scroll">
     <table class="table-input w-full">
         <thead class="thead-input">
             <tr>
@@ -165,6 +166,7 @@
             </template>
         </tbody>
     </table>
+    </div>
 
     <div class="mt-12 flex gap-3">
         <button type="button" @click="localStep = {{ AuthStep::INITIAL }}" class="button-minor">

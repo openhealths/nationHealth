@@ -74,6 +74,7 @@
             <h2>{{ __('immunizations.vaccination_protocol') }}</h2>
         </legend>
 
+        <div class="table-scroll">
         <table class="table-input w-inherit">
             <thead class="thead-input">
                 <tr>
@@ -198,6 +199,7 @@
                 </template>
             </tbody>
         </table>
+        </div>
 
         <p class="text-error mt-1 text-xs" x-show="modalImmunization.vaccinationProtocols.length === 0">
             {{ __('immunizations.vaccination_protocol_required') }}

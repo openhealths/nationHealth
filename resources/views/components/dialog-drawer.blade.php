@@ -19,9 +19,9 @@
     $resolvedWidth = $customWidth;
     if (!$resolvedWidth) {
         $resolvedWidth = [
-            'sm' => 'w-72 sm:w-80',
-            'md' => 'w-80 sm:w-96',
-            'lg' => 'w-96 sm:w-[28rem]',
+            'sm' => 'w-full sm:w-80',
+            'md' => 'w-full sm:w-96',
+            'lg' => 'w-full sm:w-[28rem]',
             'xl' => 'w-full sm:w-[32rem]',
             '2xl' => 'w-full sm:w-[40rem]',
             '3xl' => 'w-full sm:w-[48rem]',

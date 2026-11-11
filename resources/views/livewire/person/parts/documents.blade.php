@@ -57,6 +57,7 @@
             <h2>{{ __('patients.identity_document') }}</h2>
         </legend>
 
+        <div class="table-scroll">
         <table class="table-input w-inherit">
             <thead class="thead-input">
                 <tr>
@@ -161,6 +162,7 @@
                 </template>
             </tbody>
         </table>
+        </div>
 
         <div>
             {{-- Button to trigger the modal --}}

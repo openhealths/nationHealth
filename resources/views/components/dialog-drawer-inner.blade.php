@@ -26,7 +26,7 @@
 
     <!-- Panel Container -->
     <div
-        class="fixed {{ $topClass }} bottom-0 right-0 flex {{ $resolvedWidth }} pointer-events-auto"
+        class="fixed {{ $topClass }} bottom-0 right-0 flex max-lg:max-w-full max-lg:min-w-0 {{ $resolvedWidth }} pointer-events-auto"
         style="z-index: {{ $pZVal }};"
     >
         <div
@@ -39,14 +39,14 @@
             x-transition:leave-end="translate-x-full"
             class="h-full w-full"
         >
-            <div class="h-full flex flex-col bg-white dark:bg-gray-800 shadow-xl overflow-y-auto {{ $topClass !== 'top-0' ? 'p-8' : 'pt-20 p-8' }} relative">
+            <div class="responsive-content h-full max-lg:min-w-0 flex flex-col bg-white dark:bg-gray-800 shadow-xl overflow-y-auto {{ $topClass !== 'top-0' ? 'p-4 sm:p-8' : 'p-4 pt-20 sm:p-8 sm:pt-20' }} relative">
                 <!-- Header -->
                 @isset($title)
                     <h3 class="modal-header mb-6 !border-b-0 pb-0" x-dialog:title>{{ $title }}</h3>
                 @endisset
 
                 <!-- Slot Content -->
-                <div class="flex-1">{{ $slot }}</div>
+                <div class="flex-1 max-lg:min-w-0">{{ $slot }}</div>
             </div>
         </div>
     </div>

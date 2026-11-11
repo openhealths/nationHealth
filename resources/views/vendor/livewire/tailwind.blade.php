@@ -1,7 +1,36 @@
 <div wire:key="pagination-wrapper-{{ $paginator->currentPage() }}">
     @if ($paginator->hasPages())
-        <nav role="navigation" aria-label="{{ __('Pagination Navigation') }}" class="flex justify-center">
-            <div class="flex items-center -space-x-px text-base">
+        <nav role="navigation" aria-label="{{ __('Pagination Navigation') }}" class="flex max-lg:w-full max-lg:min-w-0 justify-center">
+            <div class="flex w-full items-center justify-between gap-3 sm:hidden">
+                <button
+                    type="button"
+                    wire:click="previousPage('{{ $paginator->getPageName() }}')"
+                    wire:loading.attr="disabled"
+                    @disabled($paginator->onFirstPage())
+                    aria-label="{{ __('pagination.previous') }}"
+                    class="button-minor px-3 disabled:cursor-default disabled:opacity-50"
+                >
+                    <svg class="h-3 w-3 rtl:rotate-180" aria-hidden="true" fill="none" viewBox="0 0 6 10">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 1 1 5l4 4" />
+                    </svg>
+                </button>
+                <span aria-current="page" class="text-sm text-gray-600 dark:text-gray-400">
+                    {{ $paginator->currentPage() }} / {{ $paginator->lastPage() }}
+                </span>
+                <button
+                    type="button"
+                    wire:click="nextPage('{{ $paginator->getPageName() }}')"
+                    wire:loading.attr="disabled"
+                    @disabled(!$paginator->hasMorePages())
+                    aria-label="{{ __('pagination.next') }}"
+                    class="button-minor px-3 disabled:cursor-default disabled:opacity-50"
+                >
+                    <svg class="h-3 w-3 rtl:rotate-180" aria-hidden="true" fill="none" viewBox="0 0 6 10">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 9 4-4-4-4" />
+                    </svg>
+                </button>
+            </div>
+            <div class="hidden items-center -space-x-px text-base sm:flex max-lg:flex-wrap max-lg:gap-y-2">
 
                 {{-- Previous Page Link --}}
                 @if ($paginator->onFirstPage())

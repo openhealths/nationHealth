@@ -29,6 +29,7 @@
     @endphp
 
     @if ($linkedCarePlans->count() > 0)
+        <div class="table-scroll">
         <table class="table-input w-inherit">
             <thead class="thead-input">
                 <tr>
@@ -61,6 +62,7 @@
                 @endforeach
             </tbody>
         </table>
+        </div>
     @else
         <div class="rounded-lg border border-dashed border-gray-200 py-6 text-center text-gray-400">
             {{ __('care-plan.no_care_plans') }}

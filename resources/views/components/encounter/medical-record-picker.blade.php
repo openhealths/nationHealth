@@ -35,6 +35,7 @@
         </div>
     </div>
 
+    <div class="table-scroll">
     <table class="table-input w-inherit">
         <thead class="thead-input">
             <tr>
@@ -91,4 +92,5 @@
             @endforelse
         </tbody>
     </table>
+    </div>
 </div>
