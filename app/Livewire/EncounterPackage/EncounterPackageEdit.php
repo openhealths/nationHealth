@@ -34,6 +34,8 @@ use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
@@ -196,10 +198,9 @@ class EncounterPackageEdit extends EncounterPackageComponent
             $this->referralSubmissionPending = Repository::serviceRequest()->latestCompletion($incomingReferral)?->status === JobStatus::PENDING->value;
         }
 
-        $encounter = $encounterModel->toArray();
         $this->isReadonly = Auth::user()->cannot('update', $encounterModel);
 
-        $episodeId = data_get($encounter, 'episode.identifier.value', '');
+        $episodeId = $encounterModel->episode?->value ?? '';
         $draftEpisode = Episode::whereUuid($episodeId)->whereStatus(EpisodeStatus::DRAFT)->with('type')->first();
 
         if ($draftEpisode !== null) {
@@ -216,7 +217,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
 
         $this->initializeComponent(loadEpisodes: !$this->isReadonly);
 
-        $package = Fhir::encounterPackageLoader()->load($encounter);
+        $package = Fhir::encounterPackageLoader()->load($encounterModel->toArray());
 
         $reactionIds = collect($package['observations'])->pluck('reactionOn')->filter()->unique();
         $packageImmunizationIds = collect($package['immunizations'])->pluck('uuid')->filter()->unique();
@@ -231,6 +232,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
         $this->immunizationForm->immunizations = $package['immunizations'];
         $this->diagnosticReportForm->diagnosticReports = $package['diagnosticReports'];
         $this->observationForm->observations = $package['observations'];
+        $this->loadReferencedReactionImmunizations($package['observations']);
         $this->procedureForm->procedures = $package['procedures'];
         $this->deviceDispenseForm->deviceDispenses = $package['deviceDispenses'];
         $this->specimenForm->specimens = $package['specimens'];
@@ -257,12 +259,13 @@ class EncounterPackageEdit extends EncounterPackageComponent
         }
 
         $this->loadIcd10Descriptions(
-            collect([...$package['procedures'], ...$package['clinicalImpressions']])
+            collect([...$package['procedures'], ...$package['clinicalImpressions'], ...$package['conditions']])
                 ->flatMap(static fn (array $record) => array_merge(
                     $record['reasonReferences'] ?? [],
                     $record['complicationDetails'] ?? [],
                     $record['problems'] ?? [],
-                    $record['findings'] ?? []
+                    $record['findings'] ?? [],
+                    $record['evidenceDetails'] ?? []
                 ))
                 ->concat(
                     collect($package['diagnosticReports'])
@@ -270,6 +273,17 @@ class EncounterPackageEdit extends EncounterPackageComponent
                         ->map(static fn (array $report): array => [
                             'codeSystem' => 'eHealth/ICD10_AM/condition_codes',
                             'codeCode' => $report['conclusionCode'],
+                        ])
+                        ->all()
+                )
+                ->concat(
+                    collect($package['encounter']['supportingInfo'])
+                        ->concat(collect($package['clinicalImpressions'])->flatMap(
+                            static fn (array $impression): array => $impression['supportingInfo'] ?? []
+                        )->all())
+                        ->map(static fn (array $reference): array => [
+                            'codeSystem' => $reference['codeSystem'],
+                            'codeCode' => $reference['code']
                         ])
                         ->all()
                 )
@@ -311,13 +325,13 @@ class EncounterPackageEdit extends EncounterPackageComponent
         }
 
         try {
-            $this->syncRegisteredConditions($validated['conditions'] ?? []);
+            $this->syncReferencedRecords();
         } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error while getting registered conditions');
+            $exception->handle('Error while getting the records the package refers to');
 
             return null;
         } catch (Throwable $exception) {
-            $this->handleDatabaseErrors($exception, 'Failed to store registered conditions');
+            $this->handleDatabaseErrors($exception, 'Failed to store the records the package refers to');
 
             return null;
         }
@@ -553,7 +567,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
         }
 
         $this->redirectRoute(
-            $this->prepersonId !== null ? 'prepersons.encounter.view' : 'encounter.view',
+            $this->prepersonId !== null ? 'prepersons.encounters.package.show' : 'persons.encounters.package.show',
             $this->prepersonId !== null
                 ? [legalEntity(), 'preperson' => $this->prepersonId, 'encounter' => $this->encounterId]
                 : [legalEntity(), 'person' => $this->personId, 'encounter' => $this->encounterId],
@@ -618,7 +632,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
         // Cancelled records leave the encounter itself alive, so the page reloads to show them as they now are
         if ($this->selectedCancellationRecords() !== []) {
             $this->redirectRoute(
-                $this->prepersonId !== null ? 'prepersons.encounter.view' : 'encounter.view',
+                $this->prepersonId !== null ? 'prepersons.encounters.package.show' : 'persons.encounters.package.show',
                 $this->prepersonId !== null
                     ? [legalEntity(), 'preperson' => $this->prepersonId, 'encounter' => $this->encounterId]
                     : [legalEntity(), $this->personId, $this->encounterId],
@@ -630,7 +644,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
 
         if ($this->prepersonId !== null) {
             $this->redirectRoute(
-                'prepersons.encounters',
+                'prepersons.encounters.index',
                 [legalEntity(), 'preperson' => $this->prepersonId],
                 navigate: true
             );
@@ -638,7 +652,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
             return;
         }
 
-        $this->redirectRoute('persons.encounters', [legalEntity(), $this->personId], navigate: true);
+        $this->redirectRoute('persons.encounters.index', [legalEntity(), $this->personId], navigate: true);
     }
 
     /**
@@ -655,8 +669,8 @@ class EncounterPackageEdit extends EncounterPackageComponent
     }
 
     /**
-     * Drop the records of the draft package the user removed from the form, so that only the submitted ones stay stored.
-     * The draft never reached eHealth, so none of these records exists there.
+     * Drop the records of the draft package the user removed from the form, together with every row they refer to,
+     * so that only the submitted ones stay stored. The draft never reached eHealth, so none of these records exists there.
      *
      * @param  string  $encounterUuid
      * @param  array  $fhir  Package sections keyed as Fhir::encounterPackage()->toFhir() returns them
@@ -664,25 +678,28 @@ class EncounterPackageEdit extends EncounterPackageComponent
      */
     private function deleteRemovedDraftRecords(string $encounterUuid, array $fhir): void
     {
-        $sections = [
-            'conditions' => Condition::class,
-            'immunizations' => Immunization::class,
-            'diagnosticReports' => DiagnosticReport::class,
-            'observations' => Observation::class,
-            'procedures' => Procedure::class,
-            'devices' => Device::class,
-            'deviceAssociations' => DeviceAssociation::class,
-            'detectedIssues' => DetectedIssue::class,
-            'deviceDispenses' => DeviceDispense::class,
-            'specimens' => Specimen::class,
-            'clinicalImpressions' => ClinicalImpression::class
+        $patient = $this->patient();
+
+        $queries = [
+            'conditions' => Condition::forPatient($patient)->forEncounter($encounterUuid)->withAllRelations(),
+            'immunizations' => Immunization::forPatient($patient)->forEncounter($encounterUuid)->withAllRelations(),
+            'diagnosticReports' => DiagnosticReport::forPatient($patient)->forEncounter($encounterUuid)->withAllRelations(),
+            'observations' => Observation::forPatient($patient)->forEncounter($encounterUuid)->withAllRelations(),
+            'procedures' => Procedure::forPatient($patient)->forEncounter($encounterUuid)->withAllRelations(),
+            'devices' => Device::forPatient($patient)->forEncounter($encounterUuid)->withAllRelations(),
+            'deviceAssociations' => DeviceAssociation::forPatient($patient)->forEncounter($encounterUuid)->withAllRelations(),
+            'detectedIssues' => DetectedIssue::forPatient($patient)->forEncounter($encounterUuid)->withAllRelations(),
+            'deviceDispenses' => DeviceDispense::forPatient($patient)->forEncounter($encounterUuid)->withAllRelations(),
+            'specimens' => Specimen::forPatient($patient)->forEncounter($encounterUuid)->withAllRelations(),
+            'clinicalImpressions' => ClinicalImpression::forPatient($patient)->forEncounter($encounterUuid)->withAllRelations()
         ];
 
-        foreach ($sections as $section => $model) {
-            $model::forPatient($this->patient())
-                ->forEncounter($encounterUuid)
+        $removedRecords = collect($queries)
+            ->map(static fn (Builder $query, string $section): Collection => $query
                 ->whereNotIn('uuid', array_column($fhir[$section], 'id'))
-                ->delete();
-        }
+                ->get())
+            ->collapse();
+
+        Repository::encounter()->deleteWithLoadedRows($removedRecords);
     }
 }

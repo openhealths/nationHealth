@@ -131,7 +131,7 @@
                     )
                     .map((specimen) => ({
                         uuid: specimen.uuid,
-                        name: specimenTypes[specimen.typeCode] || specimen.uuid
+                        name: specimen.name || specimen.uuid
                     }))
             ];
         },

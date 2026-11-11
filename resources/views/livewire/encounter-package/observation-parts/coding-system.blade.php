@@ -14,7 +14,7 @@
                 id="loincDictionary"
                 type="radio"
                 value="loinc"
-                name="loinc"
+                name="observationCodingSystem"
                 class="default-radio"
                 :checked="modalObservation.codingSystem === 'loinc'"
             />
@@ -35,7 +35,7 @@
                 id="icfDictionary"
                 type="radio"
                 value="icf"
-                name="icf"
+                name="observationCodingSystem"
                 class="default-radio"
                 :checked="modalObservation.codingSystem === 'icf'"
             />
@@ -56,7 +56,7 @@
                 id="customDictionary"
                 type="radio"
                 value="custom"
-                name="custom"
+                name="observationCodingSystem"
                 class="default-radio"
                 :checked="modalObservation.codingSystem === 'custom'"
             />
