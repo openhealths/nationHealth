@@ -87,7 +87,15 @@ class SharedApiBoundaryTest extends TestCase
     {
         $body = $this->examples()[$operation];
         $api = $this->client(Configuration::class, $body);
-        $this->assertSame($body['data'], $api->$method()->validate());
+        $validated = $api->$method()->validate();
+        if ($method === 'getCompositions') {
+            foreach ($validated as $index => &$row) {
+                $this->assertSame(json_decode($body['data'][$index]['settings'], true, flags: JSON_THROW_ON_ERROR), $row['decoded_settings']);
+                unset($row['decoded_settings']);
+            }
+            unset($row);
+        }
+        $this->assertSame($body['data'], $validated);
         unset($body['data'][0][$required]);
         $api = $this->client(Configuration::class, $body);
         $this->expectException(ValidationException::class);
