@@ -16,12 +16,22 @@ trait InteractsWithCompositions
             return [];
         }
 
-        return EHealth::composition()->getById(
+        $details = EHealth::composition()->getById(
             $composition->patientUuid,
             $composition->uuid,
             $composition->episodeOfCareUuid,
             $composition->encounterUuid
         )->validate();
+
+        Repository::composition()->assertDocumentContext($details, [
+            'identifier.value' => $composition->uuid,
+            'subject.value' => $composition->patientUuid,
+            'encounter.value' => $composition->encounterUuid,
+            'author.value' => $composition->authorUuid,
+            'type.coding.0.code' => $composition->type->value,
+        ]);
+
+        return $details;
     }
 
     protected function fetchIntegration(Composition $composition): array

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Composition\Forms;
 
 use App\Core\BaseForm;
-use App\Livewire\Composition\Forms\Concerns\BuildsCompositionPayload;
-use App\Enums\Composition\CompositionRelation;
 use App\Enums\Composition\CompositionCategory;
+use App\Enums\Composition\CompositionRelation;
 use App\Enums\Composition\CompositionType;
+use App\Livewire\Composition\Forms\Concerns\BuildsCompositionPayload;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\Rule;
 
@@ -36,6 +36,9 @@ class CompositionTempDisabilityForm extends BaseForm
      * caring for someone else, which is why it is captured separately.
      */
     public string $sectionFocusUuid = '';
+
+    /** Focus may be an identified caregiver even when the subject is a preperson child. */
+    public bool $isFocusUnidentified = false;
 
     /** Start of the incapacity period, as `d.m.Y` (app date format). */
     public string $eventPeriodStart = '';
@@ -86,6 +89,7 @@ class CompositionTempDisabilityForm extends BaseForm
             'subjectUuid' => ['required', 'uuid'],
             'encounterUuid' => ['required', 'uuid'],
             'sectionFocusUuid' => ['required', 'uuid'],
+            'isFocusUnidentified' => ['boolean'],
 
             // UI uses the application date format; toPayload preserves the calendar date.
             'eventPeriodStart' => ['required', 'date_format:'.config('app.date_format')],
@@ -142,7 +146,7 @@ class CompositionTempDisabilityForm extends BaseForm
             'encounterUuid' => $this->encounterUuid,
             'authorEmployeeUuid' => $authorEmployeeUuid,
             'focusUuid' => $this->sectionFocusUuid,
-            'focusResource' => $subjectResource,
+            'focusResource' => $this->isFocusUnidentified ? 'preperson' : 'person',
             'periodStart' => $this->startOfDay($this->eventPeriodStart),
             'periodEnd' => $this->endOfDay($this->eventPeriodEnd),
         ]);
@@ -202,6 +206,9 @@ class CompositionTempDisabilityForm extends BaseForm
             $this->sectionFocusUuid = $previousFocusUuid === data_get($previous, 'subject.value') && $this->subjectUuid !== ''
                 ? $this->subjectUuid
                 : $previousFocusUuid;
+            $this->isFocusUnidentified = $previousFocusUuid === data_get($previous, 'subject.value')
+                ? $this->isUnidentified
+                : data_get($previous, 'section.focus.type.coding.0.code') === 'preperson';
         }
         $this->eventPeriodStart = $this->asDate(data_get($previous, 'event.0.period.start'));
         $this->eventPeriodEnd = $this->asDate(data_get($previous, 'event.0.period.end'));
@@ -257,6 +264,7 @@ class CompositionTempDisabilityForm extends BaseForm
         $this->isUnidentified = false;
         $this->encounterUuid = '';
         $this->sectionFocusUuid = '';
+        $this->isFocusUnidentified = false;
         $this->eventPeriodStart = '';
         $this->eventPeriodEnd = '';
         $this->informWithUuid = null;

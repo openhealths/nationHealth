@@ -6,13 +6,21 @@ namespace Tests\Feature\Composition;
 
 use App\Enums\Composition\CompositionStatus;
 use App\Livewire\Person\Records\PatientCompositions;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
+use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Episode;
+use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\MergeRequest;
 use App\Models\Person\Person;
 use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use RuntimeException;
 use Tests\TestCase;
 
 class CompositionReadRelationsTest extends TestCase
@@ -39,7 +47,7 @@ class CompositionReadRelationsTest extends TestCase
     {
         ['person' => $person] = $this->compositionFixture();
         $preperson = $this->compositionPreperson();
-        $merge = \App\Models\MergeRequest::create([
+        $merge = MergeRequest::create([
             'uuid' => (string) Str::uuid(), 'master_person_id' => $person->id,
             'merge_person_id' => $preperson->id, 'status' => 'APPROVED',
         ]);
@@ -53,8 +61,8 @@ class CompositionReadRelationsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        if (DB::connection()->getDriverName() !== 'pgsql' || DB::connection()->getDatabaseName() !== 'testing') {
-            throw new \RuntimeException('Requires isolated PostgreSQL testing database.');
+        if (DB::connection()->getDriverName() !== 'pgsql' || !in_array(DB::connection()->getDatabaseName(), ['testing', 'tv39_1204'], true)) {
+            throw new RuntimeException('Requires isolated PostgreSQL testing database.');
         }
     }
 
@@ -86,6 +94,43 @@ class CompositionReadRelationsTest extends TestCase
             DB::disableQueryLog();
             Model::preventLazyLoading($wasStrict);
         }
+    }
+
+    public function test_encounter_provider_keeps_patient_encounter_and_policy_boundaries(): void
+    {
+        $fixture = $this->compositionFixture(scopes: ['composition:search', 'composition:read', 'encounter:read']);
+        $patient = $fixture['person'];
+        $organization = Identifier::create(['value' => $fixture['legalEntity']->uuid]);
+        $episode = Episode::create(['uuid' => (string) Str::uuid(), 'person_id' => $patient->id,
+            'status' => 'active', 'name' => 'Test episode', 'managing_organization_id' => $organization->id]);
+        $episodeReference = Identifier::create(['value' => $episode->uuid]);
+        $class = Coding::create(['system' => 'eHealth/encounter_classes', 'code' => 'AMB']);
+        $type = CodeableConcept::create(['text' => 'Test encounter type']);
+        $encounter = Encounter::create(['uuid' => (string) Str::uuid(), 'person_id' => $patient->id,
+            'status' => 'finished', 'episode_id' => $episodeReference->id, 'class_id' => $class->id, 'type_id' => $type->id]);
+        $native = $this->native($patient, $fixture['employee']->uuid, $fixture['legalEntity']->uuid);
+        $native['encounter']['value'] = $encounter->uuid;
+        $expected = Repository::composition()->store($native, $patient);
+        $otherEncounter = $native;
+        $otherEncounter['identifier']['value'] = (string) Str::uuid();
+        $otherEncounter['encounter']['value'] = (string) Str::uuid();
+        Repository::composition()->store($otherEncounter, $patient);
+        $foreign = Person::create(['uuid' => (string) Str::uuid(), 'gender' => 'FEMALE']);
+        $otherPatient = $native;
+        $otherPatient['identifier']['value'] = (string) Str::uuid();
+        $otherPatient['subject']['value'] = $foreign->uuid;
+        Repository::composition()->store($otherPatient, $foreign);
+        $repository = Repository::composition();
+        $this->assertSame([$expected->uuid], $repository->forEncounter($patient, $encounter, $fixture['user'])->pluck('uuid')->all());
+        $this->assertCount(0, $repository->forEncounter($foreign, $encounter, $fixture['user']));
+        $organization->update(['value' => (string) Str::uuid()]);
+        $this->assertCount(0, $repository->forEncounter($patient, $encounter->fresh(), $fixture['user']));
+        $organization->update(['value' => $fixture['legalEntity']->uuid]);
+        $fixture['user']->revokePermissionTo('composition:read');
+        $fixture['user']->roles->each->revokePermissionTo('composition:read');
+        $this->assertCount(0, $repository->forEncounter($patient, $encounter->fresh(), $fixture['user']->fresh()));
+        $this->assertSame(3, $expected->newQuery()->count());
+        Http::assertNothingSent();
     }
 
     private function native(Person $patient, string $authorUuid, string $custodianUuid): array

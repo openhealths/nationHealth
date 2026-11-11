@@ -11,11 +11,15 @@ use App\Exceptions\MedicalEvents\CompositionGuardException;
 use App\Livewire\Composition\CompositionCreate;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Composition;
+use App\Models\MedicalEvents\Sql\CompositionOperation;
+use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Preperson;
-use App\Repositories\MedicalEvents\CompositionRepository;
+use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use ReflectionMethod;
@@ -35,13 +39,13 @@ class CompositionCreateNewbornTest extends TestCase
     public function test_compositions_table_exists_after_install_migrations(): void
     {
         $this->assertTrue(
-            \Illuminate\Support\Facades\Schema::hasTable('compositions'),
+            Schema::hasTable('compositions'),
             'artisan install/update must create compositions (FHIR shape).'
         );
-        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('compositions', 'type_id'));
-        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('compositions', 'subject_id'));
+        $this->assertTrue(Schema::hasColumn('compositions', 'type_id'));
+        $this->assertTrue(Schema::hasColumn('compositions', 'subject_id'));
         $this->assertFalse(
-            \Illuminate\Support\Facades\Schema::hasColumn('compositions', 'subject_uuid'),
+            Schema::hasColumn('compositions', 'subject_uuid'),
             'Scalar subject_uuid must not be the canonical column.'
         );
     }
@@ -102,7 +106,7 @@ class CompositionCreateNewbornTest extends TestCase
         $compositionUuid = (string) Str::uuid();
         $encounterUuid = (string) Str::uuid();
 
-        $stored = app(CompositionRepository::class)->store(
+        $stored = Repository::composition()->store(
             [
                 'identifier' => ['value' => $compositionUuid],
                 'status' => 'final',
@@ -212,7 +216,7 @@ class CompositionCreateNewbornTest extends TestCase
         $encounterUuid = (string) Str::uuid();
 
         $episode = Identifier::create(['value' => (string) Str::uuid()]);
-        $class = \App\Models\MedicalEvents\Sql\Coding::create([
+        $class = Coding::create([
             'system' => 'eHealth/encounter_classes',
             'code' => 'INPATIENT',
         ]);
@@ -222,7 +226,7 @@ class CompositionCreateNewbornTest extends TestCase
             'code' => 'AMB',
         ]);
 
-        $local = \App\Models\MedicalEvents\Sql\Encounter::create([
+        $local = Encounter::create([
             'uuid' => $encounterUuid,
             'status' => 'finished',
             'preperson_id' => $newborn->id,
@@ -257,7 +261,7 @@ class CompositionCreateNewbornTest extends TestCase
             ->assertSet('selectedEncounter.authorUuid', $author->uuid)
             ->call('submitComposition')
             ->assertHasNoErrors()
-            ->assertSet('asyncJobId', 'birth-job');
+            ->assertSet('asyncJobId', '9d91c3ee-ca37-59ea-99f7-2713cb0927b9');
 
         Http::assertSent(static fn ($request): bool =>
             $request->method() === 'POST'
@@ -270,14 +274,15 @@ class CompositionCreateNewbornTest extends TestCase
     public function test_birth_job_stores_the_newborn_fields_and_selected_author_without_a_raw_snapshot(): void
     {
         [$component, $author, $encounterUuid] = $this->birthConclusionWithSecondAuthor();
-        $component->call('submitComposition')->assertHasNoErrors();
+        $component->call('submitComposition');
+        $component->assertHasNoErrors();
         $compositionUuid = (string) Str::uuid();
         $newbornUuid = $component->get('form.prepersonUuid');
         $this->fakeEHealth([
-            '*/composition/job/*' => Http::response(['data' => ['status' => 'DONE',
-                'links' => [['href' => "/composition/$compositionUuid"]]]]),
+            '*/composition/job/*' => Http::response(['data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'DONE',
+                'links' => [['entity' => 'eHealth/resources', 'href' => "/composition/$compositionUuid"]]]]),
             '*integrationData*' => Http::response(['data' => []]),
-            '*' => Http::response([
+            '*' => Http::response($this->nativeCompositionDocument([
                 'identifier' => ['value' => $compositionUuid], 'status' => 'PRELIMINARY', 'title' => 'МВН',
                 'type' => ['coding' => [['system' => 'COMPOSITION_TYPES', 'code' => 'NEWBORN']]],
                 'category' => ['coding' => [['system' => 'COMPOSITION_CATEGORIES', 'code' => 'LIVE_BIRTH']]],
@@ -287,11 +292,11 @@ class CompositionCreateNewbornTest extends TestCase
                     ['valueCode' => 'NEWBORN_BIRTH_DATE', 'valueDate' => now()->format('Y-m-d')],
                     ['valueCode' => 'NEWBORN_SEX', 'valueString' => 'MALE'],
                 ],
-            ]),
+            ])),
         ]);
-        $operation = \App\Models\MedicalEvents\Sql\CompositionOperation::whereRemoteJobId($component->get('asyncJobId'))->firstOrFail();
+        $operation = CompositionOperation::whereRemoteJobId($component->get('asyncJobId'))->firstOrFail();
         $this->assertNull(Composition::whereUuid($compositionUuid)->first());
-        $this->assertTrue(app(\App\Repositories\MedicalEvents\CompositionOperationRepository::class)->processResult(
+        $this->assertTrue(Repository::compositionOperation()->processResult(
             $operation,
             ['status' => 'DONE', 'compositionUuid' => $compositionUuid],
             'synthetic-token',
@@ -337,7 +342,7 @@ class CompositionCreateNewbornTest extends TestCase
     public function test_birth_conclusion_requires_a_primary_authentication_method_even_when_informing_is_skipped(): void
     {
         [$component, $author, $encounterUuid] = $this->birthConclusionWithSecondAuthor();
-        foreach ([[], [['id' => 'bbbbbbbb-0000-4000-8000-000000000002', 'type' => 'THIRD_PERSON']]] as $methods) {
+        foreach ([[], [$this->nativeAuthenticationMethod('bbbbbbbb-0000-4000-8000-000000000002', 'THIRD_PERSON')]] as $methods) {
             $this->fakeEHealth([
                 '*authentication_methods*' => Http::response($this->eHealthBody($methods)),
                 '*/encounters*' => Http::response($this->eHealthBody([$this->compositionEncounter($encounterUuid, $author->uuid)])),
@@ -360,6 +365,9 @@ class CompositionCreateNewbornTest extends TestCase
         $author->uuid = (string) Str::uuid();
         $author->position = 'P6';
         $author->save();
+        $author->specialities()->create(['speciality' => 'OBSTETRICS_AND_GYNECOLOGY', 'speciality_officio' => true,
+            'level' => 'FIRST', 'attestation_name' => 'Synthetic qualification',
+            'attestation_date' => '2020-01-01', 'certificate_number' => 'TEST-001']);
         $user->employees()->attach($author->id);
         $this->assertEqualsCanonicalizing(
             [$firstAuthor->uuid, $author->uuid],
@@ -379,8 +387,8 @@ class CompositionCreateNewbornTest extends TestCase
                 $this->compositionEncounter((string) Str::uuid(), $ineligibleAuthor->uuid),
                 $this->compositionEncounter((string) Str::uuid(), (string) Str::uuid()),
             ])),
-            '*authentication_methods*' => Http::response($this->eHealthBody([['id' => 'aaaaaaaa-0000-4000-8000-000000000001', 'type' => 'OFFLINE']])),
-            '*/composition' => Http::response(['data' => ['id' => 'birth-job', 'status' => 'PENDING']]),
+            '*authentication_methods*' => Http::response($this->eHealthBody([$this->nativeAuthenticationMethod('aaaaaaaa-0000-4000-8000-000000000001')])),
+            '*/composition' => Http::response(['data' => ['id' => '9d91c3ee-ca37-59ea-99f7-2713cb0927b9', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']]),
             '*' => Http::response($this->eHealthBody([])),
         ]);
 

@@ -1,3 +1,6 @@
+@use('App\Enums\Composition\CompositionStatus')
+@use('App\Models\MedicalEvents\Sql\Composition')
+@use('Carbon\CarbonImmutable')
 @use('App\Livewire\Composition\CompositionCreate', 'Wizard')
 @use('App\Enums\Composition\CompositionJobStatus')
 
@@ -202,7 +205,7 @@
                                             <div class="record-inner-value text-[15px] font-semibold">
                                                 {{
                                                     data_get($encounter, 'period.start')
-                                                    ? \Carbon\CarbonImmutable::parse(data_get($encounter, 'period.start'))->format(config('app.date_format'))
+                                                    ? CarbonImmutable::parse(data_get($encounter, 'period.start'))->format(config('app.date_format'))
                                                     : '-'
                                                 }}
                                             </div>
@@ -276,6 +279,12 @@
                         {{ __('compositions.create_newborn.auth_method_hint') }}
                     </div>
 
+                    @if ($this->authenticationManagementUrl)
+                        <div class="mb-4 flex flex-wrap gap-3">
+                            <a href="{{ $this->authenticationManagementUrl }}" target="_blank" rel="noopener" class="button-minor">{{ __('compositions.wizard.manage_authentication') }}</a>
+                            <button type="button" wire:click="refreshAuthenticationMethods" class="button-minor">{{ __('compositions.wizard.refresh_authentication') }}</button>
+                        </div>
+                    @endif
                     <div class="space-y-3">
                         @foreach ($authMethods as $method)
                             <div
@@ -480,9 +489,9 @@
             </fieldset>
 
             @if ($step === Wizard::STEP_AWAITING_JOB)
-                <div @if ($asyncJobStatus === CompositionJobStatus::PENDING->value) wire:poll.3s="pollAsyncJob" @endif>
+                <div @if ($asyncJobStatus === CompositionJobStatus::PENDING->value && !$asyncJobErrors) wire:poll.3s="pollAsyncJob" @endif>
                     <livewire:components.submission-status
-                        :record-type="\App\Models\MedicalEvents\Sql\Composition::class"
+                        :record-type="Composition::class"
                         :record-id="0"
                         :record-status-label="$asyncJobStatus"
                         :composition-operation-id="$this->compositionOperationId"
@@ -490,8 +499,11 @@
                     />
                     @if ($asyncJobErrors)
                         <p class="mt-3 text-sm text-red-600" role="alert">{{ implode(' ', $asyncJobErrors) }}</p>
+                        @if ($asyncJobStatus !== CompositionJobStatus::FAILED->value)
+                            <button type="button" wire:click="retryAsyncJob" class="button-primary mt-4">{{ __('compositions.async.retry_read') }}</button>
+                        @endif
                     @endif
-                    @if ($asyncJobStatus === \App\Enums\Composition\CompositionJobStatus::FAILED->value && $compositionUuid === null)
+                    @if ($asyncJobStatus === CompositionJobStatus::FAILED->value && $compositionUuid === null)
                         <button type="button" wire:click="restart" class="button-primary mt-4">
                             {{ __('forms.update') }}
                         </button>
@@ -504,7 +516,7 @@
                     <legend class="legend">{{ __('compositions.create_newborn.steps.review') }}</legend>
                     <div class="mt-6">
                         @php
-                            $reviewStatus = \App\Enums\Composition\CompositionStatus::fromEHealth(data_get($compositionDetail, 'status'));
+                            $reviewStatus = CompositionStatus::fromEHealth(data_get($compositionDetail, 'status'));
                         @endphp
 
                         @include('livewire.composition.parts.details-summary', ['detail' => $compositionDetail])

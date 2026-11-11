@@ -1,0 +1,732 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MIS mirror of Composition EMAL chart parameters (values must be supplied by the operator)",
+  "type": "object",
+  "required": [
+    "EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_POSITION",
+    "EMAL_VALIDATION_ENCOUNTER_MAX_AGE_DAYS_BY_CATEGORY",
+    "EMAL_VALIDATION_CATEGORY_DISABILITY_CODES",
+    "EMAL_VALIDATION_CATEGORY_NEWBORN_CODES",
+    "EMAL_VALIDATION_EXTENSION_ALLOWED_BY_CATEGORY",
+    "EMAL_VALIDATION_SUBJECT_FOCUS_REQUIRE_EQUALITY_BY_CATEGORY",
+    "EMAL_FILTER_DISABILITY_SINGLE_SPAN_DISABILITY",
+    "EMAL_FILTER_DISABILITY_SINGLE_SPAN_DISABILITY_ENABLED",
+    "EMAL_FILTER_PERIOD_START_DISABILITY",
+    "EMAL_FILTER_PERIOD_START_DISABILITY_ENABLED",
+    "EMAL_FILTER_PERIOD_START_NEWBORN",
+    "EMAL_FILTER_PERIOD_START_NEWBORN_ENABLED",
+    "EMAL_FILTER_CANCEL_TIMEOUT_DISABILITY",
+    "EMAL_FILTER_CANCEL_TIMEOUT_DISABILITY_ENABLED",
+    "EMAL_COMPOSITION_FLOW_REPLACE_ENABLED",
+    "EMAL_REPLACEMENT_FLOW_DISABILITY_ALLOWED_CANCELLATION_REASONS",
+    "EMAL_FILTER_REPLACEMENT_CANCEL_TIMEOUT_DISABILITY",
+    "EMAL_VALIDATION_PREGNANCY_NEW_COMPOSITION_ALLOWED_PERIODS",
+    "EMAL_VALIDATION_PREGNANCY_APPENDED_COMPOSITION_ALLOWED_PERIOD",
+    "EMAL_VALIDATION_AUTHOR_ACTIVE_STATUS_VALUE",
+    "EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_TYPE",
+    "EMAL_VALIDATION_CUSTODIAN_CATEGORIES_BY_TYPE",
+    "EMAL_VALIDATION_CUSTODIAN_ALLOWED_STATUSES_DISABILITY",
+    "EMAL_VALIDATION_CUSTODIAN_ALLOWED_STATUSES_NEWBORN",
+    "EMAL_VALIDATION_SUBJECT_CATEGORIES_BY_TYPE",
+    "EMAL_VALIDATION_FOCUS_CATEGORIES_BY_TYPE",
+    "EMAL_VALIDATION_SUBJECT_ALLOWED_STATUSES_BY_CATEGORY",
+    "EMAL_VALIDATION_FOCUS_ALLOWED_STATUSES_BY_CATEGORY",
+    "EMAL_VALIDATION_SUBJECT_ALLOWED_VERIFICATION_STATUSES_BY_CATEGORY",
+    "EMAL_VALIDATION_FOCUS_ALLOWED_VERIFICATION_STATUSES_BY_CATEGORY",
+    "EMAL_VALIDATION_SUBJECT_ALLOWED_AGES_BY_CATEGORY",
+    "EMAL_VALIDATION_FOCUS_ALLOWED_AGES_BY_CATEGORY",
+    "EMAL_VALIDATION_SUBJECT_GENDERS_BY_CATEGORY",
+    "EMAL_VALIDATION_FOCUS_GENDERS_BY_CATEGORY",
+    "EMAL_VALIDATION_SUBJECT_DOCUMENTS_BY_CATEGORY",
+    "EMAL_VALIDATION_FOCUS_DOCUMENTS_BY_CATEGORY",
+    "IDENTITY_DOCUMENT_TYPES_FOREIGN",
+    "EMAL_ERLN_CREATE_RECORD_JOB_DOCUMENT_TYPE_CODES",
+    "EMAL_FILTER_DISABILITY_TOTAL_SPAN_DISABILITY",
+    "EMAL_FILTER_DISABILITY_TOTAL_SPAN_DISABILITY_ENABLED",
+    "EMAL_FILTER_DIVISION_REQUIREMENTS_DISABILITY",
+    "EMAL_FILTER_ENCOUNTER_TYPE_DISABILITY",
+    "EMAL_FILTER_ENCOUNTER_DIAGNOSES_DISABILITY",
+    "EMAL_FILTER_AGE_DISABILITY",
+    "EMAL_FILTER_GENDER_DISABILITY",
+    "EMAL_FILTER_DIVISION_REQUIREMENTS_DISABILITY_ENABLED",
+    "EMAL_FILTER_ENCOUNTER_TYPE_DISABILITY_ENABLED",
+    "EMAL_FILTER_ENCOUNTER_DIAGNOSES_DISABILITY_ENABLED",
+    "EMAL_FILTER_AGE_DISABILITY_ENABLED",
+    "EMAL_FILTER_GENDER_DISABILITY_ENABLED",
+    "EMAL_FILTER_DIVISION_REQUIREMENTS_NEWBORN",
+    "EMAL_FILTER_ENCOUNTER_TYPE_NEWBORN",
+    "EMAL_FILTER_ENCOUNTER_DIAGNOSES_NEWBORN",
+    "EMAL_FILTER_AGE_NEWBORN",
+    "EMAL_FILTER_GENDER_NEWBORN",
+    "EMAL_FILTER_DIVISION_REQUIREMENTS_NEWBORN_ENABLED",
+    "EMAL_FILTER_ENCOUNTER_TYPE_NEWBORN_ENABLED",
+    "EMAL_FILTER_ENCOUNTER_DIAGNOSES_NEWBORN_ENABLED",
+    "EMAL_FILTER_AGE_NEWBORN_ENABLED",
+    "EMAL_FILTER_GENDER_NEWBORN_ENABLED",
+    "EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_SPECIALITY",
+    "EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_SPECIALITY_ENABLED",
+    "EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_SPECIALITY_OFFICIO",
+    "EMAL_FILTER_DOCTOR_SPECIALITY_NEWBORN",
+    "EMAL_FILTER_DOCTOR_SPECIALITY_NEWBORN_ENABLED",
+    "EMAL_FILTER_PREPERSON_DUPLICATE_DISABILITY_ENABLED",
+    "EMAL_FILTER_PREPERSON_DUPLICATE_NEWBORN_ENABLED",
+    "EMAL_FILTER_SIGN_PREPERSON_DUPLICATE_DISABILITY_ENABLED",
+    "EMAL_FILTER_SIGN_PREPERSON_DUPLICATE_NEWBORN_ENABLED",
+    "EMAL_FILTER_SIGN_CREATE_DELAY_DISABILITY",
+    "EMAL_FILTER_SIGN_CREATE_DELAY_NEWBORN",
+    "EMAL_FILTER_SIGN_CREATE_DELAY_DISABILITY_ENABLED",
+    "EMAL_FILTER_SIGN_CREATE_DELAY_NEWBORN_ENABLED",
+    "EMAL_FILTER_REPLACEMENT_PERIOD_START_DISABILITY",
+    "EMAL_FILTER_REPLACEMENT_PERIOD_START_NEWBORN"
+  ],
+  "properties": {
+    "EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_POSITION": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "EMAL_VALIDATION_ENCOUNTER_MAX_AGE_DAYS_BY_CATEGORY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "EMAL_VALIDATION_CATEGORY_DISABILITY_CODES": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "EMAL_VALIDATION_CATEGORY_NEWBORN_CODES": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "EMAL_VALIDATION_EXTENSION_ALLOWED_BY_CATEGORY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "EMAL_VALIDATION_SUBJECT_FOCUS_REQUIRE_EQUALITY_BY_CATEGORY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "EMAL_FILTER_DISABILITY_SINGLE_SPAN_DISABILITY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "EMAL_FILTER_DISABILITY_SINGLE_SPAN_DISABILITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_PERIOD_START_DISABILITY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "EMAL_FILTER_PERIOD_START_DISABILITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_PERIOD_START_NEWBORN": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "EMAL_FILTER_PERIOD_START_NEWBORN_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_CANCEL_TIMEOUT_DISABILITY": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "EMAL_FILTER_CANCEL_TIMEOUT_DISABILITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_COMPOSITION_FLOW_REPLACE_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_REPLACEMENT_FLOW_DISABILITY_ALLOWED_CANCELLATION_REASONS": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "EMAL_FILTER_REPLACEMENT_CANCEL_TIMEOUT_DISABILITY": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "EMAL_VALIDATION_PREGNANCY_NEW_COMPOSITION_ALLOWED_PERIODS": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "EMAL_VALIDATION_PREGNANCY_APPENDED_COMPOSITION_ALLOWED_PERIOD": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "EMAL_VALIDATION_AUTHOR_ACTIVE_STATUS_VALUE": {
+      "type": "string",
+      "minLength": 1
+    },
+    "EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_TYPE": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "EMAL_VALIDATION_CUSTODIAN_CATEGORIES_BY_TYPE": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "EMAL_VALIDATION_CUSTODIAN_ALLOWED_STATUSES_DISABILITY": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "EMAL_VALIDATION_CUSTODIAN_ALLOWED_STATUSES_NEWBORN": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "EMAL_VALIDATION_SUBJECT_CATEGORIES_BY_TYPE": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "EMAL_VALIDATION_FOCUS_CATEGORIES_BY_TYPE": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "EMAL_VALIDATION_SUBJECT_ALLOWED_STATUSES_BY_CATEGORY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "EMAL_VALIDATION_FOCUS_ALLOWED_STATUSES_BY_CATEGORY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "EMAL_VALIDATION_SUBJECT_ALLOWED_VERIFICATION_STATUSES_BY_CATEGORY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "EMAL_VALIDATION_FOCUS_ALLOWED_VERIFICATION_STATUSES_BY_CATEGORY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "EMAL_VALIDATION_SUBJECT_ALLOWED_AGES_BY_CATEGORY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "minimum": 0,
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "EMAL_VALIDATION_FOCUS_ALLOWED_AGES_BY_CATEGORY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "minimum": 0,
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "EMAL_VALIDATION_SUBJECT_GENDERS_BY_CATEGORY": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "object"
+        },
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "null"
+        }
+      ]
+    },
+    "EMAL_VALIDATION_FOCUS_GENDERS_BY_CATEGORY": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "object"
+        },
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "null"
+        }
+      ]
+    },
+    "EMAL_VALIDATION_SUBJECT_DOCUMENTS_BY_CATEGORY": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "object"
+        },
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "null"
+        }
+      ]
+    },
+    "EMAL_VALIDATION_FOCUS_DOCUMENTS_BY_CATEGORY": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "object"
+        },
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "null"
+        }
+      ]
+    },
+    "IDENTITY_DOCUMENT_TYPES_FOREIGN": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "EMAL_ERLN_CREATE_RECORD_JOB_DOCUMENT_TYPE_CODES": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "EMAL_FILTER_DISABILITY_TOTAL_SPAN_DISABILITY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "EMAL_FILTER_DISABILITY_TOTAL_SPAN_DISABILITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_DIVISION_REQUIREMENTS_DISABILITY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "EMAL_FILTER_ENCOUNTER_TYPE_DISABILITY": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "EMAL_FILTER_ENCOUNTER_DIAGNOSES_DISABILITY": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "object"
+        },
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "null"
+        }
+      ]
+    },
+    "EMAL_FILTER_AGE_DISABILITY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "minimum": 0,
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "EMAL_FILTER_GENDER_DISABILITY": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "object"
+        },
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "null"
+        }
+      ]
+    },
+    "EMAL_FILTER_DIVISION_REQUIREMENTS_DISABILITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_ENCOUNTER_TYPE_DISABILITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_ENCOUNTER_DIAGNOSES_DISABILITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_AGE_DISABILITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_GENDER_DISABILITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_DIVISION_REQUIREMENTS_NEWBORN": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "EMAL_FILTER_ENCOUNTER_TYPE_NEWBORN": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "EMAL_FILTER_ENCOUNTER_DIAGNOSES_NEWBORN": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "object"
+        },
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "null"
+        }
+      ]
+    },
+    "EMAL_FILTER_AGE_NEWBORN": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "minimum": 0,
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "EMAL_FILTER_GENDER_NEWBORN": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "object"
+        },
+        {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "type": "null"
+        }
+      ]
+    },
+    "EMAL_FILTER_DIVISION_REQUIREMENTS_NEWBORN_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_ENCOUNTER_TYPE_NEWBORN_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_ENCOUNTER_DIAGNOSES_NEWBORN_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_AGE_NEWBORN_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_GENDER_NEWBORN_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_SPECIALITY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_SPECIALITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_SPECIALITY_OFFICIO": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "EMAL_FILTER_DOCTOR_SPECIALITY_NEWBORN": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "EMAL_FILTER_DOCTOR_SPECIALITY_NEWBORN_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_PREPERSON_DUPLICATE_DISABILITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_PREPERSON_DUPLICATE_NEWBORN_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_SIGN_PREPERSON_DUPLICATE_DISABILITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_SIGN_PREPERSON_DUPLICATE_NEWBORN_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_SIGN_CREATE_DELAY_DISABILITY": {
+      "type": "object",
+      "required": [
+        "max-hours"
+      ],
+      "properties": {
+        "max-hours": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "EMAL_FILTER_SIGN_CREATE_DELAY_NEWBORN": {
+      "type": "object",
+      "required": [
+        "max-hours"
+      ],
+      "properties": {
+        "max-hours": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "EMAL_FILTER_SIGN_CREATE_DELAY_DISABILITY_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_SIGN_CREATE_DELAY_NEWBORN_ENABLED": {
+      "type": "boolean"
+    },
+    "EMAL_FILTER_REPLACEMENT_PERIOD_START_DISABILITY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "EMAL_FILTER_REPLACEMENT_PERIOD_START_NEWBORN": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    }
+  }
+}

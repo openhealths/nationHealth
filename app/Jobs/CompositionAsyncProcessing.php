@@ -7,8 +7,9 @@ namespace App\Jobs;
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\EHealthJob;
-use App\Enums\JobStatus;
 use App\Enums\Composition\CompositionJobStatus;
+use App\Enums\JobStatus;
+use App\Exceptions\EHealth\EHealthException;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\CompositionOperation;
 use App\Repositories\MedicalEvents\Repository;
@@ -17,6 +18,7 @@ use DateTimeInterface;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Validation\ValidationException;
 
 class CompositionAsyncProcessing extends EHealthJob
 {
@@ -43,7 +45,14 @@ class CompositionAsyncProcessing extends EHealthJob
             return null;
         }
 
-        return EHealth::composition()->withToken($token)->getAsyncJobStatus($this->operation->remoteJobId);
+        try {
+            return EHealth::composition()->withToken($token)->getAsyncJobStatus($this->operation->remoteJobId);
+        } catch (EHealthException) {
+            Repository::compositionOperation()->recordRetryError($this->operation, __('compositions.errors.job_status_unavailable'));
+            $this->release(10);
+
+            return null;
+        }
     }
 
     protected function processResponse(?EHealthResponse $response): void
@@ -51,7 +60,12 @@ class CompositionAsyncProcessing extends EHealthJob
         if ($response === null) {
             return;
         }
-        $finished = Repository::compositionOperation()->processResult($this->operation, $response->validate(), $this->token);
+        try {
+            $finished = Repository::compositionOperation()->processResult($this->operation, $response->validate(), $this->token);
+        } catch (ValidationException) {
+            Repository::compositionOperation()->recordRetryError($this->operation, __('compositions.errors.invalid_response'));
+            $finished = false;
+        }
         if (!$finished) {
             $this->release(min(5 * 2 ** min($this->attempts() - 1, 6), 300));
         }

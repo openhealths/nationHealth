@@ -33,7 +33,6 @@ DOMAIN_PATHS=(
   tests/Unit/Repositories/RepositoryCarePlanTest.php
   tests/Unit/Repositories/MedicalEvents/MedicationRequestRepositoryFhirRefsTest.php
   tests/Unit/Services/Party
-  tests/Unit/Services/MedicalEvents/CarePlanActivityRegistrationBoundaryTest.php
   tests/Unit/Services/MedicalEvents/CarePlanActivityLifecycleServiceTest.php
   tests/Unit/Services/MedicalEvents/CarePlanActivityRegistrationBoundaryTest.php
   tests/Unit/Services/MedicalEvents/CarePlanLifecycleServiceTest.php
@@ -69,6 +68,7 @@ DOMAIN_PATHS=(
   tests/Feature/Encounter
   tests/Feature/MedicalEvents/PatientSummaryTv39AuthorizationTest.php
   tests/Feature/MedicalEvents/EncounterLinkedDocumentsTest.php
+  tests/Feature/MedicalEvents/ClinicalSidebarNavigationTest.php
   tests/Feature/MedicalEvents/SharedSubmissionStatusTest.php
   tests/Feature/MedicalEvents/Tv39ClinicalWorkplaceAccessTest.php
   tests/Feature/MedicationRequest

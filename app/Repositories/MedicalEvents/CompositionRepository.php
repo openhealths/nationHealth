@@ -4,15 +4,23 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
-use App\Enums\Composition\CompositionStatus;
-use App\Exceptions\MedicalEvents\CompositionGuardException;
 use App\Enums\Composition\CompositionExtension;
+use App\Enums\Composition\CompositionStatus;
+use App\Enums\MergeRequest\Status as MergeRequestStatus;
+use App\Exceptions\MedicalEvents\CompositionGuardException;
 use App\Models\MedicalEvents\Sql\Composition;
+use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\MergeRequest;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 class CompositionRepository extends BaseRepository
 {
@@ -37,9 +45,32 @@ class CompositionRepository extends BaseRepository
 
     public function hasSignedIdentification(Person $patient, int $prepersonId): bool
     {
-        return \App\Models\MergeRequest::whereMasterPersonId($patient->id)
+        return MergeRequest::whereMasterPersonId($patient->id)
             ->whereMergePersonId($prepersonId)
-            ->whereStatus(\App\Enums\MergeRequest\Status::SIGNED->value)->exists();
+            ->whereStatus(MergeRequestStatus::SIGNED->value)->exists();
+    }
+
+    /** BA03/BA07: the shared encounter view receives only readable documents of its source patient. */
+    public function forEncounter(Person|Preperson $patient, Encounter $encounter, User $user): Collection
+    {
+        if ($user->cannot('viewAny', Composition::class) || $user->cannot('view', [$encounter, $patient])
+            || !Encounter::forPatient($patient)->whereKey($encounter->id)->exists()) {
+            return collect();
+        }
+
+        return $this->model->newQuery()->forPatient($patient)->forEncounter($encounter->uuid)
+            ->with(self::READ_RELATIONS)->recentlyUpdatedFirst()->get()
+            ->filter(static fn (Composition $composition): bool => $user->can('view', $composition))->values();
+    }
+
+    /** Native schema validity does not prove that the document belongs to the requested operation. */
+    public function assertDocumentContext(array $details, array $expected): void
+    {
+        foreach ($expected as $path => $value) {
+            if (data_get($details, $path) !== $value) {
+                throw ValidationException::withMessages([$path => __('compositions.errors.invalid_response')]);
+            }
+        }
     }
 
     public function paginateForPatient(Person|Preperson $patient, array $filters, int $perPage): LengthAwarePaginator
@@ -86,7 +117,7 @@ class CompositionRepository extends BaseRepository
             $composition = $this->model->newQuery()->with(['typeConcept.coding', 'categoryConcept.coding'])->firstOrNew(['uuid' => $uuid]);
             [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
             if ($composition->exists && ((int) $composition->getAttribute($ownerColumn) !== (int) $ownerId)) {
-                throw new \InvalidArgumentException('A Composition cannot be reassigned to another patient.');
+                throw new InvalidArgumentException('A Composition cannot be reassigned to another patient.');
             }
 
             $attributes = [
@@ -140,8 +171,13 @@ class CompositionRepository extends BaseRepository
                 $attributes['episode_of_care_id'] = $this->storeIdentifier($episodeReference, $composition->episodeOfCareId);
             }
             if (array_key_exists('relatesTo', $details)) {
-                $attributes['relates_to_code'] = data_get($details, 'relatesTo.code');
-                $attributes['relates_to_target_id'] = $this->storeIdentifier(data_get($details, 'relatesTo.targetIdentifier'), $composition->relatesToTargetId);
+                // Legacy creation uses one object; native reads return an ordered relation list.
+                // The local continuation picker uses its primary relationship, while signing
+                // always rereads and validates the complete native document.
+                $relations = $details['relatesTo'] ?? [];
+                $relation = is_array($relations) && array_is_list($relations) ? ($relations[0] ?? []) : $relations;
+                $attributes['relates_to_code'] = data_get($relation, 'code');
+                $attributes['relates_to_target_id'] = $this->storeIdentifier(data_get($relation, 'targetIdentifier'), $composition->relatesToTargetId);
             }
 
             // The shared presentation cast truncates fractions; this owned write preserves UTC precision.
@@ -149,7 +185,7 @@ class CompositionRepository extends BaseRepository
             $composition->fill($attributes);
             if (array_key_exists('date', $details)) {
                 $raw = $composition->getAttributes();
-                $raw['date'] = isset($details['date']) ? \Carbon\CarbonImmutable::parse($details['date'], 'UTC')->utc()->format('Y-m-d H:i:s.u') : null;
+                $raw['date'] = isset($details['date']) ? CarbonImmutable::parse($details['date'], 'UTC')->utc()->format('Y-m-d H:i:s.u') : null;
                 $composition->setRawAttributes($raw);
             }
             $composition->save();

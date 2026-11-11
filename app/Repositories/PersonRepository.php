@@ -10,6 +10,7 @@ use App\Models\Person\PersonRequest;
 use App\Models\Relations\PersonVerificationDetail;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOneOrMany;
+use Illuminate\Support\Str;
 use Throwable;
 
 class PersonRepository
@@ -29,6 +30,15 @@ class PersonRepository
     public function getById(int $personId): Person
     {
         return Person::findOrFail($personId);
+    }
+
+    public function findByUuid(string $uuid): ?Person
+    {
+        if (!Str::isUuid($uuid)) {
+            return null;
+        }
+
+        return Person::whereUuid($uuid)->first();
     }
 
     public function searchBySurname(string $surname): array

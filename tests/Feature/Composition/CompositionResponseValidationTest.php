@@ -58,7 +58,7 @@ class CompositionResponseValidationTest extends TestCase
 
     public function test_a_write_response_without_a_job_identifier_is_rejected(): void
     {
-        $this->fakeEHealth(['*' => Http::response(['data' => ['status' => 'PENDING']])]);
+        $this->fakeEHealth(['*' => Http::response(['data' => ['eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']])]);
         $this->expectException(ValidationException::class);
 
         EHealth::composition()->create([])->validate();
@@ -76,10 +76,10 @@ class CompositionResponseValidationTest extends TestCase
 
     public function test_job_errors_in_links_and_response_data_are_normalized(): void
     {
-        $this->fakeEHealth(['*' => Http::response(['data' => [
+        $this->fakeEHealth(['*' => Http::response(['data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [],
             'status' => 'FAILED',
             'response_data' => ['error' => ['code' => 1172, 'message' => 'Invalid date']],
-            'links' => [['error' => ['message' => 'Another failure']]],
+            'links' => [['entity' => 'eHealth/resources', 'error' => ['message' => 'Another failure']]],
         ]])]);
 
         $job = EHealth::composition()->getAsyncJobStatus('job')->validate();
@@ -91,7 +91,7 @@ class CompositionResponseValidationTest extends TestCase
     {
         $uuid = '89678f60-4cdc-4fe3-ae83-e8b3ebd35c59';
 
-        return [
+        return $this->nativeCompositionDocument([
             'identifier' => ['value' => $uuid],
             'status' => 'PRELIMINARY',
             'date' => '2026-09-01T10:00:00Z',
@@ -103,6 +103,6 @@ class CompositionResponseValidationTest extends TestCase
             'extension' => [['valueCode' => 'IS_ACCIDENT', 'valueBoolean' => true]],
             'relatesTo' => ['code' => 'replaces', 'targetIdentifier' => ['value' => $uuid]],
             'event' => [['period' => ['start' => '2026-09-01T00:00:01Z', 'end' => '2026-09-05T20:59:59Z']]],
-        ];
+        ]);
     }
 }

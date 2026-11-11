@@ -87,7 +87,7 @@ class SchemaResponseContract
 
     private static function contracts(string $group): array
     {
-        if (!in_array($group, ['shared', 'medication'], true)) {
+        if (!in_array($group, ['shared', 'medication', 'composition'], true)) {
             throw new RuntimeException('Unknown eHealth response contract group.');
         }
         if (!isset(self::$contracts[$group])) {

@@ -10,14 +10,17 @@ use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Composition;
+use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\Permission;
 use App\Models\Relations\Party;
 use App\Models\User;
 use App\Policies\CompositionPolicy;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role as PermissionRole;
 use Tests\TestCase;
 
 /**
@@ -141,11 +144,32 @@ class CompositionPolicyTest extends TestCase
         $this->assertTrue($policy->createTempDisability($user)->denied());
     }
 
+    public function test_assistant_read_scopes_do_not_grant_authoring_signing_or_cancellation(): void
+    {
+        foreach ([LegalEntity::TYPE_PRIMARY_CARE, LegalEntity::TYPE_OUTPATIENT] as $type) {
+            ['user' => $user, 'employee' => $employee] = $this->actingInEntity(
+                $type,
+                ['composition:read', 'composition:search', 'composition:create', 'composition:sign', 'composition:cancel'],
+                Role::ASSISTANT
+            );
+            $policy = new CompositionPolicy();
+            $this->assertTrue($policy->viewAny($user)->allowed());
+            $this->assertTrue($policy->createNewborn($user)->denied());
+            $this->assertTrue($policy->createTempDisability($user)->denied());
+            $draft = $this->composition(CompositionStatus::PRELIMINARY, $employee->uuid);
+            $final = $this->composition(CompositionStatus::FINAL, $employee->uuid);
+            $this->assertTrue($policy->view($user, $draft)->allowed());
+            $this->assertTrue($policy->sign($user, $draft)->denied());
+            $this->assertTrue($policy->cancel($user, $final)->denied());
+        }
+    }
+
     public function test_only_the_author_may_sign_an_unsigned_conclusion(): void
     {
         ['user' => $user, 'employee' => $employee] = $this->actingInEntity(
             LegalEntity::TYPE_OUTPATIENT,
-            ['composition:sign']
+            ['composition:sign'],
+            Role::SPECIALIST
         );
 
         $policy = new CompositionPolicy();
@@ -173,7 +197,8 @@ class CompositionPolicyTest extends TestCase
     {
         ['user' => $user, 'employee' => $employee] = $this->actingInEntity(
             LegalEntity::TYPE_OUTPATIENT,
-            ['composition:cancel']
+            ['composition:cancel'],
+            Role::SPECIALIST
         );
 
         $policy = new CompositionPolicy();
@@ -228,13 +253,13 @@ class CompositionPolicyTest extends TestCase
         $type = CompositionType::from($overrides['type'] ?? CompositionType::TEMP_DISABILITY->value);
         unset($overrides['type'], $overrides['author_uuid']);
 
-        $typeConcept = \App\Models\MedicalEvents\Sql\CodeableConcept::create(['text' => null]);
+        $typeConcept = CodeableConcept::create(['text' => null]);
         $typeConcept->coding()->create([
             'system' => 'COMPOSITION_TYPES',
             'code' => $type->value,
         ]);
 
-        $author = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $authorUuid]);
+        $author = Identifier::create(['value' => $authorUuid]);
 
         $composition = Composition::create(array_merge([
             'uuid' => (string) Str::uuid(),
@@ -397,6 +422,11 @@ class CompositionPolicyTest extends TestCase
 
         $user->employees()->attach($employee->id);
 
+        foreach ($scopes as $scope) {
+            $permission = Permission::findOrCreate($scope, 'web');
+            $permission->legalEntityTypes()->syncWithoutDetaching([$typeId]);
+        }
+
         $this->instance('legalEntity', $legalEntity);
 
         if (config('permission.teams')) {
@@ -410,6 +440,12 @@ class CompositionPolicyTest extends TestCase
                     $scopes
                 )
             );
+        }
+
+        if ($scopes !== []) {
+            $permissionRole = PermissionRole::findOrCreate($role->value, 'web');
+            $permissionRole->syncPermissions($scopes);
+            $user->assignRole($permissionRole);
         }
 
         return compact('legalEntity', 'user', 'employee');
