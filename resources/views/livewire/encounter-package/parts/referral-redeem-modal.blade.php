@@ -15,11 +15,16 @@
                 <h3 class="mb-2 text-lg font-bold text-gray-900 dark:text-gray-100">
                     {{ __('care-plan.referral_complete_title') }}
                 </h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('referrals.messages.completion_record_hint') }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ __('referrals.messages.completion_record_hint') }}
+                </p>
             </div>
 
             <div class="form-group mb-4">
-                <label for="referralCompletionType" class="label">{{ __('care-plan.referral_complete_emz_type') }}</label>
+                <label
+                    for="referralCompletionType"
+                    class="label"
+                >{{ __('care-plan.referral_complete_emz_type') }}</label>
                 <select id="referralCompletionType" wire:model.live="referralCompletionType" class="input">
                     @foreach ($referralCompletionTypes as $type)
                         <option value="{{ $type }}">{{ __('care-plan.emz_type.'.$type) }}</option>
@@ -27,7 +32,10 @@
                 </select>
             </div>
             <div class="form-group mb-4">
-                <label for="referralCompletionUuid" class="label">{{ __('care-plan.referral_complete_emz_select') }}</label>
+                <label
+                    for="referralCompletionUuid"
+                    class="label"
+                >{{ __('care-plan.referral_complete_emz_select') }}</label>
                 <select id="referralCompletionUuid" wire:model="referralCompletionUuid" class="input">
                     <option value="">{{ __('forms.select') }}</option>
                     @foreach ($this->referralCompletionResources as $resource)
@@ -35,10 +43,21 @@
                     @endforeach
                 </select>
                 @if ($this->referralCompletionResources === [])
-                    <p class="text-sm text-amber-700 dark:text-amber-300">{{ __('referrals.messages.completion_record_empty', ['type' => __('care-plan.emz_type.'.$referralCompletionType)]) }}</p>
+                    <p class="text-sm text-amber-700 dark:text-amber-300">
+                        {{ __('referrals.messages.completion_record_empty', ['type' => __('care-plan.emz_type.'.$referralCompletionType)]) }}
+                    </p>
                 @endif
             </div>
 
+            @if ($completionRemainingQuantity > 0)
+                <p class="mb-3 text-sm text-amber-700 dark:text-amber-300">
+                    {{ __('referrals.remaining_quantity_warning') }}
+                </p>
+                <label class="flex items-start gap-2 text-sm">
+                    <input type="checkbox" wire:model="acknowledgeRemainingQuantity" />
+                    <span>{{ __('referrals.remaining_quantity_confirm') }}</span>
+                </label>
+            @endif
             <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button type="button" @click="show = false" class="btn-secondary w-full sm:w-auto">
                     {{ __('forms.close') }}

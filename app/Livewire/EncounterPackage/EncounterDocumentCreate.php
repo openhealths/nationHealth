@@ -11,6 +11,8 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
@@ -38,24 +40,37 @@ abstract class EncounterDocumentCreate extends BasePatientComponent
 
     public function mount(LegalEntity $legalEntity, ?Person $person = null, ?Preperson $preperson = null, ?Encounter $encounter = null): void
     {
-        abort_unless($person !== null && $preperson === null && $encounter !== null, 404);
+        abort_unless($encounter !== null && (($person !== null && $preperson === null) || ($person === null && $preperson !== null && $this->documentAbility() === 'createServiceRequest')), 404);
         $this->legalEntityId = $legalEntity->id;
-        $this->personId = $person->id;
+        $this->personId = $person?->id;
+        $this->prepersonId = $preperson?->id;
         $this->encounterId = $encounter->id;
-        $this->encounterUuid = $this->resolveEncounterModelForStandalone()->uuid;
+        $this->encounterUuid = $encounter->uuid;
 
-        parent::mount($legalEntity, $person);
+        $this->loadPatientData();
+        if ($this->resolveEncounterModelForStandalone() === null) {
+            $this->returnToEncounter();
+
+            return;
+        }
+        $this->initializeComponent();
     }
 
     public function hydrate(): void
     {
-        $this->resolveEncounterModelForStandalone();
+        if ($this->resolveEncounterModelForStandalone() === null) {
+            $this->returnToEncounter();
+        }
     }
 
     protected function resolveEncounterModelForStandalone(): ?Encounter
     {
         $encounter = Repository::encounter()->findForStandaloneDocument($this->encounterId, $this->patient());
-        $this->authorize($this->documentAbility(), [$encounter, $this->patient(), $this->legalEntityId]);
+        if (Auth::user()->cannot($this->documentAbility(), [$encounter, $this->patient(), $this->legalEntityId])) {
+            Session::flash('error', __('care-plan.document_context_unavailable'));
+
+            return null;
+        }
 
         return $encounter;
     }
@@ -63,11 +78,11 @@ abstract class EncounterDocumentCreate extends BasePatientComponent
     #[Computed]
     public function encounterUrl(): string
     {
-        return route('encounter.view', ['legalEntity' => $this->legalEntityId, 'person' => $this->personId, 'encounter' => $this->encounterId]);
+        return route($this->prepersonId !== null ? 'prepersons.encounters.view' : 'encounter.view', ['legalEntity' => $this->legalEntityId, $this->prepersonId !== null ? 'preperson' : 'person' => $this->prepersonId ?? $this->personId, 'encounter' => $this->encounterId]);
     }
 
     protected function returnToEncounter(): void
     {
-        $this->redirectRoute('encounter.view', ['legalEntity' => $this->legalEntityId, 'person' => $this->personId, 'encounter' => $this->encounterId]);
+        $this->redirect($this->encounterUrl);
     }
 }

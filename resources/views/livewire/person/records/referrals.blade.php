@@ -12,6 +12,7 @@
     @endassets
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     @include('livewire.encounter-package.parts.referral-redeem-modal')
+    @include('livewire.person.records.parts.completed-referral-resource')
     @if ($syncBatchId !== null)
         <div wire:poll.5s="checkSyncStatus" role="status">{{ __('referrals.messages.sync_running') }}</div>
     @endif
@@ -38,7 +39,10 @@
         @endcan
     </x-slot>
 
-    <div class="breadcrumb-form shift-content p-4" @if ($pendingCompletions !== []) wire:poll.5s="checkPendingCompletions" @endif>
+    <div
+        class="breadcrumb-form shift-content p-4"
+        @if ($pendingCompletions !== []) wire:poll.5s="checkPendingCompletions" @endif
+    >
         <div class="mt-6 w-full">
             <div class="mb-4 flex items-center gap-1 font-semibold text-gray-900 dark:text-gray-100">
                 @icon('search-outline', 'w-4.5 h-4.5')
@@ -215,6 +219,16 @@
                                                 @icon('eye', 'w-5 h-5 text-gray-500')
                                                 {{ $expandedUuid === $referral['uuid'] ? __('referrals.registry.hide') : __('forms.view_details') }}
                                             </button>
+                                            @if ($referral['canViewCompletedResource'] ?? false)
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item"
+                                                    @click="close($refs.button)"
+                                                    wire:click="viewCompletedResource('{{ $referral['uuid'] }}')"
+                                                >
+                                                    {{ __('referrals.completed_resource') }}
+                                                </button>
+                                            @endif
                                             @if (!empty($referral['canSign']))
                                                 <button
                                                     type="button"
@@ -384,7 +398,9 @@
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label">{{ __('care-plan.program') }}</div>
-                                        <div class="record-inner-value break-words">{{ $referral['programName'] ?? '—' }}</div>
+                                        <div class="record-inner-value break-words">
+                                            {{ $referral['programName'] ?? '—' }}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -406,7 +422,9 @@
                                             'identifierValue' => $referral['requestNumber'] ?? null,
                                         ])
                                         @if ($referral['kind'] === 'service_request')
-                                            <p class="mt-1 text-sm text-gray-500">{{ __('referrals.registry.number_hint') }}</p>
+                                            <p class="mt-1 text-sm text-gray-500">
+                                                {{ __('referrals.registry.number_hint') }}
+                                            </p>
                                         @endif
                                     </div>
                                     <div>

@@ -1,4 +1,5 @@
 @use(App\Models\MedicalEvents\Sql\DeviceRequestRequest)
+@use(Illuminate\Support\Facades\Auth)
 
 @php
     $additionalActionLinks = [
@@ -11,8 +12,8 @@
         'outgoing-referrals' => [
             'label' => __('encounters.add_referral'),
             'unavailable' => __('encounters.referral_creation_unavailable'),
-            'href' => $personId !== null && $this->isFinished && Auth::user()->can('service_request:write')
-                ? route('encounter.referral.create', ['legalEntity' => legalEntity(), 'person' => $personId, 'encounter' => $encounterId]) : null,
+            'href' => ($personId !== null || $prepersonId !== null) && $this->isFinished && Auth::user()->can('service_request:write')
+                ? route($prepersonId !== null ? 'prepersons.encounter.referral.create' : 'encounter.referral.create', ['legalEntity' => legalEntity(), $prepersonId !== null ? 'preperson' : 'person' => $prepersonId ?? $personId, 'encounter' => $encounterId]) : null,
         ],
         'medical-reports' => [
             'label' => __('encounters.add_medical_report'),

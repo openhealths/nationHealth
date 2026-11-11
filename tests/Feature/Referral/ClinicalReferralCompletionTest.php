@@ -9,16 +9,15 @@ use App\Classes\eHealth\Api\Patient\ServiceRequest as ServiceRequestApi;
 use App\Classes\eHealth\Api\ServiceRequest as ExecutorApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\JobStatus;
-use App\Jobs\ServiceRequestSync;
 use App\Exceptions\EHealth\EHealthResponseException;
-use Illuminate\Http\Client\Response as ClientResponse;
-use Illuminate\Bus\PendingBatch;
+use App\Jobs\ServiceRequestSync;
 use App\Livewire\Person\Records\PatientReferrals;
 use App\Livewire\Referral\ReferralIndex;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use App\Policies\DiagnosticReportPolicy;
@@ -29,7 +28,9 @@ use App\Services\Dictionary\Dictionaries\ServiceDictionary;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use GuzzleHttp\Psr7\Response as HttpResponse;
 use Illuminate\Auth\Access\Response;
+use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -40,8 +41,8 @@ use Livewire\Livewire;
 use Mockery;
 use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\Feature\Composition\UsesCompositionDictionaries;
-use Tests\TestCase;
 use Tests\Support\ClinicalEncounterView;
+use Tests\TestCase;
 
 class ClinicalReferralCompletionTest extends TestCase
 {
@@ -76,6 +77,12 @@ class ClinicalReferralCompletionTest extends TestCase
         $resource['requisition'] = '1234-5678-9012-3456';
         $resource['authoredOn'] = '2026-11-06T07:00:00Z';
         $resource['programProcessingStatus'] = 'in_progress';
+        $resource['usedByLegalEntity'] = ['identifier' => ['value' => $context['legalEntity']->uuid, 'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'legal_entity']]]], 'displayValue' => 'Наш заклад'];
+        $resource['usedByEmployee'] = ['displayValue' => ''];
+        $resource['statusHistory'] = [];
+        $resource['expirationDate'] = '2027-11-11T00:00:00Z';
+        Cache::forever(ServiceDictionary::KEY, [['id' => $resource['code']['identifier']['value'], 'code' => 'TEST', 'name' => 'Group', 'is_active' => true, 'request_allowed' => true, 'services' => [['id' => '10050000-0000-4000-8000-000000000022', 'code' => 'TEST-LEAF', 'name' => 'Service', 'category' => 'diagnostic_procedure', 'is_active' => true, 'request_allowed' => true]]]]);
+        $this->partialMock(ServiceRequestApi::class)->shouldReceive('getById')->andReturn($this->response($resource))->byDefault();
         unset($resource['basedOn']);
         $record = Repository::serviceRequest()->importResource($resource, $context['person']->id);
         $encounter = $this->encounter($context['person'], $record->uuid);
@@ -87,13 +94,15 @@ class ClinicalReferralCompletionTest extends TestCase
     {
         $type = CodeableConcept::create();
         $type->coding()->create(['system' => 'eHealth/encounter_types', 'code' => 'AMB']);
+        $episode = Episode::create(['uuid' => (string) Str::uuid(), 'person_id' => $person->id, 'status' => 'active', 'name' => 'Synthetic episode', 'managing_organization_id' => Identifier::create(['value' => legalEntity()->uuid])->id]);
         $encounter = Encounter::create([
             'uuid' => (string) Str::uuid(), 'person_id' => $person->id, 'status' => $status,
             'incoming_referral_id' => Identifier::create(['value' => $referralUuid])->id,
-            'episode_id' => Identifier::create(['value' => (string) Str::uuid()])->id,
+            'episode_id' => Identifier::create(['value' => $episode->uuid])->id,
             'class_id' => Coding::firstOrCreate(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id,
             'type_id' => $type->id,
         ]);
+        $encounter->actionReferences()->attach(Identifier::create(['value' => '10050000-0000-4000-8000-000000000022'])->id);
         $encounter->period()->create(['start' => '2026-11-06T08:00:00Z', 'end' => '2026-11-06T09:00:00Z']);
 
         return $encounter;
@@ -457,14 +466,17 @@ class ClinicalReferralCompletionTest extends TestCase
         $report = DiagnosticReport::create([
             'uuid' => (string) Str::uuid(), 'person_id' => $context['person']->id, 'status' => 'final',
             'based_on_id' => Identifier::create(['value' => $record->uuid])->id,
-            'code_id' => $record->codeReference->id,
+            'code_id' => Identifier::create(['value' => '10050000-0000-4000-8000-000000000022'])->id,
             'recorded_by_id' => Identifier::create(['value' => $context['employee']->uuid])->id,
             'managing_organization_id' => Identifier::create(['value' => $context['legalEntity']->uuid])->id,
             'issued' => now(), 'primary_source' => true,
         ]);
         $row = ['id' => $record->uuid, 'status' => 'active', 'program_processing_status' => 'in_progress',
+            'used_by_legal_entity' => ['identifier' => ['value' => $context['legalEntity']->uuid]],
             'subject' => ['identifier' => ['value' => $context['person']->uuid]], 'category' => ['coding' => [['code' => 'imaging']]]];
-        $this->partialMock(ServiceRequestApi::class)->shouldReceive('searchForServiceRequestsByParams')->times(4)->andReturn($this->response([$row]));
+        $api = $this->partialMock(ServiceRequestApi::class);
+        $api->shouldReceive('searchForServiceRequestsByParams')->times(4)->andReturn($this->response([$row]));
+        $api->shouldReceive('getById')->once()->andReturn($this->response($resource));
         $this->mock(ExecutorApi::class)->shouldReceive('complete')->once()->with($record->uuid, Mockery::on(
             fn (array $payload): bool => data_get($payload, 'completed_with.identifier.type.coding.0.code') === 'diagnostic_report'
                 && data_get($payload, 'completed_with.identifier.value') === $report->uuid
@@ -522,6 +534,7 @@ class ClinicalReferralCompletionTest extends TestCase
         $referral = [
             'id' => $context['record']->uuid, 'requisition' => '1234-5678-9012-3456',
             'status' => 'active', 'program_processing_status' => 'in_progress',
+            'used_by_legal_entity' => ['identifier' => ['value' => $context['legalEntity']->uuid]],
             'subject' => ['identifier' => ['value' => $context['person']->uuid]],
         ];
         $api = Mockery::mock(ServiceRequestApi::class);
@@ -548,5 +561,39 @@ class ClinicalReferralCompletionTest extends TestCase
         Livewire::test(PatientReferrals::class, ['legalEntity' => $context['legalEntity'], 'personId' => $context['person']->id])
             ->call('sync')->assertSee(__('service-requests.policy.search'));
         $this->assertDatabaseCount('service_request_requests', 1);
+    }
+
+    public function test_program_completion_requires_an_actual_member_service_and_known_episode_owner(): void
+    {
+        $context = $this->context();
+        $encounter = $context['encounter'];
+        $encounter->actionReferences()->sync([Identifier::create(['value' => (string) Str::uuid()])->id]);
+        $this->assertSame([], Repository::serviceRequest()->completionResources($context['person'], $context['record']->uuid, 'encounter'));
+        $encounter->actionReferences()->sync([Identifier::create(['value' => '10050000-0000-4000-8000-000000000022'])->id]);
+        $this->assertSame([$encounter->uuid], array_column(Repository::serviceRequest()->completionResources($context['person'], $context['record']->uuid, 'encounter'), 'uuid'));
+        Episode::whereUuid($encounter->episode->value)->update(['managing_organization_id' => null]);
+        $this->assertSame([], Repository::serviceRequest()->completionResources($context['person'], $context['record']->uuid, 'encounter'));
+    }
+
+    public function test_fresh_remaining_quantity_blocks_completion_before_mutation_and_can_be_acknowledged(): void
+    {
+        $context = $this->context();
+        $resource = $context['resource'];
+        $resource['remainingQuantity'] = ['value' => 2, 'system' => 'SERVICE_UNIT', 'code' => 'PIECE'];
+        app(ServiceRequestApi::class)->shouldReceive('getById')->twice()->andReturn($this->response($resource));
+        $executor = $this->mock(ExecutorApi::class);
+        $executor->shouldReceive('complete')->once()->andReturn($this->response(['status' => 'completed']));
+        $service = app(ReferralRequestLifecycleService::class);
+        try {
+            $service->completeReferral($context['record']->uuid, $context['encounter']->uuid);
+            $this->fail('A positive remaining quantity requires explicit acknowledgement.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('acknowledgeRemainingQuantity', $exception->errors());
+            $this->assertSame('active', $context['record']->fresh()->status);
+            $this->assertFalse(Repository::serviceRequest()->hasPendingSubmission($context['record']));
+        }
+        $result = $service->completeReferral($context['record']->uuid, $context['encounter']->uuid, payload: ['acknowledge_remaining_quantity' => true]);
+        $this->assertSame('completed', $result['status']);
+        $this->assertSame($context['encounter']->uuid, $context['record']->fresh()->completedWith->value);
     }
 }

@@ -6,45 +6,44 @@ namespace App\Livewire\EncounterPackage;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Enums\ClinicalImpression\Status as ClinicalImpressionStatus;
 use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\Equipment\AvailabilityStatus;
-use App\Enums\ClinicalImpression\Status as ClinicalImpressionStatus;
-use App\Enums\Person\ImmunizationStatus;
 use App\Enums\Person\DeviceRequestStatus;
-use App\Enums\Person\ServiceRequestStatus;
+use App\Enums\Person\ImmunizationStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Livewire\EncounterPackage\Forms\ClinicalImpressionForm;
+use App\Livewire\EncounterPackage\Forms\ConditionForm;
 use App\Livewire\EncounterPackage\Forms\DetectedIssueForm;
 use App\Livewire\EncounterPackage\Forms\DeviceAssociationForm;
-use App\Livewire\EncounterPackage\Forms\DeviceForm;
 use App\Livewire\EncounterPackage\Forms\DeviceDispenseForm;
-use App\Livewire\EncounterPackage\Forms\ConditionForm;
+use App\Livewire\EncounterPackage\Forms\DeviceForm;
 use App\Livewire\EncounterPackage\Forms\DiagnosticReportForm;
+use App\Livewire\EncounterPackage\Forms\EncounterForm as Form;
 use App\Livewire\EncounterPackage\Forms\ImmunizationForm;
 use App\Livewire\EncounterPackage\Forms\ObservationForm;
 use App\Livewire\EncounterPackage\Forms\ProcedureForm;
 use App\Livewire\EncounterPackage\Forms\SpecimenForm;
-use App\Livewire\EncounterPackage\Forms\EncounterForm as Form;
 use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Immunization;
-use App\Models\MedicalEvents\Sql\Specimen;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
-use App\Models\Person\Person;
-use App\Models\Preperson;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\EpisodeCurrentDiagnosis;
-use App\Repositories\Repository;
+use App\Models\MedicalEvents\Sql\Immunization;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Models\MedicalEvents\Sql\Specimen;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
-use App\Services\MedicalEvents\Fhir;
+use App\Repositories\Repository;
 use App\Services\Dictionary\Mappers\ImmunizationDictionaryMapper;
 use App\Services\MedData\MedData;
+use App\Services\MedicalEvents\Fhir;
 use App\Traits\FormTrait;
 use App\Traits\SearchesElectronicReferrals;
 use Illuminate\Database\Eloquent\Builder;
@@ -585,7 +584,7 @@ class EncounterPackageComponent extends Component
             return;
         }
 
-        if ($this->personId === null) {
+        if ($this->personId === null && $this->prepersonId === null) {
             $this->referralsLoaded = true;
 
             return;
@@ -596,7 +595,7 @@ class EncounterPackageComponent extends Component
 
         $this->availableReferrals = MedicalEventsRepository::serviceRequest()
             ->encounterOptions(
-                $this->personId,
+                $this->patient(),
                 $procedureCategories,
                 $diagnosticReportCategories
             );

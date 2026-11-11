@@ -22,6 +22,16 @@ class EncounterTransferDivisionLookupTest extends TestCase
         session()->put(config('ehealth.api.oauth.bearer_token'), 'source-facility-token');
     }
 
+    private function row(string $id, array $overrides = []): array
+    {
+        return array_replace(['id' => $id, 'name' => 'Destination clinic', 'type' => 'CLINIC', 'coordinates' => ['latitude' => 50.4, 'longitude' => 30.5], 'legal_entity' => ['name' => 'Destination facility', 'type' => 'OUTPATIENT', 'owner_property_type' => 'PRIVATE', 'legal_form' => 'TEST', 'edrpou' => '12345678', 'addresses' => [], 'phones' => [], 'email' => 'test@example.com'], 'healthcare_services' => []], $overrides);
+    }
+
+    private function envelope(array $rows, int $page = 1, int $totalPages = 1): array
+    {
+        return ['data' => $rows, 'paging' => ['page_number' => $page, 'page_size' => 100, 'total_entries' => count($rows), 'total_pages' => $totalPages]];
+    }
+
     public function test_other_facility_is_loaded_through_public_registry_with_its_response_shape(): void
     {
         $destination = (string) Str::uuid();
@@ -37,13 +47,7 @@ class EncounterTransferDivisionLookupTest extends TestCase
                 return Http::response(['data' => []]);
             }
 
-            return Http::response(['data' => [[
-                'id' => $divisionId,
-                'name' => 'Destination clinic',
-                'type' => 'CLINIC',
-                'legal_entity' => ['name' => 'Destination facility'],
-                'healthcare_services' => [],
-            ]], 'paging' => ['page_number' => 1, 'total_pages' => 1]]);
+            return Http::response($this->envelope([$this->row($divisionId)]));
         });
         $this->instance(Division::class, $api);
 
@@ -76,14 +80,12 @@ class EncounterTransferDivisionLookupTest extends TestCase
             $page = (int) $query['page'];
             $pages[] = $page;
 
-            return Http::response(['data' => $page === 1 ? [] : [
-                ['id' => $divisionId, 'name' => 'Clinic', 'type' => 'CLINIC', 'legal_entity' => ['id' => $destination]],
-                ['id' => (string) Str::uuid(), 'type' => 'CLINIC', 'legal_entity' => ['id' => (string) Str::uuid()]],
-                ['id' => (string) Str::uuid(), 'type' => 'CLINIC', 'status' => 'INACTIVE'],
-                ['id' => (string) Str::uuid(), 'type' => 'CLINIC', 'is_active' => false],
-                ['id' => (string) Str::uuid(), 'type' => 'INVALID'],
-                ['id' => 'not-a-uuid', 'type' => 'CLINIC'],
-            ], 'paging' => ['page_number' => $page, 'total_pages' => 2]]);
+            return Http::response($this->envelope($page === 1 ? [] : [
+                $this->row($divisionId),
+                $this->row((string) Str::uuid(), ['legal_entity_id' => (string) Str::uuid()]),
+                $this->row((string) Str::uuid(), ['status' => 'INACTIVE']),
+                $this->row((string) Str::uuid(), ['is_active' => false]),
+            ], $page, 2));
         });
         $this->instance(Division::class, $api);
         $harness = new TransferDivisionLookupHarness();
@@ -93,30 +95,17 @@ class EncounterTransferDivisionLookupTest extends TestCase
         $this->assertSame([$divisionId], $harness->encounterReferralAllowedDivisionIds);
     }
 
-    public function test_nested_reporting_entries_are_loaded_across_pages(): void
+    public function test_undocumented_nested_entries_are_rejected_without_exposing_partial_rows(): void
     {
-        $destination = (string) Str::uuid();
-        $divisionId = (string) Str::uuid();
-        $pages = [];
         $api = new Division();
         $api->preventStrayRequests();
-        $api->stub(function (Request $request) use (&$pages, $divisionId) {
-            parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
-            $page = (int) $query['page'];
-            $pages[] = $page;
-
-            return Http::response(['data' => [
-                'page' => $page,
-                'total_pages' => 2,
-                'entries' => $page === 1 ? [] : [['id' => $divisionId, 'name' => 'Destination clinic', 'type' => 'CLINIC']],
-            ]]);
-        });
+        $api->stub(fn () => Http::response(['data' => ['entries' => [$this->row((string) Str::uuid())], 'page' => 1, 'total_pages' => 1]]));
         $this->instance(Division::class, $api);
         $harness = new TransferDivisionLookupHarness();
-
-        $this->assertTrue($harness->loadDestination($destination));
-        $this->assertSame([1, 2], $pages);
-        $this->assertSame([$divisionId], $harness->encounterReferralAllowedDivisionIds);
+        $this->assertFalse($harness->loadDestination((string) Str::uuid()));
+        $this->assertSame([], $harness->encounterReferralAllowedDivisionIds);
+        $this->assertSame([], $harness->encounterReferralDivisions);
+        $this->assertSame($harness->encounterReferralWarningMessage, session('error'));
     }
 
     public function test_failed_lookup_clears_stale_permissions_and_returns_loading_error(): void
@@ -140,7 +129,7 @@ class EncounterTransferDivisionLookupTest extends TestCase
     {
         $api = new Division();
         $api->preventStrayRequests();
-        $api->stub(fn () => Http::response(['data' => []]));
+        $api->stub(fn () => Http::response($this->envelope([])));
         $this->instance(Division::class, $api);
         $harness = new TransferDivisionLookupHarness();
 

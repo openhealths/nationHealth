@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\EncounterPackage\Concerns;
 
-use App\Classes\eHealth\EHealth as SubmissionApi;
 use App\Classes\eHealth\EHealth;
+use App\Classes\eHealth\EHealth as SubmissionApi;
 use App\Enums\JobStatus;
 use App\Enums\MedicalProgram\Type as MedicalProgramType;
 use App\Enums\Person\EncounterStatus;
@@ -82,6 +82,11 @@ trait ManagesEncounterReferrals
     /** @var list<array{id: string, name: string, type: string}> */
     public array $encounterReferralDivisions = [];
 
+    public string $encounterReferralDestinationUuid = '';
+
+    #[Locked]
+    public ?string $encounterReferralVerifiedDestinationUuid = null;
+
     /**
      * Division UUIDs loaded for the destination legal entity.
      * Locked so the client cannot inject a division that does not belong to the performer.
@@ -129,13 +134,15 @@ trait ManagesEncounterReferrals
 
         $this->loadEncounterReferralAuthMethods($encounter);
         $this->loadEncounterReferralPrograms();
+        $this->loadEncounterReferralSpecialities();
 
         $transfer = $this->resolveEncounterReferralTransfer($encounter);
         $this->encounterReferralIsTransfer = $transfer !== null;
         $this->encounterReferralPerformerName = $transfer['name'] ?? '';
+        $this->encounterReferralDestinationUuid = $transfer['uuid'] ?? '';
+        $this->encounterReferralVerifiedDestinationUuid = $transfer['uuid'] ?? null;
         $this->encounterReferralDivisions = [];
         $this->encounterReferralAllowedDivisionIds = [];
-        $this->encounterReferralSpecialities = [];
         $this->encounterReferralWarningMessage = '';
 
         $start = now()->addMinutes(30)->startOfMinute();
@@ -206,7 +213,7 @@ trait ManagesEncounterReferrals
         try {
             $this->encounterReferralServiceResults = ServiceSearch::search(
                 $query,
-                static fn (array $params): array => EHealth::service()->getMany($params)->getData()
+                static fn (array $params): array => EHealth::service()->getMany($params)->validate()
             );
             $this->encounterReferralWarningMessage = '';
         } catch (Throwable $exception) {
@@ -269,22 +276,30 @@ trait ManagesEncounterReferrals
     /** Resolve group identity and referral eligibility from the server catalog. */
     protected function resolveEncounterReferralServiceChoice(array $service): ?array
     {
-        if (($service['type'] ?? '') !== 'service_group') {
-            return $service;
-        }
         try {
-            $group = dictionary()->services()->flattened()->firstWhere('id', $service['id'] ?? null);
+            $choice = dictionary()->services()->flattened()->firstWhere('id', $service['id'] ?? null);
         } catch (Throwable $exception) {
             report($exception);
-            $group = null;
+            $choice = null;
         }
-        if (($group['type'] ?? '') !== 'service_group' || empty($group['request_allowed'])) {
+        if ($choice === null || empty($choice['request_allowed'])) {
             Session::flash('error', __('care-plan.service_group_referral_not_allowed'));
 
             return null;
         }
+        if (Auth::user()->isAssistantOnly()) {
+            $allowed = config('ehealth.referrals.assistant_allowed_categories', []);
+            $categories = ($choice['type'] ?? '') === 'service_group'
+                ? dictionary()->services()->flattened()->whereIn('id', ServiceSearch::memberServiceIds($choice['id'], dictionary()->services()->toArray()))->pluck('category')->unique()->all()
+                : [$choice['category'] ?? null];
+            if ($categories === [] || array_diff($categories, $allowed) !== []) {
+                Session::flash('error', __('referrals.messages.category_forbidden'));
 
-        return $group;
+                return null;
+            }
+        }
+
+        return $choice;
     }
 
     public function saveEncounterReferralDraft(): void
@@ -327,10 +342,7 @@ trait ManagesEncounterReferrals
 
         $period = $this->encounterReferralPeriod();
 
-        if ($this->encounterReferralServiceType === 'service_group'
-            && $this->resolveEncounterReferralServiceChoice([
-                'id' => $this->encounterReferralForm['service_id'], 'type' => 'service_group',
-            ]) === null) {
+        if ($this->resolveEncounterReferralServiceChoice(['id' => $this->encounterReferralForm['service_id']]) === null) {
             return;
         }
 
@@ -339,6 +351,13 @@ trait ManagesEncounterReferrals
                 $encounter,
                 Auth::user()?->activeDoctorEmployee()?->id
             );
+
+            $employee = MedicalEventsRepository::serviceRequest()->authorForDraft($employeeContext['employee_id'], $employeeContext['employee_uuid']);
+            if ($employee === null || Auth::user()->cannot('create', [ServiceRequestRequest::class, $employee, $this->encounterReferralForm['category'], $encounter])) {
+                $this->failEncounterReferral(__('referrals.messages.category_forbidden'));
+
+                return;
+            }
 
             $formData = array_replace($this->encounterReferralForm, $period);
             $formData['program_id'] = $formData['program_id'] !== '' ? $formData['program_id'] : null;
@@ -505,7 +524,7 @@ trait ManagesEncounterReferrals
 
                 return;
             }
-            $person = Person::find($encounter->person_id);
+            $person = MedicalEventsRepository::serviceRequest()->patientForEncounter($encounter);
             if ($person === null || empty($person->uuid)) {
                 throw new RuntimeException(__('Пацієнта не знайдено'));
             }
@@ -516,6 +535,11 @@ trait ManagesEncounterReferrals
                 $requestRecord->employeeId ?? Auth::user()?->activeDoctorEmployee()?->id
             );
 
+            if (Auth::user()->cannot('create', [ServiceRequestRequest::class, MedicalEventsRepository::serviceRequest()->authorForDraft($employeeContext['employee_id'], $employeeContext['employee_uuid']), (string) ($this->encounterReferralForm['category'] ?? ''), $encounter])) {
+                Session::flash('error', __('referrals.messages.category_forbidden'));
+
+                return;
+            }
             $dbData = $lifecycle->buildSignDbData($requestRecord, null, $encounter, $employeeContext);
 
             $this->assertEncounterReferralPeriod($dbData);
@@ -541,7 +565,7 @@ trait ManagesEncounterReferrals
             );
 
             $this->assertEncounterReferralPeriod($dbData);
-            $requestRecord = MedicalEventsRepository::serviceRequest()->storeResource($resource, (int) $encounter->person_id, $requestRecord->employeeId, $requestRecord->divisionId);
+            $requestRecord = MedicalEventsRepository::serviceRequest()->storeResource($resource, $person, $requestRecord->employeeId, $requestRecord->divisionId);
             $finalResponse = $this->submitClinicalOperation($requestRecord, ['status' => 'active'], fn () => SubmissionApi::serviceRequest()->createSigned($person->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']));
             if ($finalResponse === null) {
                 return;
@@ -551,7 +575,7 @@ trait ManagesEncounterReferrals
                 $dbData,
                 $finalResponse,
                 'service_request',
-                (int) $encounter->person_id
+                $person
             );
 
             $requestRecord->requestNumber = $dbData['request_number'] ?? null;
@@ -616,9 +640,9 @@ trait ManagesEncounterReferrals
         $previousStatus = $this->encounterReferralSubmission['status'] ?? null;
         if ($synchronize && $record->status !== 'active') {
             try {
-                $person = $repository->person((int) $encounter->person_id);
+                $person = $repository->patientForEncounter($encounter);
                 $remote = app(ReferralRequestLifecycleService::class)->fetchRemoteReferral($person->uuid, $record->uuid, 'service_request');
-                $record = $repository->importResource((new ServiceRequestMapper())->normalize($remote), $record->personId, $record->employeeId, $record->divisionId);
+                $record = $repository->importResource((new ServiceRequestMapper())->normalize($remote), $person, $record->employeeId, $record->divisionId);
             } catch (Throwable $exception) {
                 report($exception);
                 Session::flash('warning', __('referrals.submission_refresh_failed'));
@@ -639,9 +663,9 @@ trait ManagesEncounterReferrals
         if (blank($record->requestNumber)) {
             try {
                 $repository = MedicalEventsRepository::serviceRequest();
-                $person = $repository->person((int) $record->personId);
+                $person = $repository->patientForRequest($record);
                 $remote = app(ReferralRequestLifecycleService::class)->fetchRemoteReferral($person->uuid, $record->uuid, 'service_request');
-                $number = $remote['requisition'] ?? $remote['request_number'] ?? null;
+                $number = $remote['requisition'] ?? ($remote['request_number'] ?? null);
                 if (is_string($number) && $number !== '') {
                     $repository->updateRequestNumber($record->uuid, $number);
                     $record->requestNumber = $number;
@@ -690,6 +714,9 @@ trait ManagesEncounterReferrals
         $category = ServiceSearch::requestCategory($service);
         if ($category !== null) {
             $this->encounterReferralForm['category'] = $category;
+            if ($category === 'hospitalization') {
+                $this->loadEncounterReferralSpecialities();
+            }
             $this->resetValidation('encounterReferralForm.category');
         }
     }
@@ -743,16 +770,37 @@ trait ManagesEncounterReferrals
         $transfer = $this->resolveEncounterReferralTransfer($encounter);
         $category = (string) ($this->encounterReferralForm['category'] ?? '');
 
-        if ($category === 'transfer_of_care' && $transfer === null) {
-            $this->failEncounterReferral(__('Електронне направлення на переведення можна створити лише для завершеної виписки з результатом «Переведено в інший ЗОЗ».'));
+        if ($category === 'transfer_of_care' && $transfer === null && ($encounter->class?->code !== 'INPATIENT' || !in_array($encounter->type?->coding?->first()?->code, ['service_delivery_location', 'discharge'], true))) {
+            $this->failEncounterReferral(__('referrals.messages.transfer_encounter_required'));
 
             return true;
         }
 
-        if ($transfer === null) {
-            $this->encounterReferralForm['performer'] = '';
-            $this->encounterReferralForm['location_reference'] = '';
-            $this->encounterReferralForm['performer_type'] = '';
+        if ($transfer === null || $category !== 'transfer_of_care') {
+            if ($category === 'transfer_of_care' && blank($this->encounterReferralForm['performer'] ?? null)) {
+                $this->failEncounterReferral(__('referrals.messages.transfer_destination_required'));
+
+                return true;
+            }
+            $performer = (string) ($this->encounterReferralForm['performer'] ?? '');
+            $location = (string) ($this->encounterReferralForm['location_reference'] ?? '');
+            if (($performer !== '' && $performer !== $this->encounterReferralVerifiedDestinationUuid)
+                || ($location !== '' && !in_array($location, $this->encounterReferralAllowedDivisionIds, true))
+                || ($category === 'transfer_of_care' && $location === '')) {
+                $this->failEncounterReferral(__('referrals.messages.transfer_destination_required'));
+
+                return true;
+            }
+            // Optional destination fields survive; hospitalization always supplies a specialty.
+            if ($category === 'hospitalization') {
+                $this->loadEncounterReferralSpecialities();
+                $speciality = (string) ($this->encounterReferralForm['performer_type'] ?? '');
+                if ($speciality === '' || !array_key_exists($speciality, $this->encounterReferralSpecialities)) {
+                    $this->failEncounterReferral(__('referrals.messages.hospitalization_speciality_required'));
+
+                    return true;
+                }
+            }
 
             return false;
         }
@@ -793,6 +841,35 @@ trait ManagesEncounterReferrals
         Session::flash('error', $message);
     }
 
+    /** Resolve a selected destination before exposing its divisions as choices. */
+    public function selectEncounterReferralDestination(): void
+    {
+        if (Auth::user()->cannot('service_request:write')) {
+            Session::flash('error', __('referrals.messages.category_forbidden'));
+
+            return;
+        }
+        $this->validate(['encounterReferralDestinationUuid' => ['required', 'uuid']]);
+        try {
+            $destination = EHealth::legalEntity()->getDetails(uuid: $this->encounterReferralDestinationUuid)->validate();
+            $destination = array_is_list($destination) ? $destination[0] : $destination;
+            $id = $destination['uuid'] ?? ($destination['id'] ?? null);
+            if ($id !== $this->encounterReferralDestinationUuid || ($destination['status'] ?? '') !== 'ACTIVE') {
+                throw new RuntimeException(__('referrals.messages.transfer_destination_required'));
+            }
+            if (!$this->loadEncounterReferralDivisions($id)) {
+                return;
+            }
+            $this->encounterReferralVerifiedDestinationUuid = $id;
+            $this->encounterReferralForm['performer'] = $id;
+            $this->encounterReferralForm['location_reference'] = '';
+            $this->encounterReferralPerformerName = $destination['name'] ?? '';
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->failEncounterReferral(__('referrals.messages.transfer_destination_required'));
+        }
+    }
+
     protected function loadEncounterReferralDivisions(string $legalEntityUuid): bool
     {
         $this->encounterReferralWarningMessage = '';
@@ -804,13 +881,13 @@ trait ManagesEncounterReferrals
             $page = 1;
             do {
                 $response = EHealth::division()->search($legalEntityUuid, $page);
-                $data = $response->getData();
+                $data = $response->validate();
                 $entries = $data['entries'] ?? $data;
                 if (!is_array($entries) || !array_is_list($entries)) {
                     throw new RuntimeException(__('encounters.referral_divisions_invalid_response'));
                 }
                 $rows = [...$rows, ...$entries];
-                $totalPages = (int) ($data['total_pages'] ?? $response->getPaging()['total_pages'] ?? $page);
+                $totalPages = (int) ($data['total_pages'] ?? ($response->getPaging()['total_pages'] ?? $page));
                 $page++;
             } while ($page <= $totalPages);
         } catch (Throwable $exception) {
@@ -826,12 +903,12 @@ trait ManagesEncounterReferrals
                 continue;
             }
 
-            $id = (string) ($row['id'] ?? $row['uuid'] ?? '');
+            $id = (string) ($row['id'] ?? ($row['uuid'] ?? ''));
             // The public registry filters by destination LE; some rows only expose its name.
-            $owner = (string) ($row['legal_entity_id'] ?? $row['legal_entity_uuid'] ?? data_get($row, 'legal_entity.id') ?? $legalEntityUuid);
+            $owner = (string) ($row['legal_entity_id'] ?? ($row['legal_entity_uuid'] ?? (data_get($row, 'legal_entity.id') ?? $legalEntityUuid)));
             $type = (string) ($row['type'] ?? '');
             $status = strtoupper((string) ($row['status'] ?? ''));
-            $active = $row['is_active'] ?? $row['isActive'] ?? true;
+            $active = $row['is_active'] ?? ($row['isActive'] ?? true);
 
             // Registry rows may omit status. eHealth prequalify validates the chosen division before persistence.
             if (!Str::isUuid($id) || $owner !== $legalEntityUuid || ($status !== '' && $status !== 'ACTIVE') || $active === false) {
@@ -881,13 +958,13 @@ trait ManagesEncounterReferrals
     protected function loadEncounterReferralAuthMethods(Encounter $encounter): void
     {
         $this->encounterReferralAuthMethods = [];
-        $person = Person::find($encounter->person_id);
-        if ($person === null || empty($person->uuid)) {
+        $person = MedicalEventsRepository::serviceRequest()->patientForEncounter($encounter);
+        if (!$person instanceof Person || empty($person->uuid)) {
             return;
         }
 
         try {
-            $authMethods = EHealth::person()->getAuthMethods($person->uuid)->getData();
+            $authMethods = EHealth::person()->getAuthMethods($person->uuid)->validate();
             if (!is_array($authMethods)) {
                 return;
             }

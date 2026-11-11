@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Referral\Forms;
 
+use App\Services\MedicalEvents\Fhir;
+use App\Services\MedicalEvents\FhirResource;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Form;
 
@@ -13,14 +15,14 @@ class ServiceRequestForm extends Form
     {
         Validator::make($resource, ['id' => ['required', 'uuid'], 'code.identifier.value' => ['required'], 'requesterEmployee.identifier.value' => ['required', 'uuid'], 'requesterLegalEntity.identifier.value' => ['required', 'uuid']])->validate();
 
-        return \App\Services\MedicalEvents\Fhir::serviceRequest()->createContent($resource);
+        return Fhir::serviceRequest()->createContent($resource);
     }
 
     public static function buildStatusContent(array $snapshot, array|string $reason, string $explanatoryLetter, ?string $reasonSystem = null): array
     {
         if (is_string($reason)) {
             Validator::make(['code' => $reason, 'system' => $reasonSystem], ['code' => ['required', 'string'], 'system' => ['required', 'string']])->validate();
-            $reason = \App\Services\MedicalEvents\FhirResource::make()->coding($reasonSystem, $reason)->toCodeableConcept();
+            $reason = FhirResource::make()->coding($reasonSystem, $reason)->toCodeableConcept();
         }
         Validator::make(['snapshot' => $snapshot, 'reason' => $reason, 'letter' => trim($explanatoryLetter)], [
             'snapshot.id' => ['required', 'uuid'], 'reason.coding' => ['required', 'array', 'min:1'],

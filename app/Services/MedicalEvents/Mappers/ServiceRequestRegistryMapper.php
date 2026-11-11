@@ -93,6 +93,7 @@ final class ServiceRequestRegistryMapper
             'statusBadge' => ServiceRequestStatus::colorFor($status),
             'itemName' => $itemName !== '' && $itemName !== '—' ? $itemName : 'Послуга',
             'quantity' => $qtyLabel !== '' ? $qtyLabel : '—',
+            'remainingQuantity' => (float) ($request->remainingQuantity?->value ?? 0),
             'startedAt' => $startedAt?->toDateString(),
             'endedAt' => $endedAt?->toDateString(),
             'periodLabel' => $periodLabel,

@@ -25,10 +25,10 @@ use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\Dictionary\Dictionaries\RuleEngineRuleDictionary;
 use App\Services\Dictionary\Dictionaries\ServiceDictionary;
 use Exception;
-use Illuminate\Support\Facades\Log;
-use InvalidArgumentException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
 /**
  * Dictionary Manager for handling multiple dictionary sources.
@@ -187,7 +187,7 @@ class DictionaryManager
                 $response = $dictionary->fetch();
                 $freshData = $dictionary instanceof BasicDictionary
                     ? BasicDictionary::prune($response->getData())
-                    : $response->getData();
+                    : ($dictionary instanceof ServiceDictionary ? $response->validate() : $response->getData());
                 $paging = $response->getPaging();
                 $totalPages = $paging['total_pages'] ?? 1;
 

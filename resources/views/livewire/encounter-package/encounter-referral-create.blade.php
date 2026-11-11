@@ -1,5 +1,6 @@
 <x-layouts.patient
     :personId="$personId"
+    :prepersonId="$prepersonId"
     :patientFullName="$patientFullName"
     :hideNavigation="true"
     :showLegacyMessages="false"

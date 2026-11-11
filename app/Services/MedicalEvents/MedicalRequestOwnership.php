@@ -47,7 +47,14 @@ final class MedicalRequestOwnership
 
     public function serviceForEncounter(string $uuid, Encounter $encounter): ServiceRequestRequest
     {
-        return $this->forEncounter(ServiceRequestRequest::class, $uuid, $encounter);
+        $patient = $encounter->person ?? $encounter->preperson;
+        $record = $patient === null ? null : ServiceRequestRequest::forPatient($patient)->whereUuid($uuid)->first();
+        if ($record === null || $record->context?->value !== $encounter->uuid) {
+            throw (new ModelNotFoundException())->setModel(ServiceRequestRequest::class, [$uuid]);
+        }
+        $this->assertEmployeeLegalEntity($record->employeeId);
+
+        return $record;
     }
 
     public function deviceForEncounter(string $uuid, Encounter $encounter): DeviceRequestRequest

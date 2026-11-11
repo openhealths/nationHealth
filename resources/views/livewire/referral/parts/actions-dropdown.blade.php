@@ -106,7 +106,7 @@
                             {{ __('referrals.actions.mark_as_error') }}
                         </button>
                     @endif
-                    @if ($this->canManageUsage($referral))
+                    @if ($this->canCompleteReferral($referral))
                         @can('service_request:complete')
                             <button
                                 type="button"
@@ -117,6 +117,8 @@
                                 {{ __('referrals.actions.complete') }}
                             </button>
                         @endcan
+                    @endif
+                    @if ($this->canManageUsage($referral))
                         @can('service_request:use')
                             <button
                                 type="button"

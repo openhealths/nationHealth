@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\EncounterPackage\Concerns;
 
 use App\Classes\eHealth\EHealth;
-use App\Exceptions\EHealth\EHealthValidationException;
+use App\Core\Arr;
 use App\Enums\JobStatus;
+use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
@@ -115,14 +117,14 @@ trait ManagesIncomingReferralSelection
         $this->form->encounter['referralType'] = 'electronic';
         $this->form->encounter['referralNumber'] = implode('-', str_split($cleanNumber, 4));
 
-        if ($cleanNumber === '' || strlen($cleanNumber) > 16 || $this->personId === null) {
+        if ($cleanNumber === '' || strlen($cleanNumber) > 16 || ($this->personId === null && $this->prepersonId === null)) {
             $this->addError('form.encounter.referralNumber', __('encounters.messages.referral_number_invalid'));
 
             return false;
         }
 
         try {
-            $patient = Repository::serviceRequest()->person($this->personId);
+            $patient = $this->patient();
             if ($patient === null || $patient->uuid !== $this->patientUuid) {
                 throw new RuntimeException(__('encounters.messages.referral_not_found'));
             }
@@ -165,14 +167,15 @@ trait ManagesIncomingReferralSelection
 
         try {
             $record = Repository::serviceRequest()->findByUuid($uuid);
-            if ($record === null || (int) $record->personId !== $this->personId) {
+            if ($record === null || Repository::serviceRequest()->patientForRequest($record)?->uuid !== $this->patientUuid) {
                 throw new RuntimeException(__('encounters.messages.referral_not_found'));
             }
             $result = $lifecycle->checkCompletion($record, 'service_request:use');
             if ($result['submissionPending'] ?? false) {
                 return 'pending';
             }
-            if (!Repository::serviceRequest()->canComplete($record->fresh())) {
+            $record = $record->fresh();
+            if (Auth::user()->cannot('manageUsage', [ServiceRequestRequest::class, Arr::toSnakeCase(Repository::serviceRequest()->getResource($record))])) {
                 throw new RuntimeException(__('encounters.messages.referral_selection_required'));
             }
             $this->confirmedElectronicReferralUuid = $uuid;
@@ -231,7 +234,7 @@ trait ManagesIncomingReferralSelection
     }
 
     /** Validate complete snapshots before import; the repository preserves any pending local operation. */
-    private function importIncomingReferralMatches(array $results, Person $patient): void
+    private function importIncomingReferralMatches(array $results, Person|Preperson $patient): void
     {
         foreach (array_keys($results) as $uuid) {
             $details = EHealth::serviceRequest()->getById($this->patientUuid, $uuid)->validate();
@@ -271,21 +274,23 @@ trait ManagesIncomingReferralSelection
     private function ensureReferralTakenIntoWork(ReferralRequestLifecycleService $service, string $referralUuid): bool
     {
         $local = Repository::serviceRequest()->findByUuid($referralUuid);
-        if ($local === null || (int) $local->personId !== $this->personId) {
-            throw new RuntimeException(__('Направлення не належить поточному пацієнту.'));
+        if ($local === null || Repository::serviceRequest()->patientForRequest($local)?->uuid !== $this->patientUuid) {
+            throw new RuntimeException(__('encounters.messages.referral_not_found'));
         }
 
         if (Repository::serviceRequest()->latestCompletion($local, 'service_request:use')?->status === JobStatus::PENDING->value) {
             return false;
         }
 
-        $employee = Auth::user()?->employees()
-            ->where('legal_entity_id', legalEntity()->id)
-            ->first();
-
-        if ($employee === null) {
-            throw new RuntimeException(__('Не знайдено співробітника для взяття направлення в роботу.'));
+        $category = $local->category?->coding?->first()?->code ?? '';
+        $choices = Repository::serviceRequest()->executorChoices($category);
+        // Reuse the encounter's explicit performer choice; never silently select the first linked employee.
+        $performerUuid = $this->form->encounter['performerId'] ?? null;
+        $choice = filled($performerUuid) ? collect($choices)->firstWhere('uuid', $performerUuid) : (count($choices) === 1 ? $choices[0] : null);
+        if ($choice === null) {
+            throw new RuntimeException(__('referrals.messages.executor_unavailable'));
         }
+        $employee = Repository::serviceRequest()->executorForUse($choice['id'], $category);
 
         $response = $service->takeIntoWork(
             $referralUuid,

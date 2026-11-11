@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\EncounterPackage;
 
-use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
 use App\Enums\Person\ServiceRequestStatus;
+use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
 use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
@@ -60,8 +60,11 @@ class EncounterReferralCreate extends EncounterDocumentCreate
             return;
         }
         $encounter = $this->resolveEncounterModelForStandalone();
+        if ($encounter === null) {
+            return;
+        }
         $submissionUuid = ctype_digit($submissionId)
-            ? Repository::serviceRequest()->findForPerson((int) $submissionId, (int) $this->personId)->uuid
+            ? Repository::serviceRequest()->findForPatient((int) $submissionId, $this->patient())->uuid
             : $submissionId;
         $record = app(MedicalRequestOwnership::class)->serviceForEncounter($submissionUuid, $encounter);
         $resource = Repository::serviceRequest()->getResource($record);
@@ -172,9 +175,9 @@ class EncounterReferralCreate extends EncounterDocumentCreate
 
     private function redirectToDraft(): void
     {
-        $this->redirectRoute('encounter.referral.edit', [
+        $this->redirectRoute($this->prepersonId !== null ? 'prepersons.encounter.referral.edit' : 'encounter.referral.edit', [
             'legalEntity' => $this->legalEntityId,
-            'person' => $this->personId,
+            $this->prepersonId !== null ? 'preperson' : 'person' => $this->prepersonId ?? $this->personId,
             'encounter' => $this->encounterId,
             'referral' => $this->submissionId,
         ], navigate: true);

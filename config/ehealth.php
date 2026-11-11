@@ -77,6 +77,12 @@ return [
         'seed_icd10_from_api' => filter_var(env('EHEALTH_SEED_ICD10', true), FILTER_VALIDATE_BOOL),
     ],
 
+    // TV39 names are supplied from the deployment's ESOZ configuration; unset values deny reuse/assistant categories.
+    'referrals' => [
+        'assistant_allowed_categories' => array_values(array_filter(array_map('trim', explode(',', (string) env('ASSISTANT_SERVICE_REQUEST_ALLOWED_CATEGORIES', ''))))),
+        'reuse_after_minutes' => env('SERVICE_REQUEST_REUSE_AFTER_MINUTES'),
+    ],
+
     'party_verification' => [
         // Local parties synced synchronously via getDetails before the rest go to the queue.
         'details_sync_page_size' => (int) env('EHEALTH_PARTY_VERIFICATION_DETAILS_PAGE_SIZE', 50),

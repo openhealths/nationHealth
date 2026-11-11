@@ -28,10 +28,10 @@ use App\Livewire\DiagnosticReport\DiagnosticReportView;
 use App\Livewire\Encounter\EncounterIndex;
 use App\Livewire\Encounter\EncounterView;
 use App\Livewire\EncounterPackage\EncounterEPrescriptionCreate;
-use App\Livewire\EncounterPackage\EncounterReferralCreate;
 use App\Livewire\EncounterPackage\EncounterPackageCreate;
 use App\Livewire\EncounterPackage\EncounterPackageEdit;
 use App\Livewire\EncounterPackage\EncounterPackageView;
+use App\Livewire\EncounterPackage\EncounterReferralCreate;
 use App\Livewire\Episode\EpisodeCreate;
 use App\Livewire\Episode\EpisodeEdit;
 use App\Livewire\Episode\EpisodeIndex;
@@ -418,6 +418,14 @@ Route::prefix('prepersons')
                 ->can('view', ['clinicalImpression', 'preperson'])
                 ->whereNumber('clinicalImpression')
                 ->name('clinical-impressions.view');
+            Route::get('/encounters/{encounter}/referral/create', EncounterReferralCreate::class)
+                ->can('createServiceRequest', ['encounter', 'preperson', 'legalEntity'])
+                ->whereNumber('encounter')
+                ->name('encounter.referral.create');
+            Route::get('/encounters/{encounter}/referral/{referral}/edit', EncounterReferralCreate::class)
+                ->can('createServiceRequest', ['encounter', 'preperson', 'legalEntity'])
+                ->whereNumber(['encounter', 'referral'])
+                ->name('encounter.referral.edit');
             Route::get('/encounters', EncounterIndex::class)
                 ->can('viewAny', Encounter::class)
                 ->name('encounters');
