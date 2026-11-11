@@ -335,6 +335,28 @@ class DeviceRequestForm extends Component
         }
     }
 
+    #[Computed]
+    public function carePlanApprovalContext(): array
+    {
+        if (!$this->carePlanApprovalRequired || $this->selectedCarePlanId === null) {
+            return [];
+        }
+        if (Auth::user()->cannot('create', DeviceRequestRequest::class)) {
+            Session::flash('error', __('device-requests.policy.create'));
+
+            return [];
+        }
+
+        try {
+            // Consent must target the selected encounter actor, never another available writer.
+            return ['actingEmployeeUuid' => $this->carePlanActorUuid()];
+        } catch (Throwable $exception) {
+            $this->reportError($exception);
+
+            return [];
+        }
+    }
+
     private function carePlanActorUuid(): string
     {
         $encounter = MedicalEventsRepository::deviceRequest()->encounterForPerson($this->person, $this->request['encounter_uuid'] ?? '');

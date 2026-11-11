@@ -31,7 +31,12 @@
         </select>
         @if ($carePlanApprovalRequired && $this->selectedCarePlan)
             <p>{{ __('care-plan.prescribing_patient_access_required') }}</p>
-            @livewire('care-plan.care-plan-approvals', ['legalEntity' => $legalEntity, 'carePlan' => $this->selectedCarePlan], key('device-plan-access-'.$selectedCarePlanId))
+            @php
+                $approvalContext = $this->carePlanApprovalContext;
+            @endphp
+            @if ($approvalContext !== [])
+                @livewire('care-plan.care-plan-approvals', ['legalEntity' => $legalEntity, 'carePlan' => $this->selectedCarePlan, 'actingEmployeeUuid' => $approvalContext['actingEmployeeUuid']], key('device-plan-access-'.$selectedCarePlanId.'-'.$approvalContext['actingEmployeeUuid']))
+            @endif
             <button type="button" wire:click="searchCarePlans" class="button-minor">
                 {{ __('device-requests.form.refresh_plan_access') }}
             </button>

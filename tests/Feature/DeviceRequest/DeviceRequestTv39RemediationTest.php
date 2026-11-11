@@ -11,6 +11,7 @@ use App\Classes\eHealth\Api\DeviceDefinition;
 use App\Classes\eHealth\Api\Patient\DeviceRequest as DeviceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
+use App\Livewire\CarePlan\CarePlanApprovals;
 use App\Livewire\DeviceRequest\DeviceRequestForm;
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
@@ -37,6 +38,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Component;
 use Livewire\Livewire;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -139,6 +141,57 @@ class DeviceRequestTv39RemediationTest extends TestCase
             ->call('sign')->assertSet('showSignatureModal', true)->assertSee(__('device-requests.validation.inactive_plan'));
         $this->assertDatabaseCount('device_request_requests', 0);
         Http::assertNothingSent();
+    }
+
+    public function test_rendered_approval_uses_selected_actor_and_remounts_without_falling_back(): void
+    {
+        $context = $this->documentContext();
+        $plan = $context['plan'];
+        $encounter = $context['encounter'];
+        $first = $context['employee'];
+        $second = $first->replicate();
+        $second->uuid = (string) Str::uuid();
+        $second->save();
+        $context['user']->employees()->attach($second->id);
+        $this->grantCarePlanEmployeeRole($second, 'OUTPATIENT');
+        $plan->approvals()->delete();
+        $this->assertSame($first->uuid, $context['user']->getCarePlanWriterEmployee('OUTPATIENT')->uuid);
+        $encounter->performer()->update(['value' => $second->uuid]);
+        Queue::fake();
+        DeviceApprovalActorCapture::$receivedActors = [];
+        Livewire::component('care-plan.care-plan-approvals', DeviceApprovalActorCapture::class);
+
+        try {
+            $component = $this->planHarness($context)->call('selectCarePlan', $plan->id);
+            $component->assertSeeHtml('data-approval-actor="'.$second->uuid.'"');
+            $this->assertSame([$second->uuid], DeviceApprovalActorCapture::$receivedActors);
+
+            // The plan stays selected; a different actor must mount a new approval component.
+            $encounter->performer()->update(['value' => $first->uuid]);
+            $component->call('$refresh')->assertSeeHtml('data-approval-actor="'.$first->uuid.'"');
+            $this->assertSame([$second->uuid, $first->uuid], DeviceApprovalActorCapture::$receivedActors);
+
+            // Another writer remains available, but cannot receive this encounter's consent.
+            $first->update(['is_active' => false]);
+            $this->assertSame($second->uuid, $context['user']->getCarePlanWriterEmployee('OUTPATIENT')->uuid);
+            $component->call('searchCarePlans')->assertDontSeeHtml('data-approval-actor=');
+            $this->assertSame([$second->uuid, $first->uuid], DeviceApprovalActorCapture::$receivedActors);
+
+            $first->update(['is_active' => true]);
+            $context['user']->syncRoles([]);
+            $context['user']->revokePermissionTo('device_request:write');
+            $context['user']->unsetRelation('roles')->unsetRelation('permissions');
+            $this->assertFalse($context['user']->can('device_request:write'));
+            $component->call('searchCarePlans')->assertDontSeeHtml('data-approval-actor=')
+                ->assertSee(__('device-requests.policy.create'));
+            $this->assertSame([$second->uuid, $first->uuid], DeviceApprovalActorCapture::$receivedActors);
+            $this->assertDatabaseCount('device_request_requests', 0);
+            $this->assertSame(0, $plan->approvals()->count());
+            Http::assertNothingSent();
+            Queue::assertNothingPushed();
+        } finally {
+            Livewire::component('care-plan.care-plan-approvals', CarePlanApprovals::class);
+        }
     }
 
     public function test_selected_model_displays_native_manufacturer_name_and_country(): void
@@ -381,5 +434,23 @@ class DeviceRequestPlanHarness extends DeviceRequestSigningHarness
     public function primeSigning(): void
     {
         $this->showSignatureModal = true;
+    }
+}
+
+class DeviceApprovalActorCapture extends Component
+{
+    public static array $receivedActors = [];
+
+    public string $actorUuid;
+
+    public function mount(LegalEntity $legalEntity, CarePlan $carePlan, string $actingEmployeeUuid): void
+    {
+        $this->actorUuid = $actingEmployeeUuid;
+        self::$receivedActors[] = $actingEmployeeUuid;
+    }
+
+    public function render(): string
+    {
+        return '<div data-approval-actor="'.$this->actorUuid.'"></div>';
     }
 }
