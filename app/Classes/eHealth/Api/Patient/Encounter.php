@@ -9,10 +9,10 @@ use App\Classes\eHealth\Errors\MedicalEventsErrorTranslator;
 use App\Classes\eHealth\ValidationRuleBuilder;
 use App\Contracts\ApiErrorTranslator;
 use App\Enums\Person\EncounterStatus;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use App\Exceptions\EHealth\EHealthConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -48,7 +48,25 @@ class Encounter extends PatientApiBase
      */
     public function cancel(string $id, array $data): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateCancellationReceipt(...));
+
         return $this->patch(self::URL . "/$id/encounter_package", $data);
+    }
+
+    /** The official 202 receipt requires status; an optional link still requires both Link fields. */
+    protected function validateCancellationReceipt(EHealthResponse $response): array
+    {
+        $data = $response->getData();
+        Validator::make($data, [
+            'status' => ['required', 'string'],
+            'eta' => ['sometimes', 'string'],
+            'links' => ['sometimes', 'array'],
+            'links.*' => ['required', 'array'],
+            'links.*.entity' => ['required', 'string'],
+            'links.*.href' => ['required', 'string'],
+        ])->validate();
+
+        return $data;
     }
 
     /**

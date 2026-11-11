@@ -10,6 +10,7 @@ use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Models\Declaration;
 use App\Models\Employee\Employee;
+use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
@@ -91,15 +92,26 @@ class EncounterPolicy
      */
     public function cancel(User $user, Encounter $encounter): Response
     {
+        $access = $this->viewCancellation($user, $encounter);
+        if ($access->denied()) {
+            return $access;
+        }
+
+        return $encounter->status === EncounterStatus::FINISHED
+            ? Response::allow()
+            : Response::denyWithStatus(404);
+    }
+
+    /** Read the outcome after cancellation changes the encounter status, preserving the same author checks. */
+    public function viewCancellation(User $user, Encounter $encounter): Response
+    {
         if ($user->cannot('encounter:cancel')
             || !$encounter->belongsToCurrentLegalEntity()
             || !$this->signsAsEmployeeAllowedToCancel($user, $encounter)) {
             return Response::denyWithStatus(404);
         }
 
-        return $encounter->status === EncounterStatus::FINISHED
-            ? Response::allow()
-            : Response::denyWithStatus(404);
+        return Response::allow();
     }
 
     /**
@@ -159,16 +171,16 @@ class EncounterPolicy
             ->exists();
     }
 
-    public function createMedicationRequest(User $user, Encounter $encounter, Person $patient, int|\App\Models\LegalEntity $legalEntityId): Response
+    public function createMedicationRequest(User $user, Encounter $encounter, Person $patient, int|LegalEntity $legalEntityId): Response
     {
-        $legalEntityId = $legalEntityId instanceof \App\Models\LegalEntity ? $legalEntityId->id : $legalEntityId;
+        $legalEntityId = $legalEntityId instanceof LegalEntity ? $legalEntityId->id : $legalEntityId;
 
         return $this->standaloneDocumentResponse($user, $encounter, $patient, $legalEntityId, 'medication_request_request:write');
     }
 
-    public function createServiceRequest(User $user, Encounter $encounter, Person $patient, int|\App\Models\LegalEntity $legalEntityId): Response
+    public function createServiceRequest(User $user, Encounter $encounter, Person $patient, int|LegalEntity $legalEntityId): Response
     {
-        $legalEntityId = $legalEntityId instanceof \App\Models\LegalEntity ? $legalEntityId->id : $legalEntityId;
+        $legalEntityId = $legalEntityId instanceof LegalEntity ? $legalEntityId->id : $legalEntityId;
 
         return $this->standaloneDocumentResponse($user, $encounter, $patient, $legalEntityId, 'service_request:write');
     }

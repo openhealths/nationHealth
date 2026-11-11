@@ -1,6 +1,9 @@
 @php($formPath = $formPath ?? 'form')
 
 <div x-data="{ showCancellationModal: $wire.entangle('showCancellationModal') }">
+    @if($this->pendingEncounterCancellations->isNotEmpty())
+        <p wire:poll.10s="pollEncounterCancellation" role="status">{{ __('encounters.messages.cancel_pending') }}</p>
+    @endif
     <template x-teleport="body">
         <div
             x-show="showCancellationModal"

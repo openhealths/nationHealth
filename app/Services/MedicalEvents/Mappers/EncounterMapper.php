@@ -10,6 +10,7 @@ use App\Enums\ClinicalImpression\Status;
 use App\Enums\DetectedIssue\Status as DetectedIssueStatus;
 use App\Enums\Device\Status as DeviceStatus;
 use App\Enums\DeviceAssociation\Status as DeviceAssociationStatus;
+use App\Enums\DeviceDispense\Status as DeviceDispenseStatus;
 use App\Enums\Person\ConditionVerificationStatus;
 use App\Enums\Person\DiagnosticReportStatus;
 use App\Enums\Person\EncounterStatus;
@@ -28,6 +29,7 @@ class EncounterMapper implements FhirMapperContract
      * @var array
      */
     private const array CANCELLED_STATUSES = [
+        'deviceDispenses' => ['status', DeviceDispenseStatus::ENTERED_IN_ERROR],
         'conditions' => ['verificationStatus', ConditionVerificationStatus::ENTERED_IN_ERROR],
         'observations' => ['status', ObservationStatus::ENTERED_IN_ERROR],
         'immunizations' => ['status', ImmunizationStatus::ENTERED_IN_ERROR],
@@ -47,6 +49,7 @@ class EncounterMapper implements FhirMapperContract
      * @var array
      */
     private const array SEPARATELY_CANCELLED_STATUSES = [
+        'deviceDispenses' => ['status', DeviceDispenseStatus::ENTERED_IN_ERROR],
         'observations' => ['status', ObservationStatus::ENTERED_IN_ERROR],
         'immunizations' => ['status', ImmunizationStatus::ENTERED_IN_ERROR],
         'diagnosticReports' => ['status', DiagnosticReportStatus::ENTERED_IN_ERROR],

@@ -10,15 +10,20 @@ use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthValidationException;
+use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Livewire\EncounterPackage\Forms\EncounterCancellationForm;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;
 use App\Services\MedicalEvents\FhirResource;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
 use Throwable;
@@ -51,6 +56,10 @@ trait HandlesEncounterCancellation
     #[Locked]
     public string $cancellingRecordId = '';
 
+    /** Submission IDs seen by this page remain available when the worker completes between polls. */
+    #[Locked]
+    public array $cancellationSubmissionIds = [];
+
     /**
      * The form holding the reason and the explanation of the cancellation.
      *
@@ -59,7 +68,7 @@ trait HandlesEncounterCancellation
     abstract protected function encounterCancellationForm(): EncounterCancellationForm;
 
     /**
-     * Where the page goes once eHealth has accepted the cancellation.
+     * Refresh the page after eHealth has confirmed the cancellation.
      *
      * @return void
      */
@@ -124,6 +133,12 @@ trait HandlesEncounterCancellation
 
         if (Auth::user()->cannot('cancel', $encounter)) {
             Session::flash('error', __('encounters.policy.cancel'));
+
+            return;
+        }
+
+        if (Repository::encounter()->pendingCancellation($encounter) !== null) {
+            Session::flash('warning', __('encounters.messages.cancel_pending'));
 
             return;
         }
@@ -221,6 +236,32 @@ trait HandlesEncounterCancellation
             return;
         }
 
+        if (Repository::encounter()->pendingCancellation($encounter) !== null) {
+            Session::flash('warning', __('encounters.messages.cancel_pending'));
+
+            return;
+        }
+
+        try {
+            Repository::encounter()->synchronizeCancellationPackage($encounter, $this->patient());
+            $encounter->refresh();
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while fetching the complete encounter package', __('encounters.messages.cancel_package_prepare_error'));
+
+            return;
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Error while synchronizing the cancellation package', __('encounters.messages.cancel_package_prepare_error'));
+
+            return;
+        }
+
+        // Recheck the current remote performer and status before signing a cancellation.
+        if (Auth::user()->cannot('cancel', $encounter)) {
+            Session::flash('error', __('encounters.policy.cancel'));
+
+            return;
+        }
+
         $selectedRecords = Repository::encounter()->withWholeDeviceGroup(
             $encounter->uuid,
             $this->selectedCancellationRecords()
@@ -279,49 +320,63 @@ trait HandlesEncounterCancellation
         }
 
         try {
+            $submission = Repository::encounter()->startCancellation($encounter, [
+            ...$package,
+            'operation' => 'cancelEncounter',
+            'selectedRecords' => $selectedRecords,
+            'cancellationReasonConcept' => FhirResource::make()
+                ->coding('eHealth/cancellation_reasons', $validated['cancellationReason'])
+                ->toCodeableConcept(data_get($this->dictionaries, 'eHealth/cancellation_reasons.'.$validated['cancellationReason'], '')),
+            'explanatoryLetter' => $validated['explanatoryLetter'],
+            ]);
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Error while saving encounter cancellation submission', __('encounters.messages.cancel_package_save_error'));
+
+            return;
+        }
+        if ($submission === null) {
+            Session::flash('warning', __('encounters.messages.cancel_pending'));
+
+            return;
+        }
+
+        $this->cancellationSubmissionIds[] = $submission->id;
+
+        try {
             $response = EHealth::encounter()->cancel($this->patient()->uuid, [
                 'signed_data' => $signedContent->getBase64Data(),
                 'signed_data_encoding' => 'base64'
             ]);
+            $receipt = $response->validate();
+            $job = collect($receipt['links'] ?? [])->first(
+                static fn (array $link): bool => str_contains(strtolower($link['href']), '/jobs/')
+            );
+            if ($job === null) {
+                // An accepted request without a job link remains guarded until it can be reconciled.
+                $submission->job()->update(['response_data' => $receipt]);
+                Session::flash('warning', __('encounters.messages.cancel_unconfirmed'));
+
+                return;
+            }
+            $receipt['links'] = [$job];
+            RemoteEHealthLinksProcessing::track($submission, $receipt);
         } catch (EHealthException|EHealthConnectionException $exception) {
+            if ($exception instanceof EHealthValidationException
+                || ($exception instanceof EHealthResponseException && $exception->getCode() >= 400
+                    && $exception->getCode() < 500 && $exception->getCode() !== 408)) {
+                RemoteEHealthLinksProcessing::markSubmissionFailed($submission);
+            }
             $exception->handle(
                 'Error while sending encounter cancellation package',
                 __('encounters.messages.cancel_package_request_error')
             );
 
             return;
-        }
-
-        logger()->debug('Job ID of cancel to further debug', $response->getData());
-
-        // eHealth accepted the cancellation; only now persist it locally
-        try {
-            if ($selectedRecords === []) {
-                Repository::encounter()->markAsEnteredInError(
-                    $encounter,
-                    FhirResource::make()
-                        ->coding('eHealth/cancellation_reasons', $validated['cancellationReason'])
-                        ->toCodeableConcept(
-                            data_get(
-                                $this->dictionaries,
-                                'eHealth/cancellation_reasons.' . $validated['cancellationReason'],
-                                ''
-                            )
-                        ),
-                    $validated['explanatoryLetter']
-                );
-            } else {
-                Repository::encounter()->markRecordsAsEnteredInError(
-                    $encounter->uuid,
-                    $selectedRecords,
-                    $validated['explanatoryLetter']
-                );
-            }
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors(
                 $exception,
-                'Error while saving encounter cancellation status',
-                __('encounters.messages.cancel_package_save_error')
+                'Encounter cancellation outcome is unconfirmed',
+                __('encounters.messages.cancel_unconfirmed')
             );
 
             return;
@@ -329,11 +384,65 @@ trait HandlesEncounterCancellation
 
         $this->resetCancellationState();
 
-        Session::flash('success', __($selectedRecords === []
-            ? 'encounters.messages.cancel_request_sent'
-            : 'encounters.messages.records_cancel_request_sent'));
+        Session::flash('info', __('encounters.messages.cancel_pending'));
 
-        $this->afterEncounterCancelled();
+        unset($this->pendingEncounterCancellations);
+    }
+
+    #[Computed]
+    public function pendingEncounterCancellations(): Collection
+    {
+        $pending = Repository::encounter()->pendingPatientCancellations($this->patient());
+        $submissions = $pending->merge(Repository::encounter()->patientCancellationsByIds($this->patient(), $this->cancellationSubmissionIds))
+            ->unique('id')->filter(static fn ($submission): bool => Auth::user()->can('viewCancellation', $submission->linkable));
+
+        // Remember jobs rendered after reopening the page, including completion by a worker before the next poll.
+        $this->cancellationSubmissionIds = $submissions->pluck('id')->values()->all();
+
+        return $submissions;
+    }
+
+    /** Poll durable jobs after a refresh; a receipt alone never changes clinical statuses. */
+    public function pollEncounterCancellation(): void
+    {
+        foreach ($this->pendingEncounterCancellations as $submission) {
+            $this->cancellationSubmissionIds = array_values(array_unique([...$this->cancellationSubmissionIds, $submission->id]));
+            try {
+                if (in_array($submission->status, ['PENDING', 'PROCESSING'], true)) {
+                    if (is_string($submission->href) && $submission->href !== '') {
+                        $result = EHealth::job()->getDetailsByHref($submission->href)->validate();
+                        Repository::encounter()->finishCancellation($submission, $result);
+                    } else {
+                        Repository::encounter()->reconcileCancellation($submission, $this->patient());
+                    }
+                }
+                $submission->refresh();
+                if (in_array($submission->status, ['PROCESSED', 'FAILED'], true)) {
+                    $succeeded = $submission->status === 'PROCESSED';
+                    Session::flash($succeeded ? 'success' : 'error', __($succeeded
+                        ? 'encounters.messages.cancel_confirmed' : 'encounters.messages.cancel_package_request_error'));
+                    $this->cancellationSubmissionIds = array_values(array_diff($this->cancellationSubmissionIds, [$submission->id]));
+                    if ($succeeded) {
+                        // Restore the submitted selection before refreshing pages which distinguish whole and selected cancellation.
+                        $selected = $submission->job->request_data['selectedRecords'];
+                        if (property_exists($this, 'selectedRecords')) {
+                            $this->selectedRecords = $selected;
+                        } else {
+                            $this->cancellingRecordSection = array_key_first($selected) ?? '';
+                            $this->cancellingRecordId = $selected[$this->cancellingRecordSection][0] ?? '';
+                        }
+                        $this->afterEncounterCancelled();
+                    }
+                }
+            } catch (EHealthException|EHealthConnectionException $exception) {
+                $exception->handle('Error while polling encounter cancellation');
+            } catch (ValidationException) {
+                Session::flash('error', __('encounters.messages.cancel_unconfirmed'));
+            } catch (Throwable $exception) {
+                $this->handleDatabaseErrors($exception, 'Cancellation remains unconfirmed after remote reread', __('encounters.messages.cancel_unconfirmed'));
+            }
+        }
+        unset($this->pendingEncounterCancellations);
     }
 
     /**
