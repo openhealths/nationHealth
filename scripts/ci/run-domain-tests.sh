@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run PHPUnit suites owned for:
-# Employee · Party · Care Plan · Care Plan Activity · ePrescription · Service Request · Device Request · Healthcare Service
+# Employee · Party · Care Plan · Care Plan Activity · ePrescription · Service Request · Device Request · Composition · Healthcare Service
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -34,6 +34,7 @@ DOMAIN_PATHS=(
   tests/Unit/Repositories/MedicalEvents/MedicationRequestRepositoryFhirRefsTest.php
   tests/Unit/Services/Party
   tests/Unit/Services/MedicalEvents/CarePlanActivityLifecycleServiceTest.php
+  tests/Unit/Services/MedicalEvents/CarePlanActivityRegistrationBoundaryTest.php
   tests/Unit/Services/MedicalEvents/CarePlanLifecycleServiceTest.php
   tests/Unit/Services/MedicalEvents/EHealthJobResolverTest.php
   tests/Unit/Services/MedicalEvents/EHealthRequestLifecycleServiceTest.php
@@ -66,6 +67,8 @@ DOMAIN_PATHS=(
   tests/Feature/CarePlanActivityPayloadTest.php
   tests/Feature/Encounter
   tests/Feature/MedicalEvents/PatientSummaryTv39AuthorizationTest.php
+  tests/Feature/MedicalEvents/EncounterLinkedDocumentsTest.php
+  tests/Feature/MedicalEvents/SharedSubmissionStatusTest.php
   tests/Feature/MedicalEvents/Tv39ClinicalWorkplaceAccessTest.php
   tests/Feature/MedicationRequest
   tests/Feature/DeviceRequest
@@ -89,14 +92,12 @@ DOMAIN_PATHS=(
   tests/Feature/EmployeeRole
 )
 
-# Composition is a later module in the review stack; run its regressions once that slice is present.
-if [[ -f tests/Feature/Composition/CompositionFhirFidelityTest.php ]]; then
+# Include every medical-conclusion regression once the composition slice is present.
+if [[ -d tests/Feature/Composition ]]; then
   DOMAIN_PATHS+=(
-    tests/Feature/Composition/CompositionFhirFidelityTest.php
-    tests/Feature/Composition/CompositionReadRelationsTest.php
-    tests/Feature/Composition/CompositionCreateNewbornTest.php
-    tests/Feature/Composition/CompositionTempDisabilityFormTest.php
-    tests/Feature/Composition/CompositionTempDisabilityCreateTest.php
+    tests/Feature/Composition
+    tests/Unit/Composition
+    tests/Unit/Enums/CompositionEnumsTest.php
     tests/Feature/Person/PatientRegistryUatTest.php
   )
 fi

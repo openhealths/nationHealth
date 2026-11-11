@@ -1,5 +1,5 @@
-# Owned domain PHPUnit: employee, party, care plan, ePrescription, service request.
-# Same scripts as Azure Pipelines. PostgreSQL is installed with apt — no Docker.
+# Owned domain PHPUnit and clinical browser checks: employee, party, care plan, prescriptions, referrals, devices and medical conclusions.
+# Same scripts as Azure Pipelines. PostgreSQL runs on the agent without Docker.
 
 name: Domain tests
 
@@ -85,6 +85,27 @@ jobs:
 
       - name: PHPUnit owned domains
         run: scripts/ci/run-domain-tests.sh
+
+      - name: Setup Node for clinical browser checks
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Prepare clinical browser assets
+        run: |
+          npm ci
+          npm run build
+          npx playwright install --with-deps chromium
+
+      - name: Test clinical drawers and referral workflows
+        env:
+          APP_ENV: testing
+          DB_DATABASE: testing
+          PHPUNIT_CONFIGURATION: phpunit.xml
+        run: |
+          npm run test:drawers
+          npm run test:referrals
 
       - name: Publish JUnit
         if: always()

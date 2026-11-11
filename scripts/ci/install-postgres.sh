@@ -15,10 +15,19 @@ if [[ "${DB_DATABASE}" != "testing" ]]; then
 fi
 
 if ! pg_isready -h "${DB_HOST}" -p "${DB_PORT}" >/dev/null 2>&1; then
-  echo "==> Installing PostgreSQL from apt"
-  sudo apt-get update -y
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql postgresql-contrib
+  # Hosted Ubuntu agents already provide a stopped cluster. Start it without
+  # depending on apt mirrors when the PostgreSQL server is installed.
+  if ! command -v pg_lsclusters >/dev/null 2>&1 || ! pg_lsclusters --no-header | grep -q '^[0-9]'; then
+    echo "==> Installing PostgreSQL from apt"
+    sudo apt-get update -y
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql postgresql-contrib
+  fi
   sudo service postgresql start
+fi
+
+if ! pg_isready -h "${DB_HOST}" -p "${DB_PORT}" >/dev/null 2>&1; then
+  echo "PostgreSQL did not become ready on ${DB_HOST}:${DB_PORT}." >&2
+  exit 1
 fi
 
 echo "==> Ensuring role '${DB_USERNAME}' and database '${DB_DATABASE}'"
