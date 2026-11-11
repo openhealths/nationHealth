@@ -6,7 +6,6 @@ namespace App\Livewire\CarePlan;
 
 use App\Classes\eHealth\EHealth;
 use App\Enums\CarePlanStatus;
-use App\Enums\Person\ApprovalStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Exceptions\EHealth\EHealthJobTimeoutException;
@@ -124,7 +123,7 @@ class CarePlanApprovals extends Component
         }
         if (empty($this->selectedAuthMethodUuid)) {
             $method = collect($this->authMethods)->firstWhere('type', 'OTP') ?? ($this->authMethods[0] ?? null);
-            $this->selectedAuthMethodUuid = $method['id'] ?? $method['uuid'] ?? null;
+            $this->selectedAuthMethodUuid = $method['id'] ?? ($method['uuid'] ?? null);
         }
     }
 
@@ -565,12 +564,11 @@ class CarePlanApprovals extends Component
     public function getSelectedEmployeeHasAccessProperty(): bool
     {
         return collect($this->approvals)->contains(function (array $approval): bool {
-            $expiresAt = $approval['expiresAt'] ?? $approval['expires_at'] ?? null;
+            $expiresAt = $approval['expiresAt'] ?? ($approval['expires_at'] ?? null);
 
             return data_get($approval, 'grantedTo.value', data_get($approval, 'granted_to.value')) === $this->newApproval['employee_uuid']
-                && ($approval['isVerified'] ?? $approval['is_verified'] ?? false)
-                && ($expiresAt === null || CarbonImmutable::parse($expiresAt)->isFuture())
-                && ApprovalStatus::resolve($approval['status'] ?? null)?->isGranted();
+                && ($approval['isVerified'] ?? ($approval['is_verified'] ?? false))
+                && $expiresAt !== null && CarbonImmutable::parse($expiresAt)->isFuture();
         });
     }
 

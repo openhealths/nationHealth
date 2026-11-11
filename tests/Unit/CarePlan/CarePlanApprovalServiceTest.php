@@ -4,6 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\Unit\CarePlan;
 
+use Illuminate\Validation\ValidationException;
+use ReflectionMethod;
+use GuzzleHttp\Psr7\Response;
+use Illuminate\Support\Facades\DB;
+use App\Models\Relations\Party;
+use Illuminate\Support\Facades\Hash;
+use App\Models\Employee\Employee;
+use App\Enums\User\Role;
+use App\Enums\Status;
+
 use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Models\CarePlan;
@@ -25,6 +35,7 @@ use Illuminate\Support\Str;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
+use RuntimeException;
 
 class CarePlanApprovalServiceTest extends TestCase
 {
@@ -48,7 +59,7 @@ class CarePlanApprovalServiceTest extends TestCase
         $carePlan->update(['status' => 'draft']);
         $this->mock(ApprovalApi::class)->shouldNotReceive('createApproval');
 
-        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->expectException(ValidationException::class);
         $this->expectExceptionMessage(__('care-plan.cannot_grant_unregistered'));
         app(CarePlanApprovalService::class)->create($carePlan, 'patient-uuid', 'employee-uuid', 'write', null, $legalEntity, $user);
     }
@@ -176,7 +187,7 @@ class CarePlanApprovalServiceTest extends TestCase
         $response->shouldReceive('getStatusCode')->andReturn(201);
         $response->shouldReceive('validate')->andReturn([
             'id' => '11111111-1111-1111-1111-111111111111',
-            'is_verified' => true,
+            'expires_at' => now()->addDay()->toIso8601String(), 'is_verified' => true,
             'status' => 'active',
             'urgent' => [
                 'authentication_method_current' => ['type' => 'OTP'],
@@ -244,7 +255,7 @@ class CarePlanApprovalServiceTest extends TestCase
         ];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('confirmationMethods')]
+    #[DataProvider('confirmationMethods')]
     public function test_sync_creation_preserves_the_required_confirmation(array $method, bool $requiresOtp): void
     {
         [$carePlan, $legalEntity, $user] = $this->makeCarePlanContext();
@@ -254,7 +265,7 @@ class CarePlanApprovalServiceTest extends TestCase
         $response->shouldReceive('getStatusCode')->andReturn(201);
         $response->shouldReceive('validate')->andReturn([
             'id' => '11111111-1111-1111-1111-111111111111',
-            'is_verified' => false,
+            'expires_at' => now()->addDay()->toIso8601String(), 'is_verified' => false,
             'urgent' => [
                 'authentication_method_current' => $method,
             ],
@@ -345,7 +356,7 @@ class CarePlanApprovalServiceTest extends TestCase
 
         $this->instance(ApprovalApi::class, $this->mockAsyncCreateApi());
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(__('care-plan.approval_create_error'));
 
         try {
@@ -372,7 +383,7 @@ class CarePlanApprovalServiceTest extends TestCase
 
         $this->instance(ApprovalApi::class, $this->mockAsyncCreateApi());
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(__('care-plan.approval_create_error'));
 
         try {
@@ -388,7 +399,7 @@ class CarePlanApprovalServiceTest extends TestCase
         }
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('confirmationMethods')]
+    #[DataProvider('confirmationMethods')]
     public function test_async_creation_preserves_the_required_confirmation(array $method, bool $requiresOtp): void
     {
         [$carePlan] = $this->makeCarePlanContext();
@@ -405,7 +416,7 @@ class CarePlanApprovalServiceTest extends TestCase
             'status' => 'PROCESSED',
             'response_data' => [
                 'id' => '44444444-4444-4444-4444-444444444444',
-                'is_verified' => false,
+                'expires_at' => now()->addDay()->toIso8601String(), 'is_verified' => false,
                 'authentication_method_current' => $method,
             ],
         ]);
@@ -422,7 +433,7 @@ class CarePlanApprovalServiceTest extends TestCase
         $this->assertTrue($before->requiresConfirmation());
         $this->assertSame($requiresOtp, $before->requiresOtp());
         $this->assertSame('33333333-3333-3333-3333-333333333333', $approval->fresh()->uuid);
-        \App\Repositories\MedicalEvents\Repository::approval()->completeCarePlanRequest($link, $job->response_data);
+        Repository::approval()->completeCarePlanRequest($link, $job->response_data);
         $status = app(CarePlanApprovalService::class)->resolveAsyncJob($link->id);
 
         $this->assertTrue($status->requiresConfirmation());
@@ -488,7 +499,7 @@ class CarePlanApprovalServiceTest extends TestCase
             'status' => 'PROCESSED',
             'response_data' => [
                 'id' => '99999999-9999-9999-9999-999999999999',
-                'is_verified' => true,
+                'expires_at' => now()->addDay()->toIso8601String(), 'is_verified' => true,
                 'status' => 'active',
                 'authentication_method_current' => ['type' => 'OTP'],
             ],
@@ -502,7 +513,7 @@ class CarePlanApprovalServiceTest extends TestCase
             'href' => '/jobs/job-inpatient',
         ]);
 
-        \App\Repositories\MedicalEvents\Repository::approval()->completeCarePlanRequest($link, $job->response_data);
+        Repository::approval()->completeCarePlanRequest($link, $job->response_data);
         $status = app(CarePlanApprovalService::class)->resolveAsyncJob($link->id);
 
         $this->assertTrue($status->isGranted());
@@ -514,23 +525,59 @@ class CarePlanApprovalServiceTest extends TestCase
         [$carePlan] = $this->makeCarePlanContext();
         $approval = $carePlan->approvals()->create([
             'uuid' => (string) Str::uuid(), 'status' => 'pending',
-            'access_level' => 'write', 'is_verified' => false,
+            'access_level' => 'write', 'expires_at' => now()->addDay()->toIso8601String(), 'is_verified' => false,
         ]);
-        $validator = new \ReflectionMethod(ApprovalApi::class, 'validateVerification');
+        $validator = new ReflectionMethod(ApprovalApi::class, 'validateVerification');
         $response = new EHealthResponse(
-            new \GuzzleHttp\Psr7\Response(200, [], '{"data":{},"meta":{"code":200,"type":"object"}}'),
+            new Response(200, [], '{"data":{},"meta":{"code":200,"type":"object"}}'),
             fn (EHealthResponse $response): array => $validator->invoke(new ApprovalApi(), $response),
         );
         $api = Mockery::mock(ApprovalApi::class);
         $api->shouldReceive('withToken')->once()->with('synthetic-token')->andReturnSelf();
         $api->shouldReceive('verify')->once()->with($carePlan->person->uuid, $approval->uuid, ['code' => 1234])->andReturn($response);
-        $api->shouldNotReceive('getApprovalDetails');
+        $details = Mockery::mock(EHealthResponse::class);
+        $details->shouldReceive('successful')->once()->andReturnTrue();
+        $details->shouldReceive('validate')->once()->andReturn([
+            'id' => $approval->uuid, 'is_verified' => true, 'expires_at' => now()->addYear()->toIso8601String(),
+        ]);
+        $api->shouldReceive('getApprovalDetails')->once()->with($carePlan->person->uuid, $approval->uuid)->andReturn($details);
         $this->instance(ApprovalApi::class, $api);
 
         app(CarePlanApprovalService::class)->verify($carePlan->person->uuid, $approval->uuid, 1234, 'synthetic-token');
 
         $this->assertTrue($approval->fresh()->getAttribute('is_verified'));
-        $this->assertSame('active', $approval->fresh()->status);
+        $this->assertSame('pending', $approval->fresh()->status);
+        $this->assertTrue($approval->fresh()->expiresAt->isFuture());
+    }
+
+    public function test_verification_acknowledgement_cannot_promote_an_unverified_remote_approval(): void
+    {
+        [$plan] = $this->makeCarePlanContext();
+        $approval = $plan->approvals()->create([
+            'uuid' => (string) Str::uuid(), 'is_verified' => false,
+            'access_level' => 'write', 'expires_at' => now()->addDay(),
+        ]);
+        $acknowledgement = Mockery::mock(EHealthResponse::class);
+        $acknowledgement->shouldReceive('successful')->once()->andReturnTrue();
+        $acknowledgement->shouldReceive('validate')->once()->andReturn([]);
+        $details = Mockery::mock(EHealthResponse::class);
+        $details->shouldReceive('successful')->once()->andReturnTrue();
+        $details->shouldReceive('validate')->once()->andReturn([
+            'id' => $approval->uuid, 'is_verified' => false,
+            'expires_at' => now()->addDay()->toIso8601String(),
+        ]);
+        $api = $this->mock(ApprovalApi::class);
+        $api->shouldReceive('verify')->once()->with($plan->person->uuid, $approval->uuid, ['code' => 1234])->andReturn($acknowledgement);
+        $api->shouldReceive('getApprovalDetails')->once()->with($plan->person->uuid, $approval->uuid)->andReturn($details);
+
+        try {
+            app(CarePlanApprovalService::class)->verify($plan->person->uuid, $approval->uuid, 1234);
+            $this->fail('An acknowledgement must not grant unverified access.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(__('care-plan.approval_verify_error'), $exception->getMessage());
+        }
+        $this->assertFalse($approval->fresh()->getAttribute('is_verified'));
+        $this->assertNull($approval->fresh()->status);
     }
 
     public function test_consumed_sms_code_is_reconciled_by_reading_the_same_approval(): void
@@ -538,15 +585,15 @@ class CarePlanApprovalServiceTest extends TestCase
         [$carePlan] = $this->makeCarePlanContext();
         $approval = $carePlan->approvals()->create([
             'uuid' => (string) Str::uuid(), 'status' => 'pending',
-            'access_level' => 'write', 'is_verified' => false,
+            'access_level' => 'write', 'expires_at' => now()->addDay()->toIso8601String(), 'is_verified' => false,
         ]);
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('successful')->once()->andReturnTrue();
-        $response->shouldReceive('validate')->once()->andThrow(\Illuminate\Validation\ValidationException::withMessages(['body' => 'Unknown acknowledgement']));
+        $response->shouldReceive('validate')->once()->andThrow(ValidationException::withMessages(['body' => 'Unknown acknowledgement']));
         $details = Mockery::mock(EHealthResponse::class);
         $details->shouldReceive('successful')->once()->andReturnTrue();
         $details->shouldReceive('validate')->once()->andReturn([
-            'id' => $approval->uuid, 'status' => 'active', 'is_verified' => true,
+            'id' => $approval->uuid, 'is_verified' => true,
             'access_level' => 'write', 'expires_at' => now()->addYear()->toIso8601String(),
         ]);
         $api = Mockery::mock(ApprovalApi::class);
@@ -645,7 +692,7 @@ class CarePlanApprovalServiceTest extends TestCase
             $created->shouldReceive('validate')->once()->andReturn([
                 'id' => $newApprovalId,
                 'status' => 'pending',
-                'is_verified' => false,
+                'expires_at' => now()->addDay()->toIso8601String(), 'is_verified' => false,
                 'authentication_method_current' => ['type' => 'OTP', 'phone_number' => '+380991112233'],
             ]);
             $api->shouldReceive('createApproval')->once()
@@ -669,8 +716,8 @@ class CarePlanApprovalServiceTest extends TestCase
      */
     private function makeCarePlanContext(): array
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -680,7 +727,7 @@ class CarePlanApprovalServiceTest extends TestCase
             'is_active' => true,
         ]);
 
-        $party = \App\Models\Relations\Party::create([
+        $party = Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Doctor',
             'last_name' => 'Who',
@@ -692,15 +739,15 @@ class CarePlanApprovalServiceTest extends TestCase
         $user = User::create([
             'uuid' => (string) Str::uuid(),
             'email' => 'doctor-'.Str::random(8).'@example.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'password' => Hash::make('password'),
             'party_id' => $party->id,
         ]);
 
-        $employee = \App\Models\Employee\Employee::create([
+        $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr. Test',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $legalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',

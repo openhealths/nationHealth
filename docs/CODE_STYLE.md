@@ -148,6 +148,17 @@ If a view uses a protected model, restore it on every Livewire request (for
 example, in `boot()`). Initialization in `mount()` or a single action does not
 cover later property updates, refreshes, or other actions.
 
+### Care-plan approvals
+
+In care-plan workflows, derive approval confirmation from `is_verified`: `true` means
+confirmed, `false` means awaiting confirmation. Access also requires a non-null future
+`expires_at`; an expired approval grants no access regardless of its verified flag.
+Do not read or write the legacy `approvals.status` column for care-plan approvals,
+including patient-owned requests that grant access only to care plans.
+Keep asynchronous request progress in eHealth jobs and links, separate from patient consent.
+A verification acknowledgement alone cannot grant access: read and validate the approval
+when the PATCH does not return its verified flag and expiry.
+
 ### Synchronization
 
 After synchronization, refresh displayed form values from the saved records.

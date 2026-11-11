@@ -306,7 +306,7 @@ class Approval extends Model
     protected function carePlanAccessGrantedTo(Builder $query, User $user, LegalEntity $legalEntity): Builder
     {
         return $query->whereApprovableType(CarePlan::class)
-            ->active()
+            ->isVerified()->whereFuture('expires_at')
             ->whereAccessLevel('read')
             ->grantedToEmployees($user, $legalEntity);
     }
@@ -424,7 +424,7 @@ class Approval extends Model
         }
 
         if ($this->grantedToType === 'legal_entity') {
-            $legalEntity = \App\Models\LegalEntity::where('uuid', $uuid)->first();
+            $legalEntity = LegalEntity::where('uuid', $uuid)->first();
 
             if ($legalEntity) {
                 return [

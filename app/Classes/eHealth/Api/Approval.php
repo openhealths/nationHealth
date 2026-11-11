@@ -241,9 +241,9 @@ class Approval extends Request
             'data' => ['present', 'array', 'list'],
             'data.*.id' => ['required', 'uuid'],
             'data.*.granted_to.identifier.value' => ['required', 'uuid'],
-            'data.*.is_verified' => ['sometimes', 'boolean:strict'],
+            'data.*.is_verified' => ['required', 'boolean:strict'],
             'data.*.access_level' => ['nullable', Rule::in(['read', 'write'])],
-            'data.*.expires_at' => ['nullable', 'date'],
+            'data.*.expires_at' => ['required', 'date'],
             'paging' => ['required', 'array'],
             'paging.page_number' => ['required_without:paging.page', 'integer', 'min:1'],
             'paging.page' => ['required_without:paging.page_number', 'integer', 'min:1'],
@@ -329,7 +329,7 @@ class Approval extends Request
         $urgent = null;
         for ($depth = 0; $depth < 6; $depth++) {
             $urgent = $data['urgent'] ?? $urgent;
-            $nested = $data['response_data'] ?? $data['result'] ?? data_get($data, 'response.body') ?? $data['data'] ?? null;
+            $nested = $data['response_data'] ?? ($data['result'] ?? (data_get($data, 'response.body') ?? ($data['data'] ?? null)));
             if (!is_array($nested)) {
                 break;
             }
@@ -346,7 +346,7 @@ class Approval extends Request
                 'status' => ['sometimes', 'string'],
                 'access_level' => ['nullable', Rule::in(['read', 'write'])],
                 'authorize_with' => ['nullable', 'uuid'],
-                'expires_at' => ['nullable', 'date'],
+                'expires_at' => [$complete ? 'required' : 'sometimes', 'date'],
                 'inserted_at' => ['nullable', 'date'],
                 'updated_at' => ['nullable', 'date'],
                 'urgent' => ['nullable', 'array'],

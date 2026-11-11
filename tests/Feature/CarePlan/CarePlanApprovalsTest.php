@@ -4,6 +4,22 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
+use Tests\Concerns\CreatesFhirCarePlans;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use App\Enums\User\Role;
+use App\Enums\Status;
+use Illuminate\Support\Facades\Cache;
+use App\Services\Dictionary\Dictionaries\BasicDictionary;
+use App\Classes\eHealth\Api\Person as ApiPerson;
+use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Api\Approval;
+use App\Livewire\CarePlan\CarePlanApprovals;
+use Illuminate\Support\Facades\Gate;
+use PHPUnit\Framework\Attributes\DataProvider;
+use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\MedicalEvents\Sql\Approval as SqlApproval;
+
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
 use App\Models\Employee\Employee;
@@ -19,7 +35,7 @@ use Illuminate\Support\Str;
 
 class CarePlanApprovalsTest extends TestCase
 {
-    use \Tests\Concerns\CreatesFhirCarePlans;
+    use CreatesFhirCarePlans;
 
     use DatabaseTransactions;
 
@@ -38,8 +54,8 @@ class CarePlanApprovalsTest extends TestCase
     public function test_employees_are_filtered_by_active_legal_entity(): void
     {
         // 1. Setup initial active legal entity and user/employee
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $activeLegalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -70,7 +86,7 @@ class CarePlanApprovalsTest extends TestCase
         $user = User::create([
             'uuid' => (string) Str::uuid(),
             'email' => 'doctor@example.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'password' => Hash::make('password'),
             'party_id' => $party->id,
         ]);
 
@@ -78,8 +94,8 @@ class CarePlanApprovalsTest extends TestCase
         $employeeActive = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr. Active',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $activeLegalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',
@@ -88,18 +104,18 @@ class CarePlanApprovalsTest extends TestCase
             'party_id' => $party->id,
         ]);
 
-        \Illuminate\Support\Facades\Cache::forever(\App\Services\Dictionary\Dictionaries\BasicDictionary::KEY, [
+        Cache::forever(BasicDictionary::KEY, [
             ['name' => 'POSITION', 'values' => [['code' => 'P8', 'description' => 'Лікар-педіатр']]],
         ]);
-        \Illuminate\Support\Facades\Cache::forever(\App\Services\Dictionary\Dictionaries\BasicDictionary::KEY.':fresh', true);
+        Cache::forever(BasicDictionary::KEY.':fresh', true);
         $employeeActive->update(['position' => 'P8']);
 
         // Employee belonging to other legal entity
         $employeeOther = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr. Other',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $otherLegalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',
@@ -130,10 +146,10 @@ class CarePlanApprovalsTest extends TestCase
         ]);
 
         // Mock dependencies for Livewire mount
-        $mockPatientApi = Mockery::mock(\App\Classes\eHealth\Api\Person::class);
-        $this->instance(\App\Classes\eHealth\Api\Person::class, $mockPatientApi);
+        $mockPatientApi = Mockery::mock(ApiPerson::class);
+        $this->instance(ApiPerson::class, $mockPatientApi);
 
-        $authResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $authResponse = Mockery::mock(EHealthResponse::class);
         $authResponse->shouldReceive('getData', 'validate')->andReturn([
             [
                 'id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -144,11 +160,11 @@ class CarePlanApprovalsTest extends TestCase
         $authResponse->shouldReceive('getStatusCode')->andReturn(200);
         $mockPatientApi->shouldReceive('getAuthMethods')->andReturn($authResponse);
 
-        $mockApprovalApi = Mockery::mock(\App\Classes\eHealth\Api\Approval::class);
+        $mockApprovalApi = Mockery::mock(Approval::class);
         $mockApprovalApi->shouldReceive('withToken')->andReturnSelf();
-        $this->instance(\App\Classes\eHealth\Api\Approval::class, $mockApprovalApi);
+        $this->instance(Approval::class, $mockApprovalApi);
 
-        $approvalsResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $approvalsResponse = Mockery::mock(EHealthResponse::class);
         $approvalsResponse->shouldReceive('getData', 'validate')->andReturn([]);
         $approvalsResponse->shouldReceive('getStatusCode')->andReturn(200);
         $mockApprovalApi->shouldReceive('getPatientApprovals')->andReturn($approvalsResponse);
@@ -157,7 +173,7 @@ class CarePlanApprovalsTest extends TestCase
         $this->grantMedicalEventAbilities($user);
 
         // Test Livewire mount - verify employees lists ONLY employees of activeLegalEntity
-        $component = Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, [
+        $component = Livewire::test(CarePlanApprovals::class, [
             'legalEntity' => $activeLegalEntity,
             'carePlan' => $carePlan,
         ]);
@@ -172,8 +188,8 @@ class CarePlanApprovalsTest extends TestCase
 
     public function test_create_approval_uses_write_access_level_for_same_legal_entity(): void
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $activeLegalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -196,15 +212,15 @@ class CarePlanApprovalsTest extends TestCase
         $user = User::create([
             'uuid' => (string) Str::uuid(),
             'email' => 'doctor@example.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'password' => Hash::make('password'),
             'party_id' => $party->id,
         ]);
 
         $employeeActive = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr. Active',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $activeLegalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',
@@ -235,10 +251,10 @@ class CarePlanApprovalsTest extends TestCase
         ]);
 
         // Mock dependencies
-        $mockPatientApi = Mockery::mock(\App\Classes\eHealth\Api\Person::class);
-        $this->instance(\App\Classes\eHealth\Api\Person::class, $mockPatientApi);
+        $mockPatientApi = Mockery::mock(ApiPerson::class);
+        $this->instance(ApiPerson::class, $mockPatientApi);
 
-        $authResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $authResponse = Mockery::mock(EHealthResponse::class);
         $authResponse->shouldReceive('getData', 'validate')->andReturn([
             [
                 'id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -249,11 +265,11 @@ class CarePlanApprovalsTest extends TestCase
         $authResponse->shouldReceive('getStatusCode')->andReturn(200);
         $mockPatientApi->shouldReceive('getAuthMethods')->andReturn($authResponse);
 
-        $mockApprovalApi = Mockery::mock(\App\Classes\eHealth\Api\Approval::class);
+        $mockApprovalApi = Mockery::mock(Approval::class);
         $mockApprovalApi->shouldReceive('withToken')->andReturnSelf();
-        $this->instance(\App\Classes\eHealth\Api\Approval::class, $mockApprovalApi);
+        $this->instance(Approval::class, $mockApprovalApi);
 
-        $approvalsResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $approvalsResponse = Mockery::mock(EHealthResponse::class);
         $approvalsResponse->shouldReceive('getData', 'validate')->andReturn([]);
         $approvalsResponse->shouldReceive('getStatusCode')->andReturn(200);
         $mockApprovalApi->shouldReceive('getPatientApprovals')->andReturn($approvalsResponse);
@@ -284,8 +300,8 @@ class CarePlanApprovalsTest extends TestCase
             'authorize_with' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         ];
 
-        $approvalCreateResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
-        $approvalCreateResponse->shouldReceive('getData', 'validate')->andReturn(['id' => (string) Str::uuid(), 'status' => 'new', 'is_verified' => false, 'authentication_method_current' => ['type' => 'OTP']]);
+        $approvalCreateResponse = Mockery::mock(EHealthResponse::class);
+        $approvalCreateResponse->shouldReceive('getData', 'validate')->andReturn(['id' => (string) Str::uuid(), 'is_verified' => false, 'expires_at' => now()->addDay()->toIso8601String(), 'authentication_method_current' => ['type' => 'OTP']]);
         $approvalCreateResponse->shouldReceive('successful')->andReturnTrue();
         $approvalCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
 
@@ -297,7 +313,7 @@ class CarePlanApprovalsTest extends TestCase
         $this->actingAs($user);
         $this->grantMedicalEventAbilities($user);
 
-        Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, [
+        Livewire::test(CarePlanApprovals::class, [
             'legalEntity' => $activeLegalEntity,
             'carePlan' => $carePlan,
         ])
@@ -307,8 +323,8 @@ class CarePlanApprovalsTest extends TestCase
 
     public function test_create_approval_uses_read_access_level_for_external_legal_entity(): void
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $activeLegalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -339,15 +355,15 @@ class CarePlanApprovalsTest extends TestCase
         $user = User::create([
             'uuid' => (string) Str::uuid(),
             'email' => 'doctor@example.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'password' => Hash::make('password'),
             'party_id' => $party->id,
         ]);
 
         $employeeActive = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr. Active',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $activeLegalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',
@@ -379,19 +395,19 @@ class CarePlanApprovalsTest extends TestCase
 
         $this->actingAs($user);
 
-        $this->assertTrue(\Illuminate\Support\Facades\Gate::forUser($user)->denies('view', $carePlan));
+        $this->assertTrue(Gate::forUser($user)->denies('view', $carePlan));
         $this->assertSame(
             'read',
-            app(\App\Services\MedicalEvents\CarePlanApprovalService::class)
+            app(CarePlanApprovalService::class)
                 ->resolveAccessLevel($carePlan, $activeLegalEntity)
         );
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('approvalVisibility')]
-    public function test_granted_and_awaiting_approvals_are_visible(string $status, bool $visible, bool $verified, bool $awaiting): void
+    #[DataProvider('approvalVisibility')]
+    public function test_granted_and_awaiting_approvals_are_visible(?string $status, bool $visible, bool $verified, bool $awaiting, bool $expired = false): void
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -414,15 +430,15 @@ class CarePlanApprovalsTest extends TestCase
         $user = User::create([
             'uuid' => (string) Str::uuid(),
             'email' => 'revoke_'.Str::random(6).'@example.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'password' => Hash::make('password'),
             'party_id' => $party->id,
         ]);
 
         $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr. Active',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $legalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',
@@ -453,8 +469,8 @@ class CarePlanApprovalsTest extends TestCase
             'terms_of_service' => 'INPATIENT',
         ]);
 
-        $identifier = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $employee->uuid]);
-        \App\Models\MedicalEvents\Sql\Approval::create([
+        $identifier = Identifier::create(['value' => $employee->uuid]);
+        SqlApproval::create([
             'uuid' => (string) Str::uuid(),
             'approvable_type' => CarePlan::class,
             'approvable_id' => $carePlan->id,
@@ -462,6 +478,7 @@ class CarePlanApprovalsTest extends TestCase
             'granted_to_type' => 'employee',
             'status' => $status,
             'is_verified' => $verified,
+            'expires_at' => $expired ? now()->subSecond() : now()->addDay(),
         ]);
 
         $approvalService = Mockery::mock(CarePlanApprovalService::class)->makePartial();
@@ -469,20 +486,20 @@ class CarePlanApprovalsTest extends TestCase
         $approvalService->shouldReceive('skipsPatientOtp')->andReturn(true);
         $this->instance(CarePlanApprovalService::class, $approvalService);
 
-        $mockPatientApi = Mockery::mock(\App\Classes\eHealth\Api\Person::class);
-        $this->instance(\App\Classes\eHealth\Api\Person::class, $mockPatientApi);
-        $authResponse = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $mockPatientApi = Mockery::mock(ApiPerson::class);
+        $this->instance(ApiPerson::class, $mockPatientApi);
+        $authResponse = Mockery::mock(EHealthResponse::class);
         $authResponse->shouldReceive('getData', 'validate')->andReturn([]);
         $mockPatientApi->shouldReceive('getAuthMethods')->andReturn($authResponse);
 
         $this->actingAs($user);
         $this->grantMedicalEventAbilities($user);
 
-        $component = Livewire::test(\App\Livewire\CarePlan\CarePlanApprovals::class, [
+        $component = Livewire::test(CarePlanApprovals::class, [
             'legalEntity' => $legalEntity,
             'carePlan' => $carePlan->fresh(),
-        ])
-            ->assertSet('approvals.0.status', $status);
+        ]);
+        $this->assertFalse(array_key_exists('status', $component->get('approvals')[0] ?? []));
 
         if ($visible) {
             $component->assertSeeHtml('wire:click="cancelApproval')
@@ -509,8 +526,11 @@ class CarePlanApprovalsTest extends TestCase
             'legacy approved awaiting confirmation' => ['APPROVED', true, false, true],
             'pending' => ['pending', true, false, true],
             'new' => ['NEW', true, false, true],
-            'inactive' => ['inactive', false, false, false],
-            'terminated' => ['terminated', false, true, false],
+            'inactive legacy value ignored' => ['inactive', true, false, true],
+            'no local status' => [null, true, true, false],
+            'expired verified' => ['active', false, true, false, true],
+            'expired pending' => ['pending', false, false, false, true],
+            'terminated legacy value ignored' => ['terminated', true, true, false],
         ];
     }
 }
