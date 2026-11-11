@@ -7,6 +7,7 @@ namespace Tests\Feature\CarePlan;
 use App\Livewire\CarePlan\CarePlanApprovals;
 use App\Livewire\CarePlan\CarePlanShow;
 use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
+use App\Livewire\Components\XMessage;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
@@ -17,17 +18,22 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Models\Permission;
 use App\Models\Person\Person;
+use App\Models\Role as RoleModel;
 use App\Models\User;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
+use App\Services\Dictionary\Dictionaries\BasicDictionary;
 use App\Services\MedicalEvents\CarePlanActivityValidationService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\TestCase;
@@ -89,6 +95,96 @@ class CarePlanBusinessRulesTest extends TestCase
             ->assertSee(__('care-plan.approval_access_denied'))->assertSet('carePlanId', 0)
             ->assertSet('employees', [])->assertSet('approvals', []);
         Http::assertNothingSent();
+    }
+
+    public function test_registered_referral_modals_use_referral_permissions_after_the_plan_closes(): void
+    {
+        $activity = Repository::carePlanActivity()->saveForm($this->draftData(), $this->plan);
+        $request = $this->confirmedReferral($activity);
+        $this->plan->update(['status' => 'completed']);
+        $this->useRegisteredReferralPermissions(['service_request:recall', 'service_request:cancel']);
+        $this->assertFalse($this->user->can('care_plan:write'));
+        Queue::fake();
+
+        foreach (['recall_referral', 'cancel_referral'] as $action) {
+            $this->assertTrue($this->user->can($action === 'recall_referral' ? 'recall' : 'cancel', $request));
+            $component = new CarePlanShow();
+            $component->carePlan = $this->plan->fresh();
+            $component->openSignatureModal($action, null, $request->uuid);
+            $this->assertTrue($component->showSignatureModal);
+            $this->assertSame($action, $component->actionType);
+            $this->assertSame($request->uuid, $component->referralRequestIdToSign);
+        }
+        $this->assertSame('active', $request->fresh()->status);
+        Http::assertNothingSent();
+        Queue::assertNothingPushed();
+    }
+
+    public function test_registered_referral_modal_denial_is_visible_before_changing_form_state(): void
+    {
+        $activity = Repository::carePlanActivity()->saveForm($this->draftData(), $this->plan);
+        $request = $this->confirmedReferral($activity);
+        $this->useRegisteredReferralPermissions([]);
+        Queue::fake();
+
+        $component = new CarePlanShow();
+        $component->carePlan = $this->plan;
+        $component->statusReason = 'existing-reason';
+        $component->referralExplanatoryLetter = 'Existing letter';
+        $component->openSignatureModal('recall_referral', null, $request->uuid);
+        $this->assertFalse($component->showSignatureModal);
+        $this->assertSame('', $component->actionType);
+        $this->assertSame('existing-reason', $component->statusReason);
+        $this->assertSame('Existing letter', $component->referralExplanatoryLetter);
+        Livewire::test(XMessage::class, ['consumeMessages' => true])
+            ->assertSee(__('referrals.messages.action_unavailable'));
+        $this->assertSame('active', $request->fresh()->status);
+        Http::assertNothingSent();
+        Queue::assertNothingPushed();
+    }
+
+    public function test_registered_referral_modal_rejects_another_patients_record(): void
+    {
+        $activity = Repository::carePlanActivity()->saveForm($this->draftData(), $this->plan);
+        $request = $this->confirmedReferral($activity);
+        $other = Person::create(['uuid' => (string) Str::uuid(), 'birth_date' => '1990-01-01', 'gender' => 'MALE']);
+        $request->update(['person_id' => $other->id]);
+        $this->useRegisteredReferralPermissions(['service_request:recall']);
+        Queue::fake();
+
+        $component = new CarePlanShow();
+        $component->carePlan = $this->plan;
+        $component->openSignatureModal('recall_referral', null, $request->uuid);
+        $this->assertFalse($component->showSignatureModal);
+        $this->assertSame('', $component->actionType);
+        Livewire::test(XMessage::class, ['consumeMessages' => true])
+            ->assertSee(__('care-plan.document_context_unavailable'));
+        $this->assertSame('active', $request->fresh()->status);
+        Http::assertNothingSent();
+        Queue::assertNothingPushed();
+    }
+
+    private function useRegisteredReferralPermissions(array $scopes): void
+    {
+        $this->withoutVite();
+        $permissions = ['care_plan:read', 'service_request:read', ...$scopes];
+        foreach ($permissions as $scope) {
+            Permission::findOrCreate($scope, 'web')->legalEntityTypes()
+                ->syncWithoutDetaching([$this->legalEntity->legalEntityTypeId]);
+        }
+        RoleModel::findByName($this->employee->employeeType, 'web')->syncPermissions($permissions);
+        Cache::memo()->forget('allowed_permissions:'.$this->legalEntity->id.':web');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $this->user = $this->user->fresh();
+        $this->actingAs($this->user);
+        $this->user->syncPermissionsParent($permissions);
+        $dictionaries = Cache::get(BasicDictionary::KEY, []);
+        foreach (['recall', 'cancel'] as $operation) {
+            $dictionaries[] = ['name' => 'eHealth/service_request_'.$operation.'_reasons',
+                'values' => [['code' => 'incorrect_data', 'description' => 'Помилкові дані', 'is_active' => true]]];
+        }
+        Cache::forever(BasicDictionary::KEY, $dictionaries);
+        Cache::forever(BasicDictionary::KEY.':fresh', true);
     }
 
     private function draftData(string $unit = 'PIECE'): array
