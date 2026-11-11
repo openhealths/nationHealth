@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan\Forms;
 
-use Illuminate\Support\Facades\Validator;
-
 use App\Core\Arr;
 
 use Carbon\CarbonImmutable;
+
+use Illuminate\Support\Facades\Validator;
 use Livewire\Form;
 
 class CarePlanForm extends Form
@@ -32,8 +32,8 @@ class CarePlanForm extends Form
     public string $termsOfService = '';
     public array $episodes = [];
     public array $medicalRecords = [];
-    public ?string $based_on = null;
-    public ?string $part_of = null;
+    public ?string $basedOn = null;
+    public ?string $partOf = null;
     public string $knedp = '';
     public mixed $keyContainerUpload = null;
     public string $keyContainerFileName = '';
@@ -58,6 +58,8 @@ class CarePlanForm extends Form
             'termsOfService' => 'required|in:INPATIENT,OUTPATIENT',
             'episodes' => 'nullable|array',
             'medicalRecords' => 'nullable|array',
+            'basedOn' => 'nullable|uuid',
+            'partOf' => 'nullable|uuid',
         ];
     }
 
@@ -102,6 +104,8 @@ class CarePlanForm extends Form
             'note' => __('care-plan.notes'),
             'informWith' => __('care-plan.inform_with'),
             'termsOfService' => __('forms.providing_condition'),
+            'basedOn' => __('care-plan.based_care_plan'),
+            'partOf' => __('care-plan.part_care_plan'),
             'knedp' => __('forms.knedp') ?? 'КНЕДП',
             'keyContainerUpload' => __('forms.key_container') ?? 'Ключ-контейнер',
             'password' => __('forms.password'),
@@ -128,8 +132,12 @@ class CarePlanForm extends Form
             'author.identifier.value' => ['required', 'uuid'],
             'addresses' => ['required', 'array', 'min:1'],
             'termsOfService.coding' => ['required', 'array', 'min:1'],
+            'basedOn' => ['nullable', 'array'],
+            'basedOn.identifier.value' => ['required_with:basedOn', 'uuid'],
+            'partOf' => ['nullable', 'array'],
+            'partOf.identifier.value' => ['required_with:partOf', 'uuid'],
         ])->validate();
-        $content = array_intersect_key($resource, array_flip(['id', 'category', 'title', 'description', 'period', 'supportingInfo', 'note', 'encounter', 'addresses', 'author', 'contributor', 'termsOfService', 'informWith']));
+        $content = array_intersect_key($resource, array_flip(['id', 'category', 'title', 'description', 'period', 'supportingInfo', 'note', 'encounter', 'addresses', 'author', 'contributor', 'termsOfService', 'informWith', 'basedOn', 'partOf']));
         $content['intent'] = 'order';
         $content['status'] = 'new';
 

@@ -3,6 +3,16 @@
 declare(strict_types=1);
 
 return [
+    'period_date' => 'Date within the plan period',
+    'managing_organization_uuid' => 'Managing organization UUID',
+    'requisition_results' => 'eHealth requisition search results',
+    'patient_age' => ':age years',
+
+    'medication_program_required' => 'Select an active MEDICATION program for the medication activity.',
+    'device_quantity_options_required' => 'Select an allowed quantity based on packaging and the maximum daily count for the full prescription period.',
+    'activity_period_both_dates_required' => 'Enter both activity period dates, or leave both empty without a medical program.',
+    'encounter_author_required' => 'The care plan author must be your active employee who authored the base encounter and has the required active role.',
+    'related_plan_unavailable' => 'The related care plan must belong to this patient, be registered in eHealth, and be available to view.',
     'confirm_cancel_shared_approval' => 'Revoke this shared approval? Access under this approval will end for all plans it covers.',
     'shared_approval' => 'Shared care plan approval',
 

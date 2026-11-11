@@ -1,5 +1,9 @@
 @use('App\Livewire\CarePlan\CarePlanShow')
 @use('App\Enums\CarePlanStatus')
+@use('App\Enums\JobStatus')
+@use('App\Models\CarePlan')
+@use('Illuminate\Support\Facades\Lang')
+@use('Carbon\CarbonImmutable')
 
 @assets
     <script src="{{ asset('js/print-sandboxed.js') }}"></script>
@@ -13,7 +17,7 @@
     :hideNavigation="true"
     :breadcrumbs="[
         ['label' => __('general.home') ?? 'Головна', 'url' => route('dashboard', [legalEntity()])],
-        ['label' => $carePlan->person?->full_name ?? __('care-plan.patient') ?? 'Пацієнт', 'url' => route('persons.care-plans', [legalEntity(), $carePlan->person_id])],
+        ['label' => $carePlan->person?->full_name ?? __('care-plan.patient'), 'url' => route('persons.care-plans', [legalEntity(), $carePlan->person_id])],
         ['label' => __('care-plan.care_plan') . ' №' . ($carePlan->requisition ?? $carePlan->id)]
     ]"
 >
@@ -305,7 +309,7 @@
                                     'FIELD' => 'За місцем перебування пацієнта',
                                     'COMMUNITY' => 'За місцем проживання/перебування',
                                 ];
-                                $tosLabel = $tosMap[$tosUpper] ?? ($carePlan->care_provision_conditions ?? $tos ?? '-');
+                                $tosLabel = $tosMap[$tosUpper] ?? ($carePlan->care_provision_conditions ?? ($tos ?? '-'));
                             @endphp
 
                             <div class="form-group group">
@@ -371,7 +375,7 @@
                                     @endphp
                                     <tr class="index-table-tr">
                                         <td class="index-table-td">
-                                            {{ $condition?->onsetDate ? \Carbon\CarbonImmutable::parse($condition->onsetDate)->format('d.m.Y') : '-' }}
+                                            {{ $condition?->onsetDate ? CarbonImmutable::parse($condition->onsetDate)->format('d.m.Y') : '-' }}
                                         </td>
                                         <td class="index-table-td-primary">
                                             {{ $condition?->code?->text ?: ($condition?->code?->coding->first()?->code ?? ($address['text'] ?? data_get($address, 'coding.0.code', '-'))) }}
@@ -449,7 +453,7 @@
                                         @forelse ($medical_records as $item)
                                             @php
                                                 $ref = $item['name'] ?? ($item['reference'] ?? ($item['uuid'] ?? '-'));
-                                                $date = $item['date'] ?? \Carbon\CarbonImmutable::now()->format('d.m.Y');
+                                                $date = $item['date'] ?? CarbonImmutable::now()->format('d.m.Y');
                                             @endphp
                                             <tr class="index-table-tr">
                                                 <td class="index-table-td">{{ $date }}</td>
@@ -472,6 +476,13 @@
                 {{-- Additional Information --}}
                 <fieldset class="fieldset !mb-6 !max-w-full !rounded-xl !border-gray-100 bg-white !p-6 !shadow-none dark:!border-gray-700 dark:bg-gray-800">
                     <legend class="legend">{{ __('forms.additional_info') }}</legend>
+                    @foreach (['based_on', 'part_of'] as $relationship)
+                        <div class="mb-4">
+                            <p class="text-sm font-medium">{{ __('care-plan.'.$relationship) }}</p>
+                            <p class="text-sm">{{ $remotePlanDetails[$relationship] ?? '—' }}</p>
+                        </div>
+                    @endforeach
+
 
                     <div>
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
@@ -494,16 +505,18 @@
 
                 <div
                     class="mb-6"
-                    @if (in_array($planSubmission['status'] ?? null, [\App\Enums\JobStatus::PENDING->value, \App\Enums\JobStatus::PROCESSING->value], true) || in_array($inpatientApprovalStatus, ['queued', 'pending'], true)) wire:poll.3s="checkPlanSubmissionStatus" @endif
+                    @if (in_array($planSubmission['status'] ?? null, [JobStatus::PENDING->value, JobStatus::PROCESSING->value], true) || in_array($inpatientApprovalStatus, ['queued', 'pending'], true)) wire:poll.3s="checkPlanSubmissionStatus" @endif
                 >
                     <livewire:components.submission-status
-                        :record-type="\App\Models\CarePlan::class"
+                        :record-type="CarePlan::class"
                         :record-id="$carePlan->id"
                         :record-status-label="CarePlanStatus::labelFor($carePlan->status)"
                         :edit-url="$this->canSignPlan && auth()->user()->can('update', $carePlan) ? route('care-plans.edit', [legalEntity(), $carePlan->id]) : null"
                         :key="'plan-submission-'.$carePlan->id.'-'.($planSubmission['status'] ?? 'draft')"
                     />
                 </div>
+
+                @includeIf('livewire.medication-request.care-plan-registry')
 
                 {{-- Approvals --}}
                 @if (in_array($inpatientApprovalStatus, ['queued', 'pending'], true))
@@ -520,7 +533,7 @@
                         {{ __('care-plan.inpatient_registered') }}
                     </p>
                 @endif
-                @if ($carePlan->status !== CarePlanStatus::DRAFT->value && ($planSubmission['status'] ?? null) !== \App\Enums\JobStatus::PENDING->value)
+                @if ($carePlan->status !== CarePlanStatus::DRAFT->value && ($planSubmission['status'] ?? null) !== JobStatus::PENDING->value)
                     <div class="mb-6">
                         @livewire('care-plan.care-plan-approvals', ['carePlan' => $carePlan], key('care-plan-approvals-'.$carePlan->id.'-'.$carePlan->status))
                     </div>
@@ -613,7 +626,7 @@
                                             @php
                                                 $resolvedKind = $activity->resolvedKind();
                                                 $kindTranslationKey = 'care-plan.activity_kind.' . $resolvedKind;
-                                                $translatedKind = \Illuminate\Support\Facades\Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $resolvedKind;
+                                                $translatedKind = Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $resolvedKind;
                                             @endphp
                                             <div class="font-medium text-gray-900 dark:text-white">
                                                 {{ $translatedKind ?: '-' }}
@@ -644,7 +657,7 @@
                                                 $activityStatusEnum = CarePlanStatus::tryFrom(strtolower(str_replace('_', '-', (string) $activityStatus)));
                                                 $statusKey = 'care-plan.status.' . strtolower($activityStatus);
                                                 $activityStatusDisplay = $activityStatusEnum?->label()
-                                                    ?? (\Illuminate\Support\Facades\Lang::has($statusKey) ? __($statusKey) : (is_array($activity->status) ? ($activity->status['text'] ?? ($activity->status['coding'][0]['display'] ?? $activityStatus)) : $activityStatus));
+                                                    ?? (Lang::has($statusKey) ? __($statusKey) : (is_array($activity->status) ? ($activity->status['text'] ?? ($activity->status['coding'][0]['display'] ?? $activityStatus)) : $activityStatus));
                                                 $activityBadgeColor = $activityStatusEnum === CarePlanStatus::DRAFT
                                                     ? 'badge-red'
                                                     : ($activityStatusEnum?->color()

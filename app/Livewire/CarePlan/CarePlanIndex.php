@@ -4,32 +4,36 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan;
 
-use App\Enums\CarePlanStatusFilter;
+use App\Classes\eHealth\EHealth;
 use App\Enums\CarePlanCompletenessFilter;
-use App\Traits\SynchronizesCarePlans;
-use Livewire\Attributes\Computed;
-use Illuminate\Database\Eloquent\Collection;
-
+use App\Enums\CarePlanStatusFilter;
+use App\Jobs\CarePlanFullSync;
 use App\Models\CarePlan;
+
 use App\Repositories\Repository;
+use App\Traits\HandlesCarePlanSync;
+use App\Traits\SynchronizesCarePlans;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Livewire\Component;
-use App\Traits\HandlesCarePlanSync;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Component;
 use Throwable;
-use App\Jobs\CarePlanFullSync;
 
 class CarePlanIndex extends Component
 {
-    use SynchronizesCarePlans;
     use HandlesCarePlanSync;
+    use SynchronizesCarePlans;
 
     #[Locked]
     public array $syncBatchIds = [];
 
     #[Locked]
     public bool $syncInitiationFailed = false;
+
+    #[Locked]
+    public array $requisitionResults = [];
 
     public string $searchRequisition = '';
 
@@ -50,6 +54,7 @@ class CarePlanIndex extends Component
     {
         $this->reset([
             'searchRequisition',
+            'requisitionResults',
             'filterName',
             'filterEncounterId',
             'filterStatus',
@@ -64,19 +69,30 @@ class CarePlanIndex extends Component
      */
     public function searchByRequisition(): void
     {
+        if (Auth::user()->cannot('search', CarePlan::class)) {
+            session()->flash('error', __('care-plan.sync_access_denied'));
+
+            return;
+        }
+        $this->validate(['searchRequisition' => ['nullable', 'string', 'max:255']]);
         if (empty($this->searchRequisition)) {
+            $this->requisitionResults = [];
+
             return;
         }
 
         try {
-            $this->synchronizeSearch(['requisition' => $this->searchRequisition], (int) legalEntity()->id);
+            // The requisition endpoint exposes only the permitted identity projection.
+            // Do not require a local patient or fetch protected clinical details here.
+            $this->requisitionResults = $this->collectSummaries(fn (int $page) => EHealth::carePlan()->getMany(['requisition' => $this->searchRequisition, 'page' => $page]));
             $this->filterCompleteness = CarePlanCompletenessFilter::ALL->value;
             if ($this->filterStatus === CarePlanStatusFilter::CURRENT->value) {
                 $this->filterStatus = CarePlanStatusFilter::ALL->value;
             }
         } catch (Throwable $e) {
-            Log::error('CarePlan search error: ' . $e->getMessage());
-            session()->flash('error', __('care-plan.search_error') . ': ' . $e->getMessage());
+            $this->requisitionResults = [];
+            Log::error('Care Plan requisition search failed', ['exceptionType' => $e::class]);
+            session()->flash('error', __('care-plan.search_error'));
         }
     }
 

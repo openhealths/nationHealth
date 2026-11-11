@@ -2,6 +2,7 @@
 @use('App\Enums\CarePlanCompletenessFilter')
 @use('App\Livewire\CarePlan\CarePlanIndex')
 @use('App\Enums\CarePlanStatus')
+@use('App\Models\CarePlan')
 
 <div data-livewire-background-actions="checkSyncStatus">
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
@@ -172,10 +173,25 @@
                 </label>
             </div>
 
+            @if ($requisitionResults !== [])
+                <section class="mb-6 space-y-4" aria-label="{{ __('care-plan.requisition_results') }}">
+                    <h2 class="font-semibold">{{ __('care-plan.requisition_results') }}</h2>
+                    @foreach ($requisitionResults as $result)
+                        <div class="record-inner-card" wire:key="requisition-{{ $result['id'] }}">
+                            <p class="font-semibold">{{ $result['requisition'] }}</p>
+                            <p>{{ trim(implode(' ', [$result['identity']['lastName'], $result['identity']['firstName'], $result['identity']['secondName']])) }} · {{ __('care-plan.patient_age', ['age' => $result['identity']['age']]) }}</p>
+                            <p>{{ CarePlanStatus::labelFor($result['status']) }}</p>
+                            <p>{{ $result['period']['start'] }} — {{ $result['period']['end'] ?? __('care-plan.no_end_date') }}</p>
+                            <p>{{ $result['managingOrganization']['displayValue'] }}</p>
+                        </div>
+                    @endforeach
+                </section>
+            @endif
+
             <div class="space-y-4">
                 @forelse ($this->carePlans as $plan)
                     @php
-                        /** @var \App\Models\CarePlan $plan */
+                        /** @var CarePlan $plan */
                         $statusEnum = CarePlanStatus::fromStored($plan->status);
                         $displayTitle = $plan->displayTitle();
 

@@ -6,12 +6,14 @@ namespace App\Livewire\CarePlan\Concerns;
 
 use App\Classes\eHealth\EHealth;
 use App\Enums\CarePlanStatus;
+use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
 use App\Models\CarePlanActivity;
 use App\Repositories\CarePlanActivityRepository;
 use App\Repositories\CarePlanRepository;
+use App\Repositories\Repository;
 use App\Services\Dictionary\Collections\BasicDictionaryCollection;
-use App\Services\Dictionary\ServiceSearch;
 use App\Services\Dictionary\MedicationProgramPicker;
+use App\Services\Dictionary\ServiceSearch;
 use App\Services\MedicalEvents\CarePlanActivityValidationService;
 use App\Services\MedicalEvents\DeviceProgramParticipationGuard;
 use Exception;
@@ -20,7 +22,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Throwable;
 use UnitEnum;
 
@@ -42,6 +46,9 @@ trait ManagesCarePlanActivities
 
     public string $deviceSearchModelNumber = '';
 
+    #[Locked]
+    public array $deviceQuantityCatalog = [];
+
     /** @var array<int, array<string, mixed>> */
     #[Locked]
     public array $deviceSearchCatalog = [];
@@ -49,6 +56,15 @@ trait ManagesCarePlanActivities
     public function updatedSelectedProgram(): void
     {
         $this->activityForm['program'] = $this->selectedProgram;
+        $kindLower = strtolower((string) ($this->activityForm['kind'] ?? ''));
+        if (str_contains($kindLower, 'device') && $this->selectedProduct !== null && filled($this->selectedProgram)) {
+            try {
+                $this->loadDeviceQuantityCatalog($this->selectedProduct, $this->selectedProgram);
+            } catch (Throwable $exception) {
+                $this->deviceQuantityCatalog = [];
+                session()->flash('error', __('care-plan.device_search_error'));
+            }
+        }
 
         if (!empty($this->activityForm['id'])) {
             $this->selectedProduct = null;
@@ -67,7 +83,9 @@ trait ManagesCarePlanActivities
 
     public function initActivityForm(string $kind): void
     {
-        $this->authorizeCarePlanActivityWrite();
+        if (!$this->authorizeCarePlanActivityWrite()) {
+            return;
+        }
         if ($this->guardTerminalCarePlanMutation()) {
             return;
         }
@@ -99,7 +117,9 @@ trait ManagesCarePlanActivities
 
     public function editActivity(int $activityId, CarePlanActivityRepository $repository): void
     {
-        $this->authorizeCarePlanActivityWrite();
+        if (!$this->authorizeCarePlanActivityWrite()) {
+            return;
+        }
         $activity = $this->ownedActivity($activityId);
         if (!$activity) {
             return;
@@ -141,10 +161,10 @@ trait ManagesCarePlanActivities
                         $filters['medical_program_id'] = $programId;
                     }
                     $response = EHealth::drug()->getMany($filters);
-                    $data = $response->getData();
+                    $data = $response->validate();
                     if (empty($data)) {
                         $response = EHealth::drug()->getMany(['innm_id' => $activity->productReference]);
-                        $data = $response->getData();
+                        $data = $response->validate();
                     }
                     if (!empty($data)) {
                         $this->selectedProduct = $data[0];
@@ -259,7 +279,9 @@ trait ManagesCarePlanActivities
 
     public function confirmDeleteActivity(int $activityId): void
     {
-        $this->authorizeCarePlanActivityWrite();
+        if (!$this->authorizeCarePlanActivityWrite()) {
+            return;
+        }
         if ($this->guardTerminalCarePlanMutation()) {
             return;
         }
@@ -276,7 +298,9 @@ trait ManagesCarePlanActivities
 
     public function deleteActivity(int $activityId, CarePlanActivityRepository $repository): void
     {
-        $this->authorizeCarePlanActivityWrite();
+        if (!$this->authorizeCarePlanActivityWrite()) {
+            return;
+        }
         $activity = $repository->findById($activityId);
         if (!$activity || $activity->carePlanId !== $this->carePlan->id) {
             Session::flash('error', __('care-plan.activity_not_found'));
@@ -329,7 +353,9 @@ trait ManagesCarePlanActivities
      */
     protected function persistActivityDraft(CarePlanActivityRepository $repository, bool $andSign): void
     {
-        $this->authorizeCarePlanActivityWrite();
+        if (!$this->authorizeCarePlanActivityWrite()) {
+            return;
+        }
         $usesAlternativeSchedule = false;
         if (!empty($this->activityForm['id'])) {
             $activity = $this->ownedActivity((int) $this->activityForm['id']);
@@ -352,8 +378,8 @@ trait ManagesCarePlanActivities
 
         $this->syncDeviceProductReferenceFromSelection();
 
-        $programId = $this->activityForm['program'] ?? $this->selectedProgram ?? null;
-        $periodRule = !empty($programId) && !$usesAlternativeSchedule ? 'required|string' : 'nullable|string';
+        $programId = $this->activityForm['program'] ?? ($this->selectedProgram ?? null);
+        $periodRule = !empty($programId) && !$usesAlternativeSchedule ? 'required|date_format:'.config('app.date_format') : 'nullable|date_format:'.config('app.date_format');
 
         $rules = [
             'activityForm.kind' => 'required|string',
@@ -390,19 +416,28 @@ trait ManagesCarePlanActivities
         }
 
         if (str_contains($kindLower, 'medication')) {
+            $rules['activityForm.program'] = 'required|uuid';
+            $rules['activityForm.quantity'] = 'required|numeric|gt:0';
             $rules['activityForm.daily_amount'] = 'required|numeric|min:0.01';
             $rules['activityForm.quantity_code'] = 'required|string';
         }
 
         if (str_contains($kindLower, 'service')) {
             $this->activityForm['quantity_system'] = 'SERVICE_UNIT';
-            $rules['activityForm.quantity'] = !empty($programId) ? 'required|numeric|gt:0' : 'nullable|numeric|gt:0';
+            $rules['activityForm.quantity'] = 'required|integer|gt:0';
             $rules['activityForm.quantity_code'] = 'required_with:activityForm.quantity|in:PIECE,MINUTE';
         }
 
         $activityValidation = app(CarePlanActivityValidationService::class);
         $programPayload = $this->resolveMedicalProgramPayload(is_string($programId) ? $programId : null);
 
+        if (str_contains($kindLower, 'medication') && ($programPayload === null || ($programPayload['type'] ?? null) !== 'MEDICATION')) {
+            $message = __('care-plan.medication_program_required');
+            Session::flash('error', $message);
+            $this->addError('activityForm.program', $message);
+
+            return;
+        }
         if ($programPayload !== null) {
             $providingBlock = $activityValidation->providingConditionsBlockReason($this->carePlan, $programPayload);
             if ($providingBlock !== null) {
@@ -441,9 +476,9 @@ trait ManagesCarePlanActivities
             return;
         }
 
-        $activityStart = convertToYmd($validated['activityForm']['scheduled_period_start']);
-        $activityEnd = convertToYmd($validated['activityForm']['scheduled_period_end']);
-        $periodError = $usesAlternativeSchedule && $activityStart === '' && $activityEnd === ''
+        $activityStart = convertToYmd($validated['activityForm']['scheduled_period_start'] ?? '');
+        $activityEnd = convertToYmd($validated['activityForm']['scheduled_period_end'] ?? '');
+        $periodError = $activityStart === '' && $activityEnd === ''
             ? null : $this->validateActivityPeriodAgainstCarePlan($activityStart, $activityEnd);
         if ($periodError !== null) {
             Session::flash('error', $periodError);
@@ -458,10 +493,10 @@ trait ManagesCarePlanActivities
             if (empty($product) && !empty($this->activityForm['product_reference'])) {
                 try {
                     $response = EHealth::drug()->getMany(['innm_dosage_id' => $this->activityForm['product_reference']]);
-                    $data = $response->getData();
+                    $data = $response->validate();
                     if (empty($data)) {
                         $response = EHealth::drug()->getMany(['innm_id' => $this->activityForm['product_reference']]);
-                        $data = $response->getData();
+                        $data = $response->validate();
                     }
                     if (!empty($data)) {
                         $product = $data[0];
@@ -538,12 +573,28 @@ trait ManagesCarePlanActivities
                 return;
             }
 
-            if ($packagingCount > 0 && $quantity % $packagingCount !== 0) {
+            if (!filled($programForDevice) && $packagingCount > 0 && $quantity % $packagingCount !== 0) {
                 $message = __('care-plan.device_quantity_packaging', ['count' => $packagingCount]);
                 Session::flash('error', $message);
                 $this->addError('activityForm.quantity', $message);
 
                 return;
+            }
+
+            if (filled($programForDevice)) {
+                try {
+                    $this->loadDeviceQuantityCatalog($this->selectedProduct, $programForDevice);
+                    $options = $this->deviceQuantityOptions();
+                } catch (Throwable) {
+                    $options = [];
+                }
+                if (!in_array($quantity, $options, true)) {
+                    $message = __('care-plan.device_quantity_options_required');
+                    Session::flash('error', $message);
+                    $this->addError('activityForm.quantity', $message);
+
+                    return;
+                }
             }
 
             // Persist dictionary-normalized unit code for the eHealth payload.
@@ -605,7 +656,7 @@ trait ManagesCarePlanActivities
             Session::flash('success', __('care-plan.activity_updated'));
         } else {
             $activityData['care_plan_id'] = $this->carePlan->id;
-            $activityData['author_id'] = Auth::user()?->activeDoctorEmployee()?->id;
+            $activityData['author_id'] = Auth::user()?->getCarePlanWriterEmployee($this->carePlan->termsOfServiceCode())?->id;
             $activityData['status'] = CarePlanStatus::DRAFT->value;
 
             $created = $repository->create($activityData);
@@ -635,7 +686,7 @@ trait ManagesCarePlanActivities
         try {
             $this->searchResults = ServiceSearch::search(
                 trim($this->searchQuery),
-                static fn (array $params): array => EHealth::service()->getMany($params)->getData(),
+                static fn (array $params): array => EHealth::service()->getMany($params)->validate(),
                 $this->searchPage
             );
         } catch (Exception $e) {
@@ -663,7 +714,7 @@ trait ManagesCarePlanActivities
 
             $response = EHealth::drug()->getMany($filters);
 
-            $this->searchResults = $response->getData();
+            $this->searchResults = $response->validate();
         } catch (Exception $e) {
             Log::error("Failed to search medications: " . $e->getMessage());
             $this->searchResults = [];
@@ -718,7 +769,7 @@ trait ManagesCarePlanActivities
 
                     // Without a program, only require an active device definition.
                     if (!filled($programId)) {
-                        $isActive = $device['is_active'] ?? $device['isActive'] ?? true;
+                        $isActive = $device['is_active'] ?? ($device['isActive'] ?? true);
 
                         return filter_var($isActive, FILTER_VALIDATE_BOOLEAN);
                     }
@@ -740,6 +791,7 @@ trait ManagesCarePlanActivities
             Log::error('Failed to search medical devices: ' . $e->getMessage());
             $this->searchResults = [];
             $this->deviceSearchCatalog = [];
+            $this->deviceQuantityCatalog = [];
             $this->deviceSearchTotalEntries = 0;
             $this->deviceSearchTotalPages = 1;
         }
@@ -757,6 +809,7 @@ trait ManagesCarePlanActivities
         $pageSize = (int) config('ehealth.api.page_size', 300);
         $page = 1;
         $all = [];
+        $seenIds = [];
 
         do {
             $response = EHealth::deviceDefinition()->getMany(array_merge($filters, [
@@ -764,14 +817,21 @@ trait ManagesCarePlanActivities
                 'page_size' => $pageSize,
             ]));
 
-            $all = array_merge($all, $response->getData());
+            $items = $response->validate();
+            foreach ($items as $item) {
+                if (isset($seenIds[$item['id']])) {
+                    throw ValidationException::withMessages(['paging' => __('care-plan.device_search_error')]);
+                }
+                $seenIds[$item['id']] = true;
+            }
+            $all = array_merge($all, $items);
             $page++;
             $hasMore = $response->isNotLast();
-        } while ($hasMore && $page <= 50);
+        } while ($hasMore);
 
         $indexed = [];
         foreach ($all as $device) {
-            $id = (string) ($device['id'] ?? $device['uuid'] ?? '');
+            $id = (string) ($device['id'] ?? ($device['uuid'] ?? ''));
             if ($id !== '') {
                 $indexed[$id] = $device;
             }
@@ -859,7 +919,7 @@ trait ManagesCarePlanActivities
     protected function fetchDeviceDefinitionByUuid(string $uuid): ?array
     {
         try {
-            $data = EHealth::deviceDefinition()->getById($uuid)->getData();
+            $data = EHealth::deviceDefinition()->getById($uuid)->validate();
             if (!is_array($data) || $data === []) {
                 return null;
             }
@@ -988,7 +1048,7 @@ trait ManagesCarePlanActivities
     protected function compactDeviceForState(array $device): array
     {
         $enriched = $this->enrichDeviceForDisplay($device);
-        $id = (string) ($enriched['id'] ?? $enriched['uuid'] ?? $enriched['display_uuid'] ?? '');
+        $id = (string) ($enriched['id'] ?? ($enriched['uuid'] ?? ($enriched['display_uuid'] ?? '')));
 
         return [
             'id' => $id !== '' ? $id : null,
@@ -1006,7 +1066,7 @@ trait ManagesCarePlanActivities
                 : null,
             'device_names' => is_array($enriched['device_names'] ?? null) ? $enriched['device_names'] : null,
             'program_devices' => is_array($enriched['program_devices'] ?? null) ? $enriched['program_devices'] : null,
-            'is_active' => $enriched['is_active'] ?? $enriched['isActive'] ?? true,
+            'is_active' => $enriched['is_active'] ?? ($enriched['isActive'] ?? true),
         ];
     }
 
@@ -1029,7 +1089,7 @@ trait ManagesCarePlanActivities
             return $device['description'];
         }
 
-        return (string) ($device['model_number'] ?? $device['id'] ?? '');
+        return (string) ($device['model_number'] ?? ($device['id'] ?? ''));
     }
 
     protected function resolveDeviceTypeName(array $device): string
@@ -1100,10 +1160,12 @@ trait ManagesCarePlanActivities
         $this->selectProduct($this->compactDeviceForState($product), 'device_request');
     }
 
-    #[\Livewire\Attributes\On('care-plan-service-selected')]
+    #[On('care-plan-service-selected')]
     public function selectCarePlanServiceFromCatalog(array $service): void
     {
-        $this->authorizeCarePlanActivityWrite();
+        if (!$this->authorizeCarePlanActivityWrite()) {
+            return;
+        }
         $product = dictionary()->services()->flattened()
             ->firstWhere('id', $service['id'] ?? null);
         if ($product === null) {
@@ -1122,7 +1184,7 @@ trait ManagesCarePlanActivities
             : $product;
 
         if ($kind !== 'device_request') {
-            $this->activityForm['product_reference'] = $product['id'] ?? $product['uuid'] ?? $product['code'] ?? '';
+            $this->activityForm['product_reference'] = $product['id'] ?? ($product['uuid'] ?? ($product['code'] ?? ''));
         }
 
         if ($kind === 'service_request') {
@@ -1164,6 +1226,14 @@ trait ManagesCarePlanActivities
 
             $programDevice = app(DeviceProgramParticipationGuard::class)
                 ->resolveProgramDevice($this->selectedProduct, $this->activityForm['program'] ?: null);
+            if (filled($this->activityForm['program'])) {
+                try {
+                    $this->loadDeviceQuantityCatalog($this->selectedProduct, $this->activityForm['program']);
+                } catch (Throwable) {
+                    $this->deviceQuantityCatalog = [];
+                    Session::flash('error', __('care-plan.device_quantity_options_required'));
+                }
+            }
             $maxDaily = isset($programDevice['max_daily_count']) ? (int) $programDevice['max_daily_count'] : null;
             $this->deviceSelectionWarning = $maxDaily !== null && $maxDaily > 0
                 ? __('care-plan.device_max_daily_count_hint', ['count' => $maxDaily])
@@ -1172,6 +1242,103 @@ trait ManagesCarePlanActivities
             $this->showMedicalDeviceSearchDrawer = false;
             $this->showMedicalDeviceFormDrawer = true;
         }
+    }
+
+    /** Revalidate old drafts against the current program catalog immediately before KEP. */
+    protected function assertMedicationActivityProgramForSigning(array $resource): void
+    {
+        if (data_get($resource, 'detail.kind') !== 'medication_request') {
+            return;
+        }
+        $programId = data_get($resource, 'detail.program.identifier.value');
+        $program = is_string($programId) ? $this->resolveMedicalProgramPayload($programId) : null;
+        if ($program === null || ($program['type'] ?? null) !== 'MEDICATION') {
+            throw ValidationException::withMessages(['activityToSign' => __('care-plan.medication_program_required')]);
+        }
+    }
+
+    protected function assertDeviceActivityQuantityForSigning(array $resource): void
+    {
+        $detail = $resource['detail'] ?? [];
+        if (($detail['kind'] ?? null) !== 'device_request' || empty($detail['program'])) {
+            return;
+        }
+        $programId = (string) data_get($detail, 'program.identifier.value', '');
+        $definitionId = data_get($detail, 'productReference.identifier.value');
+        $classification = data_get($detail, 'productCodeableConcept.coding.0');
+        $filters = ['medical_program_id' => $programId, 'is_active' => true];
+        if (is_array($classification)) {
+            $filters['classification_type_system'] = $classification['system'] ?? '';
+            $filters['classification_type_code'] = $classification['code'] ?? '';
+        }
+        $catalog = $this->fetchAllDeviceDefinitions($filters);
+        $guard = app(DeviceProgramParticipationGuard::class);
+        $selected = $definitionId !== null
+            ? collect($catalog)->firstWhere('id', $definitionId)
+            : collect($catalog)->first(fn (array $device): bool => $guard->deviceAllowsCarePlanActivity($device, $programId));
+        $selectedClassification = data_get($selected, 'classification_types.0');
+        $programDevice = is_array($selected) ? $guard->resolveProgramDevice($selected, $programId) : null;
+        $counts = [];
+        foreach ($catalog as $device) {
+            if (data_get($device, 'classification_types.0.system') === ($selectedClassification['system'] ?? null)
+                && data_get($device, 'classification_types.0.code') === ($selectedClassification['code'] ?? null)
+                && $guard->deviceAllowsCarePlanActivity($device, $programId)
+                && data_get($device, 'packaging.packaging_unit') === data_get($detail, 'quantity.code')) {
+                $counts[] = (int) data_get($device, 'packaging.packaging_count', 0);
+            }
+        }
+        $options = CarePlanActivityForm::deviceQuantityOptions(
+            $counts,
+            (int) ($programDevice['max_daily_count'] ?? 0),
+            (string) data_get($detail, 'scheduledPeriod.start', ''),
+            (string) data_get($detail, 'scheduledPeriod.end', '')
+        );
+        $quantity = data_get($detail, 'quantity.value');
+        if (!is_numeric($quantity) || (float) $quantity !== (float) (int) $quantity || !in_array((int) $quantity, $options, true)) {
+            throw ValidationException::withMessages(['activityToSign' => __('care-plan.device_quantity_options_required')]);
+        }
+    }
+
+    protected function loadDeviceQuantityCatalog(array $device, string $programId): void
+    {
+        $this->deviceQuantityCatalog = [];
+        $classification = $device['classification_types'][0] ?? null;
+        if (!is_array($classification) || empty($classification['system']) || empty($classification['code'])) {
+            return;
+        }
+        $this->deviceQuantityCatalog = $this->fetchAllDeviceDefinitions([
+            'medical_program_id' => $programId,
+            'classification_type_system' => $classification['system'],
+            'classification_type_code' => $classification['code'],
+            'is_active' => true,
+        ]);
+    }
+
+    #[Computed]
+    public function deviceQuantityOptions(): array
+    {
+        $programId = $this->activityForm['program'] ?? null;
+        if (!filled($programId) || $this->selectedProduct === null) {
+            return [];
+        }
+        $guard = app(DeviceProgramParticipationGuard::class);
+        $programDevice = $guard->resolveProgramDevice($this->selectedProduct, $programId);
+        $maxDailyCount = (int) ($programDevice['max_daily_count'] ?? 0);
+        $unit = (string) data_get($this->selectedProduct, 'packaging.packaging_unit', '');
+        $counts = [];
+        foreach ($this->deviceQuantityCatalog as $device) {
+            if ($guard->deviceAllowsCarePlanActivity($device, $programId)
+                && (string) data_get($device, 'packaging.packaging_unit', '') === $unit) {
+                $counts[] = (int) data_get($device, 'packaging.packaging_count', 0);
+            }
+        }
+
+        return CarePlanActivityForm::deviceQuantityOptions(
+            $counts,
+            $maxDailyCount,
+            convertToYmd($this->activityForm['scheduled_period_start'] ?? ''),
+            convertToYmd($this->activityForm['scheduled_period_end'] ?? '')
+        );
     }
 
     public function addLinkedGround(string $type, string $uuid): void
@@ -1221,11 +1388,17 @@ trait ManagesCarePlanActivities
 
     protected function validateActivityPeriodAgainstCarePlan(string $activityStart, string $activityEnd): ?string
     {
+        if ($activityStart === '' && $activityEnd === '') {
+            return null;
+        }
+        if ($activityStart === '' || $activityEnd === '') {
+            return __('care-plan.activity_period_both_dates_required');
+        }
         if ($activityStart > $activityEnd) {
             return __('care-plan.activity_period_end_before_start');
         }
 
-        $bounds = app(CarePlanRepository::class)->resolveEHealthPeriodBounds($this->carePlan);
+        $bounds = Repository::carePlan()->resolveEHealthPeriodBounds($this->carePlan);
         $planStart = $bounds['start'];
         $planEnd = $bounds['end'];
 
@@ -1258,7 +1431,7 @@ trait ManagesCarePlanActivities
 
     protected function ensureCarePlanEffectivePeriodSynced(CarePlanRepository $repository): void
     {
-        $this->carePlan = app(\App\Repositories\CarePlanRepository::class)->findById($this->carePlan->id);
+        $this->carePlan = app(CarePlanRepository::class)->findById($this->carePlan->id);
 
         if ($this->carePlan->effectivePeriod && $repository->resolveEHealthPeriodBounds($this->carePlan)['start']) {
             return;
@@ -1309,7 +1482,7 @@ trait ManagesCarePlanActivities
         $allowsDeviceDefinition = in_array('DEVICE_DEFINITION', $allowedTypes, true);
         $allowsClassification = in_array('CLASSIFICATION_TYPE', $allowedTypes, true);
 
-        $deviceId = (string) ($product['id'] ?? $product['uuid'] ?? '');
+        $deviceId = (string) ($product['id'] ?? ($product['uuid'] ?? ''));
         $classificationCode = $this->resolveDeviceClassificationCode($product);
 
         if ($allowsDeviceDefinition && $deviceId !== '') {
@@ -1374,6 +1547,7 @@ trait ManagesCarePlanActivities
         $this->deviceSearchTotalEntries = 0;
         $this->deviceSearchModelNumber = '';
         $this->deviceSearchCatalog = [];
+        $this->deviceQuantityCatalog = [];
         $this->selectedProduct = null;
         $this->linkedGrounds = [];
         $this->deviceSelectionWarning = '';

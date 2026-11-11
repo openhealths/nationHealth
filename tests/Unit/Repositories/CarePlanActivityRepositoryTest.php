@@ -7,6 +7,7 @@ namespace Tests\Unit\Repositories;
 use App\Classes\eHealth\Api\CarePlanActivity as ActivityApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
+use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
 use App\Services\MedicalEvents\Mappers\DeviceRequestMapper;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Validation\ValidationException;
@@ -20,7 +21,7 @@ class CarePlanActivityRepositoryTest extends TestCase
         $resource = $this->fixture();
         $resource['detail']['kind'] = 'device_request';
         $resource['detail']['quantity']['value'] = 1;
-        $payload = \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCreateContent($resource);
+        $payload = CarePlanActivityForm::buildCreateContent($resource);
         $this->assertIsInt($payload['detail']['quantity']['value']);
         $this->assertSame(1, $payload['detail']['quantity']['value']);
     }
@@ -30,7 +31,7 @@ class CarePlanActivityRepositoryTest extends TestCase
         $resource = $this->fixture();
         $resource['detail']['productCodeableConcept'] = ['coding' => [['system' => 'synthetic/classification', 'code' => 'TEST']]];
         $this->expectException(ValidationException::class);
-        \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCreateContent($resource);
+        CarePlanActivityForm::buildCreateContent($resource);
     }
 
     public function test_build_device_prequalify_payload_includes_occurrence_period(): void
@@ -50,14 +51,14 @@ class CarePlanActivityRepositoryTest extends TestCase
     {
         $resource = $this->fixture();
         $resource['detail']['scheduledPeriod']['start'] = '2026-06-25T16:33:00.123456Z';
-        $payload = \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCreateContent($resource);
+        $payload = CarePlanActivityForm::buildCreateContent($resource);
         $this->assertSame('2026-06-25T16:33:00.123456Z', $payload['detail']['scheduled_period']['start']);
     }
 
     public function test_payload_author_comes_from_the_activity_not_the_current_session(): void
     {
         $resource = $this->fixture();
-        $payload = \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCreateContent($resource);
+        $payload = CarePlanActivityForm::buildCreateContent($resource);
         $this->assertSame($resource['author'][0]['identifier']['value'], $payload['author'][0]['identifier']['value']);
         $this->assertCount(2, $payload['author']);
     }
@@ -67,14 +68,14 @@ class CarePlanActivityRepositoryTest extends TestCase
         $resource = $this->fixture();
         $resource['author'] = [];
         $this->expectException(ValidationException::class);
-        \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCreateContent($resource);
+        CarePlanActivityForm::buildCreateContent($resource);
     }
 
     public function test_create_content_excludes_server_fields_and_preserves_false(): void
     {
         $resource = $this->fixture();
         $resource['insertedAt'] = '2026-06-25T18:14:41.040000Z';
-        $payload = \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCreateContent($resource);
+        $payload = CarePlanActivityForm::buildCreateContent($resource);
         $this->assertArrayNotHasKey('inserted_at', $payload);
         $this->assertArrayNotHasKey('remaining_quantity', $payload['detail']);
         $this->assertArrayNotHasKey('outcome_reference', $payload);
@@ -86,13 +87,13 @@ class CarePlanActivityRepositoryTest extends TestCase
         $base = Arr::toSnakeCase($this->fixture());
         $base['remote_extension'] = ['false' => false, 'zero' => 0, 'empty' => []];
         $reason = ['coding' => [['system' => 'eHealth/care_plan_activity_cancel_reasons', 'code' => 'TEST']]];
-        $signed = \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCancelContent($base, $reason);
+        $signed = CarePlanActivityForm::buildCancelContent($base, $reason);
         $this->assertSame($reason, $signed['detail']['status_reason']);
         unset($signed['detail']['status_reason']);
         $this->assertSame($base, $signed);
     }
 
-    public function test_normalized_read_wraps_author_object_as_list(): void
+    public function test_normalized_read_rejects_an_author_object_instead_of_the_official_list(): void
     {
         $raw = Arr::toSnakeCase($this->fixture());
         $raw['author'] = $raw['author'][0];
@@ -103,9 +104,8 @@ class CarePlanActivityRepositoryTest extends TestCase
                 return $this->validateDetails($response);
             }
         };
-        $normalized = $api->normalize(new EHealthResponse(new Response(200, [], json_encode(['data' => $raw], JSON_THROW_ON_ERROR))));
-        $this->assertTrue(array_is_list($normalized['author']));
-        $this->assertSame($raw['author']['identifier']['value'], $normalized['author'][0]['identifier']['value']);
+        $this->expectException(ValidationException::class);
+        $api->normalize(new EHealthResponse(new Response(200, [], json_encode(['data' => $raw], JSON_THROW_ON_ERROR))));
     }
 
     public function test_build_activity_cancel_sign_payload_leaves_the_ehealth_author_shape_alone(): void
@@ -113,13 +113,17 @@ class CarePlanActivityRepositoryTest extends TestCase
         $base = Arr::toSnakeCase($this->fixture());
         $base['author'] = $base['author'][0];
         $reason = ['coding' => [['system' => 'eHealth/care_plan_activity_cancel_reasons', 'code' => 'TEST']]];
-        $signed = \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCancelContent($base, $reason);
+        $signed = CarePlanActivityForm::buildCancelContent($base, $reason);
         $this->assertFalse(array_is_list($signed['author']));
         $this->assertSame($base['author'], $signed['author']);
     }
 
     private function fixture(): array
     {
-        return json_decode(file_get_contents(base_path('tests/Fixtures/CarePlan/activity.json')), true, flags: JSON_THROW_ON_ERROR);
+        $resource = json_decode(file_get_contents(base_path('tests/Fixtures/CarePlan/activity.json')), true, flags: JSON_THROW_ON_ERROR);
+        $resource['detail']['program'] = $resource['carePlan'];
+        $resource['detail']['program']['identifier']['type']['coding'][0]['code'] = 'medical_program';
+
+        return $resource;
     }
 }

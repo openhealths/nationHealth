@@ -134,19 +134,24 @@
                 <div class="form-group group">
                     <label for="device_quantity" class="label"> {{ __('care-plan.quantity') }} </label>
                     <div class="flex gap-2">
-                        <input
-                            type="number"
-                            id="device_quantity"
-                            class="input peer w-full"
-                            wire:model="activityForm.quantity"
-                        />
+                        @if(filled($activityForm['program'] ?? null))
+                            <select id="device_quantity" class="input-select peer w-full" wire:model="activityForm.quantity">
+                                <option value="">{{ __('forms.select') }}</option>
+                                @foreach($this->deviceQuantityOptions as $quantity)
+                                    <option value="{{ $quantity }}">{{ $quantity }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <input type="number" min="1" step="1" id="device_quantity" class="input peer w-full" wire:model="activityForm.quantity" />
+                        @endif
                         <select class="input-select peer w-20" wire:model="activityForm.quantity_system">
                             <option value="device_unit">{{ __('care-plan.units') }}</option>
                         </select>
                     </div>
+                    @error('activityForm.quantity')<p class="text-error">{{ $message }}</p>@enderror
                 </div>
                 <div class="form-group group">
-                    <label class="label"> {{ __('care-plan.start_date') }}: <span class="text-red-500">*</span> </label>
+                    <label class="label"> {{ __('care-plan.start_date') }}: @if(filled($activityForm['program'] ?? null))<span class="text-red-500">*</span>@endif </label>
                     <div class="datepicker-wrapper">
                         <input
                             type="text"
@@ -191,7 +196,7 @@
                     </div>
                 </div>
                 <div class="form-group group">
-                    <label class="label"> {{ __('care-plan.end_date') }}: <span class="text-red-500">*</span> </label>
+                    <label class="label"> {{ __('care-plan.end_date') }}: @if(filled($activityForm['program'] ?? null))<span class="text-red-500">*</span>@endif </label>
                     <div class="datepicker-wrapper">
                         <input
                             type="text"

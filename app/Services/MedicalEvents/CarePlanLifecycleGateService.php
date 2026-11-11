@@ -10,6 +10,7 @@ use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Repositories\Repository;
 use Illuminate\Support\Collection;
 
 /**
@@ -100,19 +101,19 @@ class CarePlanLifecycleGateService
     }
 
     /**
-     * Cancel Care Plan [API-007-005-0005] requires every activity to be final.
+     * TV39 3.10.4.5.1 forbids cancelling a plan with scheduled, in-progress or completed activities.
      *
      * @return Collection<int, CarePlanActivity>
      */
     public function findActivitiesBlockingPlanCancel(CarePlan $carePlan): Collection
     {
-        app(\App\Repositories\CarePlanActivityRepository::class)->loadActivities($carePlan);
+        Repository::carePlanActivity()->loadActivities($carePlan);
 
         return $carePlan->activities
             ->filter(function (CarePlanActivity $activity): bool {
                 $status = strtolower((string) $activity->status);
 
-                return !$this->isFinalActivityStatus($status);
+                return in_array($status, ['scheduled', 'in_progress', 'completed'], true) || !$this->isFinalActivityStatus($status);
             })
             ->values();
     }
@@ -156,7 +157,7 @@ class CarePlanLifecycleGateService
             ]);
         }
 
-        app(\App\Repositories\CarePlanActivityRepository::class)->loadActivities($carePlan);
+        Repository::carePlanActivity()->loadActivities($carePlan);
 
         $open = $carePlan->activities
             ->filter(fn (CarePlanActivity $activity): bool => !$this->isFinalActivityStatus((string) $activity->status))
@@ -196,7 +197,7 @@ class CarePlanLifecycleGateService
      */
     private function openMedicationDocuments(CarePlanActivity $activity): array
     {
-        return app(\App\Repositories\CarePlanActivityRepository::class)->linkedDocuments([$activity->uuid], 'medication_request')
+        return Repository::carePlanActivity()->linkedDocuments([$activity->uuid], 'medication_request')
             ->filter(fn (MedicationRequestRequest $row): bool => $this->isOpenDocumentStatus((string) $row->status))
             ->map(fn (MedicationRequestRequest $row): array => [
                 'type' => $this->medicationDocumentType((string) $row->status),
@@ -212,7 +213,7 @@ class CarePlanLifecycleGateService
      */
     private function openServiceDocuments(CarePlanActivity $activity): array
     {
-        return app(\App\Repositories\CarePlanActivityRepository::class)->linkedDocuments([$activity->uuid], 'service_request')
+        return Repository::carePlanActivity()->linkedDocuments([$activity->uuid], 'service_request')
             ->filter(fn (ServiceRequestRequest $row): bool => $this->isOpenDocumentStatus((string) $row->status))
             ->map(fn (ServiceRequestRequest $row): array => [
                 'type' => 'service_request',
@@ -228,7 +229,7 @@ class CarePlanLifecycleGateService
      */
     private function openDeviceDocuments(CarePlanActivity $activity): array
     {
-        return app(\App\Repositories\CarePlanActivityRepository::class)->linkedDocuments([$activity->uuid], 'device_request')
+        return Repository::carePlanActivity()->linkedDocuments([$activity->uuid], 'device_request')
             ->filter(fn (DeviceRequestRequest $row): bool => $this->isOpenDocumentStatus((string) $row->status))
             ->map(fn (DeviceRequestRequest $row): array => [
                 'type' => 'device_request',
