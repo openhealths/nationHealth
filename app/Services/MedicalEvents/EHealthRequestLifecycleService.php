@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents;
 
 use App\Classes\eHealth\EHealthResponse;
+use App\Exceptions\EHealth\EHealthValidationException;
 use Closure;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -50,12 +52,13 @@ abstract class EHealthRequestLifecycleService
      * used, so the job is resolved and inspected before anything is written locally.
      *
      * @param  EHealthResponse|array<string, mixed>  $response
-     *
-     * @throws \App\Exceptions\EHealth\EHealthValidationException when the program is rejected
+     * @throws EHealthValidationException when the program is rejected
      */
     protected function runPrequalify(EHealthResponse|array $response): void
     {
-        $data = $response instanceof EHealthResponse ? $response->getData() : $response;
+        // A receipt may contain an immediate verdict or a pending job. Validate it before
+        // resolving either outcome, because the verdict controls access to KEP signing.
+        $data = $response instanceof EHealthResponse ? $response->validate() : $response;
 
         $this->jobResolver->assertPrequalifyValid($this->jobResolver->resolve($data));
     }
@@ -71,7 +74,7 @@ abstract class EHealthRequestLifecycleService
         $taxId = trim((string) ($formData['signer_tax_id'] ?? ''));
 
         if ($taxId === '') {
-            throw new \InvalidArgumentException(__('care-plan.signer_tax_id_required'));
+            throw new InvalidArgumentException(__('care-plan.signer_tax_id_required'));
         }
 
         return $taxId;

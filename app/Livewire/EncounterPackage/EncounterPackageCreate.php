@@ -8,6 +8,7 @@ use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Episode\Status;
+use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\Person\EncounterStatus;
 use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
@@ -19,6 +20,7 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\EHealthJobResolver;
 use App\Services\MedicalEvents\EncounterPackageBuilder;
 use App\Traits\EnsuresEntityExists;
 use Carbon\CarbonImmutable;
@@ -35,6 +37,8 @@ class EncounterPackageCreate extends EncounterPackageComponent
     use ManagesIncomingReferralSelection;
 
     private EncounterPackageBuilder $packageBuilder;
+
+    private ?array $confirmedEpisode = null;
 
     public ?int $prepersonId = null;
 
@@ -138,6 +142,7 @@ class EncounterPackageCreate extends EncounterPackageComponent
      */
     public function sign(): void
     {
+        $this->confirmedEpisode = null;
         if (Auth::user()->cannot('create', Encounter::class)) {
             Session::flash('error', __('encounters.policy.create'));
             $this->showSignatureModal = false;
@@ -209,7 +214,24 @@ class EncounterPackageCreate extends EncounterPackageComponent
 
         if ($this->episodeType === 'new') {
             try {
-                EHealth::episode()->create($this->patientUuid, Arr::toSnakeCase($formattedData['episode']));
+                $response = EHealth::episode()->create($this->patientUuid, Arr::toSnakeCase($formattedData['episode']));
+                $resolver = app(EHealthJobResolver::class);
+                // An accepted episode receipt is only a job acknowledgement; the package needs its confirmed result.
+                $resolver->assertSuccessful($resolver->resolve($response->validate()));
+                // The job receipt contains no episode snapshot. Read the authoritative patient-scoped resource.
+                $episodeUuid = $formattedData['episode']['id'];
+                $episode = EHealth::episode()->getById($this->patientUuid, $episodeUuid)->validate();
+                if (($episode['uuid'] ?? null) !== $episodeUuid
+                    || ($episode['status'] ?? null) !== EpisodeStatus::ACTIVE->value
+                    || data_get($episode, 'managing_organization.identifier.value') !== data_get($formattedData, 'episode.managingOrganization.identifier.value')
+                    || data_get($episode, 'care_manager.identifier.value') !== data_get($formattedData, 'episode.careManager.identifier.value')) {
+                    throw ValidationException::withMessages(['episode' => __('errors.ehealth.messages.validation_error')]);
+                }
+                $this->confirmedEpisode = $episode;
+            } catch (ValidationException $exception) {
+                Session::flash('error', __('errors.ehealth.messages.validation_error'));
+
+                return;
             } catch (EHealthException|EHealthConnectionException $exception) {
                 $exception->handle('Error when create episode');
                 $this->showSignatureModal = false;
@@ -218,7 +240,7 @@ class EncounterPackageCreate extends EncounterPackageComponent
             }
         }
 
-        // eHealth accepted the episode; only now persist the package locally
+        // eHealth confirmed the episode; only now persist the package locally.
         try {
             $createdEncounterId = $this->storeValidatedData($formattedData);
         } catch (Throwable $exception) {
@@ -340,6 +362,9 @@ class EncounterPackageCreate extends EncounterPackageComponent
 
             if (isset($formattedData['episode'])) {
                 Repository::episode()->store($formattedData['episode'], $this->patient(), $createdEncounterId);
+                if ($this->confirmedEpisode !== null) {
+                    Repository::episode()->syncFull($this->patient(), [$this->confirmedEpisode]);
+                }
             }
 
             if (isset($formattedData['conditions'])) {

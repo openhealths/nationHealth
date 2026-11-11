@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\MedicalEvents;
 
+use App\Classes\eHealth\EHealthResponse;
 use App\Contracts\EHealthRequestLifecycleContract;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use App\Services\MedicalEvents\EHealthJobResolver;
 use App\Services\MedicalEvents\EHealthRequestLifecycleService;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
+use Closure;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Mockery;
+use RuntimeException;
 use Tests\TestCase;
 
 class EHealthRequestLifecycleServiceTest extends TestCase
@@ -57,11 +62,11 @@ class EHealthRequestLifecycleServiceTest extends TestCase
                     && str_contains($message, 'eHealth is unreachable');
             });
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('eHealth is unreachable');
 
         $this->makeLifecycle()->call('Create Draft', static function (): array {
-            throw new \RuntimeException('eHealth is unreachable');
+            throw new RuntimeException('eHealth is unreachable');
         });
     }
 
@@ -71,15 +76,41 @@ class EHealthRequestLifecycleServiceTest extends TestCase
 
         $this->assertSame('1234567890', $service->signerTaxId(['signer_tax_id' => ' 1234567890 ']));
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(__('care-plan.signer_tax_id_required'));
 
         $service->signerTaxId([]);
     }
 
-    private function makeLifecycle(): EHealthRequestLifecycleService
+    public function test_prequalify_validates_the_receipt_before_resolving_the_verdict(): void
     {
-        return new class(Mockery::mock(EHealthJobResolver::class)) extends EHealthRequestLifecycleService
+        $data = [['program_id' => '50866c08-df21-4ea3-bcc4-e16a374460f4', 'status' => 'VALID']];
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->once()->andReturn($data);
+        $response->shouldNotReceive('getData');
+        $resolver = Mockery::mock(EHealthJobResolver::class);
+        $resolver->shouldReceive('resolve')->once()->with($data)->andReturn($data);
+        $resolver->shouldReceive('assertPrequalifyValid')->once()->with($data);
+
+        $this->makeLifecycle($resolver)->prequalify($response);
+    }
+
+    public function test_malformed_prequalify_receipt_never_reaches_job_resolution(): void
+    {
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->once()->andThrow(ValidationException::withMessages(['data' => 'Invalid receipt.']));
+        $response->shouldNotReceive('getData');
+        $resolver = Mockery::mock(EHealthJobResolver::class);
+        $resolver->shouldNotReceive('resolve');
+        $resolver->shouldNotReceive('assertPrequalifyValid');
+        $this->expectException(ValidationException::class);
+
+        $this->makeLifecycle($resolver)->prequalify($response);
+    }
+
+    private function makeLifecycle(?EHealthJobResolver $resolver = null): EHealthRequestLifecycleService
+    {
+        return new class ($resolver ?? Mockery::mock(EHealthJobResolver::class)) extends EHealthRequestLifecycleService
         {
             protected function requestType(): string
             {
@@ -87,10 +118,10 @@ class EHealthRequestLifecycleServiceTest extends TestCase
             }
 
             /**
-             * @param  \Closure(): array<string, mixed>  $call
+             * @param  Closure(): array<string, mixed>  $call
              * @return array<string, mixed>
              */
-            public function call(string $operation, \Closure $call): array
+            public function call(string $operation, Closure $call): array
             {
                 return $this->callEHealth($operation, $call);
             }
@@ -101,6 +132,11 @@ class EHealthRequestLifecycleServiceTest extends TestCase
             public function signerTaxId(array $formData): string
             {
                 return $this->resolveSignerTaxId($formData);
+            }
+
+            public function prequalify(EHealthResponse|array $response): void
+            {
+                $this->runPrequalify($response);
             }
         };
     }
