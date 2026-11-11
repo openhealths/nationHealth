@@ -34,7 +34,7 @@ class ReferralRequestLifecycleWriteTest extends TestCase
         $this->instance(ServiceRequestApi::class, $serviceApi);
 
         $deviceResponse = Mockery::mock(EHealthResponse::class);
-        $deviceResponse->shouldReceive('getData')->once()->andReturn(['job_id' => 'job-dr']);
+        $deviceResponse->shouldReceive('validate')->once()->andReturn(['job_id' => 'job-dr']);
         $deviceApi = Mockery::mock(DeviceRequestApi::class);
         $deviceApi->shouldReceive('createSigned')->once()->with('person-uuid', $payload)->andReturn($deviceResponse);
         $this->instance(DeviceRequestApi::class, $deviceApi);

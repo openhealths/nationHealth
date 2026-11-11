@@ -29,11 +29,13 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Mockery;
 use Ramsey\Uuid\Uuid;
+use Tests\Support\GrantsReferralEmployeeRole;
 use Tests\TestCase;
 
 class UserGetCarePlanWriterEmployeeTest extends TestCase
 {
     use DatabaseTransactions;
+    use GrantsReferralEmployeeRole;
 
     private LegalEntity $legalEntity;
 
@@ -101,6 +103,7 @@ class UserGetCarePlanWriterEmployeeTest extends TestCase
             'party_id' => $this->user->party_id,
         ]);
         $this->user->employees()->attach($employee->id);
+        $this->grantReferralEmployeeRole($this->user, $employee);
 
         return $employee;
     }

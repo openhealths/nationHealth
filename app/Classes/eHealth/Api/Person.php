@@ -22,6 +22,7 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\Person\Person as PersonModel;
 use App\Models\Preperson;
 use App\Rules\InDictionary;
+use Closure;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -1026,7 +1027,7 @@ class Person extends Request
         $data = $response->getData();
         Validator::make(['data' => $data], [
             'data' => ['present', 'array'],
-            'data.printout_form' => ['nullable', static function (string $attribute, mixed $value, \Closure $fail): void {
+            'data.printout_form' => ['nullable', static function (string $attribute, mixed $value, Closure $fail): void {
                 if (!is_array($value) && !is_string($value)) {
                     $fail(__('validation.string', ['attribute' => $attribute]));
                 }

@@ -630,8 +630,8 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             $response = $kind === 'service_request'
                 ? EHealth::serviceRequest()->getById((string) $personUuid, (string) $requestRecord->uuid)
                 : EHealth::deviceRequest()->getById((string) $personUuid, (string) $requestRecord->uuid);
-            $remote = $kind === 'service_request' ? $response->validate() : $response->getData();
-        } catch (EHealthResponseException|EHealthValidationException) {
+            $remote = $response->validate();
+        } catch (EHealthResponseException|EHealthValidationException|ValidationException) {
             return false;
         }
 
@@ -659,7 +659,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             ? EHealth::serviceRequest()->getById($personUuid, $requestUuid)
             : EHealth::deviceRequest()->getById($personUuid, $requestUuid);
 
-        $remote = $kind === 'service_request' ? $response->validate() : $response->getData();
+        $remote = $response->validate();
         if ($remote === []) {
             throw new EHealthResponseException($response);
         }
@@ -869,7 +869,7 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             default => throw new InvalidArgumentException(__('care-plan.referral_wrong_activity_kind')),
         };
 
-        return $this->jobResolver->resolve($response->getData());
+        return $this->jobResolver->resolve($response->validate());
     }
 
     /**
@@ -882,11 +882,13 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             return $this->submitServiceRequestOperation($this->signedServiceRequestRecord($patientUuid, $referralUuid), ['status' => ServiceRequestStatus::ENTERED_IN_ERROR->value], fn () => EHealth::serviceRequest()->cancel($patientUuid, $referralUuid, ServiceRequestForm::buildSignedEnvelope($payload)), 'service_request:cancel', []);
         }
         $response = match ($kind) {
-            'device_request' => EHealth::deviceRequest()->cancel($patientUuid, $referralUuid, $payload),
+            // Device cancellation uses the signed mark_in_error operation
+            // documented by the Medical Events API.
+            'device_request' => EHealth::deviceRequest()->markInError($patientUuid, $referralUuid, $payload),
             default => throw new InvalidArgumentException(__('care-plan.referral_wrong_activity_kind')),
         };
 
-        return $this->jobResolver->resolve($response->getData());
+        return $this->jobResolver->resolve($response->validate());
     }
 
     /**

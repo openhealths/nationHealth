@@ -22,11 +22,11 @@ class DeviceRequest extends PatientApiBase
     }
 
     /**
-     * Cancel a Device Request (Скасування направлення на виріб).
+     * Compatibility alias for the documented signed mark-in-error operation.
      */
     public function cancel(string $patientId, string $id, array $payload): PromiseInterface|EHealthResponse
     {
-        return $this->patch(self::URL . "/{$patientId}/device_requests/{$id}/actions/cancel", $payload);
+        return $this->markInError($patientId, $id, $payload);
     }
 
     /**
