@@ -591,6 +591,9 @@ trait ManagesCarePlanReferrals
             $this->actionType = '';
 
         } catch (ValidationException $exception) {
+            if (collect($exception->errors())->keys()->contains(static fn (string $key): bool => in_array($key, ['form.password', 'form.knedp', 'form.keyContainerUpload'], true))) {
+                throw $exception;
+            }
             $this->showSignatureModal = false;
             $this->initReferralForm($activity->id);
             $this->setErrorBag($exception->validator->errors());
@@ -636,11 +639,35 @@ trait ManagesCarePlanReferrals
 
             return;
         }
+        try {
+            $record = app(MedicalRequestOwnership::class)->serviceForPerson($requestId, (int) $this->carePlan->personId);
+        } catch (ModelNotFoundException) {
+            Session::flash('error', __('care-plan.document_context_unavailable'));
+
+            return;
+        }
+        if (Auth::user()->cannot('cancel', $record)) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+
+            return;
+        }
         $this->openSignatureModal('cancel_referral', null, $requestId);
     }
 
     public function recallReferral(string $requestId, string $kind): void
     {
+        try {
+            $record = app(MedicalRequestOwnership::class)->serviceForPerson($requestId, (int) $this->carePlan->personId);
+        } catch (ModelNotFoundException) {
+            Session::flash('error', __('care-plan.document_context_unavailable'));
+
+            return;
+        }
+        if (Auth::user()->cannot('recall', $record)) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+
+            return;
+        }
         $this->referralExplanatoryLetter = '';
         $this->openSignatureModal('recall_referral', null, $requestId);
     }
@@ -683,10 +710,21 @@ trait ManagesCarePlanReferrals
             return;
         }
 
+        if (Auth::user()->cannot('recall', $service)) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+
+            return;
+        }
+
         $this->validate(['statusReason' => ['required', 'string']]);
         try {
             $api = EHealth::serviceRequest();
             $snapshot = $this->fetchServiceRequestSnapshot($this->carePlan->person->uuid, $record->uuid);
+            if (Auth::user()->cannot('registeredAction', [ServiceRequestRequest::class, $snapshot, 'recall'])) {
+                Session::flash('error', __('referrals.messages.action_unavailable'));
+
+                return;
+            }
             $record = MedicalEventsRepository::serviceRequest()->storeResource((new ServiceRequestMapper())->normalize($snapshot), (int) $this->carePlan->personId, $record->employeeId, $record->divisionId);
             $payload = ServiceRequestForm::buildStatusContent($snapshot, $this->statusReason, $letter, 'eHealth/service_request_recall_reasons');
 
@@ -750,6 +788,11 @@ trait ManagesCarePlanReferrals
 
         $kind = $service ? 'service_request' : 'device_request';
         if ($service) {
+            if (Auth::user()->cannot('cancel', $service)) {
+                Session::flash('error', __('referrals.messages.action_unavailable'));
+
+                return;
+            }
             $this->validate(['statusReason' => ['required', 'string'], 'referralExplanatoryLetter' => ['required', 'string']]);
         }
 
@@ -767,6 +810,11 @@ trait ManagesCarePlanReferrals
             if ($kind === 'service_request') {
                 $api = EHealth::serviceRequest();
                 $snapshot = $this->fetchServiceRequestSnapshot($this->carePlan->person->uuid, $record->uuid);
+                if (Auth::user()->cannot('registeredAction', [ServiceRequestRequest::class, $snapshot, 'error'])) {
+                    Session::flash('error', __('referrals.messages.action_unavailable'));
+
+                    return;
+                }
                 $record = MedicalEventsRepository::serviceRequest()->storeResource((new ServiceRequestMapper())->normalize($snapshot), (int) $this->carePlan->personId, $record->employeeId, $record->divisionId);
                 $payload = ServiceRequestForm::buildStatusContent($snapshot, $this->statusReason, trim($this->referralExplanatoryLetter), 'eHealth/service_request_cancel_reasons');
             }
@@ -807,7 +855,13 @@ trait ManagesCarePlanReferrals
     public function loadReferralPrintoutForm(string $requestId): string
     {
         try {
-            $html = app(ReferralRequestLifecycleService::class)->buildPrintoutHtml($this->carePlan, $requestId);
+            $record = app(MedicalRequestOwnership::class)->serviceForPerson($requestId, (int) $this->carePlan->personId);
+            if (Auth::user()->cannot('viewRecord', $record)) {
+                Session::flash('error', __('referrals.messages.action_unavailable'));
+
+                return '';
+            }
+            $html = app(ReferralRequestLifecycleService::class)->buildPrintoutHtml($record, $requestId);
             $this->printableContent = $html;
 
             return $html;

@@ -76,7 +76,8 @@ class ServiceRequest extends PatientApiBase
     public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
         $this->setDefaultPageSize();
-        $this->setValidator($this->validateMany(...));
+        // Patient-context lists omit the requisition-search identity projection in the official contract.
+        $this->setValidator(fn (EHealthResponse $response): array => $this->validateMany($response, false));
 
         $query = array_merge($this->options['query'], $query);
 
@@ -194,7 +195,7 @@ class ServiceRequest extends PatientApiBase
             }
             self::validateResourceData($item);
             if ($requireIdentity) {
-                Validator::make($item, ['identity' => ['required', 'array'], 'identity.last_name' => ['present', 'string'], 'identity.first_name' => ['present', 'string'], 'identity.second_name' => ['present', 'nullable', 'string'], 'identity.gender' => ['required', 'string'], 'identity.age' => ['required', 'integer', 'min:0']])->validate();
+                Validator::make($item, ['identity' => ['required', 'array'], 'identity.last_name' => ['present', 'nullable', 'string'], 'identity.first_name' => ['present', 'nullable', 'string'], 'identity.second_name' => ['present', 'nullable', 'string'], 'identity.gender' => ['required', 'string'], 'identity.age' => ['required', 'integer', 'min:0']])->validate();
             }
         }
 
@@ -296,8 +297,8 @@ class ServiceRequest extends PatientApiBase
             'occurrence_period.end' => ['sometimes', 'date', 'after_or_equal:occurrence_period.start'],
             'occurrence_date_time' => ['required_without:occurrence_period', 'date'],
             'identity' => ['sometimes', 'array'],
-            'identity.first_name' => ['sometimes', 'string'],
-            'identity.last_name' => ['sometimes', 'string'],
+            'identity.first_name' => ['sometimes', 'nullable', 'string'],
+            'identity.last_name' => ['sometimes', 'nullable', 'string'],
             'identity.second_name' => ['sometimes', 'nullable', 'string'],
             'identity.gender' => ['sometimes', 'string'],
             'identity.age' => ['sometimes', 'integer', 'min:0'],

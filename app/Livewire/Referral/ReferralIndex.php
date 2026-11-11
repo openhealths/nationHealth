@@ -15,6 +15,7 @@ use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Exception;
 use Illuminate\Support\Facades\Auth;
@@ -79,6 +80,56 @@ class ReferralIndex extends Component
     public function mount(LegalEntity $legalEntity): void
     {
         $this->legalEntityId = $legalEntity->id;
+    }
+
+    /** Reuse the patient's canonical status/signature/print workflow for the selected native referral. */
+    public function openRegisteredAction(string $uuid, string $action): void
+    {
+        if (Auth::user()->cannot('search', ServiceRequestRequest::class)) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+
+            return;
+        }
+        $native = collect($this->searchResults)->firstWhere('id', $uuid);
+        $patient = $native === null ? null : Person::whereUuid(data_get($native, 'subject.identifier.value'))->first();
+        if ($patient === null || Auth::user()->cannot('registeredAction', [ServiceRequestRequest::class, $native, $action])) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+
+            return;
+        }
+        $record = $patient === null ? null : Repository::serviceRequest()->findByUuid($uuid);
+        if ($record === null) {
+            try {
+                $snapshot = EHealth::serviceRequest()->getById($patient->uuid, $uuid, preserveApiKeys: true)->validate();
+                if (($snapshot['id'] ?? null) !== $uuid || data_get($snapshot, 'subject.identifier.value') !== $patient->uuid
+                    || Auth::user()->cannot('registeredAction', [ServiceRequestRequest::class, $snapshot, $action])) {
+                    Session::flash('error', __('referrals.messages.action_unavailable'));
+
+                    return;
+                }
+                $record = Repository::serviceRequest()->importResource((new ServiceRequestMapper())->normalize($snapshot), $patient);
+            } catch (Exception $exception) {
+                $this->flashOperationError($exception);
+
+                return;
+            }
+        }
+        $ability = match ($action) {
+            'recall' => 'recall', 'error' => 'cancel', default => 'viewRecord'
+        };
+        if (!in_array($action, ['view', 'print', 'recall', 'error'], true) || $record === null
+            || $record->personId !== $patient->id || Auth::user()->cannot($ability, $record)) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+
+            return;
+        }
+        $source = $action === 'view' ? Repository::serviceRequest()->registeredViewRoute($record) : null;
+        if ($source !== null) {
+            $this->redirect($source, navigate: true);
+
+            return;
+        }
+        $this->redirectRoute('persons.referrals', ['legalEntity' => $this->legalEntityId, 'person' => $patient->id, 'referral' => $uuid, 'referral_action' => $action], navigate: true);
     }
 
     public function confirmUse(ReferralRequestLifecycleService $service): void
@@ -200,7 +251,7 @@ class ReferralIndex extends Component
         $this->validate([
             'selectedExecutorId' => ['required', 'integer', 'min:1', 'in:'.implode(',', array_column($this->executorChoices, 'id'))],
             'selectedProgramId' => ['nullable', 'uuid', 'in:'.implode(',', array_column($this->programChoices, 'id'))],
-        ]);
+        ], [], ['selectedExecutorId' => __('referrals.executor')]);
         try {
             $employee = Repository::serviceRequest()->executorForUse($this->selectedExecutorId, (string) data_get($referral, 'category.coding.0.code', ''));
             $response = $service->takeIntoWork($uuid, $employee, $patientUuid ?: null, ['program_id' => $this->selectedProgramId ?: null]);
@@ -514,8 +565,11 @@ class ReferralIndex extends Component
 
             $this->searchResults[$key]['status'] = $status;
             unset($this->searchResults[$key]['program_processing_status']);
-            if (isset($response['program_processing_status'])) {
-                $this->searchResults[$key]['program_processing_status'] = $response['program_processing_status'];
+            // Confirmed execution references also control the next available actions.
+            foreach (['program_processing_status', 'used_by_employee', 'used_by_legal_entity', 'used_by_legal_entity_history', 'completed_with', 'program'] as $field) {
+                if (array_key_exists($field, $response)) {
+                    $this->searchResults[$key][$field] = $response[$field];
+                }
             }
         }
     }

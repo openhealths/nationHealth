@@ -1,3 +1,7 @@
+@use('App\Enums\JobStatus')
+@use('App\Enums\Person\ServiceRequestStatus')
+@use('Carbon\Carbon')
+
 @php
     $linkedReferrals = collect($activeReferrals)->filter(
         fn ($item) => $activity->uuid && ($item['based_on_uuid'] ?? null) === $activity->uuid
@@ -31,9 +35,9 @@
             @foreach ($linkedReferrals as $referral)
                 @php
                     $referralKind = $referral['kind'] ?? (isset($referral['service_id']) ? 'service_request' : 'device_request');
-                    $status = \App\Enums\Person\ServiceRequestStatus::resolve($referral['status'] ?? null);
-                    $statusLabel = $referral['status_label'] ?? \App\Enums\Person\ServiceRequestStatus::labelFor($referral['status'] ?? null);
-                    $statusBadgeClass = \App\Enums\Person\ServiceRequestStatus::colorFor($referral['status'] ?? null);
+                    $status = ServiceRequestStatus::resolve($referral['status'] ?? null);
+                    $statusLabel = $referral['status_label'] ?? ServiceRequestStatus::labelFor($referral['status'] ?? null);
+                    $statusBadgeClass = ServiceRequestStatus::colorFor($referral['status'] ?? null);
                 @endphp
                 <div
                     class="rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm dark:border-gray-600 dark:bg-gray-900/60"
@@ -64,7 +68,7 @@
                             </div>
                             @if (!empty($referral['started_at']) && !empty($referral['ended_at']))
                                 <div class="text-xs text-gray-400 dark:text-gray-500">
-                                    Діє з {{ \Carbon\Carbon::parse($referral['started_at'], 'UTC')->setTimezone(config('app.timezone'))->format($referralKind === 'service_request' ? 'd.m.Y H:i' : 'd.m.Y') }} по {{ \Carbon\Carbon::parse($referral['ended_at'], 'UTC')->setTimezone(config('app.timezone'))->format($referralKind === 'service_request' ? 'd.m.Y H:i' : 'd.m.Y') }}
+                                    Діє з {{ Carbon::parse($referral['started_at'], 'UTC')->setTimezone(config('app.timezone'))->format($referralKind === 'service_request' ? 'd.m.Y H:i' : 'd.m.Y') }} по {{ Carbon::parse($referral['ended_at'], 'UTC')->setTimezone(config('app.timezone'))->format($referralKind === 'service_request' ? 'd.m.Y H:i' : 'd.m.Y') }}
                                 </div>
                             @endif
                             @if (!empty($referral['employee_name']))
@@ -90,7 +94,7 @@
                                 <span class="text-xs">{{ __('care-plan.referral_sync_from_ehealth') }}</span>
                             </button>
 
-                            @if (($submissionStates[$referral['uuid']]['status'] ?? null) !== \App\Enums\JobStatus::PENDING->value && in_array($status, [\App\Enums\Person\ServiceRequestStatus::DRAFT, \App\Enums\Person\ServiceRequestStatus::NEW], true))
+                            @if (($submissionStates[$referral['uuid']]['status'] ?? null) !== JobStatus::PENDING->value && in_array($status, [ServiceRequestStatus::DRAFT, ServiceRequestStatus::NEW], true))
                                 @php
                                     $signAction = $referralKind === 'service_request' ? 'sign_servicerequest' : 'sign_devicerequest';
                                 @endphp
@@ -98,7 +102,7 @@
                                     type="button"
                                     class="flex items-center gap-1 text-green-500 transition-colors hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
                                     title="Підписати КЕП"
-                                    @if ($referralKind === 'service_request' && $status === \App\Enums\Person\ServiceRequestStatus::DRAFT)
+                                    @if ($referralKind === 'service_request' && $status === ServiceRequestStatus::DRAFT)
                                         wire:click="initReferralForm({{ $activity->id }})"
                                     @else
                                         wire:click="openSignatureModal('{{ $signAction }}', null, '{{ $referral['uuid'] }}')"
@@ -109,7 +113,7 @@
                                 </button>
                             @endif
 
-                            @if ($status === \App\Enums\Person\ServiceRequestStatus::ACTIVE)
+                            @if ($status === ServiceRequestStatus::ACTIVE)
                                 <button
                                     type="button"
                                     class="flex items-center gap-1 text-blue-500 transition-colors hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"

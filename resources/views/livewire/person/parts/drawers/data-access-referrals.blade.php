@@ -1,3 +1,5 @@
+@use('App\Enums\Person\AuthStep')
+
 <div
     x-show="showReferralsDrawer"
     x-transition:enter="transition ease-out duration-300"
@@ -73,7 +75,7 @@
             <button class="button-minor" type="button" @click="showReferralsDrawer = false; selectedDataType = ''; selectedReferralOrganization = ''; selectedReferral = '';">
                 {{ __('forms.cancel') }}
             </button>
-            <button class="button-primary" type="button" @click="showReferralsDrawer = false; selectedDataType = ''; selectedReferralOrganization = ''; selectedReferral = ''; showDataAccessDrawer = false; $wire.set('authStep', {{ \App\Enums\Person\AuthStep::INITIAL->value }}); $wire.set('showAuthMethodModal', true);">
+            <button class="button-primary" type="button" @click="showReferralsDrawer = false; selectedDataType = ''; selectedReferralOrganization = ''; selectedReferral = ''; showDataAccessDrawer = false; $wire.set('authStep', {{ AuthStep::INITIAL->value }}); $wire.set('showAuthMethodModal', true);">
                 {{ __('patients.get_access') }}
             </button>
         </div>

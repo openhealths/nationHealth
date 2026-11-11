@@ -15,6 +15,7 @@ use App\Livewire\EncounterPackage\Forms\EncounterForm;
 use App\Livewire\Person\Records\PatientReferrals;
 use App\Livewire\Referral\Forms\ServiceRequestForm;
 use App\Livewire\Referral\SpecimenReferral;
+use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Condition;
@@ -31,6 +32,7 @@ use App\Repositories\MedicalEvents\Repository;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\Dictionary\Dictionaries\ServiceDictionary;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use App\Services\SignatureService;
 use GuzzleHttp\Psr7\Response as HttpResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -46,6 +48,7 @@ use ReflectionMethod;
 use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\Feature\Composition\UsesCompositionDictionaries;
 use Tests\Support\GrantsReferralEmployeeRole;
+use Tests\Support\NativeClinicalFixtures;
 use Tests\TestCase;
 
 class ReferralTv39WorkflowTest extends TestCase
@@ -63,7 +66,7 @@ class ReferralTv39WorkflowTest extends TestCase
     {
         parent::setUp();
         Http::preventStrayRequests();
-        $this->context = $this->compositionFixture(scopes: ['service_request:read', 'service_request:write', 'service_request:use', 'service_request:complete', 'specimen:read', 'encounter:read']);
+        $this->context = $this->compositionFixture(scopes: ['service_request:read', 'service_request:write', 'service_request:use', 'service_request:complete', 'specimen:read', 'encounter:read', 'condition:read', 'observation:read', 'diagnostic_report:read', 'episode:read']);
         $this->grantReferralEmployeeRole($this->context['user'], $this->context['employee']);
         Cache::forever(ServiceDictionary::KEY, [['id' => self::SERVICE, 'code' => 'TEST', 'name' => 'Laboratory', 'is_active' => true, 'request_allowed' => true, 'category' => 'laboratory_procedure']]);
         Cache::forever(ServiceDictionary::KEY.':fresh', true);
@@ -109,7 +112,7 @@ class ReferralTv39WorkflowTest extends TestCase
 
     private function response(array $data): EHealthResponse
     {
-        return new EHealthResponse(new HttpResponse(200, [], json_encode(['data' => $data], JSON_THROW_ON_ERROR)), static fn (EHealthResponse $response): array => $response->getData());
+        return new EHealthResponse(new HttpResponse(200, [], json_encode(['data' => $data], JSON_THROW_ON_ERROR)), static fn (EHealthResponse $response): array => ServiceRequestApi::validateResourceData($response->getData()));
     }
 
     private function specimen(Person|Preperson $patient): Specimen
@@ -151,6 +154,7 @@ class ReferralTv39WorkflowTest extends TestCase
     public function test_permitted_resources_include_owned_reason_episodes_and_reports_only(): void
     {
         $person = $this->context['person'];
+        $approval = Approval::create(['uuid' => (string) Str::uuid(), 'approvable_type' => Person::class, 'approvable_id' => $person->id, 'granted_to_id' => Identifier::create(['value' => $this->context['employee']->uuid])->id, 'granted_to_type' => 'employee', 'status' => 'active', 'is_verified' => true, 'expires_at' => now()->addHour()]);
         $episode = Episode::create(['uuid' => (string) Str::uuid(), 'person_id' => $person->id, 'status' => 'active', 'name' => 'Reason episode']);
         $episodeIdentifier = Identifier::create(['value' => $episode->uuid]);
         $episodeIdentifier->type()->create()->coding()->create(['system' => 'eHealth/resources', 'code' => 'episode_of_care']);
@@ -162,6 +166,15 @@ class ReferralTv39WorkflowTest extends TestCase
         $report = DiagnosticReport::create(['uuid' => (string) Str::uuid(), 'person_id' => $person->id, 'status' => 'final', 'code_id' => Identifier::create(['value' => self::SERVICE])->id, 'recorded_by_id' => Identifier::create(['value' => $this->context['employee']->uuid])->id, 'issued' => now(), 'primary_source' => true]);
         $references = [['uuid' => $condition->uuid, 'type' => 'condition'], ['uuid' => $observation->uuid, 'type' => 'observation'], ['uuid' => $report->uuid, 'type' => 'diagnostic_report']];
         $this->assertSame([['uuid' => $episode->uuid, 'type' => 'episode_of_care'], ['uuid' => $report->uuid, 'type' => 'diagnostic_report']], Repository::serviceRequest()->permittedResources($person, $references));
+        // Patient identity alone cannot authorize an unreadable clinical reason.
+        $approval->update(['status' => 'terminated']);
+        try {
+            Repository::serviceRequest()->permittedResources($person, $references);
+            $this->fail('An unreadable reason must not become a permitted resource.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('reason_reference', $exception->errors());
+            Http::assertNothingSent();
+        }
         $condition->personId = null;
         $condition->prepersonId = $this->compositionPreperson()->id;
         $condition->save();
@@ -220,6 +233,91 @@ class ReferralTv39WorkflowTest extends TestCase
         $this->context['user']->syncRoles([]);
         $this->actingAs($this->context['user']->fresh());
         Livewire::test(SpecimenReferral::class, ['specimenId' => $specimen->id, 'personId' => $this->context['person']->id])->call('loadReferrals')->assertSet('rows', [])->assertSee(__('referrals.messages.use_forbidden'));
+    }
+
+    public function test_specimen_prequalification_contract_error_is_visible_before_persistence_or_signature(): void
+    {
+        $specimen = $this->specimen($this->context['person']);
+        $record = app(ReferralRequestLifecycleService::class)->createSpecimenDraft($specimen, $this->context['person'], $this->specimenData(), $this->context['employee']);
+        $original = Repository::serviceRequest()->getResource($record);
+        $validator = new ReflectionMethod(ServiceRequestApi::class, 'validateQualification');
+        $response = new EHealthResponse(
+            new HttpResponse(200, [], json_encode(['data' => [['program_id' => (string) Str::uuid(), 'program_name' => 'Synthetic program']]], JSON_THROW_ON_ERROR)),
+            static fn (EHealthResponse $response): array => $validator->invoke(new ServiceRequestApi(), $response)
+        );
+        $this->mock(ServiceRequestApi::class)->shouldReceive('prequalify')->once()->andReturn($response);
+        $signature = $this->mock(SignatureService::class);
+        $signature->shouldReceive('getCertificateAuthorities')->andReturn([]);
+        $signature->shouldNotReceive('signData');
+        $count = ServiceRequestRequest::count();
+        $component = Livewire::test(SpecimenReferral::class, ['specimenId' => $specimen->id, 'personId' => $this->context['person']->id])
+            ->set('showSignatureModal', true)->set('actionType', 'sign_referral')->call('sign')
+            ->assertSet('draftUuid', $record->uuid)->assertSet('showSignatureModal', true)->assertHasErrors();
+        $component->assertSee($component->instance()->getErrorBag()->first());
+        $this->assertSame($count, ServiceRequestRequest::count());
+        $this->assertSame($original, Repository::serviceRequest()->getResource($record->fresh()));
+        Http::assertNothingSent();
+    }
+
+    public function test_patient_signature_field_errors_stay_visible_in_each_signature_modal(): void
+    {
+        $this->context['user']->givePermissionToParent('service_request:recall', 'service_request:cancel');
+        $person = $this->context['person'];
+        $employee = $this->context['employee'];
+        $episode = Episode::create([
+            'uuid' => (string) Str::uuid(), 'person_id' => $person->id,
+            'status' => 'active', 'name' => 'Referral signing episode',
+            'managing_organization_id' => Identifier::create(['value' => $this->context['legalEntity']->uuid])->id,
+        ]);
+        $encounter = Encounter::create([
+            'uuid' => (string) Str::uuid(), 'person_id' => $person->id, 'status' => 'finished',
+            'episode_id' => Identifier::create(['value' => $episode->uuid])->id,
+            'performer_id' => Identifier::create(['value' => $employee->uuid])->id,
+            'class_id' => Coding::create(['system' => 'eHealth/encounter_classes', 'code' => 'AMB'])->id,
+            'type_id' => CodeableConcept::create()->id,
+        ]);
+        Approval::create([
+            'uuid' => (string) Str::uuid(), 'approvable_type' => Person::class, 'approvable_id' => $person->id,
+            'granted_to_id' => Identifier::create(['value' => $employee->uuid])->id,
+            'granted_to_type' => 'employee', 'status' => 'active', 'is_verified' => true,
+            'expires_at' => now()->addHour(),
+        ]);
+        $signature = $this->mock(SignatureService::class);
+        $signature->shouldReceive('getCertificateAuthorities')->andReturn([]);
+        $signature->shouldNotReceive('signData');
+        $this->mock(ServiceRequestApi::class)->shouldNotReceive('getById', 'createSigned', 'recall', 'cancel');
+        foreach (['signDraft' => 'sign_referral', 'signRecallReferral' => 'recall_referral', 'signCancelReferral' => 'cancel_referral'] as $method => $action) {
+            $data = $this->resource();
+            if ($method === 'signDraft') {
+                $data['status'] = 'draft';
+                $data['category']['coding'][0]['code'] = 'laboratory_procedure';
+                $data['context'] = $this->reference($encounter->uuid, 'encounter');
+                unset($data['requisition']);
+            }
+            $record = Repository::serviceRequest()->importResource($data, $this->context['person'], $this->context['employee']->id);
+            $original = Repository::serviceRequest()->getResource($record);
+            $component = Livewire::test(PatientReferrals::class, ['legalEntity' => $this->context['legalEntity'], 'personId' => $this->context['person']->id])
+                ->set('requestIdToSign', $record->uuid)->set('actionType', $action)->set('showSignatureModal', true)
+                ->set('referralExplanatoryLetter', 'Synthetic explanation')->call($method)
+                ->assertSet('showSignatureModal', true)->assertHasErrors(['form.password', 'form.knedp', 'form.keyContainerUpload']);
+            $component->assertSee($component->instance()->getErrorBag()->first('form.password'));
+            $this->assertSame($original, Repository::serviceRequest()->getResource($record->fresh()));
+        }
+        Http::assertNothingSent();
+    }
+
+    public function test_specimen_status_denial_is_visible_before_polling_or_http(): void
+    {
+        $specimen = $this->specimen($this->context['person']);
+        app(ReferralRequestLifecycleService::class)->createSpecimenDraft($specimen, $this->context['person'], $this->specimenData(), $this->context['employee']);
+        $this->fakeSignatureService();
+        $this->mock(ReferralRequestLifecycleService::class)->shouldNotReceive('checkCompletion');
+        $this->context['user']->syncPermissionsParent([]);
+        $this->context['user']->syncRoles([]);
+        $this->actingAs($this->context['user']->fresh());
+        Livewire::test(SpecimenReferral::class, ['specimenId' => $specimen->id, 'personId' => $this->context['person']->id])
+            ->call('checkStatus')->assertSee(__('referrals.messages.use_forbidden'));
+        Http::assertNothingSent();
     }
 
     public function test_execution_and_completion_references_survive_full_storage_round_trip(): void
@@ -361,8 +459,13 @@ class ReferralTv39WorkflowTest extends TestCase
         $record = Repository::serviceRequest()->importResource($data, $this->context['person']);
         $native = Arr::toSnakeCase($data);
         $this->mock(ServiceRequestApi::class)->shouldReceive('getById')->once()->andReturn($this->response($native));
-        $resource = ['id' => data_get($native, 'completed_with.identifier.value'), 'subject' => $native['subject'], 'status' => 'finished', 'performer' => ['identifier' => ['value' => (string) Str::uuid()]], 'text' => 'Foreign clinical result'];
-        $this->mock(EncounterApi::class)->shouldReceive('getById')->once()->andReturn($this->response($resource));
+        $resource = $this->compositionEncounter(data_get($native, 'completed_with.identifier.value'), (string) Str::uuid()) + ['reasons' => [], 'actions' => [], 'explanatory_letter' => 'Foreign clinical result'];
+        foreach (['performer', 'visit', 'episode'] as $field) {
+            $resource[$field]['display_value'] = 'Synthetic';
+        }
+        $encounterResponse = NativeClinicalFixtures::response('GET /api/patients/{patient_id}/encounters/{encounter_id}', $resource);
+        $this->assertSame($resource, $encounterResponse->validate());
+        $this->mock(EncounterApi::class)->shouldReceive('getById')->once()->andReturn($encounterResponse);
         $count = Encounter::count();
         Livewire::test(PatientReferrals::class, ['legalEntity' => $this->context['legalEntity'], 'personId' => $this->context['person']->id])->call('viewCompletedResource', $record->uuid)->assertSet('showCompletedResourceModal', true)->assertSee('Foreign clinical result');
         $this->assertSame($count, Encounter::count());

@@ -9,6 +9,8 @@ use App\Http\Controllers\EmailController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Icd10Controller;
 use App\Livewire\Actions\Logout;
+use App\Livewire\Approval\ApprovalIndex;
+use App\Livewire\Approval\ApprovalView;
 use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\LoginDev;
@@ -17,6 +19,11 @@ use App\Livewire\Auth\Register;
 use App\Livewire\Auth\ResetPassword;
 use App\Livewire\Auth\VerifyEmail;
 use App\Livewire\Auth\VerifyPersonality;
+use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
+use App\Livewire\CarePlan\CarePlanCreate;
+use App\Livewire\CarePlan\CarePlanIndex;
+use App\Livewire\CarePlan\CarePlanShow;
+use App\Livewire\CarePlan\CarePlanUpdate;
 use App\Livewire\Contract\CapitationContractCreate;
 use App\Livewire\Contract\ContractIndex;
 use App\Livewire\Contract\ContractShow;
@@ -24,11 +31,9 @@ use App\Livewire\Contract\ReimbursementContractCreate;
 use App\Livewire\ContractRequest\ContractRequestEdit;
 use App\Livewire\ContractRequest\ContractRequestIndex;
 use App\Livewire\ContractRequest\ContractRequestShow;
-use App\Models\Contracts\ContractRequest;
 use App\Livewire\Dashboard;
-use App\Livewire\DeviceRequest\DeviceRequestIndex;
-use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Livewire\Declaration\DeclarationIndex;
+use App\Livewire\DeviceRequest\DeviceRequestIndex;
 use App\Livewire\Division\DivisionCreate;
 use App\Livewire\Division\DivisionEdit;
 use App\Livewire\Division\DivisionIndex;
@@ -45,8 +50,6 @@ use App\Livewire\Employee\EmployeePositionAdd;
 use App\Livewire\Employee\EmployeeRequestEdit;
 use App\Livewire\Employee\EmployeeRequestShow;
 use App\Livewire\Employee\EmployeeShow;
-use App\Models\Employee\Employee;
-use App\Models\Employee\EmployeeRequest;
 use App\Livewire\EmployeeRequest\EmployeeRequestIndex;
 use App\Livewire\EmployeeRole\EmployeeRoleCreate;
 use App\Livewire\EmployeeRole\EmployeeRoleIndex;
@@ -54,35 +57,43 @@ use App\Livewire\EmployeeRole\EmployeeRoleView;
 use App\Livewire\Equipment\EquipmentCreate;
 use App\Livewire\Equipment\EquipmentEdit;
 use App\Livewire\Equipment\EquipmentIndex;
-use App\Livewire\LegalEntity\LegalEntityDetails;
 use App\Livewire\Equipment\EquipmentView;
+use App\Livewire\LegalEntity\Connections\LegalEntityConnectionCreate;
+use App\Livewire\LegalEntity\Connections\LegalEntityConnectionIndex;
+use App\Livewire\LegalEntity\Connections\LegalEntityConnectionShow;
 use App\Livewire\LegalEntity\CreateLegalEntity;
 use App\Livewire\LegalEntity\EditLegalEntity;
+use App\Livewire\LegalEntity\LegalEntityDetails;
 use App\Livewire\License\LicenseCreate;
 use App\Livewire\License\LicenseEdit;
 use App\Livewire\License\LicenseIndex;
 use App\Livewire\License\LicenseView;
+use App\Livewire\MedicationRequest\MedicationRequestIndex;
 use App\Livewire\Party\PartyEdit;
-use App\Livewire\Party\PartyVerify;
 use App\Livewire\Party\PartyVerificationIndex;
+use App\Livewire\Party\PartyVerify;
+use App\Livewire\Referral\ReferralIndex;
 use App\Livewire\Specimen\SpecimenCreate;
 use App\Livewire\Specimen\SpecimenIndex;
-use App\Models\MedicalEvents\Sql\Specimen;
-use App\Models\Relations\Party;
+use App\Models\CarePlan;
 use App\Models\Connection;
+use App\Models\Contracts\ContractRequest;
 use App\Models\Declaration;
 use App\Models\Division;
+use App\Models\Employee\Employee;
+use App\Models\Employee\EmployeeRequest;
 use App\Models\EmployeeRole;
 use App\Models\Equipment;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;
 use App\Models\License;
+use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\Encounter;
-use Illuminate\Support\Facades\Route;
-use App\Livewire\LegalEntity\Connections\LegalEntityConnectionShow;
-use App\Livewire\LegalEntity\Connections\LegalEntityConnectionIndex;
-use App\Livewire\LegalEntity\Connections\LegalEntityConnectionCreate;
+use App\Models\MedicalEvents\Sql\Specimen;
+use App\Models\Relations\Party;
 use App\Repositories\Repository;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -255,7 +266,7 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
 
             // --- Referrals ---
             Route::prefix('referrals')->name('referrals.')->group(function () {
-                Route::get('/', \App\Livewire\Referral\ReferralIndex::class)
+                Route::get('/', ReferralIndex::class)
                     ->middleware('permission:service_request:read')
                     ->name('index');
 
@@ -264,7 +275,7 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
                         ->middleware('permission:service_request:read')
                         ->name('search');
                     Route::post('/{uuid}/process', [ReferralController::class, 'process'])
-                        ->middleware('permission:service_request:makeinprogress')
+                        ->middleware('permission:service_request:use')
                         ->name('process');
                     Route::post('/{uuid}/complete', [ReferralController::class, 'complete'])
                         ->middleware('permission:service_request:complete')
@@ -277,7 +288,7 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
 
             // --- Medication Requests (ePrescriptions) ---
             Route::prefix('medication-requests')->name('medication-requests.')->group(function () {
-                Route::get('/', \App\Livewire\MedicationRequest\MedicationRequestIndex::class)
+                Route::get('/', MedicationRequestIndex::class)
                     ->middleware('permission:medication_dispense:write|medication_dispense:process|medication_request:details_pharm')
                     ->name('index');
             });
@@ -324,7 +335,7 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
                         });
                 });
 
-            Route::get('/care-plans', \App\Livewire\CarePlan\CarePlanIndex::class)
+            Route::get('/care-plans', CarePlanIndex::class)
                 ->name('care-plans.index');
             Route::get('/specimens', SpecimenIndex::class)
                 ->can('view', Specimen::class)
@@ -332,31 +343,31 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
             Route::get('/specimens/create', SpecimenCreate::class)
                 ->can('create', Specimen::class)
                 ->name('specimens.create');
-            Route::get('/care-plans/create/{personId?}', \App\Livewire\CarePlan\CarePlanCreate::class)
+            Route::get('/care-plans/create/{personId?}', CarePlanCreate::class)
                 ->name('care-plans.create')
-                ->can('create', \App\Models\CarePlan::class);
-            $redirectEncounterCarePlan = static function (\App\Models\LegalEntity $legalEntity, \App\Models\MedicalEvents\Sql\Encounter $encounter) {
+                ->can('create', CarePlan::class);
+            $redirectEncounterCarePlan = static function (LegalEntity $legalEntity, Encounter $encounter) {
                 $person = Repository::carePlan()->findPatient((int) $encounter->person_id) ?? abort(404);
-                \Illuminate\Support\Facades\Gate::authorize('view', [$encounter, $person]);
+                Gate::authorize('view', [$encounter, $person]);
 
                 return redirect()->route('persons.encounters.care-plans.create', ['legalEntity' => $legalEntity, 'person' => $person, 'encounter' => $encounter]);
             };
             Route::get('/encounters/{encounter}/care-plan/create', $redirectEncounterCarePlan)
                 ->whereNumber('encounter')
-                ->can('create', \App\Models\CarePlan::class);
+                ->can('create', CarePlan::class);
             Route::get('/encounter/{encounter}/care-plan/create', $redirectEncounterCarePlan)
                 ->whereNumber('encounter')
-                ->can('create', \App\Models\CarePlan::class);
-            Route::get('/care-plans/{carePlan}', \App\Livewire\CarePlan\CarePlanShow::class)
+                ->can('create', CarePlan::class);
+            Route::get('/care-plans/{carePlan}', CarePlanShow::class)
                 ->whereNumber('carePlan')
                 ->can('view', 'carePlan')
                 ->name('care-plans.show');
-            Route::get('/care-plans/{carePlan}/activities/{activity}', \App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow::class)
+            Route::get('/care-plans/{carePlan}/activities/{activity}', CarePlanActivityShow::class)
                 ->whereNumber(['carePlan', 'activity'])
                 ->scopeBindings()
                 ->can('view', 'carePlan')
                 ->name('care-plans.activities.show');
-            Route::get('/care-plans/{carePlan}/edit', \App\Livewire\CarePlan\CarePlanUpdate::class)
+            Route::get('/care-plans/{carePlan}/edit', CarePlanUpdate::class)
                 ->whereNumber('carePlan')
                 ->can('view', 'carePlan')
                 ->name('care-plans.edit');
@@ -369,8 +380,8 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
             });
 
             Route::prefix('data-access')->name('data-access.')->group(static function () {
-                Route::get('/', \App\Livewire\Approval\ApprovalIndex::class)->name('index');
-                Route::get('/{approval}', \App\Livewire\Approval\ApprovalView::class)->can('view', 'approval')->name('view');
+                Route::get('/', ApprovalIndex::class)->name('index');
+                Route::get('/{approval}', ApprovalView::class)->can('view', 'approval')->name('view');
             });
 
             require __DIR__ . '/dictionaries.php';

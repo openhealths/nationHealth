@@ -13,6 +13,7 @@ use App\Services\Dictionary\DictionaryManager;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -22,6 +23,25 @@ use Tests\TestCase;
 class ServiceRequestContractTv39Test extends TestCase
 {
     private const string UUID = '10050000-0000-4000-8000-000000000001';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config()->set('ehealth.api.domain', 'https://ehealth.invalid');
+        Http::preventStrayRequests();
+    }
+
+    private function nativeApi(): ServiceRequest
+    {
+        $factory = Http::getFacadeRoot();
+        $api = new ServiceRequest($factory);
+        $stubs = (function () {
+            return $this->stubCallbacks;
+        })->call($factory);
+        $api->stub($stubs)->preventStrayRequests();
+
+        return $api;
+    }
 
     private function resource(): array
     {
@@ -83,6 +103,36 @@ class ServiceRequestContractTv39Test extends TestCase
         $data = $this->resource();
         unset($data['identity']);
         $this->assertSame([$data], (new ReflectionMethod(ServiceRequest::class, 'validateMany'))->invoke(new ServiceRequest(), $this->response([$data]), false));
+    }
+
+    public function test_patient_list_endpoint_validates_without_requisition_identity(): void
+    {
+        $data = $this->resource();
+        unset($data['identity']);
+        Http::fake(['*' => Http::response(['data' => [$data]], 200)]);
+        $this->assertSame([$data], $this->nativeApi()->getBySearchParams(self::UUID)->validate());
+    }
+
+    public function test_requisition_endpoint_accepts_nullable_names_but_requires_identity(): void
+    {
+        $data = $this->resource();
+        $data['identity']['first_name'] = null;
+        $data['identity']['last_name'] = null;
+        $withoutIdentity = $data;
+        unset($withoutIdentity['identity']);
+        Http::fake(['*' => Http::sequence()->push(['data' => [$data]])->push(['data' => [$withoutIdentity]])]);
+        $this->assertSame([$data], $this->nativeApi()->searchForServiceRequestsByParams(['requisition' => $data['requisition']])->validate());
+        $this->expectException(ValidationException::class);
+        $this->nativeApi()->searchForServiceRequestsByParams(['requisition' => $data['requisition']])->validate();
+    }
+
+    public function test_patient_list_endpoint_still_rejects_malformed_native_resource(): void
+    {
+        $data = $this->resource();
+        unset($data['identity'], $data['subject']);
+        Http::fake(['*' => Http::response(['data' => [$data]], 200)]);
+        $this->expectException(ValidationException::class);
+        $this->nativeApi()->getBySearchParams(self::UUID)->validate();
     }
 
     public function test_qualification_requires_complete_program_verdict(): void

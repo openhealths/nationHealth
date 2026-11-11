@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\MedicalEvents;
 
-use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
+use App\Repositories\MedicalEvents\Repository;
 use Tests\TestCase;
 
 class EncounterReferralDisplayTest extends TestCase
 {
     public function test_prefers_paper_requisition(): void
     {
-        $label = app(ServiceRequestRequestRepository::class)->encounterReferralLabel([
+        $label = Repository::serviceRequest()->encounterReferralLabel([
             'paperReferral' => ['requisition' => 'PAPER-1'],
             'incomingReferral' => ['identifier' => ['value' => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee']],
         ]);
@@ -23,7 +23,7 @@ class EncounterReferralDisplayTest extends TestCase
     {
         $uuid = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
-        $label = app(ServiceRequestRequestRepository::class)->encounterReferralLabel([
+        $label = Repository::serviceRequest()->encounterReferralLabel([
             'incomingReferral' => [
                 'identifier' => ['value' => $uuid],
                 'displayValue' => '0000-AAAA-BBBB-CCCC',
@@ -37,7 +37,7 @@ class EncounterReferralDisplayTest extends TestCase
     {
         $uuid = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
-        $label = app(ServiceRequestRequestRepository::class)->encounterReferralLabel(
+        $label = Repository::serviceRequest()->encounterReferralLabel(
             ['incomingReferral' => ['identifier' => ['value' => $uuid]]],
             [$uuid => '0000-70K0-6MTX-K8M8']
         );
@@ -47,6 +47,6 @@ class EncounterReferralDisplayTest extends TestCase
 
     public function test_dash_when_no_referral(): void
     {
-        $this->assertSame('-', app(ServiceRequestRequestRepository::class)->encounterReferralLabel([]));
+        $this->assertSame('-', Repository::serviceRequest()->encounterReferralLabel([]));
     }
 }

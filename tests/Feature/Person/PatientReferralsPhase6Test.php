@@ -9,16 +9,20 @@ use App\Livewire\DiagnosticReport\DiagnosticReportEdit;
 use App\Livewire\EncounterPackage\EncounterPackageComponent;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
+use App\Models\Relations\Party;
 use App\Models\User;
-use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
+use App\Repositories\MedicalEvents\Repository;
 use App\Services\Dictionary\Collections\ServiceCollection;
 use App\Services\Dictionary\DictionaryManager;
+use App\Services\MedicalEvents\Fhir;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Mockery;
@@ -43,7 +47,7 @@ class PatientReferralsPhase6Test extends TestCase
     {
         parent::setUp();
 
-        $party = \App\Models\Relations\Party::create([
+        $party = Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Олена',
             'last_name' => 'Коваленко',
@@ -59,8 +63,8 @@ class PatientReferralsPhase6Test extends TestCase
             'party_id' => $party->id,
         ]);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $this->legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -96,12 +100,12 @@ class PatientReferralsPhase6Test extends TestCase
             'language' => 'uk',
         ]);
 
-        $identifierId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => (string) Str::uuid()])->id;
-        $codingId = \App\Models\MedicalEvents\Sql\Coding::create([
+        $identifierId = Identifier::create(['value' => (string) Str::uuid()])->id;
+        $codingId = Coding::create([
             'code' => 'AMB',
             'system' => 'eHealth/encounter_classes',
         ])->id;
-        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
+        $ccId = CodeableConcept::create()->id;
 
         $this->encounter = Encounter::create([
             'uuid' => (string) Str::uuid(),
@@ -118,9 +122,9 @@ class PatientReferralsPhase6Test extends TestCase
 
     public function test_upstream_procedure_and_encounter_lookups_work_with_fhir_request_references(): void
     {
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
         $uuid = (string) Str::uuid();
-        $resource = \App\Services\MedicalEvents\Fhir::serviceRequest()->toFhir([
+        $resource = Fhir::serviceRequest()->toFhir([
             'uuid' => $uuid,
             'employee_id' => $this->employee->id,
             'status' => 'active',
@@ -266,7 +270,7 @@ class PatientReferralsPhase6Test extends TestCase
             'context_id' => Identifier::create(['value' => $this->encounter->uuid])->id,
         ]);
 
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
 
         $active = $repo->searchByPersonId($this->person->id, [
             'status' => 'active',
@@ -303,7 +307,7 @@ class PatientReferralsPhase6Test extends TestCase
             'note' => 'обстеження',
         ]);
 
-        $rows = app(ServiceRequestRequestRepository::class)->searchByPersonId($this->person->id);
+        $rows = Repository::serviceRequest()->searchByPersonId($this->person->id);
 
         $this->assertCount(1, $rows);
         $this->assertSame($uuid, $rows[0]['uuid']);
@@ -336,7 +340,7 @@ class PatientReferralsPhase6Test extends TestCase
             'context_id' => Identifier::create(['value' => $this->encounter->uuid])->id,
         ]);
 
-        $rows = app(ServiceRequestRequestRepository::class)->searchByPersonId($this->person->id);
+        $rows = Repository::serviceRequest()->searchByPersonId($this->person->id);
 
         $this->assertCount(1, $rows);
         $this->assertSame('0000-SMS1-NUMB-ER01', $rows[0]['requestNumber']);

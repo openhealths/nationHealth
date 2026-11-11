@@ -50,6 +50,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\Feature\Composition\UsesCompositionDictionaries;
 use Tests\Support\GrantsReferralEmployeeRole;
+use Tests\Support\NativeClinicalFixtures;
 use Tests\TestCase;
 
 class EncounterDocumentPagesTest extends TestCase
@@ -145,15 +146,16 @@ class EncounterDocumentPagesTest extends TestCase
         $parameters = compact('legalEntity', 'person', 'encounter') + ['preperson' => null];
         $service = [
             'id' => (string) Str::uuid(), 'code' => 'TEST-CONSULT', 'name' => 'Консультація для перевірки чернетки',
-            'category' => 'counselling', 'type' => 'service', 'is_active' => true, 'request_allowed' => true,
+            'category' => 'counselling', 'type' => 'service', 'is_composition' => false, 'is_active' => true, 'request_allowed' => true,
+            'inserted_at' => '2026-01-01T09:00:00Z', 'updated_at' => '2026-01-01T09:00:00Z',
+            'inserted_by' => NativeClinicalFixtures::UUID, 'updated_by' => NativeClinicalFixtures::UUID,
         ];
         Cache::forever(ServiceDictionary::KEY, [$service]);
         Cache::forever(ServiceDictionary::KEY.':fresh', true);
         $this->fakeEHealth(['*' => Http::response($this->eHealthBody([]))]);
         $rejection = new EHealthValidationException(['error' => ['message' => 'Rejected by medical program']]);
         $programId = (string) Str::uuid();
-        $response = Mockery::mock(EHealthResponse::class);
-        $response->shouldReceive('validate')->andReturn([['program_id' => $programId, 'program_name' => 'Synthetic program', 'status' => 'VALID']]);
+        $response = $this->qualificationResponse($programId);
         $attempt = 0;
         $prequalificationPayloads = [];
         $api = $this->mock(ServiceRequestApi::class);
@@ -308,8 +310,7 @@ class EncounterDocumentPagesTest extends TestCase
         $parameters = compact('legalEntity', 'person', 'encounter') + ['preperson' => null];
         $this->fakeEHealth(['*' => Http::response($this->eHealthBody([]))]);
         $programId = (string) Str::uuid();
-        $response = Mockery::mock(EHealthResponse::class);
-        $response->shouldReceive('validate')->andReturn([['program_id' => $programId, 'program_name' => 'Synthetic program', 'status' => 'VALID']]);
+        $response = $this->qualificationResponse($programId);
         $api = $this->mock(ServiceRequestApi::class);
         $api->shouldNotReceive('createSigned');
         $api->shouldReceive('prequalify')->once()->andReturnUsing(function () use ($response) {
@@ -496,8 +497,7 @@ class EncounterDocumentPagesTest extends TestCase
         $uuid = $lifecycle->createEncounterDraft($encounter, $form, $context);
         $draft = ServiceRequestRequest::whereUuid($uuid)->sole();
         $programId = (string) Str::uuid();
-        $response = Mockery::mock(EHealthResponse::class);
-        $response->shouldReceive('validate')->andReturn([['program_id' => $programId, 'program_name' => 'Synthetic program', 'status' => 'VALID']]);
+        $response = $this->qualificationResponse($programId);
         $this->mock(ServiceRequestApi::class)
             ->shouldReceive('prequalify')->once()->andReturnUsing(function () use ($draft, $response) {
                 $draft->update(['status' => 'active']);
@@ -721,10 +721,7 @@ class EncounterDocumentPagesTest extends TestCase
 
         Bus::fake();
         $api = Mockery::mock(ServiceRequestApi::class);
-        $api->shouldReceive('prequalify')->once()->andReturn(new EHealthResponse(
-            new HttpResponse(200, [], json_encode(['data' => []], JSON_THROW_ON_ERROR)),
-            ServiceRequestApi::validateQualification(...)
-        ));
+        $api->shouldReceive('prequalify')->once()->andReturn($this->qualificationResponse());
         $api->shouldReceive('createSigned')->once()
             ->with($person->uuid, ['signed_data' => 'base64-signed-payload', 'signed_data_encoding' => 'base64'])
             ->andReturn(new EHealthResponse(
@@ -777,7 +774,7 @@ class EncounterDocumentPagesTest extends TestCase
         ];
     }
 
-    public function test_refresh_keeps_the_local_draft_id_without_a_uuid_lookup_and_completion_clears_it(): void
+    public function test_refresh_keeps_the_local_draft_id_and_resolves_its_plan_actor_before_completion(): void
     {
         ['legalEntity' => $legalEntity, 'person' => $person] = $this->fixture();
         $encounter = $this->encounter($person);
@@ -787,7 +784,8 @@ class EncounterDocumentPagesTest extends TestCase
             ->set('encounterReferralForm.program_id', '')
             ->call('saveEncounterReferralDraft')->assertHasNoErrors();
         $record = ServiceRequestRequest::whereUuid($component->get('encounterReferralRequestIdToSign'))->sole();
-        $this->partialMock(ServiceRequestRequestRepository::class)->shouldNotReceive('findByUuid');
+        $this->partialMock(ServiceRequestRequestRepository::class)->shouldReceive('findByUuid')
+            ->once()->with($record->uuid)->andReturn($record);
         $component->call('$refresh')->assertSet('submissionId', (string) $record->id);
         $this->app->forgetInstance(ServiceRequestRequestRepository::class);
 
@@ -868,10 +866,7 @@ class EncounterDocumentPagesTest extends TestCase
         $this->instance(SignatureService::class, $signer);
         $api = $this->mock(ServiceRequestApi::class);
         $api->shouldNotReceive('createSigned');
-        $api->shouldReceive('prequalify')->once()->andReturn(new EHealthResponse(
-            new HttpResponse(200, [], json_encode(['data' => []], JSON_THROW_ON_ERROR)),
-            ServiceRequestApi::validateQualification(...)
-        ));
+        $api->shouldReceive('prequalify')->once()->andReturn($this->qualificationResponse());
         $component = Livewire::test(EncounterReferralCreate::class, compact('legalEntity', 'person', 'encounter') + ['preperson' => null])
             ->set('encounterReferralForm.service_id', $this->serviceId())
             ->set('encounterReferralForm.program_id', '')
@@ -907,11 +902,23 @@ class EncounterDocumentPagesTest extends TestCase
             ->assertSet('showSignatureModal', true);
     }
 
+    private function qualificationResponse(?string $programId = null): EHealthResponse
+    {
+        $data = $programId === null ? [] : [['program_id' => $programId, 'program_name' => 'Synthetic program', 'status' => 'VALID']];
+
+        return new EHealthResponse(new HttpResponse(200, [], json_encode(['data' => $data], JSON_THROW_ON_ERROR)), ServiceRequestApi::validateQualification(...));
+    }
+
     private function serviceId(): string
     {
         $id = (string) Str::uuid();
         $services = Cache::get(ServiceDictionary::KEY, []);
-        $services[] = ['id' => $id, 'code' => 'SYNTHETIC', 'name' => 'Synthetic service', 'category' => 'counselling', 'request_allowed' => true, 'is_active' => true];
+        $services[] = [
+            'id' => $id, 'code' => 'SYNTHETIC', 'name' => 'Synthetic service', 'category' => 'counselling',
+            'is_composition' => false, 'request_allowed' => true, 'is_active' => true,
+            'inserted_at' => '2026-01-01T09:00:00Z', 'updated_at' => '2026-01-01T09:00:00Z',
+            'inserted_by' => NativeClinicalFixtures::UUID, 'updated_by' => NativeClinicalFixtures::UUID,
+        ];
         Cache::forever(ServiceDictionary::KEY, $services);
         Cache::forever(ServiceDictionary::KEY.':fresh', true);
 
@@ -933,7 +940,13 @@ class EncounterDocumentPagesTest extends TestCase
     private function fixture(): array
     {
         $fixture = $this->compositionFixture(scopes: ['encounter:read', 'service_request:write', 'medication_request_request:write', 'care_plan:write']);
+        $fixture['employee']->update(['start_date' => '2020-01-01']);
         $this->grantReferralEmployeeRole($fixture['user'], $fixture['employee'], 'ehealth');
+        foreach (['encounter:read', 'service_request:write', 'medication_request_request:write', 'care_plan:write'] as $scope) {
+            $permission = Permission::findOrCreate($scope, 'ehealth');
+            $permission->legalEntityTypes()->syncWithoutDetaching([$fixture['legalEntity']->legalEntityTypeId]);
+            $fixture['user']->givePermissionToParent($permission);
+        }
         $fixture['user']->forceFill(['email_verified_at' => now()])->save();
         $this->actingAs($fixture['user'], 'ehealth');
         $this->withSession(['ehealth_legal_entity_uuid' => $fixture['legalEntity']->uuid]);

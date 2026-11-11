@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Classes\eHealth\Api\ServiceRequest;
+use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Http\Controllers\Controller;
-use App\Models\Employee\Employee;
+use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Throwable;
 
 class ReferralController extends Controller
@@ -36,9 +37,9 @@ class ReferralController extends Controller
 
         return $this->respond(
             'search',
-            fn (): array => \App\Classes\eHealth\EHealth::serviceRequest()->searchForServiceRequestsByParams(
+            fn (): array => EHealth::serviceRequest()->searchForServiceRequestsByParams(
                 ['requisition' => $validated['requisition']]
-            )->getData(),
+            )->validate(),
             ['requisition' => $validated['requisition']]
         );
     }
@@ -54,15 +55,14 @@ class ReferralController extends Controller
             'patient_uuid' => ['required_without:patient_id', 'string', 'max:255'],
             'patient_id' => ['required_without:patient_uuid', 'string', 'max:255'],
             'payload' => ['sometimes', 'array'],
+            'employee_id' => ['required', 'integer', 'min:1'],
         ]);
 
-        $employee = $this->currentEmployee();
-
-        if (!$employee instanceof Employee) {
-            return response()->json([
-                'success' => false,
-                'message' => __('care-plan.referral_api_no_active_employee'),
-            ], 403);
+        try {
+            // API clients select the actual executor; a first employee is never an implicit signature.
+            $employee = Repository::serviceRequest()->executorForUse((int) $validated['employee_id'], '');
+        } catch (InvalidArgumentException) {
+            return response()->json(['success' => false, 'message' => __('referrals.messages.executor_unavailable')], 403);
         }
 
         $patientUuid = $validated['patient_uuid'] ?? $validated['patient_id'];
@@ -152,23 +152,6 @@ class ReferralController extends Controller
     }
 
     /**
-     * Resolve the acting employee within the legal entity the request is scoped to.
-     */
-    private function currentEmployee(): ?Employee
-    {
-        $legalEntity = legalEntity();
-
-        if ($legalEntity === null) {
-            return null;
-        }
-
-        return Auth::user()
-            ?->employees()
-            ->where('legal_entity_id', $legalEntity->id)
-            ->first();
-    }
-
-    /**
      * Run an eHealth-backed action and translate its outcome into a JSON response.
      *
      * eHealth validation details are safe to surface; anything else is logged and
@@ -201,7 +184,7 @@ class ReferralController extends Controller
                 'success' => false,
                 'message' => $exception->getMessage(),
             ], 502);
-        } catch (\Illuminate\Validation\ValidationException $exception) {
+        } catch (ValidationException $exception) {
             return response()->json(['success' => false, 'message' => $exception->getMessage(), 'errors' => $exception->errors()], 422);
         } catch (Throwable $exception) {
             Log::channel('e_health_errors')->error(

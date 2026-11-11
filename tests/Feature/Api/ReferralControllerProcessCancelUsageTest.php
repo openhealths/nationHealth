@@ -6,17 +6,22 @@ namespace Tests\Feature\Api;
 
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\Permission;
+use App\Models\Relations\Party;
 use App\Models\User;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Mockery;
+use Tests\Support\GrantsReferralEmployeeRole;
 use Tests\TestCase;
 
 class ReferralControllerProcessCancelUsageTest extends TestCase
 {
     use DatabaseTransactions;
+    use GrantsReferralEmployeeRole;
 
     protected User $user;
 
@@ -40,7 +45,7 @@ class ReferralControllerProcessCancelUsageTest extends TestCase
     {
         parent::setUp();
 
-        $party = \App\Models\Relations\Party::create([
+        $party = Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Іван',
             'last_name' => 'Петренко',
@@ -56,8 +61,8 @@ class ReferralControllerProcessCancelUsageTest extends TestCase
             'party_id' => $party->id,
         ]);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $this->legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -91,13 +96,17 @@ class ReferralControllerProcessCancelUsageTest extends TestCase
     {
         $referralUuid = (string) Str::uuid();
         $patientUuid = (string) Str::uuid();
+        $selected = $this->employee->replicate();
+        $selected->uuid = (string) Str::uuid();
+        $selected->save();
+        $this->user->employees()->attach($selected->id);
 
         $mock = Mockery::mock(ReferralRequestLifecycleService::class);
         $mock->shouldReceive('takeIntoWork')
             ->once()
-            ->withArgs(function (string $uuid, Employee $employee, ?string $patientId, array $payload) use ($referralUuid, $patientUuid): bool {
+            ->withArgs(function (string $uuid, Employee $employee, ?string $patientId, array $payload) use ($referralUuid, $patientUuid, $selected): bool {
                 return $uuid === $referralUuid
-                    && $employee->id === $this->employee->id
+                    && $employee->id === $selected->id
                     && $patientId === $patientUuid
                     && ($payload['note'] ?? null) === 'take';
             })
@@ -107,12 +116,32 @@ class ReferralControllerProcessCancelUsageTest extends TestCase
 
         $response = $this->actingAsDoctor()->postJson($this->url($referralUuid, 'process'), [
             'patient_uuid' => $patientUuid,
+            'employee_id' => $selected->id,
             'payload' => ['note' => 'take'],
         ]);
 
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.status', 'in_progress');
+    }
+
+    public function test_process_requires_an_explicit_executor_before_any_rpc(): void
+    {
+        $mock = Mockery::mock(ReferralRequestLifecycleService::class);
+        $mock->shouldNotReceive('takeIntoWork');
+        $this->instance(ReferralRequestLifecycleService::class, $mock);
+        $this->actingAsDoctor()->postJson($this->url((string) Str::uuid(), 'process'), ['patient_uuid' => (string) Str::uuid()])
+            ->assertUnprocessable()->assertJsonValidationErrors(['employee_id']);
+    }
+
+    public function test_process_rejects_an_unlinked_executor_before_any_rpc(): void
+    {
+        $mock = Mockery::mock(ReferralRequestLifecycleService::class);
+        $mock->shouldNotReceive('takeIntoWork');
+        $this->instance(ReferralRequestLifecycleService::class, $mock);
+        $this->user->employees()->detach($this->employee->id);
+        $this->actingAsDoctor()->postJson($this->url((string) Str::uuid(), 'process'), ['patient_uuid' => (string) Str::uuid(), 'employee_id' => $this->employee->id])
+            ->assertForbidden()->assertJsonPath('message', __('referrals.messages.executor_unavailable'));
     }
 
     public function test_cancel_usage_requires_patient_id_and_forwards_it(): void
@@ -159,6 +188,9 @@ class ReferralControllerProcessCancelUsageTest extends TestCase
 
     private function actingAsDoctor(): static
     {
+        $this->grantReferralEmployeeRole($this->user, $this->employee, 'ehealth');
+        $this->user->givePermissionToParent(Permission::findOrCreate('service_request:use', 'ehealth'));
+
         return $this->actingAs($this->user, 'ehealth')->withoutMiddleware();
     }
 

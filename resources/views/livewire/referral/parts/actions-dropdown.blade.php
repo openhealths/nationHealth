@@ -69,7 +69,7 @@
                     </button>
                 @else
                     @if ($this->canTakeIntoWork($referral))
-                        @can('service_request:makeinprogress')
+                        @can('service_request:use')
                             <button
                                 type="button"
                                 class="dropdown-item"
@@ -80,27 +80,33 @@
                             </button>
                         @endcan
                     @endif
-                    <button type="button" class="dropdown-item" disabled>
-                        @icon('eye', 'w-5 h-5')
-                        {{ __('forms.view_details') }}
-                    </button>
-                    @if ($isIssuedReferral)
-                        <button type="button" class="dropdown-item" disabled>
+                    @if ($canViewRegistered)
+                        <button type="button" class="dropdown-item" wire:click="openRegisteredAction('{{ $referralId }}', 'view')">
+                            @icon('eye', 'w-5 h-5')
+                            {{ __('forms.view_details') }}
+                        </button>
+                    @endif
+                    @if ($canPrintRegistered)
+                        <button type="button" class="dropdown-item" wire:click="openRegisteredAction('{{ $referralId }}', 'print')">
                             @icon('printer', 'w-5 h-5')
                             {{ __('referrals.actions.print_memo') }}
                         </button>
+                    @endif
+                    @if ($canRecallRegistered)
                         <button
                             type="button"
                             class="dropdown-item dropdown-delete text-red-600! dark:text-red-400!"
-                            x-on:click="openStatusModal(@js($referralId), 'recall')"
+                            wire:click="openRegisteredAction('{{ $referralId }}', 'recall')"
                         >
                             @icon('cancel', 'w-5 h-5')
                             {{ __('referrals.actions.cancel_referral') }}
                         </button>
+                    @endif
+                    @if ($canErrorRegistered)
                         <button
                             type="button"
                             class="dropdown-item dropdown-delete text-red-600! dark:text-red-400!"
-                            x-on:click="openStatusModal(@js($referralId), 'error')"
+                            wire:click="openRegisteredAction('{{ $referralId }}', 'error')"
                         >
                             @icon('cancel', 'w-5 h-5')
                             {{ __('referrals.actions.mark_as_error') }}

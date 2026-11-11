@@ -23,6 +23,83 @@
         </div>
     @endif
     <form wire:submit.prevent="validateEncounterReferral" class="space-y-6">
+        @if (($personId ?? null) !== null && !($referralReadonly ?? false))
+            <fieldset @disabled($submissionPending || $preparingSignature) class="fieldset-card p-6 sm:p-8">
+                <legend class="legend">
+                    {{ __('referrals.plan_link.title') }}
+                </legend>
+                <div class="form-row-2 mt-6">
+                    <div class="form-group group">
+                        <label for="referralPlanSearch" class="label">
+                            {{ __('forms.search') }}
+                        </label>
+                        <input
+                            id="referralPlanSearch"
+                            type="search"
+                            class="input peer w-full"
+                            wire:model.live.debounce.300ms="encounterReferralPlanSearch"
+                        />
+                    </div>
+                    <div class="form-group group">
+                        <label for="referralPlan" class="label">
+                            {{ __('referrals.plan_link.plan') }}
+                        </label>
+                        <select
+                            id="referralPlan"
+                            class="input-select peer w-full"
+                            wire:model.live="encounterReferralForm.care_plan_id"
+                        >
+                            <option value="0">{{ __('referrals.plan_link.without_plan') }}</option>
+                            @foreach ($this->encounterReferralPlanChoices as $plan)
+                                <option value="{{ $plan['id'] }}">{{ $plan['label'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                @php
+                    $selectedPlan = collect($this->encounterReferralPlanChoices)->firstWhere('id', (int) ($encounterReferralForm['care_plan_id'] ?? 0));
+                    $selectedActivity = collect($this->encounterReferralActivityChoices)->firstWhere('id', (int) ($encounterReferralForm['care_plan_activity_id'] ?? 0));
+                @endphp
+                @if ($selectedPlan !== null && $selectedPlan['approvalRequired'])
+                    <div class="mt-4">
+                        <p class="mb-4">
+                            {{ __('referrals.plan_link.obtain_access') }}
+                        </p>
+                        @livewire('care-plan.care-plan-approvals', $this->encounterReferralApprovalContext, key('encounter-referral-plan-approval-'.$selectedPlan['id'].'-'.$this->encounterReferralApprovalContext['actingEmployeeUuid']))
+                    </div>
+                @elseif ($selectedPlan !== null)
+                    <div class="form-group group mt-6">
+                        <label for="referralPlanActivity" class="label required">
+                            {{ __('referrals.plan_link.activity') }}
+                        </label>
+                        <select
+                            id="referralPlanActivity"
+                            class="input-select peer w-full"
+                            wire:model.live="encounterReferralForm.care_plan_activity_id"
+                        >
+                            <option value="0">{{ __('forms.select') }}</option>
+                            @foreach ($this->encounterReferralActivityChoices as $activity)
+                                <option value="{{ $activity['id'] }}">{{ $activity['description'] ?: $activity['uuid'] }}</option>
+                            @endforeach
+                        </select>
+                        @error('encounterReferralForm.care_plan_activity_id')
+                            <p class="text-error">{{ $message }}</p>
+                        @enderror
+                        @if ($selectedActivity !== null)
+                            <p class="mt-2 text-sm" role="status">
+                                {{ __('care-plan.remaining_quantity') }}:
+                                {{ data_get($selectedActivity, 'remainingQuantity.value') ?? __('referrals.plan_link.unknown_remaining') }}
+                                {{ data_get($selectedActivity, 'remainingQuantity.unit') ?? data_get($selectedActivity, 'remainingQuantity.code') }}
+                            </p>
+                            <p class="mt-2 text-sm" role="status">
+                                {{ __('referrals.plan_link.activity_capacity') }}:
+                                {{ data_get($selectedActivity, 'serviceCreationCapacity.remaining') }}
+                            </p>
+                        @endif
+                    </div>
+                @endif
+            </fieldset>
+        @endif
         <fieldset
             @disabled($submissionPending || $preparingSignature || ($referralReadonly ?? false))
             class="fieldset-card p-6 sm:p-8"

@@ -113,9 +113,11 @@ class ServiceRequestMapper implements FhirMapperContract
             }
         }
         $previousCarePlan = collect($resource['basedOn'] ?? [])->first(fn (array $ref): bool => data_get($ref, 'identifier.type.coding.0.code') === 'care_plan');
-        if (!empty($options['carePlanUuid']) && data_get($previousCarePlan, 'identifier.value') !== $options['carePlanUuid']) {
+        if (array_key_exists('carePlanUuid', $options) && data_get($previousCarePlan, 'identifier.value') !== $options['carePlanUuid']) {
             $items = array_values(array_filter($resource['basedOn'] ?? [], static fn (array $ref): bool => data_get($ref, 'identifier.type.coding.0.code') !== 'care_plan'));
-            array_unshift($items, $this->reference($options['carePlanUuid'], 'care_plan', collect($resource['basedOn'] ?? [])->first(fn (array $ref): bool => data_get($ref, 'identifier.type.coding.0.code') === 'care_plan')));
+            if (!empty($options['carePlanUuid'])) {
+                array_unshift($items, $this->reference($options['carePlanUuid'], 'care_plan', $previousCarePlan));
+            }
             $resource['basedOn'] = $items;
         }
         if (array_key_exists('quantity', $input)) {

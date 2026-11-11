@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Errors;
 
 /** Translate referral-specific refusals in the API resource that owns them. */
-final class ServiceRequestErrorTranslator extends BaseErrorTranslator
+class ServiceRequestErrorTranslator extends BaseErrorTranslator
 {
     protected function messages(): array
     {

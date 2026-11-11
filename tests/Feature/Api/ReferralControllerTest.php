@@ -7,6 +7,8 @@ namespace Tests\Feature\Api;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\Permission;
+use App\Models\Relations\Party;
 use App\Models\User;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -15,12 +17,15 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
+use Tests\Support\GrantsReferralEmployeeRole;
 use Tests\TestCase;
 
 class ReferralControllerTest extends TestCase
 {
     use DatabaseTransactions;
+    use GrantsReferralEmployeeRole;
 
     protected User $user;
 
@@ -44,7 +49,7 @@ class ReferralControllerTest extends TestCase
     {
         parent::setUp();
 
-        $party = \App\Models\Relations\Party::create([
+        $party = Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Іван',
             'last_name' => 'Петренко',
@@ -113,13 +118,13 @@ class ReferralControllerTest extends TestCase
     {
         return [
             'search' => ['referrals.api.search', 'GET', 'service_request:read'],
-            'process' => ['referrals.api.process', 'POST', 'service_request:makeinprogress'],
+            'process' => ['referrals.api.process', 'POST', 'service_request:use'],
             'complete' => ['referrals.api.complete', 'POST', 'service_request:complete'],
             'cancel usage' => ['referrals.api.cancel-usage', 'POST', 'service_request:use'],
         ];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('referralRouteProvider')]
+    #[DataProvider('referralRouteProvider')]
     public function test_referral_route_requires_authentication_and_its_ehealth_permission(
         string $routeName,
         string $method,
@@ -236,7 +241,7 @@ class ReferralControllerTest extends TestCase
         $this->app->instance(ReferralRequestLifecycleService::class, $mock);
 
         $this->actingAsDoctor()
-            ->postJson($this->url('process'), ['patient_uuid' => (string) Str::uuid()])
+            ->postJson($this->url('process'), ['patient_uuid' => (string) Str::uuid(), 'employee_id' => $this->employee->id])
             ->assertStatus(403)
             ->assertJsonPath('success', false);
     }
@@ -274,6 +279,9 @@ class ReferralControllerTest extends TestCase
 
     private function actingAsDoctor(): static
     {
+        $this->grantReferralEmployeeRole($this->user, $this->employee, 'ehealth');
+        $this->user->givePermissionToParent(Permission::findOrCreate('service_request:use', 'ehealth'));
+
         return $this->actingAs($this->user, 'ehealth')->withoutMiddleware();
     }
 

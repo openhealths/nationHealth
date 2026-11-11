@@ -408,7 +408,10 @@ class ServiceRequestRequestRepository extends BaseRepository
             $uuid = $reference['uuid'] ?? data_get($reference, 'identifier.value');
             $type = $reference['type'] ?? data_get($reference, 'identifier.type.coding.0.code');
             if ($type === 'diagnostic_report') {
-                DiagnosticReport::forPatient($patient)->whereUuid($uuid)->firstOrFail();
+                $report = DiagnosticReport::forPatient($patient)->whereUuid($uuid)->firstOrFail();
+                if (Auth::user()->cannot('view', [$report, $patient])) {
+                    throw ValidationException::withMessages(['reason_reference' => __('referrals.messages.reason_unavailable')]);
+                }
                 $permitted[$uuid] = ['uuid' => $uuid, 'type' => 'diagnostic_report'];
                 continue;
             }
@@ -416,16 +419,26 @@ class ServiceRequestRequestRepository extends BaseRepository
                 $resource = $type === 'condition'
                     ? Condition::forPatient($patient)->whereUuid($uuid)->with('context')->firstOrFail()
                     : Observation::forPatient($patient)->whereUuid($uuid)->with('context')->firstOrFail();
+                if (Auth::user()->cannot('view', [$resource, $patient])) {
+                    throw ValidationException::withMessages(['reason_reference' => __('referrals.messages.reason_unavailable')]);
+                }
                 $context = $resource->context;
                 $contextType = $context?->type?->first()?->coding?->first()?->code;
                 $uuid = $context?->value;
                 if ($contextType === 'encounter') {
-                    $uuid = Encounter::forPatient($patient)->whereUuid($uuid)->with('episode')->firstOrFail()->episode?->value;
+                    $encounter = Encounter::forPatient($patient)->whereUuid($uuid)->with('episode')->firstOrFail();
+                    if (Auth::user()->cannot('view', [$encounter, $patient])) {
+                        throw ValidationException::withMessages(['reason_reference' => __('referrals.messages.reason_unavailable')]);
+                    }
+                    $uuid = $encounter->episode?->value;
                 }
                 $type = 'episode_of_care';
             }
             if (in_array($type, ['episode', 'episode_of_care'], true) && filled($uuid)) {
-                Episode::forPatient($patient)->whereUuid($uuid)->firstOrFail();
+                $episode = Episode::forPatient($patient)->whereUuid($uuid)->firstOrFail();
+                if (Auth::user()->cannot('view', [$episode, $patient])) {
+                    throw ValidationException::withMessages(['reason_reference' => __('referrals.messages.reason_unavailable')]);
+                }
                 $permitted[$uuid] = ['uuid' => $uuid, 'type' => 'episode_of_care'];
             }
         }
@@ -578,12 +591,72 @@ class ServiceRequestRequestRepository extends BaseRepository
             $programId = data_get($resource, 'detail.program.identifier.value');
         }
 
-        return array_filter(['care_plan_uuid' => $activity->carePlan->uuid, 'service_id' => $serviceId, 'program_id' => $programId, 'service_type' => $type, 'quantity_system' => $system, 'quantity_code' => $code], static fn ($value) => $value !== null);
+        return array_filter(['care_plan_id' => $activity->carePlanId, 'care_plan_activity_id' => $activity->id, 'care_plan_uuid' => $activity->carePlan->uuid, 'service_id' => $serviceId, 'program_id' => $programId, 'service_type' => $type, 'quantity_system' => $system, 'quantity_code' => $code], static fn ($value) => $value !== null);
     }
 
     public function formData(ServiceRequestRequest $request): array
     {
         return (new ServiceRequestMapper())->fromFhir($this->getResource($request));
+    }
+
+    public function registeredViewRoute(ServiceRequestRequest $request): ?string
+    {
+        $patient = $this->patientForRequest($request);
+        if (!$patient instanceof Person) {
+            return null;
+        }
+        $activity = filled($request->basedOn?->value) ? CarePlanActivity::whereUuid($request->basedOn->value)
+            ->whereHas('carePlan', fn ($query) => $query->wherePersonId($patient->id)->whereLegalEntityId(legalEntity()->id))
+            ->with('carePlan')->first() : null;
+        if ($activity !== null && Auth::user()->can('view', $activity->carePlan)) {
+            return route('care-plans.activities.show', ['legalEntity' => legalEntity()->id, 'carePlan' => $activity->carePlanId, 'activity' => $activity->id]);
+        }
+        $encounter = filled($request->context?->value) ? Encounter::forPatient($patient)->whereUuid($request->context->value)->first() : null;
+        if ($encounter !== null && Auth::user()->can('view', [$encounter, $patient])) {
+            return route('persons.encounters.referrals.show', ['legalEntity' => legalEntity()->id, 'person' => $patient->id, 'encounter' => $encounter->id, 'referral' => $request->id]);
+        }
+
+        return null;
+    }
+
+    /** Re-resolve BA08 choices before draft persistence or signing; client IDs never grant access. */
+    public function encounterActivityContext(Encounter $encounter, array $data, string $employeeUuid): array
+    {
+        $activityUuid = $data['based_on_uuid'] ?? null;
+        $activity = filled($activityUuid) ? CarePlanActivity::whereUuid($activityUuid)->first() : null;
+        $planId = (int) ($data['care_plan_id'] ?? $activity?->carePlanId);
+        $activityId = (int) ($data['care_plan_activity_id'] ?? $activity?->id);
+        if ($planId === 0 && $activityId === 0 && blank($activityUuid)) {
+            return $data;
+        }
+        $personId = $encounter->getAttribute('person_id');
+        $choice = $personId === null || $planId === 0 ? null : collect(Repository::carePlan()->documentActivityChoices(
+            $planId,
+            $personId,
+            $encounter->uuid,
+            Auth::user(),
+            'service_request',
+            $employeeUuid
+        ))->firstWhere('id', $activityId);
+        if ($choice === null || (filled($activityUuid) && $choice['uuid'] !== $activityUuid)
+            || data_get($choice, 'productReference.identifier.value') !== ($data['service_id'] ?? null)
+            || data_get($choice, 'productReference.identifier.type.coding.0.code') !== ($data['service_type'] ?? 'service')) {
+            throw ValidationException::withMessages(['encounterReferralForm.care_plan_activity_id' => __('referrals.messages.activity_unavailable')]);
+        }
+        $remaining = $choice['remainingQuantity'];
+        $quantity = (float) ($data['quantity'] ?? 0);
+        if (!is_array($remaining) || !is_numeric($remaining['value'] ?? null) || $quantity <= 0 || $quantity > (float) $remaining['value']) {
+            throw ValidationException::withMessages(['encounterReferralForm.quantity' => __('referrals.messages.activity_quantity_unavailable')]);
+        }
+        $context = $this->activityContext($choice['uuid'], $personId);
+
+        return array_replace($data, $context, [
+            'based_on_uuid' => $choice['uuid'],
+            'program_id' => $context['program_id'] ?? null,
+            'quantity_system' => $remaining['system'] ?? ($context['quantity_system'] ?? null),
+            'quantity_code' => $remaining['code'] ?? ($context['quantity_code'] ?? null),
+            'quantity_unit' => $remaining['unit'] ?? null,
+        ]);
     }
 
     private function fhirRelations(): array
