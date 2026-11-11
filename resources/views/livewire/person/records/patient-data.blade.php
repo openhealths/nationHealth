@@ -1,3 +1,5 @@
+@use('Carbon\Carbon')
+@use('App\Enums\Person\ConfidantPersonRelationshipRequestStatus')
 @use('App\Models\DeclarationRequest')
 @use('App\Models\MedicalEvents\Sql\DiagnosticReport')
 @use('App\Models\MedicalEvents\Sql\Encounter')
@@ -345,7 +347,7 @@
                                     class="input peer"
                                     placeholder=" "
                                     readonly
-                                    value="{{ !empty($form->person['birthDate']) ? \Carbon\Carbon::parse($form->person['birthDate'])->format('d.m.Y') : '-' }}"
+                                    value="{{ !empty($form->person['birthDate']) ? Carbon::parse($form->person['birthDate'])->format('d.m.Y') : '-' }}"
                                 />
                                 <label class="label">{{ __('forms.birth_date') }}</label>
                             </div>
@@ -426,10 +428,10 @@
                                                         {{ $document['issuedBy'] ?? '-' }}
                                                     </td>
                                                     <td class="td-input text-gray-700 dark:text-gray-300">
-                                                        {{ !empty($document['issuedAt']) ? \Carbon\Carbon::parse($document['issuedAt'])->format('d.m.Y') : '-' }}
+                                                        {{ !empty($document['issuedAt']) ? Carbon::parse($document['issuedAt'])->format('d.m.Y') : '-' }}
                                                     </td>
                                                     <td class="td-input text-gray-700 dark:text-gray-300">
-                                                        {{ !empty($document['expirationDate']) ? \Carbon\Carbon::parse($document['expirationDate'])->format('d.m.Y') : '-' }}
+                                                        {{ !empty($document['expirationDate']) ? Carbon::parse($document['expirationDate'])->format('d.m.Y') : '-' }}
                                                     </td>
                                                 </tr>
                                             @endforeach
@@ -895,7 +897,7 @@
                                                     @endif
                                                 </td>
                                                 <td class="td-input align-top font-medium text-gray-900 dark:text-white">
-                                                    {{ !empty($relationship['activeTo']) ? \Carbon\Carbon::parse($relationship['activeTo'])->format('d.m.Y') : '-' }}
+                                                    {{ !empty($relationship['activeTo']) ? Carbon::parse($relationship['activeTo'])->format('d.m.Y') : '-' }}
                                                 </td>
                                                 <td class="td-input align-top">
                                                     @if (!empty($relationship['documentsRelationship']))
@@ -1035,10 +1037,10 @@
                                                     <td class="td-input align-top">
                                                         @php
                                                             $statusClass = match ($req['status']) {
-                                                                \App\Enums\Person\ConfidantPersonRelationshipRequestStatus::APPROVED,
-                                                                \App\Enums\Person\ConfidantPersonRelationshipRequestStatus::COMPLETED => 'text-green-800 bg-green-100 dark:bg-green-900 dark:text-green-200',
-                                                                \App\Enums\Person\ConfidantPersonRelationshipRequestStatus::NEW => 'text-yellow-800 bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-200',
-                                                                \App\Enums\Person\ConfidantPersonRelationshipRequestStatus::CANCELLED => 'text-red-800 bg-red-100 dark:bg-red-900 dark:text-red-200',
+                                                                ConfidantPersonRelationshipRequestStatus::APPROVED,
+                                                                ConfidantPersonRelationshipRequestStatus::COMPLETED => 'text-green-800 bg-green-100 dark:bg-green-900 dark:text-green-200',
+                                                                ConfidantPersonRelationshipRequestStatus::NEW => 'text-yellow-800 bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-200',
+                                                                ConfidantPersonRelationshipRequestStatus::CANCELLED => 'text-red-800 bg-red-100 dark:bg-red-900 dark:text-red-200',
                                                                 default => 'text-gray-800 bg-gray-100 dark:bg-gray-700 dark:text-gray-200',
                                                             };
                                                         @endphp

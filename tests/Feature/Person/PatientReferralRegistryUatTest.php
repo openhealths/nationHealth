@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Person;
 
+use App\Classes\eHealth\Api\Patient\DeviceRequest as DeviceRequestApi;
+use App\Classes\eHealth\Api\Patient\ServiceRequest as ServiceRequestApi;
 use App\Livewire\Person\Records\PatientReferrals;
+use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Repositories\MedicalEvents\DeviceRequestRequestRepository;
 use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -55,11 +58,11 @@ class PatientReferralRegistryUatTest extends TestCase
     public function test_device_cancel_uses_the_device_module_even_with_a_service_kind_argument(): void
     {
         ['person' => $person, 'legalEntity' => $legalEntity, 'employee' => $employee] = $this->compositionFixture();
-        $device = \App\Models\MedicalEvents\Sql\DeviceRequestRequest::create([
+        $device = DeviceRequestRequest::create([
             'uuid' => (string) Str::uuid(), 'personId' => $person->id, 'employeeId' => $employee->id, 'deviceId' => 'synthetic-device', 'quantity' => 1, 'status' => 'active',
         ]);
-        $this->mock(\App\Classes\eHealth\Api\Patient\ServiceRequest::class)->shouldNotReceive('cancel', 'getById');
-        $this->mock(\App\Classes\eHealth\Api\Patient\DeviceRequest::class)->shouldNotReceive('cancel');
+        $this->mock(ServiceRequestApi::class)->shouldNotReceive('cancel', 'getById');
+        $this->mock(DeviceRequestApi::class)->shouldNotReceive('cancel');
         Livewire::test(PatientReferrals::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])
             ->call('cancelReferral', $device->uuid, 'service_request')
             ->assertRedirect(route('persons.device-requests', ['legalEntity' => $legalEntity, 'person' => $person]))

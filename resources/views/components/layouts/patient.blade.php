@@ -1,3 +1,4 @@
+@use('App\Models\MedicalEvents\Sql\Composition')
 @props([
     'personId' => null,
     'prepersonId' => null,
@@ -14,11 +15,11 @@
     use App\Models\MedicalEvents\Sql\DetectedIssue;
     use App\Models\MedicalEvents\Sql\DeviceAssociation;
     use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
-    use Illuminate\Support\Facades\Auth;
     use App\Models\MedicalEvents\Sql\Encounter;
     use App\Models\Person\Person;
     use App\Models\Relations\PersonVerificationDetail;
     use Illuminate\Http\Request;
+    use Illuminate\Support\Facades\Auth;
     use Livewire\Livewire;
 
     // A Livewire action runs on its own endpoint, so the page's route is found again from the URL it was sent from
@@ -153,7 +154,7 @@
                                 {{ __('clinical-impressions.plural') }}
                             </a>
 
-                            @can('viewAny', \App\Models\MedicalEvents\Sql\Composition::class)
+                            @can('viewAny', Composition::class)
                                 <a
                                     href="{{ route("$routePrefix.compositions", [legalEntity(), $routeParamKey => $recordId]) }}"
                                     class="summary-tab {{ request()->routeIs("$routePrefix.compositions") ? 'summary-tab-active' : 'summary-tab-inactive' }}"

@@ -23,6 +23,7 @@ use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesEncounterCancellation;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
@@ -367,10 +368,10 @@ class EncounterIndex extends BasePatientComponent
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $encounters
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @param  Collection<int, array<string, mixed>>  $encounters
+     * @return Collection<int, array<string, mixed>>
      */
-    protected function hydrateEncounterReferralLabels(\Illuminate\Support\Collection $encounters): \Illuminate\Support\Collection
+    protected function hydrateEncounterReferralLabels(Collection $encounters): Collection
     {
         $repository = Repository::serviceRequest();
         $requestNumbers = $repository->requestNumbersForEncounters($encounters->all());

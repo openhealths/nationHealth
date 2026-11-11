@@ -10,7 +10,7 @@
 | R02 | 3.17.1.3.3.1: лабораторне направлення на зразок без взаємодії | Окремий `SpecimenReferral` з картки зразка; focus/specimens, допустима лабораторна послуга/група, Person/Preperson, author policy, редагування того самого draft, KEP field errors. `ReferralTv39WorkflowTest`. |
 | R03 | 3.17.2.3–3.1: читання у specimen context без розкриття особи | Клієнт GetBySpecimen, повна валідація усіх сторінок до UI; результат з whitelist полів без subject; контекст та доступ перевіряються перед API. `ServiceRequestContractTv39Test`, `ReferralTv39WorkflowTest`. |
 | R04 | 3.17.1.3.4: permitted_resources із grounds/supporting info | Репозиторій визначає пов’язані епізоди/діагностичні звіти для Condition/Observation/DiagnosticReport лише поточного пацієнта; mapper передає references до підписання. `ReferralTv39WorkflowTest`. |
-| R05 | 3.17.1.14.4: PreQualify незалежно від програми | PreQualify викликається перед підписанням направлення з призначення навіть без програми. Вибрана програма мусить мати verdict; INVALID зупиняє persistence. Чернетки зберігаються без RPC. `ReferralLifecycleTest`. |
+| R05 | 3.17.1.5: PreQualify незалежно від програми | PreQualify викликається перед підписанням направлення з призначення навіть без програми. Вибрана програма мусить мати verdict; INVALID зупиняє persistence. Чернетки зберігаються без RPC. `ReferralLifecycleTest`. |
 | R06 | 3.17.1.3.2.1: дозволені категорії ASSISTANT | Policy перевіряє фактичну категорію сервісу/всіх member services групи з validated catalog; підміна category не обходить guard; невідома конфігурація забороняє. `ReferralTv39WorkflowTest`. |
 | R07 | 3.17.3.3: DOCTOR не виконує counselling | Policy use перевіряє обраного active/APPROVED linked employee, поточний заклад, роль і категорію перед Qualify/Use. Allowed SPECIALIST та denied DOCTOR перевірено. `ReferralTv39WorkflowTest`, `ReferralExecutorPhase4Test`. |
 | R08 | 3.17.3.3.1–3.2: вибір/заміна/скасування програми | У модалі Use є selector service-програми; підписаний вибір пріоритетний, null явно очищає стару програму; повторний Qualify, rejection лишає можливість змінити вибір. `ReferralExecutorPhase4Test`, `ReferralTv39WorkflowTest`. |
@@ -42,3 +42,11 @@ Runtime mapping: `ASSISTANT_SERVICE_REQUEST_ALLOWED_CATEGORIES` → `ehealth.ref
 Pint: **61 touched PHP/Blade files PASS**. `git diff --check` PASS. Перевірено імпорти, repository factories, нові policy calls та переклади feedback.
 
 `PatientReferralDateFiltersTest` і `PatientReferralRegistryUatTest` мають власну вимогу literal database `testing`; їхні guards збережено. Повторний запуск цих двох suites виконує umbrella orchestration у підготовленій ізольованій конфігурації, не в `tv39_1202`.
+
+## Актуалізація main та дат роботи
+
+Umbrella оновлено до upstream/main `c1052b115ba53da2ab43bbb86d144452047815ea` merge commit `7bf33601`: збережено cancellation synchronization, нове видалення чернеток і canonical Person/Preperson routes. Import/FQN audit охоплює всі PHP/Blade файли цього merge.
+
+U01/R07: policy перевіряє фактичні дати обраної посади: start_date null або <= today, end_date null або > today. Майбутня або завершена сьогодні посада з застарілим active прапором не дозволяє Create/Use/CreateCode. Перевірка: `ReferralEmployeeEmploymentPolicyTest`, матриця ПМД/СМД та DOCTOR/SPECIALIST/ASSISTANT/MED_COORDINATOR/MED_ADMIN/LABORANT; відмова specimen create не змінює заявки та не викликає API.
+
+Перевірка доповнення: **78 tests / 456 assertions PASS**, 1 existing PHPUnit deprecation, ізольована база `tv39_1202`. Import/FQN audit **80 merge PHP/Blade files PASS**, Pint **6 final PHP/layout files PASS**, `git diff --check` PASS. У двох великих Blade збережено попереднє форматування; зміни обмежено імпортами й короткими class references.

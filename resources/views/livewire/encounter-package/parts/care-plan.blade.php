@@ -1,3 +1,5 @@
+@use('App\Models\CarePlan')
+
 <div class="p-4 sm:p-8" id="care-plan-section">
     <h2 class="mb-6 text-xl font-bold text-gray-900 dark:text-white">{{ __('patients.care_plans') }}</h2>
 
@@ -23,7 +25,7 @@
     @php
         // Since we might not have a saved encounter yet, we show plans for the patient
         // but highlight ones linked to this encounter if it exists.
-        $linkedCarePlans = \App\Models\CarePlan::where('person_id', $personId)
+        $linkedCarePlans = CarePlan::where('person_id', $personId)
             ->where('encounter_id', $form->encounter['id'] ?? 0)
             ->get();
     @endphp
