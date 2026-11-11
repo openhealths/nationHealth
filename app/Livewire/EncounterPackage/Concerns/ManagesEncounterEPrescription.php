@@ -132,9 +132,13 @@ trait ManagesEncounterEPrescription
                     $encounter->performer?->value
                 );
             }
-        } catch (Throwable $exception) {
+        } catch (ValidationException $exception) {
             $this->encounterEPrescriptionPlanChoices = $this->encounterEPrescriptionActivityChoices = [];
             Session::flash('error', $exception->getMessage());
+        } catch (Throwable $exception) {
+            $this->encounterEPrescriptionPlanChoices = $this->encounterEPrescriptionActivityChoices = [];
+            report($exception);
+            Session::flash('error', __('care-plan.related_plan_unavailable'));
         }
     }
 

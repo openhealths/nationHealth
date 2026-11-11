@@ -128,7 +128,7 @@ class StandaloneRequestSigningTest extends TestCase
             'legal_entity_id' => $this->legalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',
-            'start_date' => now()->format('Y-m-d'),
+            'start_date' => '2026-08-01',
             'user_id' => $this->user->id,
             'party_id' => $party->id,
         ]);
@@ -711,6 +711,8 @@ class DeviceEncounterLinkHarness extends EncounterPackageEdit
 
 class DeviceEncounterActionsHarness extends Component
 {
+    public ?int $prepersonId = null;
+
     public ?int $personId = null;
 
     public int $encounterId = 17;
