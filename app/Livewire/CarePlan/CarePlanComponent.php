@@ -401,10 +401,10 @@ abstract class CarePlanComponent extends Component
             $this->dictionaries['MEDICATION_REQUEST_REJECT_REASON'] = $basics->byName('MEDICATION_REQUEST_REJECT_REASON')
                 ?->asCodeDescription()
                 ?->toArray()
-                ?? $basics->byName('eHealth/MEDICATION_REQUEST_REJECT_REASON')
+                ?? ($basics->byName('eHealth/MEDICATION_REQUEST_REJECT_REASON')
                     ?->asCodeDescription()
                     ?->toArray()
-                ?? [];
+                    ?? []);
 
             $this->dictionaries['device_definition_classification_type'] = $basics->byName('device_definition_classification_type')
                 ?->asCodeDescription()
@@ -930,8 +930,8 @@ abstract class CarePlanComponent extends Component
 
                 if ($user->hasAllowedRole(Role::SPECIALIST->value) || $user->hasAllowedRole(Role::DOCTOR->value)) {
                     $allowedSpecialities = Arr::get($program, 'medical_program_settings.speciality_types_care_plan_activity_allowed')
-                        ?? Arr::get($program, 'medical_program_settings.speciality_types_request_allowed')
-                        ?? Arr::get($program, 'medical_program_settings.speciality_types_allowed', []);
+                        ?? (Arr::get($program, 'medical_program_settings.speciality_types_request_allowed')
+                            ?? Arr::get($program, 'medical_program_settings.speciality_types_allowed', []));
 
                     if (!empty($allowedSpecialities)) {
                         return $mainSpeciality->intersect($allowedSpecialities)->isNotEmpty();
@@ -997,8 +997,8 @@ abstract class CarePlanComponent extends Component
 
                 if ($user->hasAllowedRole(Role::SPECIALIST->value) || $user->hasAllowedRole(Role::DOCTOR->value)) {
                     $allowedSpecialities = Arr::get($program, 'medical_program_settings.speciality_types_care_plan_activity_allowed')
-                        ?? Arr::get($program, 'medical_program_settings.speciality_types_request_allowed')
-                        ?? Arr::get($program, 'medical_program_settings.speciality_types_allowed', []);
+                        ?? (Arr::get($program, 'medical_program_settings.speciality_types_request_allowed')
+                            ?? Arr::get($program, 'medical_program_settings.speciality_types_allowed', []));
 
                     if (!empty($allowedSpecialities)) {
                         return $mainSpeciality->intersect($allowedSpecialities)->isNotEmpty();
