@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Dictionary;
 
 use App\Classes\eHealth\EHealth;
+
 use App\Enums\MedicalProgram\Type;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -66,7 +68,7 @@ class DeviceDefinition extends Component
      */
     public string $filterClassificationTypeCode = '';
 
-    #[\Livewire\Attributes\Locked]
+    #[Locked]
     public bool $embedded = false;
 
     public array $dictionaryNames = [

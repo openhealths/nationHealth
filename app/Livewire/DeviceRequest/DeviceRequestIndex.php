@@ -6,6 +6,7 @@ namespace App\Livewire\DeviceRequest;
 
 use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthConnectionException;
+
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\DeviceRequest\Forms\DeviceRequestSearchForm;
 use App\Models\LegalEntity;
@@ -16,6 +17,8 @@ use App\Repositories\Repository;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -156,7 +159,7 @@ class DeviceRequestIndex extends Component
             return;
         }
         $person = Repository::person()->getById($id);
-        abort_unless(\Illuminate\Support\Str::isUuid($person->uuid), 404);
+        abort_unless(Str::isUuid($person->uuid), 404);
         $this->personId = $person->id;
         unset($this->person);
         $this->patients = [];
@@ -235,14 +238,14 @@ class DeviceRequestIndex extends Component
         abort_unless($this->person?->exists, 404);
         $this->validate(['requesterEntitySearch' => 'nullable|string|max:500']);
         $entitySearch = trim($this->requesterEntitySearch);
-        if ($entitySearch === '' || \Illuminate\Support\Str::isUuid($entitySearch)) {
+        if ($entitySearch === '' || Str::isUuid($entitySearch)) {
             $this->filters->parameters['requester_legal_entity'] = $entitySearch;
         } else {
             $matches = collect($this->legalEntityOptions)->filter(
                 fn (array $entity): bool => mb_strtolower($entity['name']) === mb_strtolower($entitySearch)
             );
             if ($matches->count() !== 1) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
+                throw ValidationException::withMessages([
                     'requesterEntitySearch' => __('device-requests.labels.choose_entity_from_list'),
                 ]);
             }
@@ -273,7 +276,7 @@ class DeviceRequestIndex extends Component
 
         try {
             $response = EHealth::deviceRequest()->getBySearchParams($this->person->uuid, $filters + ['page' => $this->page]);
-            $this->requests = $response->getData();
+            $this->requests = $response->validate();
             $this->totalPages = (int) ($response->getPaging()['total_pages'] ?? 1);
         } catch (Throwable $exception) {
             $this->requests = [];
@@ -303,9 +306,9 @@ class DeviceRequestIndex extends Component
         $this->clearDetails();
 
         try {
-            abort_unless(\Illuminate\Support\Str::isUuid($id), 404);
+            abort_unless(Str::isUuid($id), 404);
             $response = EHealth::deviceRequest()->getById($this->person->uuid, $id);
-            $this->selected = $response->getData();
+            $this->selected = $response->validate();
             $this->selectedId = $id;
             $this->catalog = [];
             $this->phoneConfirmed = false;
@@ -313,7 +316,7 @@ class DeviceRequestIndex extends Component
             $modelId = data_get($this->selected, 'code_reference.identifier.value');
 
             if ($modelId && $loadCatalog) {
-                $this->catalog = [EHealth::deviceDefinition()->getById($modelId)->getData()];
+                $this->catalog = [EHealth::deviceDefinition()->getById($modelId)->validate()];
             } else {
                 foreach ($this->selected['code']['coding'] ?? [] as $coding) {
                     $labels = $service->dictionary($coding['system']);
@@ -439,14 +442,14 @@ class DeviceRequestIndex extends Component
             return;
         }
 
-        abort_unless(\Illuminate\Support\Str::isUuid($id), 404);
+        abort_unless(Str::isUuid($id), 404);
         $this->validate(['selectedId' => 'required|uuid']);
         abort_unless($this->person?->exists, 404);
         $this->dispenseDetails = [];
         $this->resetValidation();
 
         try {
-            $record = EHealth::deviceRequest()->getDispense($this->person->uuid, $id)->getData();
+            $record = EHealth::deviceRequest()->getDispense($this->person->uuid, $id)->validate();
             abort_unless(data_get($record, 'based_on.identifier.value') === $this->selectedId || collect($record['based_on'] ?? [])->contains(fn ($reference) => data_get($reference, 'identifier.value') === $this->selectedId), 404);
             $this->dispenseDetails = $record;
         } catch (Throwable $exception) {
@@ -491,7 +494,7 @@ class DeviceRequestIndex extends Component
             return;
         }
 
-        if ($exception instanceof \Illuminate\Validation\ValidationException) {
+        if ($exception instanceof ValidationException) {
             $this->setErrorBag($exception->validator->errors());
         } else {
             report($exception);

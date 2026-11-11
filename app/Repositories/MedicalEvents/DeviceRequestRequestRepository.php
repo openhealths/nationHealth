@@ -4,22 +4,23 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
+use App\Enums\Person\DeviceRequestStatus;
+use App\Enums\Person\EncounterStatus;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Models\CarePlanActivity;
-use App\Enums\Person\DeviceRequestStatus;
-use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
-use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Condition;
-use App\Models\MedicalEvents\Sql\Observation;
-use App\Models\MedicalEvents\Sql\DiagnosticReport;
-use App\Models\Person\Person;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Condition;
+use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
+use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Observation;
+use App\Models\Person\Person;
 use App\Models\User;
-use App\Enums\Person\EncounterStatus;
+use App\Policies\DeviceRequestRequestPolicy;
+use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
-use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Throwable;
@@ -39,7 +40,9 @@ class DeviceRequestRequestRepository extends BaseRepository
     public function eligibleEncounters(Person $person, User $user, LegalEntity $legalEntity): Collection
     {
         $employees = Employee::forUserInLegalEntity($user, $legalEntity)
-            ->whereIn('employee_type', ['DOCTOR', 'SPECIALIST'])->pluck('uuid');
+            ->whereIn('employee_type', ['DOCTOR', 'SPECIALIST'])->get()
+            ->filter(fn (Employee $employee): bool => app(DeviceRequestRequestPolicy::class)->employee($user, 'device_request:write', $employee->uuid) !== null)
+            ->pluck('uuid');
         $today = CarbonImmutable::now((string) config('app.timezone'))->startOfDay();
 
         return $person->encounters()->whereStatus(EncounterStatus::FINISHED)
@@ -56,9 +59,13 @@ class DeviceRequestRequestRepository extends BaseRepository
 
     public function draftsForPatientUser(int $personId, User $user, LegalEntity $legalEntity): Collection
     {
+        $employees = Employee::forUserInLegalEntity($user, $legalEntity)
+            ->whereIn('employee_type', ['DOCTOR', 'SPECIALIST'])->get()
+            ->filter(fn (Employee $employee): bool => app(DeviceRequestRequestPolicy::class)->employee($user, 'device_request:write', $employee->uuid) !== null)
+            ->pluck('id');
+
         return $this->model->newQuery()->wherePersonId($personId)
-            ->whereHas('employee', fn ($query) => $query->forUserInLegalEntity($user, $legalEntity)
-                ->whereIn('employee_type', ['DOCTOR', 'SPECIALIST']))
+            ->whereIn('employee_id', $employees)
             ->whereStatus(DeviceRequestStatus::DRAFT->value)->whereNotNull('request_payload')->latest()->get();
     }
 

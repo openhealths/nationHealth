@@ -6,7 +6,6 @@ namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Support\Facades\Validator;
 
 class DeviceRequest extends PatientApiBase
 {
@@ -17,15 +16,17 @@ class DeviceRequest extends PatientApiBase
      */
     public function createSigned(string $patientId, array $payload): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('POST /api/patients/{patient_id}/device_requests', false);
+
         return $this->post(self::URL . "/{$patientId}/device_requests", $payload);
     }
 
     /**
-     * Cancel a Device Request (Скасування направлення на виріб).
+     * Compatibility alias for the documented signed mark-in-error operation.
      */
     public function cancel(string $patientId, string $id, array $payload): PromiseInterface|EHealthResponse
     {
-        return $this->patch(self::URL . "/{$patientId}/device_requests/{$id}/actions/cancel", $payload);
+        return $this->markInError($patientId, $id, $payload);
     }
 
     /**
@@ -33,6 +34,8 @@ class DeviceRequest extends PatientApiBase
      */
     public function getById(string $patientId, string $id, array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('GET /api/patients/{patient_id}/device_requests/{device_request_id}', false);
+
         return $this->get(self::URL . "/{$patientId}/device_requests/{$id}", $query);
     }
 
@@ -47,60 +50,13 @@ class DeviceRequest extends PatientApiBase
      */
     public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateMany(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/device_requests', false);
+
         $this->setDefaultPageSize();
 
         $query = array_merge($this->options['query'], $query);
 
         return $this->get(self::URL . "/{$patientId}/device_requests", $query);
-    }
-
-    /**
-     * Validate Device Requests collection.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateMany(EHealthResponse $response): array
-    {
-        $items = $response->getData();
-        $transformedData = [];
-
-        foreach ($items as $item) {
-            if (is_array($item)) {
-                $transformedData[] = $this->replaceEHealthPropNames($item);
-            }
-        }
-
-        $validator = Validator::make($transformedData, [
-            '*.uuid' => ['required', 'uuid'],
-            '*.status' => ['required', 'string'],
-            '*.intent' => ['required', 'string'],
-            '*.requisition' => ['nullable', 'string'],
-            '*.code' => ['nullable', 'array'],
-            '*.code.coding' => ['nullable', 'array'],
-            '*.code.coding.*.system' => ['nullable', 'string'],
-            '*.code.coding.*.code' => ['nullable', 'string'],
-            '*.code_reference' => ['nullable', 'array'],
-            '*.code_reference.identifier.value' => ['nullable', 'uuid'],
-            '*.code_reference.display_value' => ['nullable', 'string'],
-            '*.program' => ['nullable', 'array'],
-            '*.program.identifier.value' => ['nullable', 'uuid'],
-            '*.quantity' => ['nullable', 'array'],
-            '*.quantity.value' => ['nullable', 'numeric'],
-            '*.quantity.code' => ['nullable', 'string'],
-            '*.based_on' => ['nullable', 'array'],
-            '*.based_on.identifier.value' => ['nullable', 'uuid'],
-            '*.dispense_valid_to' => ['nullable', 'date'],
-            '*.authored_on' => ['nullable', 'date'],
-            '*.occurrence_period' => ['nullable', 'array'],
-            '*.requester_legal_entity' => ['nullable', 'array'],
-            '*.requester' => ['nullable', 'array'],
-            '*.encounter' => ['nullable', 'array'],
-            '*.context' => ['nullable', 'array'],
-        ]);
-
-        return $validator->validate();
     }
 
     /**
@@ -110,6 +66,8 @@ class DeviceRequest extends PatientApiBase
      */
     public function prequalify(string $patientId, array $payload): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('POST /api/patients/{patient_id}/device_requests/prequalify', false);
+
         return $this->post(self::URL . "/{$patientId}/device_requests/prequalify", $payload);
     }
 
@@ -120,26 +78,36 @@ class DeviceRequest extends PatientApiBase
      */
     public function resendSms(string $patientId, string $id): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('PATCH /api/patients/{patient_id}/device_requests/{device_request_id}/actions/resend', false);
+
         return $this->patch(self::URL . "/{$patientId}/device_requests/{$id}/actions/resend", []);
     }
 
     public function revoke(string $patientId, string $id, array $payload): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('PATCH /api/patients/{patient_id}/device_requests/{device_request_id}/actions/revoke', false);
+
         return $this->patch(self::URL . "/{$patientId}/device_requests/{$id}/actions/revoke", $payload);
     }
 
     public function complete(string $patientId, string $id): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('PATCH /api/patients/{patient_id}/device_requests/{device_request_id}/actions/complete', false);
+
         return $this->patch(self::URL . "/{$patientId}/device_requests/{$id}/actions/complete", []);
     }
 
     public function markInError(string $patientId, string $id, array $payload): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('PATCH /api/patients/{patient_id}/device_requests/{device_request_id}/actions/mark_in_error', false);
+
         return $this->patch(self::URL . "/{$patientId}/device_requests/{$id}/actions/mark_in_error", $payload);
     }
 
     public function getDispenses(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('GET /api/patients/{patient_id}/device_dispenses', false);
+
         $this->setDefaultPageSize();
 
         return $this->get(self::URL . "/{$patientId}/device_dispenses", array_merge($this->options['query'], $query));
@@ -147,6 +115,8 @@ class DeviceRequest extends PatientApiBase
 
     public function getDispense(string $patientId, string $id): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('GET /api/patients/{patient_id}/device_dispenses/{device_dispense_id}', false);
+
         return $this->get(self::URL . "/{$patientId}/device_dispenses/{$id}");
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\MedicalEvents;
 
+use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Division;
@@ -18,6 +20,7 @@ use App\Models\Relations\Party;
 use App\Models\User;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -49,7 +52,7 @@ class ResolvesEmployeeContextTest extends TestCase
         ]);
     }
 
-    public function test_prefers_the_encounter_performer_over_the_acting_employee(): void
+    public function test_preserves_the_explicit_acting_employee_when_another_doctor_performed_the_encounter(): void
     {
         $performer = $this->createEmployee('Performer');
         $acting = $this->createEmployee('Acting');
@@ -59,12 +62,12 @@ class ResolvesEmployeeContextTest extends TestCase
         $context = app(ReferralRequestLifecycleService::class)
             ->resolveEmployeeContext($carePlan, null, $acting->id);
 
-        $this->assertSame($performer->id, $context['employee_id']);
-        $this->assertSame($performer->uuid, $context['employee_uuid']);
+        $this->assertSame($acting->id, $context['employee_id']);
+        $this->assertSame($acting->uuid, $context['employee_uuid']);
         $this->assertSame($this->legalEntity->uuid, $context['legal_entity_uuid']);
     }
 
-    public function test_falls_back_to_the_activity_author_then_to_the_acting_employee(): void
+    public function test_uses_the_activity_author_only_when_no_actor_is_selected(): void
     {
         $author = $this->createEmployee('Author');
         $acting = $this->createEmployee('Acting');
@@ -83,13 +86,26 @@ class ResolvesEmployeeContextTest extends TestCase
 
         $this->assertSame(
             $author->id,
-            $service->resolveEmployeeContext($carePlan, $activity, $acting->id)['employee_id']
+            $service->resolveEmployeeContext($carePlan, $activity)['employee_id']
         );
 
         $this->assertSame(
             $acting->id,
             $service->resolveEmployeeContext($carePlan, null, $acting->id)['employee_id']
         );
+    }
+
+    public function test_a_missing_selected_actor_does_not_substitute_the_historical_author(): void
+    {
+        $performer = $this->createEmployee('Historical performer');
+        $encounter = $this->createEncounter($performer->uuid);
+        $carePlan = $this->createCarePlan($performer, $encounter);
+        $service = app(ReferralRequestLifecycleService::class);
+        $missingId = Employee::max('id') + 1;
+
+        $this->assertNull($service->resolveEmployeeContext($carePlan, null, $missingId)['employee_id']);
+        $this->assertNull($service->resolveEncounterEmployeeContext($encounter, $missingId)['employee_id']);
+        $this->assertSame($performer->id, $service->resolveEncounterEmployeeContext($encounter)['employee_id']);
     }
 
     public function test_resolves_nothing_when_the_caller_names_no_acting_employee(): void
@@ -163,8 +179,8 @@ class ResolvesEmployeeContextTest extends TestCase
 
     private function createLegalEntity(): LegalEntity
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         return LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -196,8 +212,8 @@ class ResolvesEmployeeContextTest extends TestCase
         return Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => $name,
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $this->legalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',

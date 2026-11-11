@@ -14,12 +14,44 @@
             @endforeach
         </div>
     @endif
+    <fieldset class="fieldset-card space-y-4 p-6">
+        <legend class="legend">{{ __('device-requests.plan.title') }}</legend>
+        <label
+            >{{ __('device-requests.form.plan_search') }}
+            <input wire:model="carePlanSearch" wire:keydown.enter.prevent="searchCarePlans" class="input w-full" />
+        </label>
+        <button type="button" wire:click="searchCarePlans" class="button-minor">{{ __('forms.search') }}</button>
+        <select wire:change="selectCarePlan($event.target.value)" class="input-select w-full">
+            <option value="0">{{ __('device-requests.form.without_plan') }}</option>
+            @foreach ($carePlanChoices as $choice)
+                <option value="{{ $choice['id'] }}" @selected($selectedCarePlanId === $choice['id'])>
+                    {{ $choice['label'] }}
+                </option>
+            @endforeach
+        </select>
+        @if ($carePlanApprovalRequired && $this->selectedCarePlan)
+            <p>{{ __('care-plan.prescribing_patient_access_required') }}</p>
+            @livewire('care-plan.care-plan-approvals', ['legalEntity' => $legalEntity, 'carePlan' => $this->selectedCarePlan], key('device-plan-access-'.$selectedCarePlanId))
+            <button type="button" wire:click="searchCarePlans" class="button-minor">
+                {{ __('device-requests.form.refresh_plan_access') }}
+            </button>
+        @elseif ($selectedCarePlanId)
+            <select wire:change="selectCarePlanActivity($event.target.value)" class="input-select w-full">
+                <option value="0">{{ __('device-requests.form.choose_plan_activity') }}</option>
+                @foreach ($carePlanActivityChoices as $choice)
+                    <option value="{{ $choice['id'] }}" @selected($selectedCarePlanActivityId === $choice['id'])>
+                        {{ $choice['description'] ?: $choice['uuid'] }} · {{ __('device-requests.form.remaining') }}: {{ data_get($choice, 'remainingQuantity.value', '—') }} {{ data_get($choice, 'remainingQuantity.unit', data_get($choice, 'remainingQuantity.code', '')) }}
+                    </option>
+                @endforeach
+            </select>
+        @endif
+    </fieldset>
     <form wire:submit="createDraft" novalidate class="space-y-8">
         <div class="grid gap-6 rounded-xl border border-gray-200 p-6 md:grid-cols-2 dark:border-gray-700">
             <label
                 >{{ __('device-requests.form.encounter') }}
                 <select
-                    wire:model="request.encounter_uuid"
+                    wire:model.live="request.encounter_uuid"
                     class="input-select w-full @error('request.encounter_uuid') input-error @enderror"
                 >
                     <option value="">{{ __('device-requests.form.choose_encounter') }}</option>
@@ -101,6 +133,11 @@
                 <p>
                     {{ __('device-requests.form.selected_model') }}: {{ data_get($options, 'model.device_names.0.name', data_get($options, 'model.model_number', $request['device_id'])) }}
                 </p>
+                @if (!empty($options['model']['manufacturer']))
+                    <p>
+                        {{ __('device-requests.form.manufacturer') }}: {{ $options['model']['manufacturer']['name'] }} ({{ $options['model']['manufacturer']['country'] }})
+                    </p>
+                @endif
             @endif
             @foreach (['started_at' => 'start', 'ended_at' => 'end'] as $field => $label)
                 <div class="form-group group">

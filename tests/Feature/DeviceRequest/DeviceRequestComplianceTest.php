@@ -8,25 +8,40 @@ use App\Classes\eHealth\Api\CarePlan;
 use App\Classes\eHealth\Api\CarePlanActivity;
 use App\Classes\eHealth\Api\Configuration;
 use App\Classes\eHealth\Api\DeviceDefinition;
+use App\Classes\eHealth\Api\Dictionary;
 use App\Classes\eHealth\Api\Patient\DeviceRequest as DeviceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Exceptions\EHealth\EHealthValidationException;
+use App\Livewire\CarePlan\CarePlanShow;
+use App\Models\CarePlan as ModelsCarePlan;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
-use App\Models\Person\Person;
+
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
+use App\Models\MedicalEvents\Sql\Condition;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
-use App\Models\MedicalEvents\Sql\Coding;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
-use App\Repositories\MedicalEvents\PeriodRepository;
+use App\Models\MedicalEvents\Sql\Observation;
+use App\Models\Person\Person;
+use App\Models\User;
+use App\Repositories\CarePlanRepository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
+use App\Services\MedicalEvents\EHealthJobResolver;
 use Carbon\CarbonImmutable;
-use GuzzleHttp\Psr7\Response;
+use Illuminate\Auth\Access\Response as AccessResponse;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
+use Tests\Support\NativeClinicalFixtures;
 use Tests\TestCase;
 
 class DeviceRequestComplianceTest extends TestCase
@@ -43,11 +58,12 @@ class DeviceRequestComplianceTest extends TestCase
         DB::statement("SET LOCAL TIME ZONE 'UTC'");
         $this->travelTo(CarbonImmutable::parse('2026-10-29 23:30:00', (string) config('app.timezone')));
         $this->person = Person::create(['uuid' => (string) Str::uuid(), 'gender' => 'MALE']);
+        $this->person->names()->create(['first_name' => 'Тест', 'last_name' => 'Пацієнт', 'language' => 'uk']);
         $this->legalEntity = new LegalEntity(['uuid' => (string) Str::uuid()]);
         $this->requestId = (string) Str::uuid();
     }
 
-    private function response(array $data, array $urgent = [], array $paging = [], bool $validated = false): EHealthResponse
+    private function response(array $data, array $urgent = [], array $paging = [], bool $validated = false, ?string $operation = null): EHealthResponse
     {
         if ($validated) {
             $response = Mockery::mock(EHealthResponse::class);
@@ -55,8 +71,44 @@ class DeviceRequestComplianceTest extends TestCase
 
             return $response;
         }
+        $paging = $paging === [] ? null : array_replace(NativeClinicalFixtures::paging(), $paging);
+        if (isset($data['status']) || isset($data['requisition'])) {
+            $data = NativeClinicalFixtures::deviceRequest($this->requestId, $this->person->uuid, $data);
+            unset($data['identity']);
 
-        return new EHealthResponse(new Response(200, [], json_encode(compact('data', 'urgent', 'paging'), JSON_THROW_ON_ERROR)));
+            return NativeClinicalFixtures::response('GET /api/patients/{patient_id}/device_requests/{device_request_id}', $data, urgent: $urgent === [] ? null : $urgent);
+        }
+        if (isset($data[0]['status'])) {
+            $data = array_map(static fn (array $row): array => array_replace(['program_id' => NativeClinicalFixtures::UUID, 'program_name' => 'Program'], $row), $data);
+
+            return NativeClinicalFixtures::response('POST /api/patients/{patient_id}/device_requests/prequalify', $data);
+        }
+        if (isset($data[0]['values'])) {
+            $data = array_map(static function (array $row): array {
+                $row['description'] = 'Device dictionary';
+                $row['is_active'] = true;
+                $row['values'] = array_map(NativeClinicalFixtures::dictionaryValue(...), $row['values']);
+
+                return $row;
+            }, $data);
+
+            return NativeClinicalFixtures::response('GET /api/v2/dictionaries', $data);
+        }
+        if (isset($data['classification_types'])) {
+            return NativeClinicalFixtures::definitionResponse(NativeClinicalFixtures::definition($data));
+        }
+        if (isset($data[0]['packaging'])) {
+            return NativeClinicalFixtures::definitionResponse(array_map(NativeClinicalFixtures::definition(...), $data), $paging);
+        }
+        if ($operation === 'resend') {
+            return NativeClinicalFixtures::response('PATCH /api/patients/{patient_id}/device_requests/{device_request_id}/actions/resend', ['status' => 'pending', 'links' => [['entity' => 'job', 'href' => '/api/Jobs/job-123']]]);
+        }
+        $operation ??= isset($data[0]['settings'][0]['codes'])
+            ? 'GET /api/dictionaries_configurations'
+            : (isset($data[0]['code']) ? 'GET /api/device_parameters_configurations' : 'GET /api/devices_configurations');
+        $data = array_map(NativeClinicalFixtures::configuration(...), $data);
+
+        return NativeClinicalFixtures::response($operation, $data, $paging);
     }
 
     private function service(): DeviceRequestLifecycleService
@@ -73,7 +125,7 @@ class DeviceRequestComplianceTest extends TestCase
         $items = app(DeviceRequestLifecycleService::class)->collectPages(function (int $page) use (&$pages): EHealthResponse {
             $pages[] = $page;
 
-            return $this->response([['id' => $page]], paging: ['page_number' => $page, 'total_pages' => 3]);
+            return $this->response([['id' => (string) $page]], paging: ['page_number' => $page, 'total_pages' => 3]);
         });
         $this->assertSame([1, 2, 3], $pages);
         $this->assertCount(3, $items);
@@ -85,7 +137,7 @@ class DeviceRequestComplianceTest extends TestCase
         $config->shouldReceive('getDictionaries')->once()->with(['name' => 'assistive_devices', 'is_active' => true, 'page' => 1])
             ->andReturn($this->response([['settings' => [['system' => 'eHealth/assistive_devices', 'codes' => ['leaf', 'inactive-leaf', 'hidden-leaf']]]]], paging: ['page_number' => 1, 'total_pages' => 1]));
         $this->instance(Configuration::class, $config);
-        $dictionary = Mockery::mock(\App\Classes\eHealth\Api\Dictionary::class);
+        $dictionary = Mockery::mock(Dictionary::class);
         $dictionary->shouldReceive('getMany')->once()->with(['name' => 'eHealth/assistive_devices', 'is_active' => true])
             ->andReturn($this->response([['name' => 'eHealth/assistive_devices', 'values' => [
                 ['code' => 'parent', 'description' => 'Категорія', 'is_active' => true, 'child_values' => [
@@ -98,7 +150,7 @@ class DeviceRequestComplianceTest extends TestCase
                     ['code' => 'hidden-leaf', 'description' => 'Прихований виріб', 'is_active' => true],
                 ]],
             ]]]));
-        $this->instance(\App\Classes\eHealth\Api\Dictionary::class, $dictionary);
+        $this->instance(Dictionary::class, $dictionary);
         $this->assertSame(
             ['eHealth/assistive_devices|leaf' => ['system' => 'eHealth/assistive_devices', 'code' => 'leaf', 'label' => 'Виріб']],
             app(DeviceRequestLifecycleService::class)->permittedTypes(false)
@@ -117,16 +169,16 @@ class DeviceRequestComplianceTest extends TestCase
             'statusReason' => ['coding' => [['code' => 'other', 'system' => 'eHealth/care_plan_cancel_reasons']], 'text' => 'Confirmed reason'],
             'note' => 'Note',
         ];
-        $plan = new \App\Models\CarePlan(['uuid' => (string) Str::uuid(), 'status' => 'cancelled', 'person_id' => $this->person->id]);
-        $repository = Mockery::mock(\App\Repositories\CarePlanRepository::class)->makePartial();
+        $plan = new ModelsCarePlan(['uuid' => (string) Str::uuid(), 'status' => 'cancelled', 'person_id' => $this->person->id]);
+        $repository = Mockery::mock(CarePlanRepository::class)->makePartial();
         $repository->shouldReceive('getResource')->once()->with($plan)->andReturn($resource);
-        $this->instance(\App\Repositories\CarePlanRepository::class, $repository);
-        $user = Mockery::mock(\App\Models\User::class);
+        $this->instance(CarePlanRepository::class, $repository);
+        $user = Mockery::mock(User::class);
         $user->shouldReceive('can')->once()->with('view', $plan)->andReturnTrue();
-        \Illuminate\Support\Facades\Auth::shouldReceive('user')->once()->andReturn($user);
+        Auth::shouldReceive('user')->once()->andReturn($user);
         $this->mock(CarePlan::class)->shouldNotReceive('getDetails');
 
-        $component = new \App\Livewire\CarePlan\CarePlanShow();
+        $component = new CarePlanShow();
         $component->carePlan = $plan;
         $component->refreshDisplayedDetails();
         $record = $component->remotePlanDetails;
@@ -148,14 +200,14 @@ class DeviceRequestComplianceTest extends TestCase
 
     public function test_plan_details_are_cleared_without_read_permission(): void
     {
-        $plan = new \App\Models\CarePlan(['uuid' => (string) Str::uuid(), 'status' => 'active']);
-        $user = Mockery::mock(\App\Models\User::class);
+        $plan = new ModelsCarePlan(['uuid' => (string) Str::uuid(), 'status' => 'active']);
+        $user = Mockery::mock(User::class);
         $user->shouldReceive('can')->once()->with('view', $plan)->andReturnFalse();
-        \Illuminate\Support\Facades\Auth::shouldReceive('user')->once()->andReturn($user);
-        $service = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class);
+        Auth::shouldReceive('user')->once()->andReturn($user);
+        $service = Mockery::mock(CarePlan::class);
         $service->shouldNotReceive('getDetails');
-        $this->instance(\App\Classes\eHealth\Api\CarePlan::class, $service);
-        $component = new \App\Livewire\CarePlan\CarePlanShow();
+        $this->instance(CarePlan::class, $service);
+        $component = new CarePlanShow();
         $component->carePlan = $plan;
         $component->remotePlanDetails = ['requisition' => 'stale'];
 
@@ -173,11 +225,11 @@ class DeviceRequestComplianceTest extends TestCase
     {
         $planUuid = (string) Str::uuid();
         $activityUuid = (string) Str::uuid();
-        $localPlan = new \App\Models\CarePlan(['uuid' => $planUuid]);
-        $repository = Mockery::mock(\App\Repositories\CarePlanRepository::class)->makePartial();
+        $localPlan = new ModelsCarePlan(['uuid' => $planUuid]);
+        $repository = Mockery::mock(CarePlanRepository::class)->makePartial();
         $repository->shouldReceive('findByUuid')->once()->with($planUuid, legalEntity()?->id, $this->person->id)->andReturn($localPlan);
-        $this->instance(\App\Repositories\CarePlanRepository::class, $repository);
-        \Illuminate\Support\Facades\Gate::shouldReceive('authorize')->once()->with('manageActivities', $localPlan)->andReturn(\Illuminate\Auth\Access\Response::allow());
+        $this->instance(CarePlanRepository::class, $repository);
+        Gate::shouldReceive('authorize')->once()->with('manageActivities', [$localPlan, null])->andReturn(AccessResponse::allow());
         $plan = Mockery::mock(CarePlan::class);
         $plan->shouldReceive('getDetails')->andReturn($this->response(['status' => $planStatus, 'period' => ['start' => now()->subDay()->toIso8601String(), 'end' => $end]], validated: true));
         $activity = Mockery::mock(CarePlanActivity::class);
@@ -251,7 +303,8 @@ class DeviceRequestComplianceTest extends TestCase
     public function test_sms_is_once_even_without_local_request(): void
     {
         $api = $this->smsApi('+380***1234');
-        $api->shouldReceive('resendSms')->once()->andReturn($this->response([]));
+        $api->shouldReceive('resendSms')->once()->andReturn($this->response([], operation: 'resend'));
+        $this->mock(EHealthJobResolver::class)->shouldReceive('resolve')->once()->andReturn(['status' => 'processed']);
         $service = $this->service();
         $service->resendOnce($this->person, $this->legalEntity, $this->requestId, true, '+380***1234');
         $this->assertDatabaseHas('device_request_sms_resends', ['device_request_uuid' => $this->requestId]);
@@ -272,11 +325,11 @@ class DeviceRequestComplianceTest extends TestCase
 
     public function test_sms_timeout_keeps_claim_to_prevent_duplicate(): void
     {
-        $this->smsApi('+380***1234')->shouldReceive('resendSms')->once()->andThrow(new \RuntimeException('Timeout'));
+        $this->smsApi('+380***1234')->shouldReceive('resendSms')->once()->andThrow(new RuntimeException('Timeout'));
         try {
             $this->service()->resendOnce($this->person, $this->legalEntity, $this->requestId, true, '+380***1234');
             $this->fail('Timeout must propagate.');
-        } catch (\RuntimeException) {
+        } catch (RuntimeException) {
             $this->assertDatabaseHas('device_request_sms_resends', ['device_request_uuid' => $this->requestId, 'confirmed_at' => null]);
         }
     }
@@ -329,7 +382,7 @@ class DeviceRequestComplianceTest extends TestCase
             'class_id' => Coding::create(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id,
             'type_id' => CodeableConcept::create()->id, 'ehealth_inserted_at' => now(),
         ]);
-        app(PeriodRepository::class)->sync($encounter, ['start' => $end, 'end' => $end]);
+        MedicalEventsRepository::period()->sync($encounter, ['start' => $end, 'end' => $end]);
 
         return $encounter;
     }
@@ -384,16 +437,16 @@ class DeviceRequestComplianceTest extends TestCase
     {
         $concept = CodeableConcept::create(['text' => 'Перевірений стан']);
         $context = Identifier::create(['value' => (string) Str::uuid()]);
-        $condition = \App\Models\MedicalEvents\Sql\Condition::create([
+        $condition = Condition::create([
             'uuid' => (string) Str::uuid(), 'person_id' => $this->person->id, 'primary_source' => true,
             'context_id' => $context->id, 'code_id' => $concept->id, 'clinical_status' => 'active',
             'verification_status' => 'confirmed', 'onset_date' => now(), 'ehealth_inserted_at' => now(),
         ]);
-        $observation = \App\Models\MedicalEvents\Sql\Observation::create([
+        $observation = Observation::create([
             'uuid' => (string) Str::uuid(), 'person_id' => $this->person->id, 'primary_source' => true,
             'code_id' => $concept->id, 'status' => 'valid', 'issued' => now(), 'ehealth_inserted_at' => now(),
         ]);
-        $report = \App\Models\MedicalEvents\Sql\DiagnosticReport::create([
+        $report = DiagnosticReport::create([
             'uuid' => (string) Str::uuid(), 'person_id' => $this->person->id, 'primary_source' => true,
             'code_id' => $context->id, 'recorded_by_id' => $context->id, 'status' => 'final', 'issued' => now(),
         ]);
@@ -410,7 +463,7 @@ class DeviceRequestComplianceTest extends TestCase
         $acceptedInPackage->uuid = (string) Str::uuid();
         $acceptedInPackage->contextId = Identifier::create(['value' => $finishedEncounter->uuid])->id;
         $acceptedInPackage->save();
-        $catalog = app(\App\Repositories\MedicalEvents\DeviceRequestRequestRepository::class)->reasonOptions($this->person);
+        $catalog = MedicalEventsRepository::deviceRequest()->reasonOptions($this->person);
         $this->assertEqualsCanonicalizing([$condition->uuid, $acceptedInPackage->uuid], array_keys($catalog['condition']));
         $this->assertStringContainsString('Перевірений стан', $catalog['condition'][$condition->uuid]);
         $this->assertSame([$observation->uuid], array_keys($catalog['observation']));
@@ -481,12 +534,12 @@ class DeviceRequestComplianceTest extends TestCase
             $patientId === $this->person->uuid
             && data_get($payload, 'programs.0.identifier.value') === $data['program_id']
             && data_get($payload, 'device_request.quantity.value') === 50)
-            ->andReturn($this->response(['links' => [['href' => '/api/Jobs/123']]]));
+            ->andReturn($this->response([['program_id' => $data['program_id'], 'program_name' => 'Program', 'status' => 'VALID']]));
         $this->instance(DeviceRequestApi::class, $api);
-        $resolver = Mockery::mock(\App\Services\MedicalEvents\EHealthJobResolver::class);
+        $resolver = Mockery::mock(EHealthJobResolver::class);
         $resolver->shouldReceive('resolve')->once()->andReturn([['status' => 'VALID']]);
         $resolver->shouldReceive('assertPrequalifyValid')->once()->with([['status' => 'VALID']]);
-        $this->instance(\App\Services\MedicalEvents\EHealthJobResolver::class, $resolver);
+        $this->instance(EHealthJobResolver::class, $resolver);
         $prepared = $service->prepare($this->person, $this->legalEntity, $data);
         $this->assertSame(50, $prepared['payload']['quantity']['value']);
         $this->assertSame($data['program_id'], $prepared['payload']['program']['identifier']['value']);
@@ -580,7 +633,7 @@ class DeviceRequestComplianceTest extends TestCase
         try {
             $service->prepare($this->person, $this->legalEntity, $data);
             $this->fail('An invalid program prequalification must block preparation.');
-        } catch (\App\Exceptions\EHealth\EHealthValidationException $exception) {
+        } catch (EHealthValidationException $exception) {
             $this->assertSame('Device is not available under this program', $exception->getDetails()['error']['message']);
         }
     }
@@ -596,9 +649,9 @@ class DeviceRequestComplianceTest extends TestCase
         $service->shouldReceive('dictionary')->with('height_values')->andReturn(['small' => 'Малий', 'large' => 'Великий']);
         $devices = Mockery::mock(DeviceDefinition::class);
         $devices->shouldReceive('getMany')->andReturn($this->response([
-            ['id' => 'a', 'packaging' => ['packaging_count' => 30, 'packaging_unit' => 'piece'], 'program_devices' => [['device_request_allowed' => true, 'max_daily_count' => 5]]],
-            ['id' => 'b', 'packaging' => ['packaging_count' => 50, 'packaging_unit' => 'piece'], 'program_devices' => [['device_request_allowed' => true, 'max_daily_count' => 10]]],
-            ['id' => 'c', 'packaging' => ['packaging_count' => 100, 'packaging_unit' => 'piece'], 'program_devices' => [['device_request_allowed' => false]]],
+            ['id' => '3e34da3d-9b8c-4aaf-be8e-24a161279b6a', 'packaging' => ['packaging_count' => 30, 'packaging_unit' => 'piece'], 'program_devices' => [['device_request_allowed' => true, 'max_daily_count' => 5]]],
+            ['id' => '3bc7a920-53a5-46a6-a88e-b5f298c7b898', 'packaging' => ['packaging_count' => 50, 'packaging_unit' => 'piece'], 'program_devices' => [['device_request_allowed' => true, 'max_daily_count' => 10]]],
+            ['id' => 'e477a845-972b-47a1-8ca3-1c71e4fd00c2', 'packaging' => ['packaging_count' => 100, 'packaging_unit' => 'piece'], 'program_devices' => [['device_request_allowed' => false]]],
         ], paging: ['page_number' => 1, 'total_pages' => 1]));
         $this->instance(DeviceDefinition::class, $devices);
         $config = Mockery::mock(Configuration::class);
@@ -628,7 +681,7 @@ class DeviceRequestComplianceTest extends TestCase
             [$service, $data] = $this->preparation();
             $period = ['start' => now()->toIso8601String(), 'end' => now()->addWeek()->toIso8601String()];
             $detail = ['quantity' => ['value' => 100, 'code' => $case === 'wrongUnit' ? 'different' : 'piece'], 'remaining_quantity' => ['value' => 100], 'product_reference' => ['identifier' => ['value' => $data['device_id']]], 'scheduled_period' => $period];
-            $service->shouldReceive('carePlanContext')->once()->with($this->person, $planUuid, $activityUuid)->andReturn(['plan' => ['period' => $period], 'detail' => $detail]);
+            $service->shouldReceive('carePlanContext')->once()->with($this->person, $planUuid, $activityUuid, null)->andReturn(['plan' => ['period' => $period], 'detail' => $detail]);
             $data['quantity'] = $case === 'missing' ? null : 50;
             try {
                 $prepared = $service->prepare($this->person, $this->legalEntity, $data, $planUuid, $activityUuid);

@@ -7,20 +7,25 @@ namespace Tests\Unit\Services\MedicalEvents;
 use App\Classes\eHealth\Api\Contract as ContractApi;
 use App\Classes\eHealth\Api\DeviceDefinition;
 use App\Classes\eHealth\EHealthResponse;
+
 use App\Enums\Contract\ContractStatus;
 use App\Enums\JobStatus;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Contracts\Contract;
+use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
+use App\Services\Dictionary\DictionaryManager;
 use App\Services\MedicalEvents\DeviceProgramParticipationGuard;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Mockery;
 use ReflectionMethod;
 use RuntimeException;
+use Tests\Support\NativeClinicalFixtures;
 use Tests\TestCase;
 
 class DeviceProgramParticipationGuardTest extends TestCase
@@ -138,19 +143,19 @@ class DeviceProgramParticipationGuardTest extends TestCase
         $api->shouldReceive('getMany')->once()->with([
             'medical_program_id' => 'program', 'page_size' => 300, 'page' => 1,
         ])->andReturn(new EHealthResponse(new Response(200, [], json_encode([
-            'data' => [['id' => 'other-device']],
-            'paging' => ['page_number' => 1, 'total_pages' => 2],
-        ]))));
+            'data' => [NativeClinicalFixtures::definition()],
+            'paging' => NativeClinicalFixtures::paging(1, 2),
+        ])), fn (EHealthResponse $response): array => (new ReflectionMethod(DeviceDefinition::class, 'validateDefinitions'))->invoke(new DeviceDefinition(), $response, true)));
         $api->shouldReceive('getMany')->once()->with([
             'medical_program_id' => 'program', 'page_size' => 300, 'page' => 2,
         ])->andReturn(new EHealthResponse(new Response(200, [], json_encode([
-            'data' => [['id' => 'target-device', 'is_active' => true]],
-            'paging' => ['page_number' => 2, 'total_pages' => 2],
-        ]))));
+            'data' => [NativeClinicalFixtures::definition(['id' => '3bc7a920-53a5-46a6-a88e-b5f298c7b898'])],
+            'paging' => NativeClinicalFixtures::paging(2, 2),
+        ])), fn (EHealthResponse $response): array => (new ReflectionMethod(DeviceDefinition::class, 'validateDefinitions'))->invoke(new DeviceDefinition(), $response, true)));
         $this->instance(DeviceDefinition::class, $api);
 
         $this->assertTrue(app(DeviceProgramParticipationGuard::class)
-            ->isDeviceInProgramCatalog('program', 'target-device'));
+            ->isDeviceInProgramCatalog('program', '3bc7a920-53a5-46a6-a88e-b5f298c7b898'));
     }
 
     public function test_incomplete_catalog_pagination_is_a_lookup_warning_not_a_missing_device(): void
@@ -161,9 +166,9 @@ class DeviceProgramParticipationGuardTest extends TestCase
             'paging' => ['page_number' => 1],
         ]))));
         $this->instance(DeviceDefinition::class, $api);
-        $dictionary = Mockery::mock(\App\Services\Dictionary\DictionaryManager::class);
+        $dictionary = Mockery::mock(DictionaryManager::class);
         $dictionary->shouldReceive('medicalPrograms')->andReturn(collect());
-        $this->instance(\App\Services\Dictionary\DictionaryManager::class, $dictionary);
+        $this->instance(DictionaryManager::class, $dictionary);
         $guard = Mockery::mock(DeviceProgramParticipationGuard::class)->makePartial();
         $guard->shouldReceive('resolveParticipatingProgramIds')->once()->andReturn(['program']);
         $activity = new CarePlanActivity(['program' => 'program', 'product_reference' => 'target-device']);
@@ -214,7 +219,7 @@ class DeviceProgramParticipationGuardTest extends TestCase
             'process_disclosure_data_consent' => true,
         ]);
 
-        $employee = \App\Models\Employee\Employee::create([
+        $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Test Doctor',
             'employee_type' => 'DOCTOR',
@@ -291,7 +296,7 @@ class DeviceProgramParticipationGuardTest extends TestCase
             'process_disclosure_data_consent' => true,
         ]);
 
-        $employee = \App\Models\Employee\Employee::create([
+        $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Test Doctor',
             'employee_type' => 'DOCTOR',
@@ -362,8 +367,8 @@ class DeviceProgramParticipationGuardTest extends TestCase
 
     private function createLegalEntity(): LegalEntity
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),

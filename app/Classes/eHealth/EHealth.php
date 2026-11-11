@@ -7,10 +7,11 @@ namespace App\Classes\eHealth;
 use App\Classes\eHealth\Api\Address;
 use App\Classes\eHealth\Api\Approval;
 use App\Classes\eHealth\Api\Auth;
-use App\Classes\eHealth\Api\Configuration;
-use App\Classes\eHealth\Api\Contract;
 use App\Classes\eHealth\Api\CarePlan;
 use App\Classes\eHealth\Api\CarePlanActivity;
+use App\Classes\eHealth\Api\Configuration;
+use App\Classes\eHealth\Api\Connection;
+use App\Classes\eHealth\Api\Contract;
 use App\Classes\eHealth\Api\ContractRequest;
 use App\Classes\eHealth\Api\Declaration;
 use App\Classes\eHealth\Api\DeclarationRequest;
@@ -37,14 +38,19 @@ use App\Classes\eHealth\Api\Patient\Composition;
 use App\Classes\eHealth\Api\Patient\Condition;
 use App\Classes\eHealth\Api\Patient\DetectedIssue;
 use App\Classes\eHealth\Api\Patient\Device;
-use App\Classes\eHealth\Api\Patient\DeviceDispense;
 use App\Classes\eHealth\Api\Patient\DeviceAssociation;
+use App\Classes\eHealth\Api\Patient\DeviceDispense;
+use App\Classes\eHealth\Api\Patient\DeviceRequest;
 use App\Classes\eHealth\Api\Patient\DiagnosticReport;
 use App\Classes\eHealth\Api\Patient\Encounter;
 use App\Classes\eHealth\Api\Patient\Episode;
 use App\Classes\eHealth\Api\Patient\Immunization;
+use App\Classes\eHealth\Api\Patient\MedicationDispense;
+use App\Classes\eHealth\Api\Patient\MedicationRequest;
+use App\Classes\eHealth\Api\Patient\MedicationRequestRequest;
 use App\Classes\eHealth\Api\Patient\Observation;
 use App\Classes\eHealth\Api\Patient\Procedure;
+use App\Classes\eHealth\Api\Patient\ServiceRequest;
 use App\Classes\eHealth\Api\Patient\Specimen;
 use App\Classes\eHealth\Api\Person;
 use App\Classes\eHealth\Api\PersonRequest;
@@ -52,13 +58,8 @@ use App\Classes\eHealth\Api\Preperson;
 use App\Classes\eHealth\Api\RuleEngineRules;
 use App\Classes\eHealth\Api\Service;
 use App\Classes\eHealth\Api\Verification;
-use App\Classes\eHealth\Api\Connection;
-use App\Classes\eHealth\Api\Patient\MedicationRequest;
-use App\Classes\eHealth\Api\Patient\MedicationDispense;
-use App\Classes\eHealth\Api\Patient\ServiceRequest;
-use App\Classes\eHealth\Api\Patient\DeviceRequest;
 
-final class EHealth
+class EHealth
 {
     public static function approval(): Approval
     {
@@ -286,9 +287,9 @@ final class EHealth
         return app(MedicationRequest::class);
     }
 
-    public static function medicationRequestRequest(): \App\Classes\eHealth\Api\Patient\MedicationRequestRequest
+    public static function medicationRequestRequest(): MedicationRequestRequest
     {
-        return app(\App\Classes\eHealth\Api\Patient\MedicationRequestRequest::class);
+        return app(MedicationRequestRequest::class);
     }
 
     public static function medicationDispense(): MedicationDispense

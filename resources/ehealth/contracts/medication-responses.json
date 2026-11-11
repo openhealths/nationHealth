@@ -1,0 +1,5156 @@
+{
+  "source": "https://ehealthmisapi1.docs.apiary.io/",
+  "version": "9.15.9",
+  "captured_at": "2026-10-22",
+  "operations": {
+    "request_create": {
+      "path": "/api/medication_request_requests",
+      "method": "POST",
+      "data": {
+        "$ref": "#/components/schemas/request_create"
+      }
+    },
+    "request_detail": {
+      "path": "/api/persons/{person_id}/medication_request_requests/{id}",
+      "method": "GET",
+      "data": {
+        "$ref": "#/components/schemas/request_detail"
+      }
+    },
+    "request_list": {
+      "path": "/api/persons/{person_id}/medication_request_requests",
+      "method": "GET",
+      "data": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/request_detail"
+        }
+      }
+    },
+    "request_care_plan_list": {
+      "path": "/api/care_plans/{care_plan_id}/medication_request_requests",
+      "method": "GET",
+      "data": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/request_detail"
+        }
+      }
+    },
+    "request_sign": {
+      "path": "/api/medication_request_requests/{id}/actions/sign",
+      "method": "PATCH",
+      "data": {
+        "$ref": "#/components/schemas/request_sign"
+      }
+    },
+    "request_reject": {
+      "path": "/api/medication_request_requests/{id}/actions/reject",
+      "method": "PATCH",
+      "data": {
+        "$ref": "#/components/schemas/request_create"
+      }
+    },
+    "prequalify": {
+      "path": "/api/medication_request_requests/prequalify",
+      "method": "POST",
+      "data": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Qualify_Medication_request_Request_Responce"
+        }
+      }
+    },
+    "qualify": {
+      "path": "/api/medication_requests/{id}/actions/qualify",
+      "method": "POST",
+      "data": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Qualify_by_ID_Request_for_Medication_request_Responce"
+        }
+      }
+    },
+    "detail": {
+      "path": "/api/persons/{person_id}/medication_requests/{id}",
+      "method": "GET",
+      "data": {
+        "$ref": "#/components/schemas/detail"
+      }
+    },
+    "list": {
+      "path": "/api/persons/{person_id}/medication_requests",
+      "method": "GET",
+      "data": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/list_items"
+        }
+      }
+    },
+    "care_plan_list": {
+      "path": "/api/care_plans/{care_plan_id}/medication_requests",
+      "method": "GET",
+      "data": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/list_items"
+        }
+      }
+    },
+    "reject": {
+      "path": "/api/medication_requests/{id}/actions/reject",
+      "method": "PATCH",
+      "data": {
+        "$ref": "#/components/schemas/reject"
+      }
+    },
+    "resend": {
+      "path": "/api/medication_requests/{id}/actions/resend",
+      "method": "PATCH",
+      "data": {
+        "$ref": "#/components/schemas/list_items"
+      }
+    },
+    "dispenses": {
+      "path": "/api/persons/{person_id}/medication_requests/{id}/medication_dispenses",
+      "method": "GET",
+      "data": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/dispenses_items"
+        }
+      }
+    },
+    "printout": {
+      "path": "/api/persons/{person_id}/medication_requests/{id}/printout_form",
+      "method": "GET",
+      "data": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "printout_form": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "printout_form"
+        ]
+      }
+    },
+    "block": {
+      "path": "/api/medication_requests/{id}/actions/block",
+      "method": "PATCH",
+      "data": {
+        "$ref": "#/components/schemas/block"
+      }
+    },
+    "unblock": {
+      "path": "/api/medication_requests/{id}/actions/unblock",
+      "method": "PATCH",
+      "data": {
+        "$ref": "#/components/schemas/block"
+      }
+    },
+    "pharmacy_detail": {
+      "path": "/api/pharmacy/medication_requests/{id}",
+      "method": "GET",
+      "data": {
+        "$ref": "#/components/schemas/pharmacy_detail"
+      }
+    },
+    "pharmacy_list": {
+      "path": "/api/pharmacy/medication_requests",
+      "method": "GET",
+      "data": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/pharmacy_list_items"
+        }
+      }
+    },
+    "pharmacy_reject": {
+      "path": "/api/pharmacy/medication_requests/{id}/actions/reject",
+      "method": "PATCH",
+      "data": {
+        "$ref": "#/components/schemas/pharmacy_reject"
+      }
+    },
+    "pharmacy_block": {
+      "path": "/api/pharmacy/medication_requests/{id}/actions/block",
+      "method": "PATCH",
+      "data": {
+        "$ref": "#/components/schemas/pharmacy_block"
+      }
+    },
+    "pharmacy_unblock": {
+      "path": "/api/pharmacy/medication_requests/{id}/actions/unblock",
+      "method": "PATCH",
+      "data": {
+        "$ref": "#/components/schemas/pharmacy_block"
+      }
+    },
+    "composition_detail": {
+      "path": "/api/persons/{person_id}/compositions/{composition_id}/medication_requests/{id}",
+      "method": "GET",
+      "data": {
+        "$ref": "#/components/schemas/detail"
+      }
+    },
+    "drugs": {
+      "path": "/api/v3/drugs",
+      "method": "GET",
+      "data": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/drugs_items"
+        }
+      }
+    },
+    "price_catalog": {
+      "source": "demo/general-mis 9.15.12 GET /api/persons/{person_id}/medication_requests/{medication_requests_id}/price_catalog_link",
+      "data": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "example": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+            "type": "string",
+            "description": "medication request identifier"
+          },
+          "price_catalog_link": {
+            "example": "https://npctest.e-life.com.ua/search-prescription",
+            "type": "string",
+            "description": "Link to State Price Catalog"
+          }
+        },
+        "required": [
+          "id",
+          "price_catalog_link"
+        ]
+      }
+    }
+  },
+  "components": {
+    "request_create_legal_entity": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "short_name": {
+          "type": "string"
+        },
+        "public_name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "edrpou": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "CLOSED"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "short_name",
+        "public_name",
+        "type",
+        "edrpou",
+        "status"
+      ]
+    },
+    "request_create_division_addresses": {
+      "type": "array",
+      "items": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Address"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {},
+              "country": {},
+              "area": {},
+              "region": {},
+              "settlement": {},
+              "settlement_id": {},
+              "street_type": {},
+              "street": {},
+              "building": {},
+              "apartment": {},
+              "zip": {}
+            }
+          }
+        ]
+      }
+    },
+    "request_create_division_working_hours": {
+      "type": "object",
+      "properties": {
+        "mon": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "tue": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "wed": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "thu": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "fri": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "sat": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "sun": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "request_create_division": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "addresses": {
+          "$ref": "#/components/schemas/request_create_division_addresses"
+        },
+        "phones": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Phone"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {},
+                  "number": {}
+                }
+              }
+            ]
+          }
+        },
+        "email": {
+          "type": "string"
+        },
+        "working_hours": {
+          "$ref": "#/components/schemas/request_create_division_working_hours"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "CLINIC"
+          ]
+        },
+        "legal_entity_id": {
+          "type": "string"
+        },
+        "external_id": {
+          "type": "string"
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "latitude": {
+              "type": "number"
+            },
+            "longitude": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "latitude",
+            "longitude"
+          ]
+        },
+        "dls_id": {
+          "type": "string"
+        },
+        "dls_verified": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "legal_entity_id",
+        "name",
+        "addresses",
+        "phones",
+        "email",
+        "type"
+      ]
+    },
+    "request_create_employee_party": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "no_tax_id": {
+          "type": "boolean"
+        },
+        "first_name": {
+          "type": "string"
+        },
+        "last_name": {
+          "type": "string"
+        },
+        "second_name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phones": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Phone"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {},
+                  "number": {}
+                }
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "no_tax_id",
+        "first_name",
+        "last_name"
+      ]
+    },
+    "request_create_medication_info_dosage": {
+      "type": "object",
+      "properties": {
+        "numerator_unit": {
+          "type": "string"
+        },
+        "numerator_value": {
+          "type": "number"
+        },
+        "denumerator_unit": {
+          "type": "string"
+        },
+        "denumerator_value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "numerator_unit",
+        "numerator_value",
+        "denumerator_unit",
+        "denumerator_value"
+      ]
+    },
+    "request_create_medication_info": {
+      "type": "object",
+      "properties": {
+        "medication_id": {
+          "type": "string"
+        },
+        "medication_name": {
+          "type": "string"
+        },
+        "form": {
+          "type": "string"
+        },
+        "dosage": {
+          "$ref": "#/components/schemas/request_create_medication_info_dosage"
+        },
+        "ingredients": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Ingredient_v2"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {},
+                  "name": {},
+                  "is_primary": {}
+                }
+              }
+            ]
+          }
+        },
+        "medication_qty": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "medication_id",
+        "medication_name",
+        "form",
+        "dosage",
+        "ingredients",
+        "medication_qty"
+      ]
+    },
+    "request_create_medical_program": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "is_active": {
+          "type": "boolean"
+        },
+        "type": {
+          "type": "string"
+        },
+        "funding_source": {
+          "type": "string"
+        },
+        "mr_blank_type": {
+          "type": "string"
+        },
+        "inserted_at": {
+          "type": "string"
+        },
+        "inserted_by": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "updated_by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "funding_source",
+        "mr_blank_type"
+      ]
+    },
+    "request_create_based_on_items_identifier": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "object",
+          "required": [
+            "coding"
+          ],
+          "properties": {
+            "coding": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "system",
+                  "code"
+                ]
+              }
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "value"
+      ]
+    },
+    "request_create": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "request_number": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "dispense_valid_from": {
+          "type": "string"
+        },
+        "dispense_valid_to": {
+          "type": "string"
+        },
+        "legal_entity": {
+          "$ref": "#/components/schemas/request_create_legal_entity"
+        },
+        "division": {
+          "$ref": "#/components/schemas/request_create_division"
+        },
+        "employee": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "position": {
+              "type": "string"
+            },
+            "party": {
+              "$ref": "#/components/schemas/request_create_employee_party"
+            }
+          },
+          "required": [
+            "id",
+            "position"
+          ]
+        },
+        "person": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "short_name": {
+              "type": "string"
+            },
+            "age": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "short_name",
+            "age"
+          ]
+        },
+        "inform_with": {
+          "type": "string"
+        },
+        "medication_info": {
+          "$ref": "#/components/schemas/request_create_medication_info"
+        },
+        "medical_program": {
+          "$ref": "#/components/schemas/request_create_medical_program"
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "order"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "community"
+          ]
+        },
+        "based_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "dosage_instruction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Dosage_Instruction"
+          }
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "asap",
+            "stat"
+          ]
+        },
+        "prior_prescription": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "container_dosage": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "system",
+            "code",
+            "value"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "created_at",
+        "started_at",
+        "ended_at",
+        "legal_entity",
+        "division",
+        "employee",
+        "medication_info",
+        "medical_program",
+        "intent",
+        "category",
+        "context",
+        "dosage_instruction"
+      ]
+    },
+    "request_detail": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "request_number": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "dispense_valid_from": {
+          "type": "string"
+        },
+        "dispense_valid_to": {
+          "type": "string"
+        },
+        "legal_entity": {
+          "$ref": "#/components/schemas/request_create_legal_entity"
+        },
+        "division": {
+          "$ref": "#/components/schemas/request_create_division"
+        },
+        "employee": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "position": {
+              "type": "string"
+            },
+            "party": {
+              "$ref": "#/components/schemas/request_create_employee_party"
+            }
+          },
+          "required": [
+            "id",
+            "position"
+          ]
+        },
+        "person": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "short_name": {
+              "type": "string"
+            },
+            "age": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "short_name",
+            "age"
+          ]
+        },
+        "medication_info": {
+          "$ref": "#/components/schemas/request_create_medication_info"
+        },
+        "medical_program": {
+          "$ref": "#/components/schemas/request_create_medical_program"
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "order"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "community"
+          ]
+        },
+        "based_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "dosage_instruction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Dosage_Instruction"
+          }
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "asap",
+            "stat"
+          ]
+        },
+        "prior_prescription": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "container_dosage": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "system",
+            "code",
+            "value"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "inform_with": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "request_number",
+        "created_at",
+        "started_at",
+        "ended_at",
+        "dispense_valid_from",
+        "dispense_valid_to",
+        "legal_entity",
+        "division",
+        "employee",
+        "person",
+        "medication_info",
+        "medical_program",
+        "intent",
+        "category",
+        "context",
+        "dosage_instruction"
+      ],
+      "additionalProperties": false
+    },
+    "request_sign_blocked_by_legal_entity": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "short_name": {
+          "type": "string"
+        },
+        "public_name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "edrpou": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "CLOSED"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "short_name",
+        "public_name",
+        "type",
+        "edrpou",
+        "status",
+        "id"
+      ]
+    },
+    "request_sign": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "COMPLETED",
+            "REJECTED",
+            "EXPIRED"
+          ]
+        },
+        "request_number": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "dispense_valid_from": {
+          "type": "string"
+        },
+        "dispense_valid_to": {
+          "type": "string"
+        },
+        "legal_entity": {
+          "$ref": "#/components/schemas/request_create_legal_entity"
+        },
+        "division": {
+          "$ref": "#/components/schemas/request_create_division"
+        },
+        "employee": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "position": {
+              "type": "string"
+            },
+            "party": {
+              "$ref": "#/components/schemas/request_create_employee_party"
+            }
+          },
+          "required": [
+            "id",
+            "position"
+          ]
+        },
+        "person": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "short_name": {
+              "type": "string"
+            },
+            "age": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "short_name",
+            "age"
+          ]
+        },
+        "medication_info": {
+          "$ref": "#/components/schemas/request_create_medication_info"
+        },
+        "medical_program": {
+          "$ref": "#/components/schemas/request_create_medical_program"
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "order"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "community"
+          ]
+        },
+        "based_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "dosage_instruction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Dosage_Instruction"
+          }
+        },
+        "rejected_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rejected_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "block_reason": {
+          "type": "string"
+        },
+        "block_reason_code": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "asap",
+            "stat"
+          ]
+        },
+        "prior_prescription": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "container_dosage": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "system",
+            "code",
+            "value"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "blocked_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocked_by_legal_entity": {
+          "$ref": "#/components/schemas/request_sign_blocked_by_legal_entity"
+        },
+        "printout_form": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "created_at",
+        "started_at",
+        "ended_at",
+        "dispense_valid_from",
+        "dispense_valid_to",
+        "legal_entity",
+        "division",
+        "employee",
+        "person",
+        "medication_info",
+        "medical_program",
+        "intent",
+        "category",
+        "context",
+        "dosage_instruction",
+        "printout_form"
+      ]
+    },
+    "detail_medication_info": {
+      "type": "object",
+      "properties": {
+        "medication_id": {
+          "type": "string"
+        },
+        "medication_name": {
+          "type": "string"
+        },
+        "form": {
+          "type": "string"
+        },
+        "dosage": {
+          "$ref": "#/components/schemas/request_create_medication_info_dosage"
+        },
+        "ingredients": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Ingredient_v2"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {},
+                  "name": {},
+                  "is_primary": {}
+                }
+              }
+            ]
+          }
+        },
+        "medication_qty": {
+          "type": "number"
+        },
+        "medication_remaining_qty": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "medication_id",
+        "medication_name",
+        "form",
+        "dosage",
+        "ingredients",
+        "medication_qty"
+      ]
+    },
+    "detail": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "COMPLETED",
+            "REJECTED",
+            "EXPIRED"
+          ]
+        },
+        "request_number": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "dispense_valid_from": {
+          "type": "string"
+        },
+        "dispense_valid_to": {
+          "type": "string"
+        },
+        "legal_entity": {
+          "$ref": "#/components/schemas/request_create_legal_entity"
+        },
+        "division": {
+          "$ref": "#/components/schemas/request_create_division"
+        },
+        "employee": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "position": {
+              "type": "string"
+            },
+            "party": {
+              "$ref": "#/components/schemas/request_create_employee_party"
+            }
+          },
+          "required": [
+            "id",
+            "position"
+          ]
+        },
+        "person": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "short_name": {
+              "type": "string"
+            },
+            "age": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "short_name",
+            "age"
+          ]
+        },
+        "medical_program": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "funding_source": {
+              "type": "string"
+            },
+            "mr_blank_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "funding_source",
+            "mr_blank_type"
+          ]
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "order"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "community"
+          ]
+        },
+        "based_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "dosage_instruction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Dosage_Instruction"
+          }
+        },
+        "rejected_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rejected_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "block_reason": {
+          "type": "string"
+        },
+        "block_reason_code": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "asap",
+            "stat"
+          ]
+        },
+        "prior_prescription": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "container_dosage": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "system",
+            "code",
+            "value"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "blocked_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocked_by_legal_entity": {
+          "$ref": "#/components/schemas/request_sign_blocked_by_legal_entity"
+        },
+        "inform_with": {
+          "type": "string"
+        },
+        "medication_info": {
+          "$ref": "#/components/schemas/detail_medication_info"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "request_number",
+        "created_at",
+        "started_at",
+        "ended_at",
+        "dispense_valid_from",
+        "dispense_valid_to",
+        "legal_entity",
+        "division",
+        "employee",
+        "person",
+        "medication_info",
+        "medical_program",
+        "intent",
+        "category",
+        "context",
+        "dosage_instruction"
+      ],
+      "additionalProperties": false
+    },
+    "list_items": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "COMPLETED",
+            "REJECTED",
+            "EXPIRED"
+          ]
+        },
+        "request_number": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "dispense_valid_from": {
+          "type": "string"
+        },
+        "dispense_valid_to": {
+          "type": "string"
+        },
+        "legal_entity": {
+          "$ref": "#/components/schemas/request_create_legal_entity"
+        },
+        "division": {
+          "$ref": "#/components/schemas/request_create_division"
+        },
+        "employee": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "position": {
+              "type": "string"
+            },
+            "party": {
+              "$ref": "#/components/schemas/request_create_employee_party"
+            }
+          },
+          "required": [
+            "id",
+            "position"
+          ]
+        },
+        "person": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "short_name": {
+              "type": "string"
+            },
+            "age": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "short_name",
+            "age"
+          ]
+        },
+        "medication_info": {
+          "$ref": "#/components/schemas/request_create_medication_info"
+        },
+        "medical_program": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "funding_source": {
+              "type": "string"
+            },
+            "mr_blank_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "funding_source",
+            "mr_blank_type"
+          ]
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "order"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "community"
+          ]
+        },
+        "based_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "dosage_instruction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Dosage_Instruction"
+          }
+        },
+        "rejected_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rejected_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "block_reason": {
+          "type": "string"
+        },
+        "block_reason_code": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "asap",
+            "stat"
+          ]
+        },
+        "prior_prescription": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "container_dosage": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "system",
+            "code",
+            "value"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "blocked_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocked_by_legal_entity": {
+          "$ref": "#/components/schemas/request_sign_blocked_by_legal_entity"
+        },
+        "inform_with": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "created_at",
+        "started_at",
+        "ended_at",
+        "dispense_valid_from",
+        "dispense_valid_to",
+        "legal_entity",
+        "division",
+        "employee",
+        "person",
+        "medication_info",
+        "medical_program",
+        "intent",
+        "category",
+        "context",
+        "dosage_instruction"
+      ]
+    },
+    "reject": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "COMPLETED",
+            "REJECTED",
+            "EXPIRED"
+          ]
+        },
+        "request_number": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "dispense_valid_from": {
+          "type": "string"
+        },
+        "dispense_valid_to": {
+          "type": "string"
+        },
+        "legal_entity": {
+          "$ref": "#/components/schemas/request_create_legal_entity"
+        },
+        "division": {
+          "$ref": "#/components/schemas/request_create_division"
+        },
+        "employee": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "position": {
+              "type": "string"
+            },
+            "party": {
+              "$ref": "#/components/schemas/request_create_employee_party"
+            }
+          },
+          "required": [
+            "id",
+            "position"
+          ]
+        },
+        "person": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "short_name": {
+              "type": "string"
+            },
+            "age": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "short_name",
+            "age"
+          ]
+        },
+        "medication_info": {
+          "$ref": "#/components/schemas/request_create_medication_info"
+        },
+        "medical_program": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "funding_source": {
+              "type": "string"
+            },
+            "mr_blank_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "funding_source",
+            "mr_blank_type"
+          ]
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "order"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "community"
+          ]
+        },
+        "based_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "dosage_instruction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Dosage_Instruction"
+          }
+        },
+        "block_reason": {
+          "type": "string"
+        },
+        "block_reason_code": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "asap",
+            "stat"
+          ]
+        },
+        "prior_prescription": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "container_dosage": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "system",
+            "code",
+            "value"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "blocked_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocked_by_legal_entity": {
+          "$ref": "#/components/schemas/request_sign_blocked_by_legal_entity"
+        },
+        "rejected_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rejected_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "created_at",
+        "started_at",
+        "ended_at",
+        "dispense_valid_from",
+        "dispense_valid_to",
+        "legal_entity",
+        "division",
+        "employee",
+        "person",
+        "medication_info",
+        "medical_program",
+        "intent",
+        "category",
+        "context",
+        "dosage_instruction",
+        "rejected_at",
+        "rejected_by",
+        "reject_reason_code"
+      ]
+    },
+    "dispenses_items_medication_request": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "COMPLETED",
+            "REJECTED",
+            "EXPIRED"
+          ]
+        },
+        "request_number": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "dispense_valid_from": {
+          "type": "string"
+        },
+        "dispense_valid_to": {
+          "type": "string"
+        },
+        "legal_entity": {
+          "$ref": "#/components/schemas/request_create_legal_entity"
+        },
+        "division": {
+          "$ref": "#/components/schemas/request_create_division"
+        },
+        "employee": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "position": {
+              "type": "string"
+            },
+            "party": {
+              "$ref": "#/components/schemas/request_create_employee_party"
+            }
+          },
+          "required": [
+            "id",
+            "position"
+          ]
+        },
+        "person": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "short_name": {
+              "type": "string"
+            },
+            "age": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "short_name",
+            "age"
+          ]
+        },
+        "medication_info": {
+          "$ref": "#/components/schemas/request_create_medication_info"
+        },
+        "medical_program": {
+          "$ref": "#/components/schemas/request_create_medical_program"
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "order"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "community"
+          ]
+        },
+        "based_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "dosage_instruction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Dosage_Instruction"
+          }
+        },
+        "rejected_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rejected_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "block_reason": {
+          "type": "string"
+        },
+        "block_reason_code": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "asap",
+            "stat"
+          ]
+        },
+        "prior_prescription": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "container_dosage": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "system",
+            "code",
+            "value"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "blocked_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocked_by_legal_entity": {
+          "$ref": "#/components/schemas/request_sign_blocked_by_legal_entity"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "created_at",
+        "started_at",
+        "ended_at",
+        "dispense_valid_from",
+        "dispense_valid_to",
+        "legal_entity",
+        "division",
+        "employee",
+        "person",
+        "medication_info",
+        "medical_program",
+        "intent",
+        "category",
+        "context",
+        "dosage_instruction"
+      ]
+    },
+    "dispenses_items": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "medication_request": {
+          "$ref": "#/components/schemas/dispenses_items_medication_request"
+        },
+        "dispensed_at": {
+          "type": "string"
+        },
+        "medical_program": {
+          "$ref": "#/components/schemas/request_create_medical_program"
+        },
+        "status": {
+          "type": "string"
+        },
+        "inserted_at": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "medication_request",
+        "dispensed_at",
+        "medical_program",
+        "status",
+        "inserted_at",
+        "updated_at"
+      ]
+    },
+    "block": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "COMPLETED",
+            "REJECTED",
+            "EXPIRED"
+          ]
+        },
+        "request_number": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "dispense_valid_from": {
+          "type": "string"
+        },
+        "dispense_valid_to": {
+          "type": "string"
+        },
+        "legal_entity": {
+          "$ref": "#/components/schemas/request_create_legal_entity"
+        },
+        "division": {
+          "$ref": "#/components/schemas/request_create_division"
+        },
+        "employee": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "position": {
+              "type": "string"
+            },
+            "party": {
+              "$ref": "#/components/schemas/request_create_employee_party"
+            }
+          },
+          "required": [
+            "id",
+            "position"
+          ]
+        },
+        "person": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "short_name": {
+              "type": "string"
+            },
+            "age": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "short_name",
+            "age"
+          ]
+        },
+        "medication_info": {
+          "$ref": "#/components/schemas/request_create_medication_info"
+        },
+        "medical_program": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "funding_source": {
+              "type": "string"
+            },
+            "mr_blank_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "funding_source",
+            "mr_blank_type"
+          ]
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "order"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "community"
+          ]
+        },
+        "based_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "dosage_instruction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Dosage_Instruction"
+          }
+        },
+        "rejected_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rejected_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "block_reason": {
+          "type": "string"
+        },
+        "block_reason_code": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "asap",
+            "stat"
+          ]
+        },
+        "prior_prescription": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "container_dosage": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "system",
+            "code",
+            "value"
+          ]
+        },
+        "blocked_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocked_by_legal_entity": {
+          "$ref": "#/components/schemas/request_sign_blocked_by_legal_entity"
+        },
+        "inform_with": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "request_number",
+        "created_at",
+        "started_at",
+        "ended_at",
+        "dispense_valid_from",
+        "dispense_valid_to",
+        "legal_entity",
+        "division",
+        "employee",
+        "person",
+        "medication_info",
+        "medical_program",
+        "intent",
+        "category",
+        "context",
+        "dosage_instruction",
+        "block_reason_code"
+      ],
+      "additionalProperties": false
+    },
+    "pharmacy_detail": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "COMPLETED",
+            "REJECTED",
+            "EXPIRED"
+          ]
+        },
+        "request_number": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "dispense_valid_from": {
+          "type": "string"
+        },
+        "dispense_valid_to": {
+          "type": "string"
+        },
+        "person": {
+          "type": "object",
+          "properties": {
+            "short_name": {
+              "type": "string"
+            },
+            "age": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "short_name",
+            "age"
+          ]
+        },
+        "medical_program": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "funding_source": {
+              "type": "string"
+            },
+            "mr_blank_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "funding_source",
+            "mr_blank_type"
+          ]
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "order"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "community"
+          ]
+        },
+        "based_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "dosage_instruction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Dosage_Instruction"
+          }
+        },
+        "reject_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "block_reason": {
+          "type": "string"
+        },
+        "block_reason_code": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "asap",
+            "stat"
+          ]
+        },
+        "prior_prescription": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "container_dosage": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "system",
+            "code",
+            "value"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "blocked_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocked_by_legal_entity": {
+          "$ref": "#/components/schemas/request_sign_blocked_by_legal_entity"
+        },
+        "inform_with": {
+          "type": "string"
+        },
+        "medication_info": {
+          "$ref": "#/components/schemas/detail_medication_info"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "request_number",
+        "created_at",
+        "started_at",
+        "ended_at",
+        "dispense_valid_from",
+        "dispense_valid_to",
+        "person",
+        "medication_info",
+        "medical_program",
+        "intent",
+        "category",
+        "context",
+        "dosage_instruction",
+        "reject_reason_code"
+      ],
+      "additionalProperties": false
+    },
+    "pharmacy_list_items_dosage_instruction_items_additional_instruction": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "coding"
+        ],
+        "properties": {
+          "coding": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "system": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "system",
+                "code"
+              ]
+            }
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pharmacy_list_items_dosage_instruction_items_timing_repeat_oneOf1_bounds_range": {
+      "type": "object",
+      "properties": {
+        "low": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ]
+        },
+        "high": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ]
+        }
+      },
+      "required": [
+        "low",
+        "high"
+      ]
+    },
+    "pharmacy_list_items_dosage_instruction_items_timing_repeat": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "number"
+        },
+        "count_max": {
+          "type": "number"
+        },
+        "duration": {
+          "type": "number"
+        },
+        "duration_max": {
+          "type": "number"
+        },
+        "duration_unit": {
+          "type": "string"
+        },
+        "frequency": {
+          "type": "number"
+        },
+        "frequency_max": {
+          "type": "number"
+        },
+        "period": {
+          "type": "number"
+        },
+        "period_max": {
+          "type": "number"
+        },
+        "period_unit": {
+          "type": "string"
+        },
+        "day_of_week": {
+          "type": "array",
+          "items": {}
+        },
+        "time_of_day": {
+          "type": "array",
+          "items": {}
+        },
+        "when": {
+          "type": "array",
+          "items": {}
+        },
+        "offset": {
+          "type": "number"
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "bounds_duration": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "system": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        {
+          "properties": {
+            "bounds_range": {
+              "$ref": "#/components/schemas/pharmacy_list_items_dosage_instruction_items_timing_repeat_oneOf1_bounds_range"
+            }
+          }
+        },
+        {
+          "properties": {
+            "bounds_period": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string"
+                },
+                "end": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "pharmacy_list_items_dosage_instruction_items_timing": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "array",
+          "items": {}
+        },
+        "repeat": {
+          "$ref": "#/components/schemas/pharmacy_list_items_dosage_instruction_items_timing_repeat"
+        },
+        "code": {
+          "type": "object",
+          "required": [
+            "coding"
+          ],
+          "properties": {
+            "coding": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "system",
+                  "code"
+                ]
+              }
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "pharmacy_list_items_dosage_instruction_items_dose_and_rate_oneOf2_rate_ratio": {
+      "type": "object",
+      "properties": {
+        "numerator": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ]
+        },
+        "denominator": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ]
+        }
+      },
+      "required": [
+        "numerator",
+        "denominator"
+      ]
+    },
+    "pharmacy_list_items_dosage_instruction_items_dose_and_rate": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "object",
+          "required": [
+            "coding"
+          ],
+          "properties": {
+            "coding": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "system",
+                  "code"
+                ]
+              }
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "dose_range": {
+              "$ref": "#/components/schemas/pharmacy_list_items_dosage_instruction_items_timing_repeat_oneOf1_bounds_range"
+            }
+          }
+        },
+        {
+          "properties": {
+            "dose_quantity (Simple_Quantity)": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "properties": {
+            "rate_ratio": {
+              "$ref": "#/components/schemas/pharmacy_list_items_dosage_instruction_items_dose_and_rate_oneOf2_rate_ratio"
+            }
+          }
+        },
+        {
+          "properties": {
+            "rate_range": {
+              "$ref": "#/components/schemas/pharmacy_list_items_dosage_instruction_items_timing_repeat_oneOf1_bounds_range"
+            }
+          }
+        },
+        {
+          "properties": {
+            "rate_quantity (Simple_Quantity)": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "pharmacy_list_items_dosage_instruction_items": {
+      "type": "object",
+      "required": [
+        "sequence",
+        "text",
+        "max_dose_per_period",
+        "max_dose_per_administration"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string"
+        },
+        "additional_instruction": {
+          "$ref": "#/components/schemas/pharmacy_list_items_dosage_instruction_items_additional_instruction"
+        },
+        "patient_instruction": {
+          "type": "string"
+        },
+        "timing": {
+          "$ref": "#/components/schemas/pharmacy_list_items_dosage_instruction_items_timing"
+        },
+        "site": {
+          "type": "object",
+          "required": [
+            "coding"
+          ],
+          "properties": {
+            "coding": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "system",
+                  "code"
+                ]
+              }
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        "route": {
+          "type": "object",
+          "required": [
+            "coding"
+          ],
+          "properties": {
+            "coding": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "system",
+                  "code"
+                ]
+              }
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        "method": {
+          "type": "object",
+          "required": [
+            "coding"
+          ],
+          "properties": {
+            "coding": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "system",
+                  "code"
+                ]
+              }
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        "dose_and_rate": {
+          "$ref": "#/components/schemas/pharmacy_list_items_dosage_instruction_items_dose_and_rate"
+        },
+        "max_dose_per_period": {
+          "$ref": "#/components/schemas/pharmacy_list_items_dosage_instruction_items_dose_and_rate_oneOf2_rate_ratio"
+        },
+        "max_dose_per_administration": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ]
+        },
+        "max_dose_per_lifetime": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ]
+        },
+        "as_needed_boolean": {
+          "type": "boolean"
+        },
+        "as_needed_codeable_concept (Codeable_Concept)": {
+          "type": "object",
+          "properties": {
+            "coding": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "system",
+                  "code"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "pharmacy_list_items_medication_info": {
+      "type": "object",
+      "properties": {
+        "medication_id": {
+          "type": "string"
+        },
+        "medication_name": {
+          "type": "string"
+        },
+        "form": {
+          "type": "string"
+        },
+        "dosage": {
+          "$ref": "#/components/schemas/request_create_medication_info_dosage"
+        },
+        "ingredients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Ingredient"
+          }
+        },
+        "medication_qty": {
+          "type": "number"
+        },
+        "medication_remaining_qty": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "medication_id",
+        "medication_name",
+        "form",
+        "dosage",
+        "ingredients",
+        "medication_qty"
+      ]
+    },
+    "pharmacy_list_items": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "COMPLETED",
+            "REJECTED",
+            "EXPIRED"
+          ]
+        },
+        "request_number": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "dispense_valid_from": {
+          "type": "string"
+        },
+        "dispense_valid_to": {
+          "type": "string"
+        },
+        "person": {
+          "type": "object",
+          "properties": {
+            "short_name": {
+              "type": "string"
+            },
+            "age": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "short_name",
+            "age"
+          ]
+        },
+        "medical_program": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "funding_source": {
+              "type": "string"
+            },
+            "mr_blank_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "funding_source",
+            "mr_blank_type"
+          ]
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "order"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "community"
+          ]
+        },
+        "based_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "dosage_instruction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/pharmacy_list_items_dosage_instruction_items"
+          }
+        },
+        "reject_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "block_reason": {
+          "type": "string"
+        },
+        "block_reason_code": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "asap",
+            "stat"
+          ]
+        },
+        "prior_prescription": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "container_dosage": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "system",
+            "code",
+            "value"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "blocked_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocked_by_legal_entity": {
+          "$ref": "#/components/schemas/request_sign_blocked_by_legal_entity"
+        },
+        "inform_with": {
+          "type": "string"
+        },
+        "medication_info": {
+          "$ref": "#/components/schemas/pharmacy_list_items_medication_info"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "created_at",
+        "started_at",
+        "ended_at",
+        "dispense_valid_from",
+        "dispense_valid_to",
+        "person",
+        "medication_info",
+        "medical_program",
+        "intent",
+        "category",
+        "context",
+        "dosage_instruction",
+        "reject_reason_code"
+      ]
+    },
+    "pharmacy_reject": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "COMPLETED",
+            "REJECTED",
+            "EXPIRED"
+          ]
+        },
+        "request_number": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "dispense_valid_from": {
+          "type": "string"
+        },
+        "dispense_valid_to": {
+          "type": "string"
+        },
+        "person": {
+          "type": "object",
+          "properties": {
+            "short_name": {
+              "type": "string"
+            },
+            "age": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "short_name",
+            "age"
+          ]
+        },
+        "medication_info": {
+          "$ref": "#/components/schemas/request_create_medication_info"
+        },
+        "medical_program": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "funding_source": {
+              "type": "string"
+            },
+            "mr_blank_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "funding_source",
+            "mr_blank_type"
+          ]
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "order"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "community"
+          ]
+        },
+        "based_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "dosage_instruction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Dosage_Instruction"
+          }
+        },
+        "block_reason": {
+          "type": "string"
+        },
+        "block_reason_code": {
+          "type": "string"
+        },
+        "blocked_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocked_by_legal_entity": {
+          "$ref": "#/components/schemas/request_sign_blocked_by_legal_entity"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "asap",
+            "stat"
+          ]
+        },
+        "prior_prescription": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "container_dosage": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "system",
+            "code",
+            "value"
+          ]
+        },
+        "inform_with": {
+          "type": "string"
+        },
+        "rejected_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rejected_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "created_at",
+        "started_at",
+        "ended_at",
+        "dispense_valid_from",
+        "dispense_valid_to",
+        "person",
+        "medication_info",
+        "medical_program",
+        "intent",
+        "category",
+        "context",
+        "dosage_instruction",
+        "reject_reason_code",
+        "block_reason_code",
+        "rejected_at",
+        "rejected_by"
+      ]
+    },
+    "pharmacy_block": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "COMPLETED",
+            "REJECTED",
+            "EXPIRED"
+          ]
+        },
+        "request_number": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "dispense_valid_from": {
+          "type": "string"
+        },
+        "dispense_valid_to": {
+          "type": "string"
+        },
+        "person": {
+          "type": "object",
+          "properties": {
+            "short_name": {
+              "type": "string"
+            },
+            "age": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "short_name",
+            "age"
+          ]
+        },
+        "medication_info": {
+          "$ref": "#/components/schemas/request_create_medication_info"
+        },
+        "medical_program": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "funding_source": {
+              "type": "string"
+            },
+            "mr_blank_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "funding_source",
+            "mr_blank_type"
+          ]
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "order"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "community"
+          ]
+        },
+        "based_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "dosage_instruction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Dosage_Instruction"
+          }
+        },
+        "reject_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_reason_code": {
+          "type": "string"
+        },
+        "block_reason": {
+          "type": "string"
+        },
+        "block_reason_code": {
+          "type": "string"
+        },
+        "blocked_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocked_by_legal_entity": {
+          "$ref": "#/components/schemas/request_sign_blocked_by_legal_entity"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "urgent",
+            "asap",
+            "stat"
+          ]
+        },
+        "prior_prescription": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "$ref": "#/components/schemas/request_create_based_on_items_identifier"
+            }
+          },
+          "required": [
+            "identifier"
+          ],
+          "additionalProperties": false
+        },
+        "container_dosage": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "system",
+            "code",
+            "value"
+          ]
+        },
+        "inform_with": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "request_number",
+        "created_at",
+        "started_at",
+        "ended_at",
+        "dispense_valid_from",
+        "dispense_valid_to",
+        "person",
+        "medication_info",
+        "medical_program",
+        "intent",
+        "category",
+        "context",
+        "dosage_instruction",
+        "reject_reason_code",
+        "block_reason_code"
+      ],
+      "additionalProperties": false
+    },
+    "drugs_items": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "mr_blank_type": {
+          "type": "string"
+        },
+        "dosage_form_is_dosed": {
+          "type": "boolean"
+        },
+        "form": {
+          "type": "string"
+        },
+        "daily_dosage": {
+          "type": "number"
+        },
+        "ingredients": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Ingredient"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {},
+                  "name": {},
+                  "is_primary": {}
+                }
+              }
+            ]
+          }
+        },
+        "program_medications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Drugs_program_medication"
+          }
+        },
+        "packages": {
+          "type": "array",
+          "items": {}
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "mr_blank_type",
+        "dosage_form_is_dosed",
+        "form",
+        "daily_dosage",
+        "ingredients"
+      ]
+    },
+    "Drugs_program_medication": {
+      "type": "object",
+      "required": [
+        "id",
+        "max_daily_dosage",
+        "package_qty_divisible"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "start_date": {
+          "type": "string"
+        },
+        "end_date": {
+          "type": "string"
+        },
+        "medication_request_allowed": {
+          "type": "boolean"
+        },
+        "care_plan_activity_allowed": {
+          "type": "boolean"
+        },
+        "registry_number": {
+          "type": "string"
+        },
+        "max_daily_dosage": {
+          "type": "number"
+        },
+        "package_qty_divisible": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Ingredient_v2": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "name_original",
+        "dosage",
+        "is_primary"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "name_original": {
+          "type": "string"
+        },
+        "sctid": {
+          "type": "string"
+        },
+        "dosage": {
+          "$ref": "#/components/schemas/Dosage_drug"
+        },
+        "is_primary": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Qualify_by_ID_Request_for_Medication_request_Responce": {
+      "type": "object",
+      "required": [
+        "participants",
+        "program_id",
+        "program_name",
+        "status"
+      ],
+      "properties": {
+        "program_id": {
+          "type": "string"
+        },
+        "program_name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "VALID",
+            "INVALID"
+          ]
+        },
+        "rejection_reason": {
+          "type": "string"
+        },
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "Ingredient": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "dosage",
+        "is_primary"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "dosage": {
+          "$ref": "#/components/schemas/Dosage_drug"
+        },
+        "is_primary": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Phone": {
+      "type": "object",
+      "required": [
+        "type",
+        "number"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "number": {
+          "type": "string"
+        }
+      }
+    },
+    "Dosage_Instruction_allOf0_additional_instruction": {
+      "type": "array",
+      "items": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Codeable_Concept"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "coding": {
+                "type": "array",
+                "items": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Coding"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "system": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "Dosage_Instruction_allOf0": {
+      "properties": {
+        "sequence": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string"
+        },
+        "additional_instruction": {
+          "$ref": "#/components/schemas/Dosage_Instruction_allOf0_additional_instruction"
+        },
+        "patient_instruction": {
+          "type": "string"
+        },
+        "timing": {
+          "$ref": "#/components/schemas/Timing"
+        }
+      },
+      "required": [
+        "sequence",
+        "text"
+      ],
+      "type": "object"
+    },
+    "Dosage_Instruction_allOf1_oneOf1": {
+      "type": "object",
+      "required": [
+        "as_needed_codeable_concept"
+      ],
+      "properties": {
+        "as_needed_codeable_concept": {
+          "type": "object",
+          "required": [
+            "coding"
+          ],
+          "properties": {
+            "coding": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "Dosage_Instruction_allOf2_site_allOf1": {
+      "type": "object",
+      "required": [
+        "coding"
+      ],
+      "properties": {
+        "coding": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Coding"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "system": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "text": {
+          "type": "string"
+        }
+      }
+    },
+    "Dosage_Instruction": {
+      "allOf": [
+        {
+          "properties": {
+            "sequence": {
+              "type": "number"
+            },
+            "text": {
+              "type": "string"
+            },
+            "additional_instruction": {
+              "type": "array",
+              "items": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Codeable_Concept"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "coding": {
+                        "type": "array",
+                        "items": {
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/Coding"
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "system": {
+                                  "type": "string"
+                                },
+                                "code": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "patient_instruction": {
+              "type": "string"
+            },
+            "timing": {
+              "$ref": "#/components/schemas/Timing"
+            }
+          },
+          "required": [
+            "sequence",
+            "text"
+          ],
+          "type": "object"
+        },
+        {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "as_needed_boolean"
+              ],
+              "properties": {
+                "as_needed_boolean": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "as_needed_codeable_concept"
+              ],
+              "properties": {
+                "as_needed_codeable_concept": {
+                  "type": "object",
+                  "required": [
+                    "coding"
+                  ],
+                  "properties": {
+                    "coding": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "site": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Codeable_Concept"
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "coding"
+                  ],
+                  "properties": {
+                    "coding": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/Coding"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "system": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            },
+            "route": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Codeable_Concept"
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "coding"
+                  ],
+                  "properties": {
+                    "coding": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/Coding"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "system": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            },
+            "method": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Codeable_Concept"
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "coding"
+                  ],
+                  "properties": {
+                    "coding": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/Coding"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "system": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            },
+            "dose_and_rate": {
+              "$ref": "#/components/schemas/Dose_and_Rate"
+            },
+            "max_dose_per_period": {
+              "$ref": "#/components/schemas/Ratio"
+            },
+            "max_dose_per_administration": {
+              "$ref": "#/components/schemas/Simple_Quantity"
+            },
+            "max_dose_per_lifetime": {
+              "$ref": "#/components/schemas/Simple_Quantity"
+            }
+          },
+          "required": [
+            "max_dose_per_period",
+            "max_dose_per_administration"
+          ]
+        }
+      ]
+    },
+    "Address": {
+      "type": "object",
+      "required": [
+        "country"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string",
+          "enum": [
+            "UA"
+          ]
+        },
+        "area": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "settlement": {
+          "type": "string"
+        },
+        "settlement_type": {
+          "type": "string"
+        },
+        "settlement_id": {
+          "type": "string"
+        },
+        "street_type": {
+          "type": "string"
+        },
+        "street": {
+          "type": "string"
+        },
+        "building": {
+          "type": "string"
+        },
+        "apartment": {
+          "type": "string"
+        },
+        "zip": {
+          "type": "string"
+        }
+      }
+    },
+    "Qualify_Medication_request_Request_Responce": {
+      "type": "object",
+      "required": [
+        "program_id",
+        "program_name",
+        "status"
+      ],
+      "properties": {
+        "program_id": {
+          "type": "string"
+        },
+        "program_name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "VALID",
+            "INVALID"
+          ]
+        },
+        "rejection_reason": {
+          "type": "string"
+        }
+      }
+    },
+    "Dose_and_Rate_allOf0_type_allOf1": {
+      "type": "object",
+      "required": [
+        "coding"
+      ],
+      "properties": {
+        "coding": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Coding"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "system",
+                  "code"
+                ],
+                "properties": {
+                  "system": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "text": {
+          "type": "string"
+        }
+      }
+    },
+    "Dose_and_Rate": {
+      "allOf": [
+        {
+          "properties": {
+            "type": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Codeable_Concept"
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "coding"
+                  ],
+                  "properties": {
+                    "coding": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/Coding"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "system",
+                              "code"
+                            ],
+                            "properties": {
+                              "system": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "dose_range"
+              ],
+              "properties": {
+                "dose_range": {
+                  "$ref": "#/components/schemas/Range"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "dose_quantity"
+              ],
+              "properties": {
+                "dose_quantity": {
+                  "$ref": "#/components/schemas/Simple_Quantity"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "rate_ratio"
+              ],
+              "properties": {
+                "rate_ratio": {
+                  "$ref": "#/components/schemas/Ratio"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "rate_range"
+              ],
+              "properties": {
+                "rate_range": {
+                  "$ref": "#/components/schemas/Range"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "rate_quantity"
+              ],
+              "properties": {
+                "rate_quantity": {
+                  "$ref": "#/components/schemas/Simple_Quantity"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "Ratio": {
+      "type": "object",
+      "required": [
+        "numerator",
+        "denominator"
+      ],
+      "properties": {
+        "numerator": {
+          "$ref": "#/components/schemas/Simple_Quantity"
+        },
+        "denominator": {
+          "$ref": "#/components/schemas/Simple_Quantity"
+        }
+      }
+    },
+    "Simple_Quantity": {
+      "type": "object",
+      "required": [
+        "value",
+        "unit"
+      ],
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "system": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        }
+      }
+    },
+    "Timing_repeat_allOf1": {
+      "properties": {
+        "count": {
+          "type": "number"
+        },
+        "count_max": {
+          "type": "number"
+        },
+        "duration": {
+          "type": "number"
+        },
+        "duration_max": {
+          "type": "number"
+        },
+        "duration_unit": {
+          "type": "string"
+        },
+        "frequency": {
+          "type": "number"
+        },
+        "frequency_max": {
+          "type": "number"
+        },
+        "period": {
+          "type": "number"
+        },
+        "period_max": {
+          "type": "number"
+        },
+        "period_unit": {
+          "type": "string"
+        },
+        "day_of_week": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "time_of_day": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "when": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "offset": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "Timing": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "repeat": {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "bounds_duration"
+                  ],
+                  "properties": {
+                    "bounds_duration": {
+                      "$ref": "#/components/schemas/Duration"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "bounds_range"
+                  ],
+                  "properties": {
+                    "bounds_range": {
+                      "$ref": "#/components/schemas/Range"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "bounds_period"
+                  ],
+                  "properties": {
+                    "bounds_period": {
+                      "$ref": "#/components/schemas/Period"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "properties": {
+                "count": {
+                  "type": "number"
+                },
+                "count_max": {
+                  "type": "number"
+                },
+                "duration": {
+                  "type": "number"
+                },
+                "duration_max": {
+                  "type": "number"
+                },
+                "duration_unit": {
+                  "type": "string"
+                },
+                "frequency": {
+                  "type": "number"
+                },
+                "frequency_max": {
+                  "type": "number"
+                },
+                "period": {
+                  "type": "number"
+                },
+                "period_max": {
+                  "type": "number"
+                },
+                "period_unit": {
+                  "type": "string"
+                },
+                "day_of_week": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "time_of_day": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "when": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "offset": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "code": {
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Codeable_Concept"
+            },
+            {
+              "type": "object",
+              "required": [
+                "coding"
+              ],
+              "properties": {
+                "coding": {
+                  "type": "array",
+                  "items": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Coding"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "text": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Codeable_Concept": {
+      "type": "object",
+      "required": [
+        "coding"
+      ],
+      "properties": {
+        "coding": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "system": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "text": {
+          "type": "string"
+        }
+      }
+    },
+    "Coding": {
+      "type": "object",
+      "required": [
+        "system",
+        "code"
+      ],
+      "properties": {
+        "system": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        }
+      }
+    },
+    "Dosage_drug": {
+      "type": "object",
+      "required": [
+        "numerator_unit",
+        "numerator_value",
+        "denumerator_unit",
+        "denumerator_value"
+      ],
+      "properties": {
+        "numerator_unit": {
+          "type": "string"
+        },
+        "numerator_value": {
+          "type": "number"
+        },
+        "denumerator_unit": {
+          "type": "string"
+        },
+        "denumerator_value": {
+          "type": "number"
+        }
+      }
+    },
+    "Duration": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "system": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        }
+      }
+    },
+    "Period": {
+      "type": "object",
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "type": "string"
+        },
+        "end": {
+          "type": "string"
+        }
+      }
+    },
+    "Range": {
+      "type": "object",
+      "required": [
+        "low",
+        "high"
+      ],
+      "properties": {
+        "low": {
+          "$ref": "#/components/schemas/Simple_Quantity"
+        },
+        "high": {
+          "$ref": "#/components/schemas/Simple_Quantity"
+        }
+      }
+    }
+  }
+}

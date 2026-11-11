@@ -1,3 +1,4 @@
+@use('App\Enums\Person\DeviceRequestStatus')
 <dl class="grid gap-3 md:grid-cols-2">
     @php
         $requesterEntityUuid = data_get($record, 'requester_legal_entity.identifier.value');
@@ -22,7 +23,7 @@
             <div>
                 <dt class="font-semibold">{{ $label }}</dt>
                 <dd>
-                    {{ $path === 'status' ? \App\Enums\Person\DeviceRequestStatus::labelFor(data_get($record, $path)) : data_get($record, $path) }}
+                    {{ $path === 'status' ? DeviceRequestStatus::labelFor(data_get($record, $path)) : data_get($record, $path) }}
                 </dd>
             </div>
         @endif

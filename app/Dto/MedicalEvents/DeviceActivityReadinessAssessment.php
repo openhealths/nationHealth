@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Dto\MedicalEvents;
 
-final class DeviceActivityReadinessAssessment
+class DeviceActivityReadinessAssessment
 {
     /**
      * @param  list<string>  $blockingIssues

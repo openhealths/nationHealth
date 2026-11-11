@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
-use Log;
-use Throwable;
 use App\Core\Arr;
-use App\Models\LegalEntity;
-use App\Models\User;
-use App\Models\Relations\Party;
-use App\Models\Employee\Employee;
-use App\Models\MedicalEvents\Sql\Approval;
-use App\Exceptions\MedicalEvents\ApprovalVerificationException;
-use Illuminate\Support\Facades\DB;
 use App\Enums\Employee\RequestStatus;
+use App\Enums\Status;
+use App\Exceptions\MedicalEvents\ApprovalVerificationException;
+use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
+use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Approval;
+use App\Models\Relations\Party;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 readonly class EmployeeRepository
 {
@@ -115,7 +116,7 @@ readonly class EmployeeRepository
             || !$employee->exists
             || (int) $employee->legalEntityId !== $legalEntityId
             || $employee->employeeType !== $employeeType
-            || $employee->status !== \App\Enums\Status::APPROVED) {
+            || $employee->status !== Status::APPROVED) {
             return [];
         }
 
@@ -126,7 +127,15 @@ readonly class EmployeeRepository
 
     public function activeForLegalEntity(User $user, LegalEntity $legalEntity, array $employeeTypes, ?string $employeeUuid = null): ?Employee
     {
+        $linkedIds = $user->employees()->where('employees.legal_entity_id', $legalEntity->id)->pluck('employees.id');
+
+        // Clinical scopes describe capabilities; the acting employee must still be
+        // linked to this user and available within their actual employment dates.
         return Employee::forUserInLegalEntity($user, $legalEntity)->whereIn('employee_type', $employeeTypes)
+            ->whereNotNull('uuid')
+            ->where(fn (Builder $query): Builder => $query->where('user_id', $user->id)->orWhereIn('id', $linkedIds))
+            ->where(fn (Builder $query): Builder => $query->whereNull('start_date')->orWhereDate('start_date', '<=', today()))
+            ->where(fn (Builder $query): Builder => $query->whereNull('end_date')->orWhereDate('end_date', '>', today()))
             ->when($employeeUuid !== null, fn (Builder $query) => $query->whereUuid($employeeUuid))
             ->orderBy('id')->first();
     }
