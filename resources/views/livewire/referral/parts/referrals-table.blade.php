@@ -1,3 +1,7 @@
+@use('Carbon\Carbon')
+@use('Illuminate\Support\Facades\Lang')
+@use('Illuminate\Support\Arr')
+@use('Illuminate\Support\Str')
 @php
     $statusLabels = [
         'active' => __('referrals.status_labels.active'),
@@ -44,7 +48,7 @@
             @php
                 $referralId = $referral['id'] ?? (string) $loop->index;
                 $authoredOn = data_get($referral, 'authored_on') ?? data_get($referral, 'inserted_at');
-                $createdAt = $authoredOn ? \Carbon\Carbon::parse($authoredOn) : null;
+                $createdAt = $authoredOn ? Carbon::parse($authoredOn) : null;
                 $serviceCode = data_get($referral, 'code.coding.0.code') ?? data_get($referral, 'service.code');
                 $serviceName = data_get($referral, 'code.coding.0.display')
                     ?? data_get($referral, 'code.text')
@@ -52,7 +56,7 @@
                     ?? data_get($referral, 'service.name');
                 $categoryCode = data_get($referral, 'category.coding.0.code') ?? '';
                 $categoryKey = 'care-plan.referral_category.' . $categoryCode;
-                $categoryLabel = \Illuminate\Support\Facades\Lang::has($categoryKey) ? __($categoryKey) : ($categoryCode ?: '—');
+                $categoryLabel = Lang::has($categoryKey) ? __($categoryKey) : ($categoryCode ?: '—');
                 $serviceDisplay = $serviceName ?: ($serviceCode ?: $categoryLabel);
                 if ($serviceCode && $serviceName && !str_contains($serviceName, $serviceCode)) {
                     $serviceDisplay = $serviceCode . ' - ' . $serviceName;
@@ -61,12 +65,12 @@
                 $filterReferral = [
                     'status' => $referral['status'] ?? '',
                     'program_processing_status' => $referral['program_processing_status'] ?? '',
-                    'identity' => \Illuminate\Support\Arr::only($identity, ['last_name', 'first_name', 'second_name']),
+                    'identity' => Arr::only($identity, ['last_name', 'first_name', 'second_name']),
                     'subject' => ['display' => data_get($referral, 'subject.display')],
                 ];
                 $patientName = trim(($identity['last_name'] ?? '') . ' '
-                    . \Illuminate\Support\Str::substr($identity['first_name'] ?? '', 0, 1) . (empty($identity['first_name']) ? '' : '.') . ' '
-                    . \Illuminate\Support\Str::substr($identity['second_name'] ?? '', 0, 1) . (empty($identity['second_name']) ? '' : '.'));
+                    . Str::substr($identity['first_name'] ?? '', 0, 1) . (empty($identity['first_name']) ? '' : '.') . ' '
+                    . Str::substr($identity['second_name'] ?? '', 0, 1) . (empty($identity['second_name']) ? '' : '.'));
                 $patientName = $patientName ?: (data_get($referral, 'subject.display') ?: '—');
                 $programName = data_get($referral, 'program.name')
                     ?? data_get($referral, 'program.display')
@@ -77,14 +81,15 @@
                 $programStatus = str_replace('-', '_', $referral['program_processing_status'] ?? '');
                 $programStatus = $programStatus === 'recalled' ? 'revoked' : $programStatus;
                 $hasActions = ($this->canTakeIntoWork($referral) && auth()->user()?->can('service_request:makeinprogress'))
-                    || ($this->canManageUsage($referral) && (auth()->user()?->can('service_request:complete') || auth()->user()?->can('service_request:use')));
+                    || $this->canCompleteReferral($referral)
+                    || ($this->canManageUsage($referral) && auth()->user()?->can('service_request:use'));
                 $isDraft = $status === 'draft';
                 $requesterUuid = data_get($referral, 'requester.legal_entity.identifier.value')
                     ?? data_get($referral, 'requester_legal_entity.identifier.value')
                     ?? data_get($referral, 'requesterLegalEntity.identifier.value');
                 $isIssuedReferral = in_array($status, ['active', 'new'], true)
                     && filled($requesterUuid)
-                    && $requesterUuid === $legalEntity->uuid
+                    && $requesterUuid === legalEntity()->uuid
                     && auth()->user()?->can('service_request:read');
                 $hasActions = $hasActions || $isDraft || $isIssuedReferral;
             @endphp
@@ -126,7 +131,7 @@
                         </td>
                     @endforeach
                     <td class="index-table-td">
-                        {{ $referral['requisition'] ?? $referral['request_number'] ?? $referral['id'] ?? '—' }}
+                        {{ $referral['requisition'] ?? ($referral['request_number'] ?? ($referral['id'] ?? '—')) }}
                         @if ($referral['hasCompletion'] ?? false)
                             <button
                                 type="button"

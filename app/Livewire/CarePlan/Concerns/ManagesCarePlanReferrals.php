@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan\Concerns;
 
-use App\Classes\eHealth\EHealth as SubmissionApi;
 use App\Classes\eHealth\EHealth;
+use App\Classes\eHealth\EHealth as SubmissionApi;
 use App\Core\Arr;
 use App\Enums\CarePlanStatus;
 use App\Enums\Person\ServiceRequestStatus;
@@ -55,7 +55,9 @@ trait ManagesCarePlanReferrals
 
     public function initReferralForm(int $activityId): void
     {
-        $this->authorizeCarePlanActivityWrite();
+        if ($this->authorizeCarePlanActivityWrite() === false) {
+            return;
+        }
 
         try {
             $activity = $this->ownedActivity($activityId);
@@ -166,14 +168,14 @@ trait ManagesCarePlanReferrals
             $defaultQuantity = (float) $this->referralDevicePackageQty;
         }
 
-        $code = $activity->productCodeableConcept ?? $activity->productReference ?? 'од.';
-
         $activityResource = Repository::carePlanActivity()->getResource($activity);
+        $code = data_get($activityResource, 'detail.productReference.identifier.value')
+            ?? ($activity->productCodeableConcept ?? ($activity->productReference ?? 'од.'));
         $this->referralServiceType = data_get($activityResource, 'detail.productReference.identifier.type.coding.0.code', 'service');
         $this->referralCategoryOptions = [];
         if ($this->referralServiceType === 'service_group') {
             try {
-                $group = dictionary()->services()->flattened()->firstWhere('id', $activity->productReference);
+                $group = dictionary()->services()->flattened()->firstWhere('id', $code);
                 if (($group['type'] ?? '') !== 'service_group' || empty($group['request_allowed'])) {
                     Session::flash('error', __('care-plan.service_group_referral_not_allowed'));
 
@@ -195,7 +197,7 @@ trait ManagesCarePlanReferrals
             }
         }
         $category = $resolvedKind === 'service_request' && $this->referralServiceType !== 'service_group'
-            ? $this->resolveServiceCategory((string) $activity->productReference)
+            ? $this->resolveServiceCategory((string) $code)
             : null;
 
         $this->referralServiceCategory = $category ?? ($this->referralServiceType === 'service_group' ? '' : 'procedure');
@@ -226,17 +228,17 @@ trait ManagesCarePlanReferrals
             $reasonReference[] = [
                 'type' => $typeCode,
                 'uuid' => $identifier->value,
-                'name' => $grounds->get($identifier->value)['name'] ?? $identifier->displayValue ?? __('care-plan.ground_name_unavailable'),
+                'name' => $grounds->get($identifier->value)['name'] ?? ($identifier->displayValue ?? __('care-plan.ground_name_unavailable')),
             ];
         });
 
         $informWith = '';
         $this->referralAuthMethods = [];
         try {
-            $authMethods = EHealth::person()->getAuthMethods($this->carePlan->person->uuid)->getData();
+            $authMethods = EHealth::person()->getAuthMethods($this->carePlan->person->uuid)->validate();
             if (is_array($authMethods)) {
                 $this->referralAuthMethods = collect($authMethods)->map(static function (array $method): array {
-                    $uuid = (string) ($method['id'] ?? $method['uuid'] ?? '');
+                    $uuid = (string) ($method['id'] ?? ($method['uuid'] ?? ''));
                     $type = (string) ($method['type'] ?? '');
                     $value = (string) ($method['phone_number'] ?? $method['value'] ?? '');
 
@@ -451,7 +453,9 @@ trait ManagesCarePlanReferrals
 
     public function resendReferralSms(string $requestId, string $kind): void
     {
-        $this->authorizeCarePlanActivityWrite();
+        if ($this->authorizeCarePlanActivityWrite() === false) {
+            return;
+        }
         if ($kind === 'device_request') {
             $this->redirectRoute('persons.device-requests', ['legalEntity' => legalEntity(), 'person' => $this->carePlan->person]);
 
@@ -477,7 +481,7 @@ trait ManagesCarePlanReferrals
                 return;
             }
 
-            Session::flash('error', __('Не вдалося повторно надіслати СМС: ') . json_encode($response->getData()));
+            Session::flash('error', __('referrals.sms_failed'));
         } catch (EHealthValidationException $exception) {
             Log::error('CarePlanShow: failed to resend referral SMS validation: ' . $exception->getTranslatedMessage());
             Session::flash('error', $exception->getTranslatedMessage());
@@ -915,7 +919,7 @@ trait ManagesCarePlanReferrals
             return $display;
         }
         try {
-            $service = $this->findServiceInCatalog(dictionary()->services()->all(), (string) $activity->productReference);
+            $service = $this->findServiceInCatalog(dictionary()->services()->all(), (string) ($activity->productReferenceIdentifier?->value ?? $activity->productReference));
             if (filled($service['name'] ?? null)) {
                 return trim(($service['code'] ?? '').' '.$service['name']);
             }
@@ -1073,7 +1077,7 @@ trait ManagesCarePlanReferrals
 
             $packaging = $device['packaging'] ?? null;
             $count = is_array($packaging)
-                ? (int) ($packaging['packaging_count'] ?? $packaging['packagingCount'] ?? 0)
+                ? (int) ($packaging['packaging_count'] ?? ($packaging['packagingCount'] ?? 0))
                 : 0;
 
             return max(0, $count);
@@ -1115,7 +1119,7 @@ trait ManagesCarePlanReferrals
             $filters['page'] = $page;
             $response = EHealth::deviceDefinition()->getMany($filters);
             $device = collect($response->getData())->first(
-                static fn (array $item): bool => (string) ($item['id'] ?? $item['uuid'] ?? '') === $reference
+                static fn (array $item): bool => (string) ($item['id'] ?? ($item['uuid'] ?? '')) === $reference
             );
 
             if (is_array($device)) {

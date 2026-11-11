@@ -13,8 +13,8 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use App\Services\MedicalEvents\Mappers\ServiceRequestRegistryMapper;
+use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Auth;
@@ -46,6 +46,11 @@ trait ManagesIncomingReferralCompletion
 
     public string $referralCompletionUuid = '';
 
+    public bool $acknowledgeRemainingQuantity = false;
+
+    #[Locked]
+    public float $completionRemainingQuantity = 0;
+
     #[Locked]
     public bool $referralSubmissionPending = false;
 
@@ -58,7 +63,7 @@ trait ManagesIncomingReferralCompletion
     #[Computed]
     public function incomingReferral(): ?array
     {
-        if ($this->personId === null) {
+        if ($this->personId === null && $this->prepersonId === null) {
             return null;
         }
         $encounter = Repository::encounter()->findForStandaloneDocument($this->encounterId, $this->patient());
@@ -128,6 +133,8 @@ trait ManagesIncomingReferralCompletion
             return;
         }
         $this->referralToRedeemId = $referral['uuid'];
+        $this->acknowledgeRemainingQuantity = false;
+        $this->completionRemainingQuantity = (float) ($referral['remainingQuantity'] ?? 0);
         $this->referralCompletionTypes = $referral['completionTypes'];
         $this->referralCompletionType = $this->referralCompletionTypes[0];
         foreach (['diagnostic_report', 'procedure', 'encounter'] as $type) {
@@ -276,7 +283,12 @@ trait ManagesIncomingReferralCompletion
                 return;
             }
 
-            $response = $service->completeReferral($referral['uuid'], $this->referralCompletionUuid, $this->referralCompletionType);
+            if ((float) ($referral['remainingQuantity'] ?? 0) > 0 && !$this->acknowledgeRemainingQuantity) {
+                Session::flash('warning', __('referrals.remaining_quantity_warning'));
+
+                return;
+            }
+            $response = $service->completeReferral($referral['uuid'], $this->referralCompletionUuid, $this->referralCompletionType, ['acknowledge_remaining_quantity' => $this->acknowledgeRemainingQuantity]);
             $this->showReferralRedeemModal = false;
             unset($this->incomingReferral);
             if ($response['submissionPending'] ?? false) {

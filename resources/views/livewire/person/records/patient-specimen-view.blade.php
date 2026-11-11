@@ -15,6 +15,7 @@
     :personId="$personId"
     :prepersonId="$prepersonId"
     :patientFullName="$patientFullName"
+    :showLegacyMessages="false"
     :hideNavigation="true"
     title="{{ __('specimens.specimen') }} {{ data_get($specimen, 'accessionIdentifier') }}"
     activeTab="specimens"
@@ -30,6 +31,7 @@
         </button>
     </x-slot>
 
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <div class="shift-content mt-8 max-w-6xl pl-3.5">
         <fieldset class="fieldset mb-6">
             <legend class="legend">{{ __('specimens.general_info') }}</legend>
@@ -242,7 +244,7 @@
                         type="text"
                         id="specimenManagingOrganization"
                         class="input peer"
-                        value="{{ data_get($specimen, 'managingOrganization.displayValue') ?? data_get($specimen, 'managingOrganization.value') ?? '-' }}"
+                        value="{{ data_get($specimen, 'managingOrganization.displayValue') ?? (data_get($specimen, 'managingOrganization.value') ?? '-') }}"
                         disabled
                     />
                     <label for="specimenManagingOrganization" class="label">
@@ -254,7 +256,7 @@
                         type="text"
                         id="specimenRegisteredBy"
                         class="input peer"
-                        value="{{ data_get($specimen, 'registeredBy.displayValue') ?? data_get($specimen, 'registeredBy.value') ?? '-' }}"
+                        value="{{ data_get($specimen, 'registeredBy.displayValue') ?? (data_get($specimen, 'registeredBy.value') ?? '-') }}"
                         disabled
                     />
                     <label
@@ -301,7 +303,7 @@
                         type="text"
                         id="collectionCollector"
                         class="input peer"
-                        value="{{ data_get($specimen, 'collection.collector.displayValue') ?? data_get($specimen, 'collection.collector.value') ?? '-' }}"
+                        value="{{ data_get($specimen, 'collection.collector.displayValue') ?? (data_get($specimen, 'collection.collector.value') ?? '-') }}"
                         disabled
                     />
                     <label for="collectionCollector" class="label">{{ __('specimens.collector') }}</label>
@@ -569,4 +571,9 @@
             >{{ __('forms.back') }}</a>
         </div>
     </div>
+    <livewire:referral.specimen-referral
+        :specimen-id="$specimenId"
+        :person-id="$personId"
+        :preperson-id="$prepersonId"
+    />
 </x-layouts.patient>

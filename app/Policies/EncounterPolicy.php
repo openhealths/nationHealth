@@ -185,14 +185,14 @@ class EncounterPolicy
         return $this->standaloneDocumentResponse($user, $encounter, $patient, $legalEntityId, 'medication_request_request:write');
     }
 
-    public function createServiceRequest(User $user, Encounter $encounter, Person $patient, int|LegalEntity $legalEntityId): Response
+    public function createServiceRequest(User $user, Encounter $encounter, Person|Preperson $patient, int|LegalEntity $legalEntityId): Response
     {
         $legalEntityId = $legalEntityId instanceof LegalEntity ? $legalEntityId->id : $legalEntityId;
 
         return $this->standaloneDocumentResponse($user, $encounter, $patient, $legalEntityId, 'service_request:write');
     }
 
-    private function standaloneDocumentResponse(User $user, Encounter $encounter, Person $patient, int $legalEntityId, string $permission): Response
+    private function standaloneDocumentResponse(User $user, Encounter $encounter, Person|Preperson $patient, int $legalEntityId, string $permission): Response
     {
         if ($legalEntityId !== (int) legalEntity()->id || $encounter->status !== EncounterStatus::FINISHED || !$user->can($permission)) {
             return Response::denyWithStatus(404);

@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
-use Exception;
-use Brick\Math\BigDecimal;
+use App\Classes\eHealth\Api\Responses\Collections\DivisionCreate;
+use App\Classes\eHealth\EHealthRequest as Request;
+use App\Classes\eHealth\EHealthResponse;
+use App\Dto\Division\Location as LocationData;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthValidationException;
+use App\Models\Division as DivisionModel;
 use App\Models\LegalEntity;
 use App\Traits\WorkTimeUtilities;
+use Brick\Math\BigDecimal;
+use Exception;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use GuzzleHttp\Promise\PromiseInterface;
-use App\Classes\eHealth\EHealthResponse;
-use App\Models\Division as DivisionModel;
 use Illuminate\Support\Facades\Validator;
-use App\Dto\Division\Location as LocationData;
-use App\Classes\eHealth\EHealthRequest as Request;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthValidationException;
-use App\Classes\eHealth\Api\Responses\Collections\DivisionCreate;
 
 class Division extends Request
 {
@@ -68,13 +68,142 @@ class Division extends Request
      */
     public function search(string $legalEntityUuid, int $page = 1): PromiseInterface|EHealthResponse
     {
-        $this->validator = null;
+        $this->setValidator(self::validateSearch(...));
 
         return parent::get(self::SEARCH_URL, [
             'legal_entity_id' => $legalEntityUuid,
             'page' => $page,
             'page_size' => 100,
         ]);
+    }
+
+    /** Public Search Divisions schema, General MIS snapshot 2026-10-22. */
+    public static function validateSearch(EHealthResponse $response): array
+    {
+        Validator::make($response->json(), [
+            'meta' => ['sometimes', 'array'],
+            'meta.code' => ['sometimes'],
+            'meta.url' => ['sometimes'],
+            'meta.type' => ['sometimes'],
+            'meta.request_id' => ['sometimes'],
+            'data' => ['present', 'array', 'list'],
+            'data.*' => ['present_with:data', 'array'],
+            'data.*.id' => ['present_with:data.*', 'string'],
+            'data.*.name' => ['present_with:data.*', 'string'],
+            'data.*.type' => ['present_with:data.*', 'string', 'in:CLINIC,AMBULANT_CLINIC,FAP'],
+            'data.*.addresses' => ['sometimes', 'array'],
+            'data.*.addresses.type' => ['sometimes'],
+            'data.*.addresses.country' => ['present_with:data.*.addresses'],
+            'data.*.addresses.area' => ['sometimes'],
+            'data.*.addresses.region' => ['sometimes'],
+            'data.*.addresses.settlement' => ['sometimes'],
+            'data.*.addresses.settlement_type' => ['sometimes'],
+            'data.*.addresses.settlement_id' => ['sometimes'],
+            'data.*.addresses.street_type' => ['sometimes'],
+            'data.*.addresses.street' => ['sometimes'],
+            'data.*.addresses.building' => ['sometimes'],
+            'data.*.addresses.apartment' => ['sometimes'],
+            'data.*.addresses.zip' => ['sometimes'],
+            'data.*.contacts' => ['sometimes', 'array'],
+            'data.*.contacts.email' => ['sometimes', 'string'],
+            'data.*.contacts.phones' => ['sometimes', 'array', 'list'],
+            'data.*.contacts.phones.*' => ['present_with:data.*.contacts.phones', 'array'],
+            'data.*.contacts.phones.*.type' => ['present_with:data.*.contacts.phones.*'],
+            'data.*.contacts.phones.*.number' => ['present_with:data.*.contacts.phones.*'],
+            'data.*.coordinates' => ['sometimes', 'array'],
+            'data.*.coordinates.latitude' => ['present_with:data.*.coordinates', 'numeric'],
+            'data.*.coordinates.longitude' => ['present_with:data.*.coordinates', 'numeric'],
+            'data.*.legal_entity' => ['present_with:data.*', 'array'],
+            'data.*.legal_entity.name' => ['present_with:data.*.legal_entity', 'string'],
+            'data.*.legal_entity.short_name' => ['sometimes', 'string'],
+            'data.*.legal_entity.public_name' => ['sometimes', 'string'],
+            'data.*.legal_entity.type' => ['present_with:data.*.legal_entity', 'string'],
+            'data.*.legal_entity.owner_property_type' => ['present_with:data.*.legal_entity', 'string'],
+            'data.*.legal_entity.legal_form' => ['present_with:data.*.legal_entity', 'string'],
+            'data.*.legal_entity.edrpou' => ['present_with:data.*.legal_entity', 'string'],
+            'data.*.legal_entity.kveds' => ['sometimes', 'string'],
+            'data.*.legal_entity.addresses' => ['present_with:data.*.legal_entity', 'array', 'list'],
+            'data.*.legal_entity.addresses.*' => ['present_with:data.*.legal_entity.addresses', 'array'],
+            'data.*.legal_entity.addresses.*.type' => ['sometimes'],
+            'data.*.legal_entity.addresses.*.country' => ['present_with:data.*.legal_entity.addresses.*'],
+            'data.*.legal_entity.addresses.*.area' => ['sometimes'],
+            'data.*.legal_entity.addresses.*.region' => ['sometimes'],
+            'data.*.legal_entity.addresses.*.settlement' => ['sometimes'],
+            'data.*.legal_entity.addresses.*.settlement_type' => ['sometimes'],
+            'data.*.legal_entity.addresses.*.settlement_id' => ['sometimes'],
+            'data.*.legal_entity.addresses.*.street_type' => ['sometimes'],
+            'data.*.legal_entity.addresses.*.street' => ['sometimes'],
+            'data.*.legal_entity.addresses.*.building' => ['sometimes'],
+            'data.*.legal_entity.addresses.*.apartment' => ['sometimes'],
+            'data.*.legal_entity.addresses.*.zip' => ['sometimes'],
+            'data.*.legal_entity.phones' => ['present_with:data.*.legal_entity', 'array', 'list'],
+            'data.*.legal_entity.phones.*' => ['present_with:data.*.legal_entity.phones', 'array'],
+            'data.*.legal_entity.phones.*.type' => ['present_with:data.*.legal_entity.phones.*'],
+            'data.*.legal_entity.phones.*.number' => ['present_with:data.*.legal_entity.phones.*'],
+            'data.*.legal_entity.email' => ['present_with:data.*.legal_entity', 'string'],
+            'data.*.legal_entity.nhs_verified' => ['sometimes', 'string'],
+            'data.*.legal_entity.owner' => ['sometimes', 'array'],
+            'data.*.legal_entity.owner.id' => ['present_with:data.*.legal_entity.owner', 'string'],
+            'data.*.legal_entity.owner.position' => ['present_with:data.*.legal_entity.owner', 'string'],
+            'data.*.legal_entity.owner.employee_type' => ['present_with:data.*.legal_entity.owner', 'string'],
+            'data.*.legal_entity.owner.party' => ['sometimes', 'array'],
+            'data.*.legal_entity.owner.party.id' => ['present_with:data.*.legal_entity.owner.party', 'string'],
+            'data.*.legal_entity.owner.party.first_name' => ['present_with:data.*.legal_entity.owner.party', 'string'],
+            'data.*.legal_entity.owner.party.second_name' => ['present_with:data.*.legal_entity.owner.party', 'string'],
+            'data.*.legal_entity.owner.party.last_name' => ['present_with:data.*.legal_entity.owner.party', 'string'],
+            'data.*.healthcare_services' => ['present_with:data.*', 'array', 'list'],
+            'data.*.healthcare_services.*' => ['present_with:data.*.healthcare_services', 'array'],
+            'data.*.healthcare_services.*.id' => ['present_with:data.*.healthcare_services.*', 'string'],
+            'data.*.healthcare_services.*.division_id' => ['present_with:data.*.healthcare_services.*', 'string'],
+            'data.*.healthcare_services.*.legal_entity_id' => ['present_with:data.*.healthcare_services.*', 'string'],
+            'data.*.healthcare_services.*.license_id' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.speciality_type' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.providing_condition' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.category' => ['present_with:data.*.healthcare_services.*', 'array'],
+            'data.*.healthcare_services.*.category.coding' => ['present_with:data.*.healthcare_services.*.category', 'array', 'list'],
+            'data.*.healthcare_services.*.category.coding.*' => ['present_with:data.*.healthcare_services.*.category.coding', 'array'],
+            'data.*.healthcare_services.*.category.coding.*.system' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.category.coding.*.code' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.category.text' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.type' => ['sometimes', 'array'],
+            'data.*.healthcare_services.*.type.coding' => ['present_with:data.*.healthcare_services.*.type', 'array', 'list'],
+            'data.*.healthcare_services.*.type.coding.*' => ['present_with:data.*.healthcare_services.*.type.coding', 'array'],
+            'data.*.healthcare_services.*.type.coding.*.system' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.type.coding.*.code' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.type.text' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.status' => ['present_with:data.*.healthcare_services.*', 'string'],
+            'data.*.healthcare_services.*.comment' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.coverage_area' => ['sometimes', 'array', 'list'],
+            'data.*.healthcare_services.*.coverage_area.*' => ['present_with:data.*.healthcare_services.*.coverage_area', 'string'],
+            'data.*.healthcare_services.*.available_time' => ['sometimes', 'array', 'list'],
+            'data.*.healthcare_services.*.available_time.*' => ['present_with:data.*.healthcare_services.*.available_time', 'array'],
+            'data.*.healthcare_services.*.available_time.*.days_of_week' => ['present_with:data.*.healthcare_services.*.available_time.*', 'array', 'list'],
+            'data.*.healthcare_services.*.available_time.*.days_of_week.*' => ['present_with:data.*.healthcare_services.*.available_time.*.days_of_week', 'string'],
+            'data.*.healthcare_services.*.available_time.*.all_day' => ['sometimes', 'boolean'],
+            'data.*.healthcare_services.*.available_time.*.available_start_time' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.available_time.*.available_end_time' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.not_available' => ['sometimes', 'array', 'list'],
+            'data.*.healthcare_services.*.not_available.*' => ['present_with:data.*.healthcare_services.*.not_available', 'array'],
+            'data.*.healthcare_services.*.not_available.*.description' => ['present_with:data.*.healthcare_services.*.not_available.*', 'string'],
+            'data.*.healthcare_services.*.not_available.*.during' => ['present_with:data.*.healthcare_services.*.not_available.*', 'array'],
+            'data.*.healthcare_services.*.not_available.*.during.start' => ['present_with:data.*.healthcare_services.*.not_available.*.during', 'string'],
+            'data.*.healthcare_services.*.not_available.*.during.end' => ['present_with:data.*.healthcare_services.*.not_available.*.during', 'string'],
+            'data.*.healthcare_services.*.licensed_healthcare_service' => ['sometimes', 'array'],
+            'data.*.healthcare_services.*.licensed_healthcare_service.status' => ['sometimes', 'string'],
+            'data.*.healthcare_services.*.licensed_healthcare_service.updated_at' => ['present_with:data.*.healthcare_services.*.licensed_healthcare_service', 'string'],
+            'data.*.healthcare_services.*.is_active' => ['present_with:data.*.healthcare_services.*', 'boolean'],
+            'data.*.healthcare_services.*.inserted_at' => ['present_with:data.*.healthcare_services.*', 'string'],
+            'data.*.healthcare_services.*.inserted_by' => ['present_with:data.*.healthcare_services.*', 'string'],
+            'data.*.healthcare_services.*.updated_at' => ['present_with:data.*.healthcare_services.*', 'string'],
+            'data.*.healthcare_services.*.updated_by' => ['present_with:data.*.healthcare_services.*', 'string'],
+            'paging' => ['required', 'array'],
+            'paging.page_number' => ['required', 'integer', 'min:1'],
+            'paging.page_size' => ['required', 'integer', 'min:1'],
+            'paging.total_entries' => ['required', 'integer', 'min:0'],
+            'paging.total_pages' => ['required', 'integer', 'min:0'],
+        ])->validate();
+
+        return $response->getData();
     }
 
     /**

@@ -584,7 +584,7 @@ class EncounterPackageComponent extends Component
             return;
         }
 
-        if ($this->personId === null) {
+        if ($this->personId === null && $this->prepersonId === null) {
             $this->referralsLoaded = true;
 
             return;
@@ -595,7 +595,7 @@ class EncounterPackageComponent extends Component
 
         $this->availableReferrals = MedicalEventsRepository::serviceRequest()
             ->encounterOptions(
-                $this->personId,
+                $this->patient(),
                 $procedureCategories,
                 $diagnosticReportCategories
             );

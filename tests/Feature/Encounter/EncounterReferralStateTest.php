@@ -4,25 +4,33 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Encounter;
 
-use App\Livewire\EncounterPackage\EncounterPackageEdit;
 use App\Enums\Person\EncounterStatus;
+use App\Livewire\EncounterPackage\EncounterPackageEdit;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
 use App\Models\Preperson;
-use App\Services\SignatureService;
+use App\Services\Dictionary\Dictionaries\ServiceDictionary;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
+use App\Services\SignatureService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\TestCase;
 
 class EncounterReferralStateTest extends TestCase
 {
+    use CompositionTestFixtures;
+    use DatabaseTransactions;
+
     protected function setUp(): void
     {
         parent::setUp();
+        $this->compositionFixture(scopes: ['service_request:read']);
         Http::preventStrayRequests();
         $this->mock(SignatureService::class)->shouldReceive('getCertificateAuthorities')->andReturn([]);
     }
@@ -32,8 +40,8 @@ class EncounterReferralStateTest extends TestCase
         Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('actionType', 'sign_referral')
             ->set('showSignatureModal', true)
-            ->assertSeeHtml('wire:click="sign"')
-            ->assertDontSeeHtml('wire:click="cancelSelectedEncounter"')
+            ->assertSeeHtml('wire:submit="sign"')
+            ->assertDontSeeHtml('wire:submit="cancelSelectedEncounter"')
             ->call('sign')
             ->assertSet('signedAction', 'sign_referral');
     }
@@ -43,8 +51,8 @@ class EncounterReferralStateTest extends TestCase
         Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('actionType', 'cancel_encounter')
             ->set('showSignatureModal', true)
-            ->assertSeeHtml('wire:click="cancelSelectedEncounter"')
-            ->assertDontSeeHtml('wire:click="sign"');
+            ->assertSeeHtml('wire:submit="cancelSelectedEncounter"')
+            ->assertDontSeeHtml('wire:submit="sign"');
     }
 
     #[DataProvider('unrelatedSignatureActions')]
@@ -242,7 +250,11 @@ class EncounterReferralStateTest extends TestCase
 
     private function service(): array
     {
-        return ['id' => 'bf112058-af5d-45c4-aea0-f6ee6783fcb7', 'code' => '12515-00', 'name' => 'Обстеження', 'category' => 'laboratory_procedure'];
+        $service = ['id' => 'bf112058-af5d-45c4-aea0-f6ee6783fcb7', 'code' => '12515-00', 'name' => 'Обстеження', 'category' => 'laboratory_procedure', 'request_allowed' => true, 'is_active' => true];
+        Cache::forever(ServiceDictionary::KEY, [$service]);
+        Cache::forever(ServiceDictionary::KEY.':fresh', true);
+
+        return $service + ['type' => 'service'];
     }
 }
 

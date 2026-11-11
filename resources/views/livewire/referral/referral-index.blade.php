@@ -12,7 +12,10 @@
                     wire:click="search"
                     wire:loading.attr="disabled"
                     wire:target="search"
-                    @click="patient = ''; status = []"
+                    @click="
+                        patient = '';
+                        status = [];
+                    "
                     class="button-sync gap-2 whitespace-nowrap disabled:cursor-default disabled:opacity-50"
                     :disabled="! requisition.trim()"
                 >
@@ -25,7 +28,10 @@
         <x-slot name="navigation">
             <form
                 wire:submit="search"
-                @submit="patient = ''; status = []"
+                @submit="
+                    patient = '';
+                    status = [];
+                "
                 class="-my-4"
             >
                 <div class="mb-6 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
@@ -86,14 +92,8 @@
                     </button>
                 </div>
 
-                <div
-                    class="mt-6"
-                    x-show="$wire.searchResults.length > 0"
-                    x-cloak
-                >
-                    <p class="mb-4 font-semibold text-gray-900 dark:text-white">
-                        {{ __('referrals.result_filters') }}
-                    </p>
+                <div class="mt-6" x-show="$wire.searchResults.length > 0" x-cloak>
+                    <p class="mb-4 font-semibold text-gray-900 dark:text-white">{{ __('referrals.result_filters') }}</p>
                     <div
                         class="form-row-3"
                         x-data="{ statusOpen: false }"
@@ -111,9 +111,7 @@
                                 autocomplete="off"
                                 aria-describedby="patient-hint"
                             />
-                            <label for="patient" class="label">
-                                {{ __('referrals.patient_filter') }}
-                            </label>
+                            <label for="patient" class="label"> {{ __('referrals.patient_filter') }} </label>
                             <button
                                 type="button"
                                 @click="patient = ''"
@@ -162,10 +160,7 @@
                     :description="__('referrals.no_search_results')"
                 />
             @else
-                <x-nothing-found
-                    :title="__('referrals.search_prompt')"
-                    :description="__('referrals.search_hint')"
-                />
+                <x-nothing-found :title="__('referrals.search_prompt')" :description="__('referrals.search_hint')" />
             @endif
         </div>
     </div>
@@ -174,11 +169,7 @@
 
     <!-- Cancel Usage Modal -->
     @if ($showCancelModal)
-        <div
-            class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50"
-            aria-modal="true"
-            role="dialog"
-        >
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50" aria-modal="true" role="dialog">
             <div class="relative w-full max-w-lg rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                 <button
                     type="button"
@@ -234,13 +225,45 @@
         </div>
     @endif
 
+    @if ($showUseModal)
+        <div class="modal" role="dialog" aria-modal="true">
+            <div class="modal-wrapper">
+                <form class="modal-content p-6" wire:submit="confirmUse">
+                    <h3 class="modal-header">{{ __('referrals.messages.use_options') }}</h3>
+                    <label for="referralExecutor" class="default-label">{{ __('referrals.messages.executor') }}</label>
+                    <select id="referralExecutor" class="input-select w-full" wire:model="selectedExecutorId">
+                        <option value="0">{{ __('forms.select') }}</option>
+                        @foreach ($this->executorChoices as $employee)
+                            <option value="{{ $employee['id'] }}">{{ $employee['label'] }}</option>
+                        @endforeach
+                    </select>
+                    @error('selectedExecutorId')
+                        <p class="text-error">{{ $message }}</p>
+                    @enderror
+                    <label for="referralProgram" class="default-label">{{ __('care-plan.program') }}</label>
+                    <select id="referralProgram" class="input-select w-full" wire:model="selectedProgramId">
+                        <option value="">{{ __('forms.select') }}</option>
+                        @foreach ($this->programChoices as $program)
+                            <option value="{{ $program['id'] }}">{{ $program['name'] }}</option>
+                        @endforeach
+                    </select>
+                    @error('selectedProgramId')
+                        <p class="text-error">{{ $message }}</p>
+                    @enderror
+                    <div class="mt-4 flex gap-3">
+                        <button type="submit" class="button-primary">{{ __('forms.confirm') }}</button>
+                        <button type="button" class="button-secondary" wire:click="$set('showUseModal', false)">
+                            {{ __('forms.cancel') }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
     <!-- Complete Referral Modal -->
     @if ($showCompleteModal)
-        <div
-            class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50"
-            aria-modal="true"
-            role="dialog"
-        >
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50" aria-modal="true" role="dialog">
             <div class="relative w-full max-w-lg rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                 <button
                     type="button"
@@ -291,6 +314,17 @@
                             </select>
                         @endif
                     </div>
+                    @if ($remainingQuantity > 0)
+                        <div class="show-alert-warning mb-4 text-left">
+                            <p>
+                                {{ __('referrals.messages.remaining_quantity_warning', ['quantity' => $remainingQuantity]) }}
+                            </p>
+                            <label class="mt-2 flex gap-2">
+                                <input type="checkbox" wire:model="acknowledgeRemainingQuantity" />
+                                <span>{{ __('referrals.messages.remaining_quantity_confirm') }}</span>
+                            </label>
+                        </div>
+                    @endif
                     <div class="flex justify-center gap-3">
                         <button
                             wire:click="confirmComplete"

@@ -53,7 +53,7 @@ class ServiceRequestMapperTest extends TestCase
     }
 
     #[Test]
-    public function transfer_of_care_includes_performer_and_location_only_for_that_category(): void
+    public function optional_performer_location_and_speciality_survive_supported_categories(): void
     {
         $performer = (string) Str::uuid();
         $division = (string) Str::uuid();
@@ -79,9 +79,9 @@ class ServiceRequestMapperTest extends TestCase
 
         $plain = (new ServiceRequestMapper())->toCreateSignedContent($diagnostic, $this->uuids());
 
-        $this->assertArrayNotHasKey('performer', $plain);
-        $this->assertArrayNotHasKey('location_reference', $plain);
-        $this->assertArrayNotHasKey('performer_type', $plain);
+        $this->assertSame($performer, data_get($plain, 'performer.identifier.value'));
+        $this->assertSame($division, data_get($plain, 'location_reference.identifier.value'));
+        $this->assertSame('THERAPIST', data_get($plain, 'performer_type.coding.0.code'));
     }
 
     /**

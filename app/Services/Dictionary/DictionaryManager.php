@@ -190,7 +190,7 @@ class DictionaryManager
                     $freshData = $this->fetchCompleteValidated($key);
                 } else {
                     $response = $dictionary->fetch();
-                    $freshData = $response->getData();
+                    $freshData = $dictionary instanceof ServiceDictionary ? $response->validate() : $response->getData();
                     $totalPages = $response->getPaging()['total_pages'] ?? 1;
                 }
 

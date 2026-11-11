@@ -2,6 +2,9 @@
   "id": "10050000-0000-4000-8000-000000000001",
   "status": "active",
   "intent": "order",
+  "usedByEmployee": {"displayValue": ""},
+  "usedByLegalEntity": {"displayValue": ""},
+  "statusHistory": [],
   "priority": "routine",
   "category": {
     "coding": [

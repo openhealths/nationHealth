@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Dictionary;
 
+use Throwable;
+
 /**
  * Search and flatten the eHealth services dictionary tree for referral pickers.
  */
@@ -37,7 +39,7 @@ final class ServiceSearch
                     if ($filtered !== []) {
                         return $filtered;
                     }
-                } catch (\Throwable) {
+                } catch (Throwable) {
                 }
             }
         }
@@ -50,7 +52,7 @@ final class ServiceSearch
             if ($filtered !== []) {
                 return $filtered;
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
         }
 
         // 3. If multi-word query produced 0 results from eHealth API, try individual words in eHealth API then filter by all terms
@@ -73,7 +75,7 @@ final class ServiceSearch
                             $collected[$svc['id']] = $svc;
                         }
                     }
-                } catch (\Throwable) {
+                } catch (Throwable) {
                 }
 
                 $filtered = self::filterByQueryNeedle(array_values($collected), $query);
@@ -100,6 +102,32 @@ final class ServiceSearch
         }
 
         return strtolower(trim($category));
+    }
+
+    /** Membership is resolved from the catalog tree, not from a group's display name. */
+    public static function memberServiceIds(string $groupUuid, array $nodes): array
+    {
+        foreach ($nodes as $node) {
+            if (($node['id'] ?? null) === $groupUuid) {
+                return self::descendantServiceIds($node);
+            }
+            $found = self::memberServiceIds($groupUuid, $node['groups'] ?? []);
+            if ($found !== []) {
+                return $found;
+            }
+        }
+
+        return [];
+    }
+
+    private static function descendantServiceIds(array $node): array
+    {
+        $ids = array_column($node['services'] ?? [], 'id');
+        foreach ($node['groups'] ?? [] as $group) {
+            $ids = [...$ids, ...self::descendantServiceIds($group)];
+        }
+
+        return array_values(array_unique($ids));
     }
 
     public static function isCodeQuery(string $query): bool

@@ -4,30 +4,47 @@ declare(strict_types=1);
 
 namespace App\Livewire\Referral;
 
-use App\Models\LegalEntity;
-use App\Models\Person\Person;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthResponseException;
-use Exception;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Session;
-use Livewire\Attributes\Locked;
-use Livewire\Component;
 use App\Classes\eHealth\EHealth;
 use App\Enums\JobStatus;
+use App\Enums\MedicalProgram\Type as MedicalProgramType;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use Exception;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
+use Livewire\Component;
 
 class ReferralIndex extends Component
 {
     #[Locked]
-    public LegalEntity $legalEntity;
+    public int $legalEntityId;
 
     public string $requisition = '';
+
+    public bool $showUseModal = false;
+
+    #[Locked]
+    public ?string $referralToUse = null;
+
+    public int $selectedExecutorId = 0;
+
+    public string $selectedProgramId = '';
+
+    public bool $acknowledgeRemainingQuantity = false;
+
+    #[Locked]
+    public float $remainingQuantity = 0;
 
     #[Locked]
     public array $searchResults = [];
@@ -58,6 +75,19 @@ class ReferralIndex extends Component
 
     /** @var list<string> */
     public array $emzTypes = ['encounter', 'procedure', 'diagnostic_report'];
+
+    public function mount(LegalEntity $legalEntity): void
+    {
+        $this->legalEntityId = $legalEntity->id;
+    }
+
+    public function confirmUse(ReferralRequestLifecycleService $service): void
+    {
+        $referral = collect($this->searchResults)->firstWhere('id', $this->referralToUse);
+        if ($referral !== null) {
+            $this->process($this->referralToUse, (string) data_get($referral, 'subject.identifier.value', ''), $service);
+        }
+    }
 
     public function search(): void
     {
@@ -115,52 +145,87 @@ class ReferralIndex extends Component
         }
     }
 
+    #[Computed]
+    public function executorChoices(): array
+    {
+        $referral = collect($this->searchResults)->firstWhere('id', $this->referralToUse);
+
+        return Repository::serviceRequest()->executorChoices((string) data_get($referral, 'category.coding.0.code', ''));
+    }
+
+    #[Computed]
+    public function programChoices(): array
+    {
+        return dictionary()->medicalPrograms()->where('is_active', true)->where('type', MedicalProgramType::SERVICE->value)->values()->all();
+    }
+
+    public function openUseModal(string $uuid): void
+    {
+        if (Auth::user()->cannot('use', ServiceRequestRequest::class)) {
+            Session::flash('error', __('referrals.messages.use_forbidden'));
+
+            return;
+        }
+        $referral = collect($this->searchResults)->firstWhere('id', $uuid);
+        if ($referral === null || !$this->canTakeIntoWork($referral)) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+
+            return;
+        }
+        $this->referralToUse = $uuid;
+        $this->selectedExecutorId = 0;
+        $this->selectedProgramId = (string) (data_get($referral, 'program.identifier.value') ?? '');
+        $this->resetValidation();
+        $this->showUseModal = true;
+    }
+
     public function process(string $uuid, string $patientUuid, ReferralRequestLifecycleService $service): void
     {
-        abort_unless(auth()->user()?->can('service_request:makeinprogress'), 403);
+        if (!$this->showUseModal || $this->referralToUse !== $uuid) {
+            $this->openUseModal($uuid);
+
+            return;
+        }
+        if (Auth::user()->cannot('use', ServiceRequestRequest::class)) {
+            Session::flash('error', __('referrals.messages.use_forbidden'));
+
+            return;
+        }
         $referral = collect($this->searchResults)->firstWhere('id', $uuid);
         if (!$referral || !$this->canTakeIntoWork($referral)) {
             Session::flash('error', __('referrals.messages.action_unavailable'));
 
             return;
         }
+        $this->validate([
+            'selectedExecutorId' => ['required', 'integer', 'min:1', 'in:'.implode(',', array_column($this->executorChoices, 'id'))],
+            'selectedProgramId' => ['nullable', 'uuid', 'in:'.implode(',', array_column($this->programChoices, 'id'))],
+        ]);
         try {
-            $employee = auth()->user()->employees()->whereLegalEntityId($this->legalEntity->id)->first();
-
-            if (!$employee) {
-                throw new Exception('Не знайдено співробітника для виконання дії.');
-            }
-
-            $programId = null;
-            foreach ($this->searchResults as $result) {
-                if (($result['id'] ?? '') === $uuid) {
-                    $programId = data_get($result, 'program.identifier.value')
-                        ?? data_get($result, 'program.id')
-                        ?? data_get($result, 'medical_program_id');
-                    break;
-                }
-            }
-
-            $response = $service->takeIntoWork($uuid, $employee, $patientUuid ?: null, array_filter([
-                'program_id' => is_string($programId) && $programId !== '' ? $programId : null,
-            ]));
-
+            $employee = Repository::serviceRequest()->executorForUse($this->selectedExecutorId, (string) data_get($referral, 'category.coding.0.code', ''));
+            $response = $service->takeIntoWork($uuid, $employee, $patientUuid ?: null, ['program_id' => $this->selectedProgramId ?: null]);
             if ($response['submissionPending'] ?? false) {
                 Session::flash('info', __('care-plan.submission_pending'));
+                $this->showUseModal = false;
 
                 return;
             }
             $this->updateSearchResult($uuid, 'in_progress', $response);
-
+            $this->showUseModal = false;
             Session::flash('success', __('referrals.messages.taken_into_work'));
         } catch (Exception $e) {
+            // A rejected qualification leaves both selectors open for another choice or cancellation.
             $this->flashOperationError($e);
         }
     }
 
     public function openCancelModal(string $uuid): void
     {
-        abort_unless(auth()->user()?->can('service_request:use'), 403);
+        if (Auth::user()->cannot('use', ServiceRequestRequest::class)) {
+            Session::flash('error', __('referrals.messages.use_forbidden'));
+
+            return;
+        }
         $referral = collect($this->searchResults)->firstWhere('id', $uuid);
         if (!$referral || !$this->canManageUsage($referral)) {
             Session::flash('error', __('referrals.messages.action_unavailable'));
@@ -175,7 +240,11 @@ class ReferralIndex extends Component
 
     public function confirmCancelUsage(ReferralRequestLifecycleService $service): void
     {
-        abort_unless(auth()->user()?->can('service_request:use'), 403);
+        if (Auth::user()->cannot('use', ServiceRequestRequest::class)) {
+            Session::flash('error', __('referrals.messages.use_forbidden'));
+
+            return;
+        }
         $uuid = $this->referralToCancel;
 
         if (empty($uuid)) {
@@ -254,7 +323,7 @@ class ReferralIndex extends Component
             return;
         }
 
-        if (!$this->canManageUsage($referral)) {
+        if (!$this->canCompleteReferral($referral)) {
             Session::flash('error', __('referrals.messages.action_unavailable'));
 
             return;
@@ -268,7 +337,7 @@ class ReferralIndex extends Component
             return;
         }
 
-        $person = Person::whereUuid($patientId)->first();
+        $person = (Person::whereUuid($patientId)->first() ?? Preperson::whereUuid($patientId)->first());
 
         if (!$person) {
             Session::flash('error', __('referrals.messages.patient_not_found'));
@@ -287,6 +356,8 @@ class ReferralIndex extends Component
                 break;
             }
         }
+        $this->remainingQuantity = (float) data_get($referral, 'remaining_quantity.value', 0);
+        $this->acknowledgeRemainingQuantity = false;
         $this->showCompleteModal = true;
     }
 
@@ -314,7 +385,7 @@ class ReferralIndex extends Component
         }
 
         $referral = collect($this->searchResults)->firstWhere('id', $uuid);
-        if (!$referral || !$this->canManageUsage($referral)) {
+        if (!$referral || !$this->canCompleteReferral($referral)) {
             Session::flash('error', __('referrals.messages.action_unavailable'));
 
             return;
@@ -326,8 +397,14 @@ class ReferralIndex extends Component
             return;
         }
 
+        if ((float) data_get($referral, 'remaining_quantity.value', 0) > 0 && !$this->acknowledgeRemainingQuantity) {
+            Session::flash('warning', __('referrals.messages.remaining_quantity_warning', ['quantity' => data_get($referral, 'remaining_quantity.value')]));
+
+            return;
+        }
+
         try {
-            $response = $service->completeReferral($uuid, $resourceUuid, $resourceType);
+            $response = $service->completeReferral($uuid, $resourceUuid, $resourceType, ['acknowledge_remaining_quantity' => $this->acknowledgeRemainingQuantity]);
             if ($response['submissionPending'] ?? false) {
                 Session::flash('info', __('care-plan.submission_pending'));
                 $this->pendingCompletions[$uuid] = true;
@@ -367,7 +444,7 @@ class ReferralIndex extends Component
         }
         $referral = collect($this->searchResults)->firstWhere('id', $uuid);
         $record = $referral === null ? null : Repository::serviceRequest()->findByUuid($uuid);
-        if ($record === null || $record->person?->uuid !== data_get($referral, 'subject.identifier.value')) {
+        if ($record === null || Repository::serviceRequest()->patientForRequest($record)?->uuid !== data_get($referral, 'subject.identifier.value')) {
             unset($this->pendingCompletions[$uuid]);
 
             return;
@@ -415,18 +492,17 @@ class ReferralIndex extends Component
 
     public function canTakeIntoWork(array $referral): bool
     {
-        return in_array($referral['status'] ?? '', ['active', 'new'], true)
-            && !$this->canManageUsage($referral);
+        return Auth::user()->can('takeIntoWork', [ServiceRequestRequest::class, $referral]);
     }
 
     public function canManageUsage(array $referral): bool
     {
-        if (in_array($referral['status'] ?? '', ['draft', 'completed', 'recalled', 'revoked', 'entered_in_error', 'entered-in-error'], true)) {
-            return false;
-        }
+        return Auth::user()->can('manageUsage', [ServiceRequestRequest::class, $referral]);
+    }
 
-        return in_array($referral['status'] ?? '', ['in_progress', 'in_queue'], true)
-            || ($referral['program_processing_status'] ?? '') === 'in_progress';
+    public function canCompleteReferral(array $referral): bool
+    {
+        return Auth::user()->can('completeReferral', [ServiceRequestRequest::class, $referral]);
     }
 
     private function updateSearchResult(string $uuid, string $status, array $response): void
@@ -465,7 +541,7 @@ class ReferralIndex extends Component
             return;
         }
 
-        $person = Person::where('uuid', $patientId)->first();
+        $person = (Person::whereUuid($patientId)->first() ?? Preperson::whereUuid($patientId)->first());
         if (!$person) {
             return;
         }
@@ -473,14 +549,14 @@ class ReferralIndex extends Component
         $this->availableEmzResources = Repository::serviceRequest()->completionResources($person, $referralUuid, $this->selectedEmzType);
     }
 
-
     private function assertEmzLinkedToReferral(string $referralUuid, string $resourceType, string $resourceUuid): bool
     {
         $referral = collect($this->searchResults)->firstWhere('id', $referralUuid);
-        $person = Person::whereUuid(data_get($referral, 'subject.identifier.value'))->first();
+        $person = (Person::whereUuid(data_get($referral, 'subject.identifier.value'))->first() ?? Preperson::whereUuid(data_get($referral, 'subject.identifier.value'))->first());
 
         return $person !== null && in_array($resourceUuid, array_column(
-            Repository::serviceRequest()->completionResources($person, $referralUuid, $resourceType), 'uuid'
+            Repository::serviceRequest()->completionResources($person, $referralUuid, $resourceType),
+            'uuid'
         ), true);
     }
 }
