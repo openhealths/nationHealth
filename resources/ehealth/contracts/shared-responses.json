@@ -643,15 +643,53 @@
           "type",
           "status",
           "name",
-          "status_history",
           "managing_organization",
           "period",
-          "care_manager",
-          "status_reason",
-          "care_team",
-          "part_of"
+          "care_manager"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "status_reason",
+                  "status_history"
+                ]
+              },
+              {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "active"
+                    ]
+                  },
+                  "period": {
+                    "not": {
+                      "required": [
+                        "end"
+                      ]
+                    }
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "closing_summary"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "explanatory_letter"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     "PATCH /api/patients/{patient_id}/episodes/{episode_id}": {
@@ -1329,11 +1367,51 @@
             "type",
             "status",
             "name",
-            "status_history",
             "managing_organization",
             "period",
-            "care_manager",
-            "status_reason"
+            "care_manager"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "required": [
+                    "status_reason",
+                    "status_history"
+                  ]
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "active"
+                      ]
+                    },
+                    "period": {
+                      "not": {
+                        "required": [
+                          "end"
+                        ]
+                      }
+                    }
+                  },
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "closing_summary"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "explanatory_letter"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
           ]
         }
       },
@@ -2037,11 +2115,51 @@
             "type",
             "status",
             "name",
-            "status_history",
             "managing_organization",
             "period",
-            "care_manager",
-            "status_reason"
+            "care_manager"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "required": [
+                    "status_reason",
+                    "status_history"
+                  ]
+                },
+                {
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "active"
+                      ]
+                    },
+                    "period": {
+                      "not": {
+                        "required": [
+                          "end"
+                        ]
+                      }
+                    }
+                  },
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "closing_summary"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "explanatory_letter"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
           ]
         }
       },
@@ -26268,15 +26386,53 @@
           "type",
           "status",
           "name",
-          "status_history",
           "managing_organization",
           "period",
-          "care_manager",
-          "status_reason",
-          "care_team",
-          "part_of"
+          "care_manager"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "status_reason",
+                  "status_history"
+                ]
+              },
+              {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "active"
+                    ]
+                  },
+                  "period": {
+                    "not": {
+                      "required": [
+                        "end"
+                      ]
+                    }
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "closing_summary"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "explanatory_letter"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     "GET /api/patients/{patient_id}/summary/episodes": {
@@ -46144,6 +46300,7 @@
     "device_request_quantityless_type": "TV39 3.20.2.2.3.2 and 3.20.3.1.5 allow a type code without program or quantities. The alternative excludes program, code_reference, quantity and remaining_quantity.",
     "allOf_sibling_properties": "Provider allOf closures are normalized with only documented sibling names. Actual field schemas remain in their declaring parts; generic allOf remains strict.",
     "encounter_participant": "Both native Medical Events examples use employee participants, while the enum only declares care_team. The endpoint-specific enum retains both documented representations.",
-    "medical_program_settings": "Both General MIS snapshots declare object items but their examples use CLASSIFICATION_TYPE/DEVICE_DEFINITION strings. Examples also declare top-level medication request/dispense permission and text fields. Only these documented alternatives are retained."
+    "medical_program_settings": "Both General MIS snapshots declare object items but their examples use CLASSIFICATION_TYPE/DEVICE_DEFINITION strings. Examples also declare top-level medication request/dispense permission and text fields. Only these documented alternatives are retained.",
+    "episode_ongoing_state": "The native Episode_Of_Care_Response component and GET examples omit care_team/part_of. Create Episode does not submit status_reason/history; Close/Cancel requires a reason. Only ongoing active snapshots without end/closing/explanation may omit reason/history; present fields retain their full native schema."
   }
 }

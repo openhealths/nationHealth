@@ -303,7 +303,7 @@ class EpisodeRepository extends BaseRepository
                     'managingOrganization'
                 );
                 $careManager = $this->syncIdentifier($existing, $data['care_manager'], 'careManager');
-                $statusReason = $this->syncCodeableConcept($existing, $data['status_reason'], 'statusReason');
+                $statusReason = $this->syncCodeableConcept($existing, $data['status_reason'] ?? null, 'statusReason');
 
                 $episodeData = [
                     $ownerColumn => $ownerId,
@@ -329,7 +329,7 @@ class EpisodeRepository extends BaseRepository
                 Repository::period()->sync($episode, $data['period']);
                 $this->syncCurrentDiagnoses($episode, $data['current_diagnoses'] ?? []);
                 $this->syncDiagnosesHistory($episode, $data['diagnoses_history'] ?? []);
-                $this->syncStatusHistory($episode, $data['status_history']);
+                $this->syncStatusHistory($episode, $data['status_history'] ?? []);
             }
         });
     }

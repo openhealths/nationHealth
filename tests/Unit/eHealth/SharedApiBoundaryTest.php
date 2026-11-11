@@ -123,6 +123,42 @@ class SharedApiBoundaryTest extends TestCase
         }
     }
 
+    public function test_official_episode_example_and_ongoing_state_preserve_optional_references(): void
+    {
+        $body = $this->examples()['GET /api/patients/{patient_id}/episodes/{episode_id}'];
+        $valid = $this->client(Episode::class, $body)->getById(Native::UUID, $body['data']['id'])->validate();
+        $this->assertSame($body['data']['id'], $valid['uuid']);
+        $this->assertSame($body['data']['status_history'][0]['status reason'], $valid['status_history'][0]['status_reason']);
+        $this->assertSame($body['data']['status_history'][0]['inserted_at'], $valid['status_history'][0]['ehealth_inserted_at']);
+
+        unset($body['data']['status_reason'], $body['data']['status_history'], $body['data']['period']['end'], $body['data']['closing_summary'], $body['data']['explanatory_letter']);
+        $ongoing = $this->client(Episode::class, $body)->getById(Native::UUID, $body['data']['id'])->validate();
+        $this->assertSame('active', $ongoing['status']);
+        $this->assertArrayNotHasKey('status_reason', $ongoing);
+    }
+
+    #[DataProvider('invalidOngoingEpisodes')]
+    public function test_episode_ongoing_alternative_retains_full_fields_and_terminal_requirements(string $case): void
+    {
+        $body = $this->examples()['GET /api/patients/{patient_id}/episodes/{episode_id}'];
+        unset($body['data']['status_reason'], $body['data']['status_history'], $body['data']['period']['end'], $body['data']['closing_summary'], $body['data']['explanatory_letter']);
+        match ($case) {
+            'closed' => $body['data']['status'] = 'closed',
+            'cancelled' => $body['data']['status'] = 'entered-in-error',
+            'end' => $body['data']['period']['end'] = '2026-11-11T10:00:00Z',
+            'reason' => $body['data']['status_reason'] = ['coding' => [['code' => 'cured']]],
+            'history' => $body['data']['status_history'] = [['status' => 'active']],
+            'period' => $body['data']['period'] = [],
+        };
+        $this->expectException(ValidationException::class);
+        $this->client(Episode::class, $body)->getById(Native::UUID, $body['data']['id'])->validate();
+    }
+
+    public static function invalidOngoingEpisodes(): array
+    {
+        return [['closed'], ['cancelled'], ['end'], ['reason'], ['history'], ['period']];
+    }
+
     public function test_dictionary_hierarchy_rejects_a_malformed_nested_label_before_flattening(): void
     {
         $body = $this->examples()['GET /api/v2/dictionaries'];

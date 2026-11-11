@@ -16,18 +16,9 @@ class SchemaResponseContractTest extends TestCase
     #[DataProvider('officialResponses')]
     public function test_documented_native_examples_validate(string $operation, array $body, string $group): void
     {
-        if ($group === 'shared' && in_array($operation, ['GET /api/patients/{patient_id}/episodes/{episode_id}', 'GET /api/patients/{patient_id}/compositions/{id}/episodes/{episode_id}'], true)) {
-            // The published example omits the schema-required care_team and part_of.
-            $this->expectException(ValidationException::class);
-        }
         try {
             $this->assertSame($body['data'], SchemaResponseContract::validate($this->response($body), $operation, $group));
         } catch (ValidationException $exception) {
-            if ($group === 'shared' && str_ends_with($operation, '/episodes/{episode_id}')) {
-                $this->assertArrayHasKey('data.care_team', $exception->errors());
-                $this->assertArrayHasKey('data.part_of', $exception->errors());
-                throw $exception;
-            }
             $this->fail($operation.' '.json_encode($exception->errors(), JSON_THROW_ON_ERROR));
         }
     }
