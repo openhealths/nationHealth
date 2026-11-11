@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\CarePlan;
 
 use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
+
 use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Jobs\CarePlanFullSync;
@@ -13,6 +14,7 @@ use App\Livewire\Person\Records\PatientCarePlans;
 use App\Models\CarePlan;
 use App\Models\Person\Person;
 use App\Repositories\CarePlanRepository;
+use App\Repositories\Repository;
 use GuzzleHttp\Psr7\Response as PsrResponse;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -259,7 +261,7 @@ class CarePlanAsyncSyncTest extends TestCase
     {
         ['person' => $person, 'legalEntity' => $legalEntity] = $this->compositionFixture(scopes: ['care_plan:read']);
         $resource = json_decode(file_get_contents(base_path('tests/Fixtures/CarePlan/plan.json')), true, flags: JSON_THROW_ON_ERROR);
-        $repository = app(CarePlanRepository::class);
+        $repository = Repository::carePlan();
         $plan = $repository->storeResource($resource, $person->id, $legalEntity->id);
         $repository->storeSummaries([['id' => $plan->uuid, 'title' => 'Incomplete summary', 'status' => 'completed']], $person->id, $legalEntity->id);
 

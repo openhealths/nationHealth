@@ -5,22 +5,24 @@ declare(strict_types=1);
 namespace App\Livewire\CarePlan\Activity\Show;
 
 use App\Classes\eHealth\EHealth;
+
+use App\Enums\JobStatus;
 use App\Livewire\CarePlan\CarePlanComponent;
-use App\Livewire\CarePlan\Concerns\ManagesCarePlanEPrescription;
 use App\Livewire\CarePlan\Concerns\CarePlanManager;
+use App\Livewire\CarePlan\Concerns\ManagesCarePlanEPrescription;
 use App\Livewire\CarePlan\Concerns\ManagesCarePlanReferrals;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
-use App\Enums\JobStatus;
 use App\Repositories\Repository;
+use Exception;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
 
 class CarePlanActivityShow extends CarePlanComponent
 {
-    use ManagesCarePlanEPrescription;
     use CarePlanManager;
+    use ManagesCarePlanEPrescription;
     use ManagesCarePlanReferrals;
 
     #[Locked]
@@ -140,7 +142,7 @@ class CarePlanActivityShow extends CarePlanComponent
                         ?? $device['model_number']
                         ?? $reference);
                 }
-            } catch (\Exception $exception) {
+            } catch (Exception $exception) {
                 Log::warning('CarePlanActivityShow: failed to resolve device label: ' . $exception->getMessage());
             }
 

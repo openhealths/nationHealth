@@ -6,10 +6,13 @@ namespace Tests\Unit\CarePlan;
 
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
+
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
+use App\Models\Relations\Party;
 use App\Services\MedicalEvents\CarePlanActivityValidationService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -27,8 +30,8 @@ class CarePlanActivityValidationServiceTest extends TestCase
 
         $this->service = new CarePlanActivityValidationService();
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -38,7 +41,7 @@ class CarePlanActivityValidationServiceTest extends TestCase
             'is_active' => true,
         ]);
 
-        $party = \App\Models\Relations\Party::create([
+        $party = Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Val',
             'last_name' => 'Doctor',

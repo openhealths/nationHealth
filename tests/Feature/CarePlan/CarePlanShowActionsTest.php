@@ -929,7 +929,7 @@ class CarePlanShowActionsTest extends TestCase
             });
     }
 
-    public function test_service_selection_saves_minutes_and_keeps_group_reference_type(): void
+    public function test_service_selection_saves_count_and_keeps_group_reference_type(): void
     {
         $this->actingAs($this->user);
         $groupId = (string) Str::uuid();
@@ -944,7 +944,7 @@ class CarePlanShowActionsTest extends TestCase
             ->assertSeeLivewire(ServiceCatalog::class)
             ->dispatch('care-plan-service-selected', service: ['id' => $laboratoryId, 'name' => 'Untrusted label'])
             ->assertSet('selectedProduct.name', 'Аналіз; вітамін B12')
-            ->set('activityForm.quantity', '45')->set('activityForm.quantity_code', 'MINUTE')
+            ->set('activityForm.quantity', '45')->set('activityForm.quantity_code', 'PIECE')
             ->call('saveActivity')->assertHasNoErrors();
 
         $activity = Repository::carePlanActivity()->findOwned(
@@ -954,11 +954,11 @@ class CarePlanShowActionsTest extends TestCase
         $resource = Repository::carePlanActivity()->getResource($activity);
         $this->assertEquals(45, $resource['detail']['quantity']['value']);
         $this->assertSame('SERVICE_UNIT', $resource['detail']['quantity']['system']);
-        $this->assertSame('MINUTE', $resource['detail']['quantity']['code']);
+        $this->assertSame('PIECE', $resource['detail']['quantity']['code']);
 
         $component->call('editActivity', $activity->id)
             ->assertSet('selectedProduct.name', 'Аналіз; вітамін B12')
-            ->assertSet('activityForm.quantity_code', 'MINUTE')
+            ->assertSet('activityForm.quantity_code', 'PIECE')
             ->assertSet('activityForm.quantity_system', 'SERVICE_UNIT');
 
         $component->call('initActivityForm', 'service_request')

@@ -7,14 +7,32 @@ namespace Tests\Feature\CarePlan;
 use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
 use App\Classes\eHealth\Api\CarePlanActivity as ActivityApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Enums\Status;
+use App\Enums\User\Role;
+use App\Jobs\RemoteEHealthLinksProcessing;
+use App\Livewire\Concerns\SubmitsClinicalOperations;
+use App\Models\CarePlan;
+use App\Models\CarePlanActivity;
+use App\Models\Employee\Employee;
+use App\Models\LegalEntity;
 use App\Models\Person\Person;
+use App\Models\Relations\Party;
 use App\Models\User;
-use App\Repositories\CarePlanRepository;
-use App\Repositories\CarePlanActivityRepository;
+use App\Notifications\RemoteEHealthLinksNotification;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
+use App\Traits\SynchronizesCarePlans;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Livewire\Component;
 use Mockery;
+use RuntimeException;
 use Tests\TestCase;
 
 class CarePlanSyncTest extends TestCase
@@ -61,8 +79,8 @@ class CarePlanSyncTest extends TestCase
 
         (new CarePlanSynchronizationHarness())->synchronizeSearch(['requisition' => 'search-number'], $employee->legalEntityId);
 
-        $this->assertSame(2, \App\Models\CarePlan::wherePersonId($person->id)->count());
-        $this->assertSame(2, \App\Models\CarePlanActivity::whereIn('uuid', array_column($activities, 'id'))->count());
+        $this->assertSame(2, CarePlan::wherePersonId($person->id)->count());
+        $this->assertSame(2, CarePlanActivity::whereIn('uuid', array_column($activities, 'id'))->count());
     }
 
     public function test_care_plan_and_activities_can_be_synced_and_mapped_to_structured_sql(): void
@@ -75,13 +93,13 @@ class CarePlanSyncTest extends TestCase
 
         $api->synchronizeResources([['id' => $plan['id']]], $person->id, $employee->legalEntityId);
 
-        $stored = \App\Models\CarePlan::whereUuid($plan['id'])->firstOrFail();
-        $storedActivity = \App\Models\CarePlanActivity::whereUuid($activity['id'])->firstOrFail();
+        $stored = CarePlan::whereUuid($plan['id'])->firstOrFail();
+        $storedActivity = CarePlanActivity::whereUuid($activity['id'])->firstOrFail();
         $this->assertSame($employee->id, $stored->authorId);
         $this->assertNotNull($stored->categoryId);
-        $this->assertSame($plan['category'], app(CarePlanRepository::class)->getResource($stored->id)['category']);
+        $this->assertSame($plan['category'], Repository::carePlan()->getResource($stored->id)['category']);
         $this->assertSame($activity['detail']['kind'], $storedActivity->kind);
-        $this->assertSame($activity['detail']['reasonCode'], app(CarePlanActivityRepository::class)->getResource($storedActivity->id)['detail']['reasonCode']);
+        $this->assertSame($activity['detail']['reasonCode'], Repository::carePlanActivity()->getResource($storedActivity->id)['detail']['reasonCode']);
         $this->assertNull($storedActivity->getRawOriginal('quantity'));
     }
 
@@ -93,9 +111,9 @@ class CarePlanSyncTest extends TestCase
 
         $api->synchronizeResources([['id' => $plan['id']]], $person->id, $employee->legalEntityId);
 
-        $stored = \App\Models\CarePlan::whereUuid($plan['id'])->firstOrFail();
+        $stored = CarePlan::whereUuid($plan['id'])->firstOrFail();
         $this->assertNull($stored->authorId);
-        $this->assertEquals($plan['author'], app(CarePlanRepository::class)->getResource($stored->id)['author']);
+        $this->assertEquals($plan['author'], Repository::carePlan()->getResource($stored->id)['author']);
     }
 
     public function test_sync_does_not_substitute_the_signed_in_employee_for_a_remote_author(): void
@@ -107,20 +125,20 @@ class CarePlanSyncTest extends TestCase
 
         $api->synchronizeResources([['id' => $plan['id']]], $person->id, $employee->legalEntityId);
 
-        $stored = \App\Models\CarePlan::whereUuid($plan['id'])->firstOrFail();
+        $stored = CarePlan::whereUuid($plan['id'])->firstOrFail();
         $this->assertNull($stored->authorId);
-        $this->assertSame($plan['author']['identifier']['value'], app(CarePlanRepository::class)->getResource($stored->id)['author']['identifier']['value']);
+        $this->assertSame($plan['author']['identifier']['value'], Repository::carePlan()->getResource($stored->id)['author']['identifier']['value']);
     }
 
     public function test_pending_write_is_queued_without_changing_the_resource_and_blocks_resubmission(): void
     {
         [$person, $employee] = $this->makeSyncContext();
         $this->actingAs(User::findOrFail($employee->userId));
-        \Illuminate\Support\Facades\Bus::fake();
-        \Illuminate\Support\Facades\Notification::fake();
+        Bus::fake();
+        Notification::fake();
         $resource = $this->fixture('plan');
         $resource['status'] = 'active';
-        $repository = app(CarePlanRepository::class);
+        $repository = Repository::carePlan();
         $plan = $repository->storeResource($resource, $person->id, $employee->legalEntityId);
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn(['links' => [['entity' => 'job', 'href' => '/Jobs/test-job']], 'status' => 'pending']);
@@ -131,39 +149,39 @@ class CarePlanSyncTest extends TestCase
         $this->assertTrue($repository->hasPendingSubmission($plan));
         $this->assertSame('/Jobs/test-job', $plan->ehealthLinks()->firstOrFail()->href);
         $this->assertFalse($harness->showSignatureModal);
-        \Illuminate\Support\Facades\Bus::assertBatched(fn ($batch) => $batch->jobs->first() instanceof \App\Jobs\RemoteEHealthLinksProcessing);
-        $this->assertNull($harness->submitClinicalOperation($plan, ['status' => 'cancelled'], fn () => throw new \RuntimeException('A duplicate request must not be sent')));
+        Bus::assertBatched(fn ($batch) => $batch->jobs->first() instanceof RemoteEHealthLinksProcessing);
+        $this->assertNull($harness->submitClinicalOperation($plan, ['status' => 'cancelled'], fn () => throw new RuntimeException('A duplicate request must not be sent')));
     }
 
     public function test_processed_job_updates_status_and_remote_metadata_once(): void
     {
         [$person, $employee] = $this->makeSyncContext();
         $user = User::findOrFail($employee->userId);
-        \Illuminate\Support\Facades\Notification::fake();
-        $repository = app(CarePlanRepository::class);
+        Notification::fake();
+        $repository = Repository::carePlan();
         $plan = $repository->storeResource($this->fixture('plan'), $person->id, $employee->legalEntityId);
         $link = $repository->beginSubmission($plan, ['status' => 'new']);
         $result = ['status' => 'processed', 'response_data' => ['id' => $plan->uuid, 'status' => 'active', 'requisition' => 'processed-requisition']];
 
-        \App\Jobs\RemoteEHealthLinksProcessing::finishSubmission($link, $result, $user);
+        RemoteEHealthLinksProcessing::finishSubmission($link, $result, $user);
         $this->assertSame('active', $plan->fresh()->status);
         $this->assertSame('processed-requisition', $plan->fresh()->requisition);
         $this->assertFalse($repository->hasPendingSubmission($plan));
-        \App\Jobs\RemoteEHealthLinksProcessing::finishSubmission($link->fresh(), $result, $user);
-        \Illuminate\Support\Facades\Notification::assertSentToTimes($user, \App\Notifications\RemoteEHealthLinksNotification::class, 1);
+        RemoteEHealthLinksProcessing::finishSubmission($link->fresh(), $result, $user);
+        Notification::assertSentToTimes($user, RemoteEHealthLinksNotification::class, 1);
     }
 
     public function test_rejected_job_preserves_the_previous_resource_and_allows_retry(): void
     {
         [$person, $employee] = $this->makeSyncContext();
         $user = User::findOrFail($employee->userId);
-        \Illuminate\Support\Facades\Notification::fake();
-        $repository = app(CarePlanRepository::class);
+        Notification::fake();
+        $repository = Repository::carePlan();
         $plan = $repository->storeResource($this->fixture('plan'), $person->id, $employee->legalEntityId);
         $before = $repository->getResource($plan->id);
         $link = $repository->beginSubmission($plan, ['status' => 'cancelled']);
 
-        \App\Jobs\RemoteEHealthLinksProcessing::finishSubmission($link, ['status' => 'failed', 'error' => ['message' => 'Synthetic rejection']], $user);
+        RemoteEHealthLinksProcessing::finishSubmission($link, ['status' => 'failed', 'error' => ['message' => 'Synthetic rejection']], $user);
         $this->assertSame($before, $repository->getResource($plan->id));
         $this->assertFalse($repository->hasPendingSubmission($plan));
         $this->assertNotSame($link->id, $repository->beginSubmission($plan, ['status' => 'cancelled'])->id);
@@ -172,8 +190,8 @@ class CarePlanSyncTest extends TestCase
     public function test_standard_period_sync_preserves_utc_fractional_seconds_and_clears_an_omitted_end(): void
     {
         [$person, $employee] = $this->makeSyncContext();
-        $plan = app(CarePlanRepository::class)->storeResource($this->fixture('plan'), $person->id, $employee->legalEntityId);
-        $repository = \App\Repositories\MedicalEvents\Repository::period();
+        $plan = Repository::carePlan()->storeResource($this->fixture('plan'), $person->id, $employee->legalEntityId);
+        $repository = MedicalEventsRepository::period();
         $period = ['start' => '2026-11-10T12:34:56.123456+03:00', 'end' => '2026-11-11T13:14:15.654321+03:00'];
         $repository->sync($plan, $period, 'effectivePeriod');
         $this->assertSame(['start' => '2026-11-10T09:34:56.123456Z', 'end' => '2026-11-11T10:14:15.654321Z'], $repository->toResource($plan->effectivePeriod));
@@ -194,9 +212,9 @@ class CarePlanSyncTest extends TestCase
     {
         [$person, $employee] = $this->makeSyncContext();
         $this->actingAs(User::findOrFail($employee->userId));
-        \Illuminate\Support\Facades\Bus::fake();
-        \Illuminate\Support\Facades\Notification::fake();
-        $repository = app(CarePlanRepository::class);
+        Bus::fake();
+        Notification::fake();
+        $repository = Repository::carePlan();
         $plan = $repository->storeResource($this->fixture('plan'), $person->id, $employee->legalEntityId);
         $before = $repository->getResource($plan->id);
         $response = Mockery::mock(EHealthResponse::class);
@@ -206,15 +224,15 @@ class CarePlanSyncTest extends TestCase
         $this->assertSame($before, $repository->getResource($plan->id));
         $this->assertTrue($repository->hasPendingSubmission($plan));
         $this->assertNull(session('success'));
-        \Illuminate\Support\Facades\Bus::assertNothingBatched();
-        \Illuminate\Support\Facades\Notification::assertNothingSent();
+        Bus::assertNothingBatched();
+        Notification::assertNothingSent();
     }
 
     public function test_pending_plan_and_activity_cannot_be_edited_or_deleted(): void
     {
         [$person, $employee] = $this->makeSyncContext();
-        $repository = app(CarePlanRepository::class);
-        $activityRepository = app(CarePlanActivityRepository::class);
+        $repository = Repository::carePlan();
+        $activityRepository = Repository::carePlanActivity();
         $resource = $this->fixture('plan');
         $resource['status'] = 'draft';
         $plan = $repository->storeResource($resource, $person->id, $employee->legalEntityId);
@@ -225,11 +243,11 @@ class CarePlanSyncTest extends TestCase
             $repository->beginSubmission($record, ['status' => 'new']);
             $this->assertFalse($repository->deleteDraft($plan->id));
             try {
-                $record instanceof \App\Models\CarePlan
+                $record instanceof CarePlan
                     ? $repository->saveForm(['title' => 'Changed while pending'], $person->id, $employee->legalEntityId, $record->id)
                     : $activityRepository->saveForm(['description' => 'Changed while pending'], $plan, $record->id);
                 $this->fail('A pending submission must prevent editing.');
-            } catch (\Illuminate\Validation\ValidationException $exception) {
+            } catch (ValidationException $exception) {
                 $this->assertArrayHasKey('submission', $exception->errors());
             }
         }
@@ -242,14 +260,14 @@ class CarePlanSyncTest extends TestCase
     public function test_mismatched_processed_resource_does_not_finish_or_modify_the_submission(): void
     {
         [$person, $employee] = $this->makeSyncContext();
-        $repository = app(CarePlanRepository::class);
+        $repository = Repository::carePlan();
         $plan = $repository->storeResource($this->fixture('plan'), $person->id, $employee->legalEntityId);
         $before = $repository->getResource($plan->id);
         $link = $repository->beginSubmission($plan, ['status' => 'cancelled']);
         try {
             $repository->finishSubmission($link, ['status' => 'processed', 'response_data' => ['id' => (string) Str::uuid(), 'status' => 'cancelled']]);
             $this->fail('A processed resource must match the submitted UUID.');
-        } catch (\Illuminate\Validation\ValidationException $exception) {
+        } catch (ValidationException $exception) {
             $this->assertArrayHasKey('id', $exception->errors());
         }
         $this->assertSame($before, $repository->getResource($plan->id));
@@ -259,8 +277,8 @@ class CarePlanSyncTest extends TestCase
     public function test_processed_activity_changes_only_the_selected_resource_and_preserves_outcomes(): void
     {
         [$person, $employee] = $this->makeSyncContext();
-        $repository = app(CarePlanRepository::class);
-        $activityRepository = app(CarePlanActivityRepository::class);
+        $repository = Repository::carePlan();
+        $activityRepository = Repository::carePlanActivity();
         $plan = $repository->storeResource($this->fixture('plan'), $person->id, $employee->legalEntityId);
         $resource = $this->fixture('activity');
         $activity = $activityRepository->storeResource($resource, $plan);
@@ -282,8 +300,8 @@ class CarePlanSyncTest extends TestCase
     public function test_processed_job_with_only_links_fetches_the_confirmed_resource_in_the_queue(): void
     {
         [$person, $employee] = $this->makeSyncContext();
-        \Illuminate\Support\Facades\Notification::fake();
-        $repository = app(CarePlanRepository::class);
+        Notification::fake();
+        $repository = Repository::carePlan();
         $resource = $this->fixture('plan');
         $plan = $repository->storeResource($resource, $person->id, $employee->legalEntityId);
         $link = $repository->beginSubmission($plan, ['status' => 'new']);
@@ -308,9 +326,9 @@ class CarePlanSyncTest extends TestCase
     public function test_queued_activity_registration_imports_the_confirmed_parent_status(): void
     {
         [$person, $employee] = $this->makeSyncContext();
-        \Illuminate\Support\Facades\Notification::fake();
-        $repository = app(CarePlanRepository::class);
-        $activityRepository = app(CarePlanActivityRepository::class);
+        Notification::fake();
+        $repository = Repository::carePlan();
+        $activityRepository = Repository::carePlanActivity();
         $resource = $this->fixture('plan');
         $resource['status'] = 'new';
         $plan = $repository->storeResource($resource, $person->id, $employee->legalEntityId);
@@ -365,14 +383,14 @@ class CarePlanSyncTest extends TestCase
     }
 
     /**
-     * @return array{0: Person, 1: \App\Models\Employee\Employee}
+     * @return array{0: Person, 1: Employee}
      */
     private function makeSyncContext(): array
     {
         $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
-        $legalEntity = \App\Models\LegalEntity::create([
+        $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
             'status' => 'ACTIVE',
             'sync_status' => 'COMPLETED',
@@ -390,7 +408,7 @@ class CarePlanSyncTest extends TestCase
             'legal_entity_id' => $legalEntity->id,
         ]);
 
-        $party = \App\Models\Relations\Party::create([
+        $party = Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Gregory',
             'last_name' => 'Doctor',
@@ -402,15 +420,15 @@ class CarePlanSyncTest extends TestCase
         $user = User::create([
             'uuid' => (string) Str::uuid(),
             'email' => 'sync-'.Str::random(8).'@example.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'password' => Hash::make('password'),
             'party_id' => $party->id,
         ]);
 
-        $employee = \App\Models\Employee\Employee::create([
+        $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr. House',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $legalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',
@@ -426,23 +444,23 @@ class CarePlanSyncTest extends TestCase
 
 class CarePlanSynchronizationHarness
 {
-    use \App\Traits\SynchronizesCarePlans {
+    use SynchronizesCarePlans {
         synchronizeResources as public;
         synchronizeSearch as public;
         fetchAllActivityResources as public;
     }
 }
 
-class CarePlanSubmissionHarness extends \Livewire\Component
+class CarePlanSubmissionHarness extends Component
 {
-    use \App\Livewire\Concerns\SubmitsClinicalOperations {
+    use SubmitsClinicalOperations {
         submitClinicalOperation as public;
     }
 
     public bool $showSignatureModal = true;
 }
 
-class CarePlanProcessingHarness extends \App\Jobs\RemoteEHealthLinksProcessing
+class CarePlanProcessingHarness extends RemoteEHealthLinksProcessing
 {
     public function processConfirmed(EHealthResponse $response): void
     {

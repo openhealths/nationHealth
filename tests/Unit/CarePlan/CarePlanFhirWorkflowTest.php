@@ -45,7 +45,9 @@ class CarePlanFhirWorkflowTest extends TestCase
         $repository = Mockery::mock(CarePlanRepository::class);
         $repository->shouldNotReceive('updateById');
 
-        $component->sign($repository, Mockery::mock(CarePlanActivityRepository::class));
+        $this->instance(CarePlanRepository::class, $repository);
+        $this->instance(CarePlanActivityRepository::class, Mockery::mock(CarePlanActivityRepository::class));
+        $component->sign();
 
         $this->assertTrue($component->signedPlan);
         $this->assertSame('draft', $component->carePlan->status);

@@ -8,6 +8,7 @@ use App\Contracts\SubmittedToEHealth;
 use App\Core\Arr;
 use App\Enums\CarePlanActivityKind;
 use App\Enums\CarePlanStatus;
+use App\Enums\Person\ServiceRequestStatus;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
@@ -16,6 +17,7 @@ use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Repositories\MedicalEvents\BaseRepository as MedicalEventsBaseRepository;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Services\MedicalEvents\CarePlanActivityValidationService;
 use App\Services\MedicalEvents\Fhir;
 use App\Services\MedicalEvents\FhirResource;
 use Carbon\CarbonImmutable;
@@ -37,8 +39,10 @@ class CarePlanActivityRepository extends MedicalEventsBaseRepository
     public function saveForm(array $data, CarePlan $plan, ?int $localId = null): CarePlanActivity
     {
         return $this->storageTransaction(function () use ($data, $plan, $localId): CarePlanActivity {
+            // Serializing on the plan prevents two drafts from consuming the final service slot.
+            CarePlan::whereKey($plan->id)->lockForUpdate()->firstOrFail();
             if ($localId !== null) {
-                $record = CarePlanActivity::whereKey($localId)->lockForUpdate()->firstOrFail();
+                $record = CarePlanActivity::whereCarePlanId($plan->id)->whereKey($localId)->lockForUpdate()->firstOrFail();
                 if (Repository::carePlan()->hasPendingSubmission($record)) {
                     throw ValidationException::withMessages(['submission' => __('care-plan.submission_pending')]);
                 }
@@ -95,7 +99,7 @@ class CarePlanActivityRepository extends MedicalEventsBaseRepository
             }
             if (isset($data['scheduledPeriodStart']) || array_key_exists('scheduledPeriodEnd', $data)) {
                 $existingPeriod = data_get($original, 'detail.scheduledPeriod', []);
-                $planPeriod = app(CarePlanRepository::class)->getResource($plan)['period'];
+                $planPeriod = Repository::carePlan()->getResource($plan)['period'];
                 foreach (['start', 'end'] as $boundary) {
                     $field = 'scheduledPeriod'.ucfirst($boundary);
                     if (!array_key_exists($field, $data)) {
@@ -135,9 +139,47 @@ class CarePlanActivityRepository extends MedicalEventsBaseRepository
                 $options['productType'] = $data['productReferenceType'];
             }
             $resource = Fhir::carePlanActivity()->toFhir($data, $options);
+            if (data_get($resource, 'detail.kind') === CarePlanActivityKind::SERVICE_REQUEST->value) {
+                $validation = app(CarePlanActivityValidationService::class);
+                $validation->assertServiceUnit($plan, (string) data_get($resource, 'detail.quantity.code', ''));
+                $validation->assertServicePeriod($plan, $resource['detail']);
+                $productUuid = data_get($resource, 'detail.productReference.identifier.value');
+                $productType = data_get($resource, 'detail.productReference.identifier.type.coding.0.code', 'service');
+                if (is_string($productUuid) && $productUuid !== '' && $this->serviceCreationCapacity($plan, $productUuid, $productType, $localId)['remaining'] < 1) {
+                    throw ValidationException::withMessages(['activityForm.product_reference' => __('care-plan.service_activity_limit_reached')]);
+                }
+            }
 
             return $this->presentForUi($this->storeResource($resource, $plan, $localId));
         });
+    }
+
+    /** BA02 counts created activities and distinct issued referrals, independently of service quantity. */
+    public function serviceCreationCapacity(CarePlan $plan, string $productUuid, string $productType = 'service', ?int $exceptId = null): array
+    {
+        $activities = CarePlanActivity::whereCarePlanId($plan->id)->whereKind(CarePlanActivityKind::SERVICE_REQUEST->value)
+            ->whereHas('productReferenceIdentifier', static fn ($query) => $query->whereValue($productUuid)
+                ->whereHas('type.coding', static fn ($coding) => $coding->whereCode($productType)))
+            ->get(['id', 'uuid']);
+
+        // These are clinical states of a full native resource, never async job states.
+        // Recalled/completed referrals retain their credit; duplicate imports of a UUID do not add another.
+        $confirmed = ServiceRequestRequest::wherePersonId($plan->personId)->whereServiceId($productUuid)
+            ->whereHas('codeReference', static fn ($query) => $query->whereValue($productUuid)
+                ->whereHas('type.coding', static fn ($coding) => $coding->whereCode($productType)))
+            ->whereNotNull('details_synced_at')->whereNotNull('request_number')->where('request_number', '<>', '')
+            ->whereIn('clinical_status', [ServiceRequestStatus::ACTIVE->value, ServiceRequestStatus::IN_QUEUE->value,
+                ServiceRequestStatus::IN_PROGRESS->value, ServiceRequestStatus::COMPLETED->value, ServiceRequestStatus::USED->value,
+                ServiceRequestStatus::CANCELLED->value, ServiceRequestStatus::RECALLED->value,
+                ServiceRequestStatus::REVOKED->value, ServiceRequestStatus::ENTERED_IN_ERROR->value])
+            ->whereHas('basedOn', static fn ($query) => $query->whereIn('value', $activities->pluck('uuid'))
+                ->whereHas('type.coding', static fn ($coding) => $coding->whereCode('care_plan_activity')))
+            ->whereHas('requesterLegalEntity', static fn ($query) => $query->whereValue($plan->legalEntity->uuid))
+            ->pluck('uuid')->unique()->count();
+        $created = $activities->when($exceptId !== null, static fn ($records) => $records->where('id', '!=', $exceptId))->count();
+        $limit = 5 + $confirmed;
+
+        return ['limit' => $limit, 'created' => $created, 'confirmedReferrals' => $confirmed, 'remaining' => max(0, $limit - $created)];
     }
 
     public function presentForUi(CarePlanActivity $activity): CarePlanActivity

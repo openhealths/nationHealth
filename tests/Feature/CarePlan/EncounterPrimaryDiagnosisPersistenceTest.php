@@ -6,15 +6,18 @@ namespace Tests\Feature\CarePlan;
 
 use App\Enums\Person\ConditionClinicalStatus;
 use App\Enums\Person\ConditionVerificationStatus;
+use App\Models\CarePlan;
+use App\Models\LegalEntity;
+
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\EncounterDiagnose;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\Person\Person;
-use App\Repositories\CarePlanRepository;
-use App\Repositories\MedicalEvents\EncounterRepository;
-use App\Repositories\MedicalEvents\Repository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -27,9 +30,9 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
     public function test_terms_of_service_follow_the_selected_encounter_and_patient(): void
     {
         $encounter = $this->encounter();
-        $repository = app(CarePlanRepository::class);
+        $repository = Repository::carePlan();
         $this->assertSame('OUTPATIENT', $repository->encounterTermsOfService($encounter->uuid, $encounter->person_id));
-        $inpatient = Repository::coding()->store(['system' => 'eHealth/encounter_classes', 'code' => 'INPATIENT']);
+        $inpatient = MedicalEventsRepository::coding()->store(['system' => 'eHealth/encounter_classes', 'code' => 'INPATIENT']);
         $encounter->update(['class_id' => $inpatient->id]);
         $this->assertSame('INPATIENT', $repository->encounterTermsOfService($encounter->uuid, $encounter->person_id));
         $foreign = $this->encounter();
@@ -40,18 +43,18 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
     {
         $encounter = $this->encounter();
         $other = $this->encounter();
-        $plan = new \App\Models\CarePlan(['person_id' => $encounter->person_id, 'encounter_id' => $encounter->id]);
+        $plan = new CarePlan(['person_id' => $encounter->person_id, 'encounter_id' => $encounter->id]);
         $context = Identifier::create(['value' => $encounter->uuid]);
-        $code = Repository::codeableConcept()->store(['coding' => [['system' => 'eHealth/ICF/classifiers', 'code' => 'b280']]]);
-        $observation = \App\Models\MedicalEvents\Sql\Observation::create([
+        $code = MedicalEventsRepository::codeableConcept()->store(['coding' => [['system' => 'eHealth/ICF/classifiers', 'code' => 'b280']]]);
+        $observation = Observation::create([
             'uuid' => (string) Str::uuid(), 'person_id' => $encounter->person_id,
             'context_id' => $context->id, 'code_id' => $code->id, 'status' => 'valid',
             'issued' => now(), 'primary_source' => true,
         ]);
-        $category = Repository::codeableConcept()->store(['coding' => [['system' => 'eHealth/ICF/observation_categories', 'code' => 'functions']]]);
+        $category = MedicalEventsRepository::codeableConcept()->store(['coding' => [['system' => 'eHealth/ICF/observation_categories', 'code' => 'functions']]]);
         $observation->categories()->attach($category->id);
         $references = [['identifier' => ['type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'observation']]], 'value' => $observation->uuid]]];
-        $repository = app(CarePlanRepository::class);
+        $repository = Repository::carePlan();
         $this->assertTrue($repository->hasRehabilitationObservation($plan, $references));
         $this->assertFalse($repository->hasRehabilitationObservation($plan, ['Condition/'.$observation->uuid]));
         $this->assertFalse($repository->hasRehabilitationObservation($plan, ['Observation/'.Str::uuid()]));
@@ -74,8 +77,8 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
             'patient_signed' => true, 'process_disclosure_data_consent' => true,
         ]);
         $episode = Identifier::create(['value' => (string) Str::uuid()]);
-        $class = Repository::coding()->store(['system' => 'eHealth/encounter_classes', 'code' => 'AMB']);
-        $type = Repository::codeableConcept()->store(['coding' => [['system' => 'eHealth/encounter_types', 'code' => 'TEST']]]);
+        $class = MedicalEventsRepository::coding()->store(['system' => 'eHealth/encounter_classes', 'code' => 'AMB']);
+        $type = MedicalEventsRepository::codeableConcept()->store(['coding' => [['system' => 'eHealth/encounter_types', 'code' => 'TEST']]]);
 
         return Encounter::create([
             'uuid' => (string) Str::uuid(), 'person_id' => $person->id, 'status' => 'finished',
@@ -87,14 +90,14 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
     private function diagnosis(Encounter $encounter, string $roleCode, string $code, int $rank): Condition
     {
         $identifier = Identifier::create(['value' => (string) Str::uuid()]);
-        $concept = Repository::codeableConcept()->store(['coding' => [['system' => 'eHealth/ICD10_AM/condition_codes', 'code' => $code]]]);
+        $concept = MedicalEventsRepository::codeableConcept()->store(['coding' => [['system' => 'eHealth/ICD10_AM/condition_codes', 'code' => $code]]]);
         $condition = Condition::create([
             'uuid' => $identifier->value, 'person_id' => $encounter->person_id,
             'primary_source' => true, 'clinical_status' => ConditionClinicalStatus::ACTIVE,
             'verification_status' => ConditionVerificationStatus::CONFIRMED,
             'code_id' => $concept->id, 'context_id' => $encounter->episode_id, 'onset_date' => now(),
         ]);
-        $role = Repository::codeableConcept()->store(['coding' => [['system' => 'eHealth/diagnosis_roles', 'code' => $roleCode]]]);
+        $role = MedicalEventsRepository::codeableConcept()->store(['coding' => [['system' => 'eHealth/diagnosis_roles', 'code' => $roleCode]]]);
         EncounterDiagnose::create([
             'encounter_id' => $encounter->id, 'condition_id' => $identifier->id,
             'role_id' => $role->id, 'rank' => $rank,
@@ -106,7 +109,7 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
     public function test_encounter_choices_exclude_known_foreign_legal_entity_episodes(): void
     {
         $organizationUuid = (string) Str::uuid();
-        $this->instance('legalEntity', new \App\Models\LegalEntity(['uuid' => $organizationUuid]));
+        $this->instance('legalEntity', new LegalEntity(['uuid' => $organizationUuid]));
         $encounter = $this->encounter();
         $foreign = $this->encounter();
         $foreign->update(['person_id' => $encounter->person_id]);
@@ -120,7 +123,7 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
             ]);
         }
 
-        $choices = app(CarePlanRepository::class)->encounterChoices((int) $encounter->person_id);
+        $choices = Repository::carePlan()->encounterChoices((int) $encounter->person_id);
 
         $this->assertCount(1, $choices);
         $this->assertSame($encounter->uuid, $choices[0]['uuid']);
@@ -140,7 +143,7 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
         Model::preventAccessingMissingAttributes();
 
         try {
-            $choices = app(CarePlanRepository::class)->encounterChoices((int) $encounter->person_id);
+            $choices = Repository::carePlan()->encounterChoices((int) $encounter->person_id);
             $labels = array_column($choices, 'label', 'uuid');
 
             $this->assertCount(2, $choices);
@@ -184,7 +187,7 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
         DB::flushQueryLog();
 
         try {
-            $choices = app(CarePlanRepository::class)->encounterChoices((int) $encounter->person_id);
+            $choices = Repository::carePlan()->encounterChoices((int) $encounter->person_id);
             $queryCount = count(DB::getQueryLog());
             $labels = array_column($choices, 'label', 'uuid');
 
@@ -210,7 +213,7 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
         $wasPreventing = Model::preventsLazyLoading();
         Model::preventLazyLoading();
         try {
-            $conditions = app(EncounterRepository::class)->primaryDiagnosisConditions($encounter->fresh());
+            $conditions = MedicalEventsRepository::encounter()->primaryDiagnosisConditions($encounter->fresh());
             $this->assertSame([$primary->uuid], $conditions->pluck('uuid')->all());
             DB::enableQueryLog();
             DB::flushQueryLog();
@@ -229,7 +232,7 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
         $primary = $this->diagnosis($encounter, 'primary', 'E11', 1);
         $primary->update(['person_id' => $otherEncounter->person_id]);
 
-        $this->assertTrue(app(EncounterRepository::class)->primaryDiagnosisConditions($encounter->fresh())->isEmpty());
+        $this->assertTrue(MedicalEventsRepository::encounter()->primaryDiagnosisConditions($encounter->fresh())->isEmpty());
     }
 
     public function test_non_uuid_identifier_does_not_abort_the_postgresql_transaction(): void
@@ -239,7 +242,7 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
         $diagnosis = $encounter->diagnoses()->firstOrFail();
         $diagnosis->condition()->update(['value' => 'not-a-condition-uuid']);
 
-        $this->assertTrue(app(EncounterRepository::class)->primaryDiagnosisConditions($encounter->fresh())->isEmpty());
+        $this->assertTrue(MedicalEventsRepository::encounter()->primaryDiagnosisConditions($encounter->fresh())->isEmpty());
         $this->assertTrue(Encounter::whereUuid($encounter->uuid)->exists());
     }
 }

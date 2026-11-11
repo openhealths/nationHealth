@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature\CarePlan;
 
 use App\Models\LegalEntity;
-use App\Models\Person\Person;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
-use App\Repositories\CarePlanRepository;
-use App\Repositories\CarePlanActivityRepository;
-use App\Repositories\MedicalEvents\MedicationRequestRepository;
-use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
+
+use App\Models\Person\Person;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
 use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -34,13 +33,13 @@ class ClinicalFhirCompatibilityTest extends TestCase
         $planResource = $this->fixture('CarePlan/plan.json');
         $planResource['id'] = $native['based_on'][0]['identifier']['value'];
         $planResource['period']['end'] = '2026-11-01T21:59:59.123456Z';
-        $plan = app(CarePlanRepository::class)->storeResource($planResource, $person->id, $legalEntity->id);
+        $plan = Repository::carePlan()->storeResource($planResource, $person->id, $legalEntity->id);
         $activityResource = $this->fixture('CarePlan/activity.json');
         $activityResource['id'] = $native['based_on'][1]['identifier']['value'];
         $activityResource['carePlan']['identifier']['value'] = $plan->uuid;
         $activityResource['detail']['productReference']['identifier']['value'] = $native['medication_info']['medication_id'];
-        $activity = app(CarePlanActivityRepository::class)->storeResource($activityResource, $plan);
-        $medications = app(MedicationRequestRepository::class);
+        $activity = Repository::carePlanActivity()->storeResource($activityResource, $plan);
+        $medications = MedicalEventsRepository::medicationRequest();
         $request = $medications->importDetails($native, $person->id, MedicationRequestRequest::TYPE_REQUEST);
         $medications->assertActivityBasis($plan, $activity, ['medication_id' => $native['medication_info']['medication_id']]);
         $this->assertSame($activity->id, $medications->findActivity($activity->uuid, $person->id, $plan->id, $legalEntity->id)?->id);
@@ -53,23 +52,23 @@ class ClinicalFhirCompatibilityTest extends TestCase
         $serviceActivity['id'] = (string) Str::uuid();
         $serviceActivity['detail']['kind'] = 'service_request';
         $serviceActivity['detail']['productReference'] = $referralResource['code'];
-        app(CarePlanActivityRepository::class)->storeResource($serviceActivity, $plan);
+        Repository::carePlanActivity()->storeResource($serviceActivity, $plan);
         $referralResource['basedOn'] = [$activityResource['carePlan'], [
             'identifier' => ['value' => $serviceActivity['id'], 'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'activity']]]],
         ]];
-        $referrals = app(ServiceRequestRequestRepository::class);
+        $referrals = MedicalEventsRepository::serviceRequestRequest();
         $referral = $referrals->storeResource($referralResource, $person->id);
 
         // Reimporting any owner must not mutate another module's references or periods.
         $medications->storeResource($medications->getResource($request), $person->id);
         $referrals->storeResource($referralResource, $person->id);
-        app(CarePlanRepository::class)->storeResource($planResource, $person->id, $legalEntity->id);
+        Repository::carePlan()->storeResource($planResource, $person->id, $legalEntity->id);
         $expectedMedication = (new MedicationRequestMapper())->fromEHealth($native);
         $expectedMedication['basedOn'][1]['identifier']['type']['coding'][1] = array_intersect_key($expectedMedication['basedOn'][1]['identifier']['type']['coding'][1], array_flip(['system', 'code']));
         $this->assertEquals($expectedMedication, $medications->getResource($request->fresh()));
         $this->assertEquals($referralResource, $referrals->getResource($referral->fresh()));
-        $this->assertEquals($activityResource, app(CarePlanActivityRepository::class)->getResource($activity->id));
-        $this->assertSame($planResource['period'], app(CarePlanRepository::class)->getResource($plan->id)['period']);
+        $this->assertEquals($activityResource, Repository::carePlanActivity()->getResource($activity->id));
+        $this->assertSame($planResource['period'], Repository::carePlan()->getResource($plan->id)['period']);
     }
 
     private function fixture(string $path): array

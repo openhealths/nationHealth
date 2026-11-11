@@ -1,12 +1,14 @@
+@use('Illuminate\Support\Facades\Lang')
+@use('App\Enums\JobStatus')
 @php
     $dictionaries = $dictionaries ?? [];
     $resolvedKind = $activity->resolvedKind();
     $kindTranslationKey = 'care-plan.activity_kind.' . $resolvedKind;
-    $translatedKind = \Illuminate\Support\Facades\Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $resolvedKind;
+    $translatedKind = Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $resolvedKind;
 
     $activityStatus = is_array($activity->status) ? ($activity->status['coding'][0]['code'] ?? ($activity->status['text'] ?? '')) : $activity->status;
     $statusKey = 'care-plan.status.' . strtolower((string) $activityStatus);
-    $activityStatusDisplay = \Illuminate\Support\Facades\Lang::has($statusKey)
+    $activityStatusDisplay = Lang::has($statusKey)
         ? __($statusKey)
         : (is_array($activity->status) ? ($activity->status['text'] ?? ($activity->status['coding'][0]['display'] ?? $activityStatus)) : $activityStatus);
 
@@ -66,7 +68,7 @@
         ->all();
 
     if ($activitySubmissionPending ?? false) {
-        $activityStatusDisplay = \App\Enums\JobStatus::PENDING->label();
+        $activityStatusDisplay = JobStatus::PENDING->label();
     }
 
     $statusReason = is_array($activity->statusReason)

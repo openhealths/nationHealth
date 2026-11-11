@@ -23,6 +23,7 @@ use App\Models\LegalEntity;
 use App\Repositories\CarePlanActivityRepository;
 use App\Repositories\CarePlanRepository;
 use App\Repositories\Repository;
+use App\Services\MedicalEvents\CarePlanActivityValidationService;
 use App\Services\MedicalEvents\CarePlanApprovalService;
 use App\Services\MedicalEvents\CarePlanLifecycleGateService;
 use App\Services\MedicalEvents\FhirResource;
@@ -103,8 +104,10 @@ trait CarePlanManager
         }
     }
 
-    public function sign(CarePlanRepository $repository, CarePlanActivityRepository $activityRepository): void
+    public function sign(): void
     {
+        $repository = Repository::carePlan();
+        $activityRepository = Repository::carePlanActivity();
         $this->authorizeCarePlanWrite();
         if (in_array($this->actionType, ['cancel', 'complete'], true) && $this->guardPlanLifecycleAccess($this->actionType)) {
             return;
@@ -125,7 +128,7 @@ trait CarePlanManager
         }
 
         if ($this->actionType === 'complete') {
-            $this->completePlan($repository);
+            $this->completePlan();
 
             return;
         }
@@ -362,8 +365,9 @@ trait CarePlanManager
         }
     }
 
-    public function completePlan(CarePlanRepository $repository): void
+    public function completePlan(): void
     {
+        $repository = Repository::carePlan();
         $this->authorizeCarePlanWrite();
         if ($this->guardPlanLifecycleAccess('complete')) {
             return;
@@ -458,6 +462,11 @@ trait CarePlanManager
                 }
             }
             $resource = $activityRepository->getResource($activity->id);
+            if (data_get($resource, 'detail.kind') === 'service_request') {
+                $validation = app(CarePlanActivityValidationService::class);
+                $validation->assertServiceUnit($this->carePlan, (string) data_get($resource, 'detail.quantity.code', ''));
+                $validation->assertServicePeriod($this->carePlan, $resource['detail']);
+            }
             $this->assertMedicationActivityProgramForSigning($resource);
             $this->assertDeviceActivityQuantityForSigning($resource);
             $payload = CarePlanActivityForm::buildCreateContent($resource);

@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Tests\Feature\CarePlan;
 
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
+
 use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 use Tests\TestCase;
 
 class MedicationPeriodNormalizationTest extends TestCase
@@ -63,7 +65,7 @@ class MedicationPeriodNormalizationTest extends TestCase
         try {
             (require database_path('migrations/update/0_1/2026_10_27_160000_normalize_care_plan_references_and_medication_periods.php'))->up();
             $this->fail('Conflicting clinical periods must not be discarded.');
-        } catch (\RuntimeException $exception) {
+        } catch (RuntimeException $exception) {
             $this->assertStringContainsString('conflicting start boundaries', $exception->getMessage());
         }
         $this->assertTrue(Schema::hasColumn('medication_request_requests', 'period_end'));

@@ -13,7 +13,6 @@ use App\Exceptions\MedicalEvents\ClinicalStorageException;
 use App\Livewire\CarePlan\Forms\CarePlanForm;
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
-use App\Repositories\CarePlanRepository;
 use App\Repositories\Repository;
 use App\Services\MedicalEvents\Fhir;
 use Illuminate\Support\Facades\Auth;
@@ -88,8 +87,9 @@ class CarePlanUpdate extends CarePlanCreate
     /**
      * Update existing local draft.
      */
-    public function save(CarePlanRepository $repository): void
+    public function save(): void
     {
+        $repository = Repository::carePlan();
         if (Auth::user()?->cannot('update', $this->carePlan)) {
             Session::flash('error', __('care-plan.no_permission_update'));
 
@@ -148,8 +148,9 @@ class CarePlanUpdate extends CarePlanCreate
         $this->redirectRoute('care-plans.edit', [legalEntity(), $this->carePlan->id], navigate: true);
     }
 
-    public function delete(CarePlanRepository $repository): void
+    public function delete(): void
     {
+        $repository = Repository::carePlan();
         if (Auth::user()->cannot('update', $this->carePlan)) {
             Session::flash('error', __('care-plan.no_permission_update'));
 
@@ -176,8 +177,9 @@ class CarePlanUpdate extends CarePlanCreate
     /**
      * Sign with KEP and send to eHealth (Update current plan).
      */
-    public function sign(CarePlanRepository $repository): void
+    public function sign(): void
     {
+        $repository = Repository::carePlan();
         if (Auth::user()?->cannot('update', $this->carePlan)) {
             Session::flash('error', __('care-plan.no_permission_update'));
 

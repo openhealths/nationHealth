@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Classes\eHealth\EHealthResponse;
+
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
 use App\Models\EhealthLink;
+
 use App\Models\LegalEntity;
 use App\Notifications\RemoteEHealthLinksNotification;
 use App\Repositories\Repository;

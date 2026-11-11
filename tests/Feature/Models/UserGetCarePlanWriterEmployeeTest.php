@@ -17,8 +17,10 @@ use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\Permission;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
+use App\Models\Role as RoleModel;
 use App\Models\User;
 use App\Repositories\CarePlanRepository;
 use App\Repositories\Repository;
@@ -29,13 +31,11 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Mockery;
 use Ramsey\Uuid\Uuid;
-use Tests\Support\GrantsReferralEmployeeRole;
 use Tests\TestCase;
 
 class UserGetCarePlanWriterEmployeeTest extends TestCase
 {
     use DatabaseTransactions;
-    use GrantsReferralEmployeeRole;
 
     private LegalEntity $legalEntity;
 
@@ -103,7 +103,12 @@ class UserGetCarePlanWriterEmployeeTest extends TestCase
             'party_id' => $this->user->party_id,
         ]);
         $this->user->employees()->attach($employee->id);
-        $this->grantReferralEmployeeRole($this->user, $employee);
+        $permission = Permission::findOrCreate('care_plan:write', 'web');
+        $role = RoleModel::findOrCreate($employeeType, 'web');
+        $role->givePermissionTo($permission);
+        $this->user->givePermissionToParent(...$role->permissions);
+        $this->user->assignRoleParent($role);
+        $this->user->unsetRelation('roles');
 
         return $employee;
     }
@@ -233,6 +238,17 @@ class UserGetCarePlanWriterEmployeeTest extends TestCase
         $this->assertNull($this->user->getCarePlanWriterEmployee());
     }
 
+    public function test_a_linked_position_and_direct_scope_do_not_replace_an_unassigned_login_role(): void
+    {
+        $employee = $this->createEmployee('P103', 'MED_COORDINATOR');
+        $service = $this->createHealthcareService('SPECIALITY', 'OUTPATIENT');
+        $this->createActiveRole($employee, $service);
+        $this->user->roles()->detach();
+        $user = $this->user->fresh();
+        $this->assertTrue($user->permissions()->whereName('care_plan:write')->exists());
+        $this->assertNull($user->getCarePlanWriterEmployee('OUTPATIENT', $employee->uuid));
+    }
+
     public function test_creation_author_is_the_selected_finished_encounter_performer(): void
     {
         $this->createEmployee('P1', 'DOCTOR');
@@ -266,6 +282,7 @@ class UserGetCarePlanWriterEmployeeTest extends TestCase
         $activity = Repository::carePlanActivity()->saveForm([
             'kind' => 'service_request', 'status' => 'draft', 'authorId' => $author->id,
             'productReference' => (string) Str::uuid(), 'quantity' => 2,
+            'scheduledPeriodStart' => '2026-11-11', 'scheduledPeriodEnd' => '2026-11-12',
         ], $plan);
         $this->assertSame(1, Uuid::fromString($activity->uuid)->getFields()->getVersion());
         $updated = Repository::carePlanActivity()->saveForm(['quantity' => 3], $plan, $activity->id);

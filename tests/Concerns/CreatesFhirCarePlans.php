@@ -13,6 +13,8 @@ use App\Models\EmployeeRole;
 use App\Models\HealthcareService;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\Permission;
+use App\Models\Role as RoleModel;
 use App\Repositories\Repository;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Str;
@@ -98,6 +100,17 @@ trait CreatesFhirCarePlans
 
     protected function grantCarePlanEmployeeRole(Employee $employee, string $providingCondition): void
     {
+        // An employee position and token scopes alone do not grant that role in the current login.
+        setPermissionsTeamId($employee->legalEntityId);
+        $role = RoleModel::findOrCreate($employee->employeeType, 'web');
+        $role->givePermissionTo(Permission::findOrCreate('care_plan:write', 'web'));
+        $users = $employee->users()->get();
+        foreach ($users as $user) {
+            $user->givePermissionToParent(...$role->permissions);
+            $user->assignRoleParent($role);
+            $user->unsetRelation('roles');
+        }
+
         if (EmployeeRole::whereEmployeeId($employee->id)->whereStatus(EmployeeRoleStatus::ACTIVE)
             ->whereIsActive(true)->whereHas('healthcareService', static fn ($query) => $query->whereProvidingCondition($providingCondition)->whereIsActive(true))->exists()) {
             return;

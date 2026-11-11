@@ -104,7 +104,8 @@ class ReviewFlashMessagesTest extends TestCase
             $component->carePlan = $plan;
             $component->personId = 1;
 
-            $component->delete($repository);
+            $this->instance(CarePlanRepository::class, $repository);
+            $component->delete();
 
             $this->assertSame('persons.care-plans', $component->redirectedRoute);
             $message = $status === 'draft'

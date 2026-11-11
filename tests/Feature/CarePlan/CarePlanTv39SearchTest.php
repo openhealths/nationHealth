@@ -174,7 +174,8 @@ class CarePlanTv39SearchTest extends TestCase
         $activityRepository->shouldNotReceive('saveForm');
         $component = $this->mutationComponent();
         $component->carePlan = $plan;
-        $component->saveActivity($activityRepository);
+        $this->instance(CarePlanActivityRepository::class, $activityRepository);
+        $component->saveActivity();
         $this->assertSame(__('care-plan.prescribing_patient_access_required'), session('error'));
     }
 
