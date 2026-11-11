@@ -334,7 +334,7 @@
                     <li>
                         <a
                             href="{{ route('persons.index', [legalEntity()]) }}"
-                            class="menu-item-simple {{ request()->routeIs('persons.*') && !request()->routeIs('persons.preperson', 'persons.care-plans') ? 'menu-item-active' : '' }}"
+                            class="menu-item-simple {{ request()->routeIs('persons.*') && !request()->routeIs('persons.care-plans', 'persons.verifications') ? 'menu-item-active' : '' }}"
                         >
                             @icon('patients')
                             <span>{{ __('patients.patients') }}</span>
@@ -344,7 +344,7 @@
 
                 @can('viewAny', PersonVerificationDetail::class)
                     <li
-                        x-data="{ open: {{ request()->routeIs('persons.verifications.*') ? 'true' : 'false' }} }"
+                        x-data="{ open: {{ request()->routeIs('persons.verifications') ? 'true' : 'false' }} }"
                         class="space-y-2"
                     >
                         <button
@@ -373,7 +373,7 @@
 
                         <ul
                             id="dropdown-my-patients"
-                            @if (!request()->routeIs('persons.verifications.*')) x-cloak @endif
+                            @if (!request()->routeIs('persons.verifications')) x-cloak @endif
                             class="space-y-2 py-2"
                             x-show="open"
                             x-transition:enter="transition ease-out duration-100"
@@ -386,7 +386,7 @@
                             <li>
                                 <a
                                     href="{{ route('persons.verifications', [legalEntity()]) }}"
-                                    class="submenu-item {{ request()->routeIs('persons.verifications.*') ? 'submenu-item-active' : '' }}"
+                                    class="submenu-item {{ request()->routeIs('persons.verifications') ? 'submenu-item-active' : '' }}"
                                 >
                                     @icon('verifications')
                                     <span>{{ __('forms.verifications') }}</span>
@@ -400,7 +400,7 @@
                     <li>
                         <a
                             href="{{ route('prepersons.index', [legalEntity()]) }}"
-                            class="menu-item-simple {{ request()->routeIs('persons.preperson') ? 'menu-item-active' : '' }}"
+                            class="menu-item-simple {{ request()->routeIs('prepersons.*') ? 'menu-item-active' : '' }}"
                         >
                             @icon('person')
                             <span>{{ __('preperson.label') }}</span>
