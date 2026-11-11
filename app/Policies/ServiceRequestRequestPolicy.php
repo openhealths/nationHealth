@@ -167,6 +167,15 @@ class ServiceRequestRequestPolicy
 
     private function linkedEmployee(User $user, Employee $employee): bool
     {
+        // A stale active flag cannot authorize a future or already ended position.
+        // Read stored ISO dates rather than the model's localized display-date cast.
+        $startDate = $employee->getRawOriginal('start_date');
+        $endDate = $employee->getRawOriginal('end_date');
+        if (($startDate !== null && CarbonImmutable::parse($startDate)->startOfDay()->greaterThan(today()))
+            || ($endDate !== null && CarbonImmutable::parse($endDate)->startOfDay()->lessThanOrEqualTo(today()))) {
+            return false;
+        }
+
         return $employee->legalEntityId === legalEntity()->id
             && $employee->status === Status::APPROVED
             && $employee->isActive
