@@ -29,7 +29,7 @@ final class PrescriptionRules
         $duration = (int) $form['duration'];
         $qty = (float) $form['medication_qty'];
         $errors = [];
-        $maxPeriod = data_get($program, 'settings.request_max_period_day');
+        $maxPeriod = self::programSetting($program, 'request_max_period_day');
         if ($maxPeriod !== null && (!is_numeric($maxPeriod) || (int) $maxPeriod < 1 || $duration > (int) $maxPeriod)) {
             $errors['duration'] = __('medication-requests.course_period_exceeded', ['max' => $maxPeriod]);
         }
@@ -53,7 +53,7 @@ final class PrescriptionRules
         if ($requiresConfirmation && !filter_var($form['dose_warning_confirmed'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $errors['dose_warning_confirmed'] = __('care-plan.eprescription_daily_dose_warning', ['name' => $drug['name'] ?? '']);
         }
-        $disabled = filter_var(data_get($program, 'settings.request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
+        $disabled = filter_var(self::programSetting($program, 'request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
         if (!$disabled) {
             if (trim((string) ($form['inform_with'] ?? '')) === '') {
                 $errors['inform_with'] = __('encounters.eprescription.select_authentication');
@@ -103,6 +103,16 @@ final class PrescriptionRules
         }
 
         return false;
+    }
+
+    /** General MIS list uses medical_program_settings; the program detail uses settings. */
+    public static function programSetting(?array $program, string $key, mixed $default = null): mixed
+    {
+        if ($program === null) {
+            return $default;
+        }
+
+        return data_get($program, 'medical_program_settings.'.$key, data_get($program, 'settings.'.$key, $default));
     }
 
     /** All permitted quantities within the supplied course/activity boundary, with no ten-item truncation. */

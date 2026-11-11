@@ -10,6 +10,7 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\MedicationRequest\Forms\PrescriptionRules;
 use App\Models\CarePlanActivity;
+use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use App\Services\MedicalEvents\CarePlanActivityEHealthGuard;
@@ -24,6 +25,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use RuntimeException;
 use Throwable;
 
@@ -300,7 +302,7 @@ trait ManagesCarePlanEPrescription
                 return;
             }
 
-            $maxPeriod = $this->ePrescriptionSelectedProgram['settings']['request_max_period_day'] ?? null;
+            $maxPeriod = PrescriptionRules::programSetting($this->ePrescriptionSelectedProgram, 'request_max_period_day');
             if ($maxPeriod !== null && $duration > (int) $maxPeriod) {
                 $this->ePrescriptionWarningMessage = __('Тривалість курсу лікування (:duration днів) перевищує максимальний період курсу за обраною програмою (:max_period днів).', ['duration' => $duration, 'max_period' => $maxPeriod]);
             } else {
@@ -479,8 +481,10 @@ trait ManagesCarePlanEPrescription
             $activeItems = $lifecycle->getByCarePlan($this->carePlan->uuid, $filters);
             $draftItems = $lifecycle->getRequestsByCarePlan($this->carePlan->uuid, array_intersect_key($filters, array_flip(['employee_id', 'status'])));
             $draftItems = $lifecycle->filterDocuments($draftItems, $filters);
-            $updatedCount = MedicalEventsRepository::medicationRequest()->importCarePlanDocuments($this->carePlan, $activeItems, $draftItems);
+            // Match confirmed prescriptions against the pre-import requests. A newly
+            // imported MR must not hide its older unsigned MRR with the same number.
             $localRequests = Repository::carePlanActivity()->linkedDocuments($this->carePlan->activities->pluck('uuid')->all(), 'medication_request');
+            $updatedCount = MedicalEventsRepository::medicationRequest()->importCarePlanDocuments($this->carePlan, $activeItems, $draftItems);
             MedicalEventsRepository::medicationRequest()->synchronizeCarePlanDocuments($localRequests, $activeItems, $draftItems);
             $this->carePlanImportedPrescriptions = array_merge(
                 array_map(static fn (array $item): array => $item + ['_resource_type' => MedicationRequestRequest::TYPE_PRESCRIPTION], $activeItems),
@@ -516,7 +520,7 @@ trait ManagesCarePlanEPrescription
                 $requestRecord,
                 array_merge($this->form, [
                     'request_notification_disabled' => filter_var(
-                        $this->ePrescriptionSelectedProgram['settings']['request_notification_disabled'] ?? false,
+                        PrescriptionRules::programSetting($this->ePrescriptionSelectedProgram, 'request_notification_disabled', false),
                         FILTER_VALIDATE_BOOLEAN
                     ),
                     'medication_unit' => $this->ePrescriptionForm['medication_unit'] ?? 'од.',
@@ -758,7 +762,7 @@ trait ManagesCarePlanEPrescription
     #[Computed]
     public function carePlanPrescriptionNotificationsDisabled(): bool
     {
-        return filter_var(data_get($this->ePrescriptionSelectedProgram, 'settings.request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
+        return filter_var(PrescriptionRules::programSetting($this->ePrescriptionSelectedProgram, 'request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
     }
 
     /**

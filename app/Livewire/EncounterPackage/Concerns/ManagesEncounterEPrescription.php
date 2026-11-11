@@ -652,7 +652,7 @@ trait ManagesEncounterEPrescription
     {
         $program = collect($this->encounterEPrescriptionPrograms)->firstWhere('id', $this->encounterEPrescriptionForm['program_id'] ?? '');
 
-        return filter_var(data_get($program, 'settings.request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
+        return filter_var(PrescriptionRules::programSetting($program, 'request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
     }
 
     public function calculateEncounterPrescriptionDates(): void

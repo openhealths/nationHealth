@@ -262,6 +262,8 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
         }
         $drug = $this->findPrescribingDrug((string) ($form['medication_id'] ?? ''), $programId);
         $form = PrescriptionRules::normalize($form, $drug, $program ?? [], $planDailyDose);
+        // Keep the resolved native program in the durable draft and Activity identity checks.
+        $form['program_id'] = $programId;
         if (!$form['request_notification_disabled']) {
             $methods = EHealth::person()->getAuthMethods($personUuid)->validate();
             $methodId = InformWith::authMethodId($form['inform_with'] ?? null);
@@ -599,7 +601,7 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
         if ($programId !== null && $program === null) {
             throw new InvalidArgumentException(__('medication-programs.unavailable'));
         }
-        $disabled = filter_var(data_get($program, 'settings.request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
+        $disabled = filter_var(PrescriptionRules::programSetting($program, 'request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
         if (strtoupper($detail['status']) !== 'ACTIVE' || $disabled) {
             throw new InvalidArgumentException(__('medication-requests.sms_unavailable'));
         }

@@ -4,24 +4,47 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Services\MedicalEvents;
 
+use App\Classes\eHealth\Api\Drug as DrugApi;
+use App\Classes\eHealth\Api\MedicationRequest;
+use App\Classes\eHealth\Api\Patient\MedicationRequestRequest as UnsignedMedicationRequestApi;
+use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\MedicationResponseContract;
+use App\Exceptions\EHealth\EHealthResponseException;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
+
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\Person\Person;
+use App\Models\Relations\Party;
 use App\Models\User;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
+use App\Services\Dictionary\MedicationProgramPicker;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
+use App\Services\SignatureService;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use GuzzleHttp\Psr7\Response as GuzzleResponse;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunClassInSeparateProcess;
+use RuntimeException;
 use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\Concerns\CreatesFhirRequestIdentifiers;
 use Tests\TestCase;
@@ -30,9 +53,9 @@ use Tests\TestCase;
 #[PreserveGlobalState(false)]
 class MedicationRequestLifecycleServiceTest extends TestCase
 {
+    use CreatesFhirCarePlans;
     use CreatesFhirRequestIdentifiers;
     use DatabaseTransactions;
-    use CreatesFhirCarePlans;
 
     protected Person $person;
 
@@ -60,8 +83,8 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'process_disclosure_data_consent' => true,
         ]);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -71,7 +94,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'is_active' => true,
         ]);
 
-        $party = \App\Models\Relations\Party::create([
+        $party = Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Іван',
             'last_name' => 'Петренко',
@@ -100,9 +123,9 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'party_id' => $party->id,
         ]);
 
-        $identifierId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => (string) Str::uuid()])->id;
-        $codingId = \App\Models\MedicalEvents\Sql\Coding::create(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id;
-        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
+        $identifierId = Identifier::create(['value' => (string) Str::uuid()])->id;
+        $codingId = Coding::create(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id;
+        $ccId = CodeableConcept::create()->id;
 
         $this->encounter = Encounter::create([
             'uuid' => (string) Str::uuid(),
@@ -139,8 +162,29 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'kind' => 'medication_request',
             'product_reference' => 'INN-101',
             'quantity' => 30.0,
-            'program' => 'program-1',
+            'program' => MedicationProgramPicker::DEFAULT_ID,
         ]);
+
+        $program = json_decode(file_get_contents(base_path('tests/Fixtures/shared-official-responses.json')), true, flags: JSON_THROW_ON_ERROR)['GET /api/medical_programs']['data'][0];
+        $program['id'] = MedicationProgramPicker::DEFAULT_ID;
+        Cache::forever(MedicalProgramDictionary::KEY, [$program]);
+        Cache::forever(MedicalProgramDictionary::KEY.':fresh', true);
+        $drug = json_decode(file_get_contents(base_path('tests/Fixtures/medication-official-responses.json')), true, flags: JSON_THROW_ON_ERROR)['drugs'][0];
+        $drug['id'] = 'INN-101';
+        $response = new EHealthResponse(new GuzzleResponse(200, [], json_encode(['data' => [$drug]], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION)), static fn (EHealthResponse $response): array => MedicationResponseContract::validate($response, 'drugs'));
+        $api = Mockery::mock(DrugApi::class);
+        $api->shouldReceive('getMany')->andReturn($response);
+        $this->instance(DrugApi::class, $api);
+    }
+
+    private function validForm(array $overrides = []): array
+    {
+        return array_replace([
+            'signature_text' => 'По 1 таблетці 2 рази на день',
+            'max_dose_per_administration' => 1, 'max_dose_per_period' => 2,
+            'medication_id' => 'INN-101', 'medication_qty' => 10,
+            'started_at' => now()->toDateString(), 'duration' => 5,
+        ], $overrides);
     }
 
     public function test_reject_successfully_rejects_new_request(): void
@@ -156,7 +200,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
-        $mockApi = Mockery::mock('alias:' . \App\Classes\eHealth\Api\MedicationRequest::class);
+        $mockApi = Mockery::mock('alias:' . MedicationRequest::class);
         $mockApi->shouldReceive('rejectUnsignedMedicationRequest')
             ->once()
             ->with((string) $requestRecord->uuid, [])
@@ -193,7 +237,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'person' => ['id' => $this->person->uuid],
         ];
 
-        $mockApi = Mockery::mock('alias:' . \App\Classes\eHealth\Api\MedicationRequest::class);
+        $mockApi = Mockery::mock('alias:' . MedicationRequest::class);
         $mockApi->shouldReceive('getBySearchParams')->andReturn([]);
         $mockApi->shouldReceive('getById')
             ->once()
@@ -209,8 +253,8 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             })
             ->andReturn(['id' => $requestRecord->uuid, 'status' => 'rejected']);
 
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService = Mockery::mock(SignatureService::class);
+        $this->instance(SignatureService::class, $mockSignatureService);
         $mockSignatureService->shouldReceive('signData')
             ->once()
             ->withArgs(function (array $signPayload) use ($activeMedicationRequest): bool {
@@ -242,7 +286,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
 
     public function test_reject_active_stops_when_ehealth_denies_access(): void
     {
-        \Illuminate\Support\Facades\Log::spy();
+        Log::spy();
         $requestRecord = MedicationRequestRequest::create([
             'uuid' => (string) Str::uuid(),
             'employee_id' => $this->employee->id,
@@ -255,24 +299,24 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
-        $forbidden = new \App\Exceptions\EHealth\EHealthResponseException(
-            new \Illuminate\Http\Client\Response(
-                new \GuzzleHttp\Psr7\Response(403, ['Content-Type' => 'application/json'], json_encode([
+        $forbidden = new EHealthResponseException(
+            new Response(
+                new GuzzleResponse(403, ['Content-Type' => 'application/json'], json_encode([
                     'error' => ['message' => 'Access denied', 'type' => 'forbidden'],
                 ]))
             )
         );
 
-        $mockApi = Mockery::mock('alias:'.\App\Classes\eHealth\Api\MedicationRequest::class);
+        $mockApi = Mockery::mock('alias:'.MedicationRequest::class);
         $mockApi->shouldReceive('getBySearchParams')->andThrow($forbidden);
         $mockApi->shouldReceive('getById')->andThrow($forbidden);
         $mockApi->shouldNotReceive('rejectMedicationRequest');
 
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService = Mockery::mock(SignatureService::class);
+        $this->instance(SignatureService::class, $mockSignatureService);
         $mockSignatureService->shouldNotReceive('signData');
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(__('care-plan.eprescription_reject_wrong_legal_entity'));
 
         app(MedicationRequestLifecycleService::class)->rejectPrescription(
@@ -300,14 +344,14 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService = Mockery::mock(SignatureService::class);
+        $this->instance(SignatureService::class, $mockSignatureService);
         $mockSignatureService->shouldNotReceive('signData');
 
         // An authenticated session must not be able to stand in for the missing form value.
         $this->actingAs($this->user);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(__('care-plan.signer_tax_id_required'));
 
         app(MedicationRequestLifecycleService::class)->rejectPrescription(
@@ -367,7 +411,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
     public function test_find_eligible_encounters_requires_today_period_and_current_performer(): void
     {
         $this->travelTo(now()->setTime(23, 30));
-        $performer = \App\Models\MedicalEvents\Sql\Identifier::create([
+        $performer = Identifier::create([
             'value' => $this->employee->uuid,
         ]);
         $this->encounter->update(['performer_id' => $performer->id]);
@@ -376,7 +420,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'end' => now()->utc(),
         ]);
 
-        $otherPerformer = \App\Models\MedicalEvents\Sql\Identifier::create([
+        $otherPerformer = Identifier::create([
             'value' => (string) Str::uuid(),
         ]);
         $otherEncounter = Encounter::create([
@@ -419,7 +463,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         $this->assertSame($this->encounter->id, $eligible->first()->id);
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('localCalendarDays')]
+    #[DataProvider('localCalendarDays')]
     public function test_eligible_encounters_use_utc_bounds_of_the_configured_local_day(
         string $timezone,
         string $localNow,
@@ -428,8 +472,8 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         string $nextStartUtc
     ): void {
         config(['app.timezone' => $timezone]);
-        $this->travelTo(\Carbon\Carbon::parse($localNow, $timezone));
-        $performer = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $this->employee->uuid]);
+        $this->travelTo(Carbon::parse($localNow, $timezone));
+        $performer = Identifier::create(['value' => $this->employee->uuid]);
         $this->encounter->update(['performer_id' => $performer->id]);
         $period = $this->encounter->period()->create(['start' => $startUtc, 'end' => $startUtc]);
         $repository = MedicalEventsRepository::medicationRequest();
@@ -442,7 +486,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         $period->update(['end' => $nextStartUtc]);
         $this->assertFalse($repository->eligibleEncounters($this->person->id, $this->employee->uuid)
             ->contains('id', $this->encounter->id));
-        $period->update(['end' => \Carbon\CarbonImmutable::parse($startUtc, 'UTC')->subSecond()->format('Y-m-d H:i:s')]);
+        $period->update(['end' => CarbonImmutable::parse($startUtc, 'UTC')->subSecond()->format('Y-m-d H:i:s')]);
         $this->assertFalse($repository->eligibleEncounters($this->person->id, $this->employee->uuid)
             ->contains('id', $this->encounter->id));
     }
@@ -461,7 +505,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
 
     public function test_create_draft_requires_selected_eligible_encounter(): void
     {
-        $performer = \App\Models\MedicalEvents\Sql\Identifier::create([
+        $performer = Identifier::create([
             'value' => $this->employee->uuid,
         ]);
         $this->encounter->update(['performer_id' => $performer->id]);
@@ -478,26 +522,20 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'legal_entity_uuid' => null,
         ];
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(__('care-plan.eprescription_encounter_required'));
 
         $service->createCarePlanDraft(
             $this->carePlan->fresh(['person']),
             $this->activity,
-            [
-                'signature_text' => 'По 1 таблетці 2 рази на день',
-                'max_dose_per_administration' => 1,
-                'max_dose_per_period' => 2,
-                'medication_id' => 'INN-101',
-                'medication_qty' => 10,
-            ],
+            $this->validForm(),
             $employeeContext
         );
     }
 
     public function test_create_draft_rejects_encounter_of_another_performer(): void
     {
-        $otherPerformer = \App\Models\MedicalEvents\Sql\Identifier::create([
+        $otherPerformer = Identifier::create([
             'value' => (string) Str::uuid(),
         ]);
         $this->encounter->update(['performer_id' => $otherPerformer->id]);
@@ -514,27 +552,20 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'legal_entity_uuid' => null,
         ];
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(__('care-plan.eprescription_encounter_none'));
 
         $service->createCarePlanDraft(
             $this->carePlan->fresh(['person']),
             $this->activity,
-            [
-                'encounter_id' => $this->encounter->id,
-                'signature_text' => 'По 1 таблетці 2 рази на день',
-                'max_dose_per_administration' => 1,
-                'max_dose_per_period' => 2,
-                'medication_id' => 'INN-101',
-                'medication_qty' => 10,
-            ],
+            $this->validForm(['encounter_id' => $this->encounter->id]),
             $employeeContext
         );
     }
 
     public function test_create_draft_persists_selected_eligible_encounter(): void
     {
-        $performer = \App\Models\MedicalEvents\Sql\Identifier::create([
+        $performer = Identifier::create([
             'value' => $this->employee->uuid,
         ]);
         $this->encounter->update(['performer_id' => $performer->id]);
@@ -544,7 +575,10 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         ]);
 
         $createdUuid = (string) Str::uuid();
-        $mockApi = Mockery::mock('alias:' . \App\Classes\eHealth\Api\MedicationRequest::class);
+        $mockApi = Mockery::mock('alias:' . MedicationRequest::class);
+        $mockApi->shouldReceive('preQualify')->once()->andReturn([
+            ['program_id' => MedicationProgramPicker::DEFAULT_ID, 'program_name' => 'Доступні ліки', 'status' => 'VALID'],
+        ]);
         $mockApi->shouldReceive('createMedicationRequest')
             ->once()
             ->andReturn([
@@ -564,21 +598,18 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         $uuid = $service->createCarePlanDraft(
             $this->carePlan->fresh(['person']),
             $this->activity,
-            [
+            $this->validForm([
                 'encounter_id' => $this->encounter->id,
-                'signature_text' => 'По 1 таблетці 2 рази на день',
-                'max_dose_per_administration' => 1,
-                'max_dose_per_period' => 2,
-                'medication_id' => 'INN-101',
-                'medication_qty' => 10,
                 'medication_unit' => 'шт.',
                 'dosage_instructions' => json_decode(file_get_contents(base_path('tests/Fixtures/medication-request-detail.json')), true)['dosage_instruction'],
-                'inform_with' => 'auth-1|OTP|+380******01',
-            ],
+            ]),
             $employeeContext
         );
 
         $this->assertSame($createdUuid, $uuid);
+        $request = MedicationRequestRequest::whereUuid($createdUuid)->firstOrFail();
+        $this->assertSame(MedicationProgramPicker::DEFAULT_ID, $request->medicationProgramId);
+        $this->assertSame(MedicationProgramPicker::DEFAULT_ID, $request->ehealthPayload['_local_form']['program_id']);
         $fhirRefs = $this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid);
         $this->assertDatabaseHas('medication_request_requests', [
             'uuid' => $createdUuid,
@@ -589,7 +620,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
 
     public function test_create_draft_requires_signature_text(): void
     {
-        $performer = \App\Models\MedicalEvents\Sql\Identifier::create([
+        $performer = Identifier::create([
             'value' => $this->employee->uuid,
         ]);
         $this->encounter->update(['performer_id' => $performer->id]);
@@ -600,18 +631,15 @@ class MedicationRequestLifecycleServiceTest extends TestCase
 
         $service = app(MedicationRequestLifecycleService::class);
 
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage(__('care-plan.eprescription_signature_required'));
+        $this->expectException(ValidationException::class);
 
         $service->createCarePlanDraft(
             $this->carePlan->fresh(['person']),
             $this->activity,
-            [
+            $this->validForm([
                 'encounter_id' => $this->encounter->id,
                 'signature_text' => '   ',
-                'max_dose_per_administration' => 1,
-                'max_dose_per_period' => 2,
-            ],
+            ]),
             [
                 'employee_id' => $this->employee->id,
                 'employee_uuid' => $this->employee->uuid,
@@ -675,7 +703,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         ];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('signedDetailCases')]
+    #[DataProvider('signedDetailCases')]
     public function test_sign_sets_tv_success_and_remaining_warning(
         bool $detailsAvailable,
         bool $fromEncounter,
@@ -701,12 +729,12 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             ],
         ]);
 
-        $mockApi = Mockery::mock('alias:' . \App\Classes\eHealth\Api\MedicationRequest::class);
-        $requestApi = Mockery::mock(\App\Classes\eHealth\Api\Patient\MedicationRequestRequest::class);
-        $requestDetail = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
+        $mockApi = Mockery::mock('alias:' . MedicationRequest::class);
+        $requestApi = Mockery::mock(UnsignedMedicationRequestApi::class);
+        $requestDetail = Mockery::mock(EHealthResponse::class);
         $requestDetail->shouldReceive('validate')->once()->andReturn(array_replace(json_decode(file_get_contents(base_path('tests/Fixtures/medication-request-sign-detail.json')), true), ['id' => $requestRecord->uuid, 'person' => ['id' => $this->person->uuid]]));
         $requestApi->shouldReceive('getById')->once()->with($this->person->uuid, $requestRecord->uuid)->andReturn($requestDetail);
-        $this->instance(\App\Classes\eHealth\Api\Patient\MedicationRequestRequest::class, $requestApi);
+        $this->instance(UnsignedMedicationRequestApi::class, $requestApi);
         $activeUuid = (string) Str::uuid();
         $detail = json_decode(file_get_contents(base_path('tests/Fixtures/medication-request-detail.json')), true);
         $detail['id'] = $activeUuid;
@@ -716,7 +744,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         if ($detailsAvailable) {
             $detailCall->andReturn($detail);
         } else {
-            $detailCall->andThrow(new \RuntimeException('Synthetic detail GET failure'));
+            $detailCall->andThrow(new RuntimeException('Synthetic detail GET failure'));
         }
         $mockApi->shouldReceive('signMedicationRequest')
             ->once()
@@ -726,8 +754,8 @@ class MedicationRequestLifecycleServiceTest extends TestCase
                 'request_number' => '9999000011112222',
             ]);
 
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService = Mockery::mock(SignatureService::class);
+        $this->instance(SignatureService::class, $mockSignatureService);
         $mockSignatureService->shouldReceive('signData')->once()->andReturn('kep-signed');
 
         $service = app(MedicationRequestLifecycleService::class);
@@ -782,7 +810,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(__('care-plan.kep_signature_required'));
 
         app(MedicationRequestLifecycleService::class)->signPrescription(
@@ -816,7 +844,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(__('care-plan.activity_issue_exceeds_remaining', ['remaining' => 0]));
 
         app(MedicationRequestLifecycleService::class)->signPrescription(
@@ -842,10 +870,10 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'status' => 'new', 'medication_qty' => 1,
             ...$this->fhirBasedOnContextIds($otherActivity->uuid, $this->encounter->uuid),
         ]);
-        $signer = Mockery::mock(\App\Services\SignatureService::class);
+        $signer = Mockery::mock(SignatureService::class);
         $signer->shouldNotReceive('signData');
-        $this->instance(\App\Services\SignatureService::class, $signer);
-        $this->expectException(\InvalidArgumentException::class);
+        $this->instance(SignatureService::class, $signer);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('The medication activity is outside the signing context.');
         app(MedicationRequestLifecycleService::class)->signPrescription($this->carePlan, $request, [
             'password' => 'synthetic', 'knedp' => 'synthetic', 'signer_tax_id' => '9876543210',

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Tests\Feature\Person;
 
 use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
+use App\Classes\eHealth\Api\Patient\MedicationRequestRequest as UnsignedMedicationRequestApi;
+
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\MedicationResponseContract;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -17,11 +20,14 @@ use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\Person\Person;
+use App\Models\Relations\Party;
 use App\Models\User;
 use App\Repositories\MedicalEvents\MedicationRequestRepository;
+use App\Repositories\MedicalEvents\Repository;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
@@ -32,6 +38,28 @@ use Tests\TestCase;
 class PatientMedicationRequestsPhase6Test extends TestCase
 {
     use DatabaseTransactions;
+
+    private function nativeResponse(string $uuid, bool $unsigned = true, bool $list = false): EHealthResponse
+    {
+        $operation = $list ? ($unsigned ? 'request_list' : 'list') : ($unsigned ? 'request_detail' : 'detail');
+        $fixtures = json_decode(file_get_contents(base_path('tests/Fixtures/medication-official-responses.json')), true, flags: JSON_THROW_ON_ERROR);
+        $native = $list ? $fixtures[$operation][0] : $fixtures[$operation];
+        $native['id'] = $uuid;
+        $native['person']['id'] = $this->person->uuid;
+        $native['employee']['id'] = $this->employee->uuid;
+        $native['legal_entity']['id'] = $this->legalEntity->uuid;
+        $native['request_number'] = '0000-API-1234';
+        $native['medication_info']['medication_id'] = 'INN-1';
+        $native['medication_info']['medication_qty'] = 7;
+        $native['medication_info']['medication_name'] = 'Fresh native medication';
+
+        $body = ['data' => $list ? [$native] : $native];
+        if ($list) {
+            $body['paging'] = ['page_number' => 1, 'page_size' => 50, 'total_pages' => 1, 'total_entries' => 1];
+        }
+
+        return new EHealthResponse(new Response(200, [], json_encode($body, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION)), static fn (EHealthResponse $response): array => MedicationResponseContract::validate($response, $operation));
+    }
 
     public function test_search_failures_clear_loading_and_show_the_appropriate_message(): void
     {
@@ -74,7 +102,7 @@ class PatientMedicationRequestsPhase6Test extends TestCase
     {
         parent::setUp();
 
-        $party = \App\Models\Relations\Party::create([
+        $party = Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Олена',
             'last_name' => 'Коваленко',
@@ -90,8 +118,8 @@ class PatientMedicationRequestsPhase6Test extends TestCase
             'party_id' => $party->id,
         ]);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $this->legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -133,7 +161,7 @@ class PatientMedicationRequestsPhase6Test extends TestCase
 
     public function test_repository_filters_by_status_period_and_source(): void
     {
-        $repo = app(MedicationRequestRepository::class);
+        $repo = Repository::medicationRequest();
 
         $repo->store([
             'uuid' => (string) Str::uuid(),
@@ -190,7 +218,7 @@ class PatientMedicationRequestsPhase6Test extends TestCase
     public function test_registry_row_maps_payload_name_and_camel_case_fields(): void
     {
         $uuid = (string) Str::uuid();
-        app(MedicationRequestRepository::class)->store([
+        Repository::medicationRequest()->store([
             'uuid' => $uuid,
             'employee_id' => $this->employee->id,
             'status' => 'active',
@@ -212,7 +240,7 @@ class PatientMedicationRequestsPhase6Test extends TestCase
             ],
         ], $this->person->id);
 
-        $rows = app(MedicationRequestRepository::class)->searchByPersonId($this->person->id, [
+        $rows = Repository::medicationRequest()->searchByPersonId($this->person->id, [
             'source' => MedicationRequestRequest::SOURCE_LOCAL,
         ]);
 
@@ -240,7 +268,7 @@ class PatientMedicationRequestsPhase6Test extends TestCase
         $standalone->setRelation('category', $category);
         $standalone->setRelation('context', $context);
 
-        $mapped = app(MedicationRequestRepository::class)->toPatientRegistryRow(
+        $mapped = Repository::medicationRequest()->toPatientRegistryRow(
             $standalone,
             [],
             [$encounterUuid => 23]
@@ -264,7 +292,7 @@ class PatientMedicationRequestsPhase6Test extends TestCase
         $fromPlan->setRelation('context', $context);
 
         $activityRow = (new CarePlanActivity())->forceFill(['id' => 42, 'uuid' => $activityUuid, 'care_plan_id' => 7]);
-        $planMapped = app(MedicationRequestRepository::class)->toPatientRegistryRow(
+        $planMapped = Repository::medicationRequest()->toPatientRegistryRow(
             $fromPlan,
             [$activityUuid => $activityRow],
             [$encounterUuid => 9]
@@ -288,39 +316,42 @@ class PatientMedicationRequestsPhase6Test extends TestCase
             ->assertSet('isSearchMode', false);
     }
 
-    public function test_imported_request_stays_in_requests_tab_and_preserves_local_details(): void
+    public function test_imported_request_stays_in_requests_tab_and_preserves_local_ownership(): void
     {
         $uuid = (string) Str::uuid();
-        $repo = app(MedicationRequestRepository::class);
+        $repo = Repository::medicationRequest();
         $repo->store([
             'uuid' => $uuid, 'employee_id' => $this->employee->id,
             'status' => 'new', 'medication_id' => 'INN-1', 'medication_qty' => 7,
             'ehealth_payload' => ['medication_name' => 'Existing name'],
         ], $this->person->id);
-        $response = Mockery::mock(EHealthResponse::class);
-        $response->shouldReceive('getData')->once()->andReturn([['id' => $uuid, 'status' => 'active']]);
+        $response = $this->nativeResponse($uuid, list: true);
         $api = Mockery::mock(MedicationRequestApi::class);
-        $api->shouldReceive('getRequestsBySearchParams')->once()->with($this->person->uuid, [])->andReturn($response);
+        $api->shouldReceive('getRequestsBySearchParams')->once()->with($this->person->uuid, ['page' => 1])->andReturn($response);
         $this->instance(MedicationRequestApi::class, $api);
+        $unsigned = Mockery::mock(UnsignedMedicationRequestApi::class);
+        $unsigned->shouldReceive('getById')->once()->with($this->person->uuid, $uuid)->andReturn($this->nativeResponse($uuid));
+        $this->instance(UnsignedMedicationRequestApi::class, $unsigned);
 
         Livewire::test(PatientMedicationRequests::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person, 'preperson' => null])
             ->call('searchInEHealth')
             ->call('saveFromEHealth', $uuid)
             ->assertSet('medicationRequests.0.uuid', $uuid)
             ->assertSet('prescriptions', [])
-            ->assertSet('isSearchMode', false);
+            ->assertSet('isSearchMode', false)
+            ->assertSee(__('medication-requests.import_saved'));
 
         $request = $repo->findByUuid($uuid);
         $this->assertSame($this->employee->id, $request->employeeId);
         $this->assertSame('7.0000000000', $request->medicationQty);
         $this->assertSame('INN-1', $request->medicationId);
-        $this->assertSame('Existing name', $request->ehealthPayload['medication_name']);
+        $this->assertSame('Fresh native medication', $request->ehealthPayload['medication_info']['medication_name']);
         $this->assertSame(MedicationRequestRequest::SOURCE_LOCAL, $request->source);
     }
 
     public function test_partial_external_summary_does_not_invent_a_medication_quantity(): void
     {
-        $request = app(MedicationRequestRepository::class)->upsertFromEHealth([
+        $request = Repository::medicationRequest()->upsertFromEHealth([
             'id' => (string) Str::uuid(), 'status' => 'active',
         ], $this->person->id);
 
@@ -331,7 +362,7 @@ class PatientMedicationRequestsPhase6Test extends TestCase
 
     public function test_external_request_is_not_classified_as_a_signed_prescription(): void
     {
-        $repo = app(MedicationRequestRepository::class);
+        $repo = Repository::medicationRequest();
         $request = $repo->upsertFromEHealth([
             'id' => (string) Str::uuid(), 'status' => 'new',
         ], $this->person->id, MedicationRequestRequest::TYPE_REQUEST);
@@ -343,7 +374,7 @@ class PatientMedicationRequestsPhase6Test extends TestCase
 
     public function test_refresh_replaces_supplied_dosage_arrays_without_retaining_removed_entries(): void
     {
-        $repo = app(MedicationRequestRepository::class);
+        $repo = Repository::medicationRequest();
         $uuid = (string) Str::uuid();
         $repo->upsertFromEHealth([
             'id' => $uuid, 'status' => 'active', 'medication_name' => 'Existing name',
@@ -359,7 +390,7 @@ class PatientMedicationRequestsPhase6Test extends TestCase
 
     public function test_import_cannot_reassign_a_record_to_another_patient(): void
     {
-        $repo = app(MedicationRequestRepository::class);
+        $repo = Repository::medicationRequest();
         $request = $repo->upsertFromEHealth(['id' => (string) Str::uuid(), 'status' => 'active'], $this->person->id);
         try {
             $repo->upsertFromEHealth(['id' => $request->uuid, 'status' => 'cancelled'], $this->person->id + 100);
@@ -386,16 +417,18 @@ class PatientMedicationRequestsPhase6Test extends TestCase
 
     public function test_reimport_reclassifies_historical_cache_without_duplicating_uuid(): void
     {
-        $repo = app(MedicationRequestRepository::class);
+        $repo = Repository::medicationRequest();
         $uuid = (string) Str::uuid();
         $historical = $repo->upsertFromEHealth(['id' => $uuid, 'status' => 'active'], $this->person->id);
         $this->assertSame(MedicationRequestRequest::TYPE_PRESCRIPTION, $historical->resourceType);
 
-        $response = Mockery::mock(EHealthResponse::class);
-        $response->shouldReceive('getData')->once()->andReturn([['id' => $uuid, 'status' => 'new']]);
+        $response = $this->nativeResponse($uuid, list: true);
         $api = Mockery::mock(MedicationRequestApi::class);
-        $api->shouldReceive('getRequestsBySearchParams')->once()->with($this->person->uuid, [])->andReturn($response);
+        $api->shouldReceive('getRequestsBySearchParams')->once()->with($this->person->uuid, ['page' => 1])->andReturn($response);
         $this->instance(MedicationRequestApi::class, $api);
+        $unsigned = Mockery::mock(UnsignedMedicationRequestApi::class);
+        $unsigned->shouldReceive('getById')->once()->with($this->person->uuid, $uuid)->andReturn($this->nativeResponse($uuid));
+        $this->instance(UnsignedMedicationRequestApi::class, $unsigned);
 
         Livewire::test(PatientMedicationRequests::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person, 'preperson' => null])
             ->assertSee(__('medication-requests.legacy_import_note'))
@@ -414,12 +447,14 @@ class PatientMedicationRequestsPhase6Test extends TestCase
     {
         $this->user->revokePermissionTo('medication_request_request:read');
         Livewire::test(PatientMedicationRequests::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person, 'preperson' => null])
-            ->call('searchInEHealth')->assertForbidden();
+            ->call('searchInEHealth')->assertStatus(200)
+            ->assertSet('eHealthResults', [])
+            ->assertSee(__('medication-requests.permission_denied'));
     }
 
     public function test_local_filters_and_reset_work_on_both_tabs(): void
     {
-        $repo = app(MedicationRequestRepository::class);
+        $repo = Repository::medicationRequest();
         $matching = [
             'request_number' => '0000-FILTER-1234',
             'status' => 'active',
@@ -479,15 +514,16 @@ class PatientMedicationRequestsPhase6Test extends TestCase
 
         foreach (['requests' => 'getRequestsBySearchParams', 'prescriptions' => 'getBySearchParams'] as $tab => $method) {
             $uuid = (string) Str::uuid();
-            $response = Mockery::mock(EHealthResponse::class);
-            $response->shouldReceive('getData')->once()->andReturn([[
-                'id' => $uuid, 'status' => 'active', 'request_number' => '0000-API-1234',
-            ]]);
+            $response = $this->nativeResponse($uuid, $tab === 'requests', true);
             $api = Mockery::mock(MedicationRequestApi::class);
-            $api->shouldReceive($method)->once()->with($this->person->uuid, [
-                'request_number' => '0000-API-1234', 'status' => 'active',
-            ])->andReturn($response);
+            $api->shouldReceive($method)->once()->with($this->person->uuid, $tab === 'requests'
+                ? ['status' => 'new', 'page' => 1]
+                : ['request_number' => '0000-API-1234', 'status' => 'active', 'page' => 1])->andReturn($response);
+            $api->shouldReceive('getById')->with($this->person->uuid, $uuid)->andReturn($this->nativeResponse($uuid, false));
             $this->instance(MedicationRequestApi::class, $api);
+            $unsigned = Mockery::mock(UnsignedMedicationRequestApi::class);
+            $unsigned->shouldReceive('getById')->with($this->person->uuid, $uuid)->andReturn($this->nativeResponse($uuid));
+            $this->instance(UnsignedMedicationRequestApi::class, $unsigned);
 
             $property = $tab === 'requests' ? 'medicationRequests' : 'prescriptions';
             Livewire::test(PatientMedicationRequests::class, [
@@ -498,7 +534,7 @@ class PatientMedicationRequestsPhase6Test extends TestCase
                 ->assertSee(__('medication-requests.search_in_ehealth'))
                 ->assertDontSeeHtml('openGroupActions')
                 ->set('searchRequestNumber', '0000-API-1234')
-                ->set('filterStatus', 'active')
+                ->set('filterStatus', $tab === 'requests' ? 'new' : 'active')
                 ->call('searchInEHealth')
                 ->assertSet('isSearchMode', true)
                 ->assertSee('0000-API-1234')
