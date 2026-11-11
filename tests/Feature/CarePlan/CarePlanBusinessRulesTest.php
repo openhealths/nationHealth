@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
+use App\Classes\eHealth\Api\Person as ApiPerson;
 use App\Livewire\CarePlan\CarePlanApprovals;
 use App\Livewire\CarePlan\CarePlanShow;
 use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
@@ -26,8 +27,11 @@ use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use App\Services\Dictionary\Dictionaries\BasicDictionary;
 use App\Services\MedicalEvents\CarePlanActivityValidationService;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -87,14 +91,77 @@ class CarePlanBusinessRulesTest extends TestCase
 
     public function test_approval_form_mount_denial_is_visible_before_loading_context(): void
     {
+        $this->withoutVite();
         $foreign = LegalEntity::create(['uuid' => (string) Str::uuid(), 'status' => 'ACTIVE',
             'legal_entity_type_id' => $this->legalEntity->legalEntityTypeId]);
         $this->plan->update(['legal_entity_id' => $foreign->id]);
-        Livewire::test(CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $this->plan,
+        Queue::fake();
+        $queries = [];
+        DB::listen(static function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+        $component = Livewire::test(CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $this->plan,
             'actingEmployeeUuid' => $this->employee->uuid])
             ->assertSee(__('care-plan.approval_access_denied'))->assertSet('carePlanId', 0)
-            ->assertSet('employees', [])->assertSet('approvals', []);
+            ->assertSet('employees', [])->assertSet('approvals', [])->assertSet('isReadOnly', true)
+            ->assertDontSeeHtml('wire:init="loadAuthMethods"');
+        $this->assertSame([], array_filter($queries, static fn (string $sql): bool => preg_match('/^\s*(insert|update|delete|alter|create|drop|truncate)\b/i', $sql) === 1));
+
+        $queries = [];
+        $component->call('loadAuthMethods')->assertStatus(200)
+            ->assertSet('carePlanId', 0)->assertSet('authMethods', [])
+            ->assertSet('employees', [])->assertSet('approvals', [])
+            ->assertDontSeeHtml('wire:init="loadAuthMethods"');
+        $this->assertSame([], $queries);
         Http::assertNothingSent();
+        Queue::assertNothingPushed();
+    }
+
+    public function test_allowed_auth_method_initialization_preserves_the_selected_actor(): void
+    {
+        $methodUuid = (string) Str::uuid();
+        $requestedUrls = [];
+        $api = new ApiPerson();
+        $api->preventStrayRequests();
+        $api->stub(static function (Request $request) use (&$requestedUrls, $methodUuid) {
+            $requestedUrls[] = $request->url();
+
+            return Http::response(['data' => [['id' => $methodUuid, 'type' => 'OTP', 'phone_number' => '+38093*****85']]]);
+        });
+        $this->instance(ApiPerson::class, $api);
+        Queue::fake();
+
+        Livewire::test(CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $this->plan,
+            'actingEmployeeUuid' => $this->employee->uuid])
+            ->assertSeeHtml('wire:init="loadAuthMethods"')->call('loadAuthMethods')->assertStatus(200)
+            ->assertSet('selectedAuthMethodUuid', $methodUuid)
+            ->assertSet('newApproval.employee_uuid', $this->employee->uuid);
+        $this->assertCount(1, $requestedUrls);
+        $this->assertStringEndsWith('/api/persons/'.$this->person->uuid.'/authentication_methods', $requestedUrls[0]);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_auth_method_initialization_rechecks_permission_after_mount(): void
+    {
+        $component = Livewire::test(CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $this->plan,
+            'actingEmployeeUuid' => $this->employee->uuid])->assertSet('isReadOnly', false);
+        RoleModel::findByName($this->employee->employeeType, 'web')->revokePermissionTo('care_plan:write');
+        $this->user->revokePermissionTo('care_plan:write');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $this->user = $this->user->fresh();
+        $this->actingAs($this->user);
+        $this->assertFalse($this->user->can('manage', $this->plan));
+        Queue::fake();
+        $before = $this->plan->fresh()->getAttributes();
+
+        $component->call('loadAuthMethods')->assertStatus(200)
+            ->assertSee(__('care-plan.approval_access_denied'))
+            ->assertSet('authMethods', [])->assertSet('selectedAuthMethodUuid', null)
+            ->assertSet('newApproval.employee_uuid', $this->employee->uuid)
+            ->assertNotDispatched('care-plan-approvals-changed');
+        $this->assertSame($before, $this->plan->fresh()->getAttributes());
+        Http::assertNothingSent();
+        Queue::assertNothingPushed();
     }
 
     public function test_registered_referral_modals_use_referral_permissions_after_the_plan_closes(): void

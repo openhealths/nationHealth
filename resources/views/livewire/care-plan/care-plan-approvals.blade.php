@@ -3,7 +3,7 @@
 @use('App\Enums\Person\AuthenticationMethod')
 
 <div
-    @if (!$skipsPatientOtp) wire:init="loadAuthMethods" @endif
+    @if (!$isReadOnly && !$skipsPatientOtp) wire:init="loadAuthMethods" @endif
     data-livewire-background-actions="checkApprovalJobStatus checkSmsResendStatus event:refreshApprovals"
 >
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />

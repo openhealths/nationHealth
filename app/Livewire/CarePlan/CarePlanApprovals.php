@@ -116,7 +116,8 @@ class CarePlanApprovals extends Component
 
     public function loadAuthMethods(): void
     {
-        if (!$this->guardApprovalAccess($this->currentCarePlan()) || $this->isReadOnly) {
+        // A denied mount leaves the plan id unset, so skip deferred initialization before resolving it.
+        if ($this->isReadOnly || !$this->guardApprovalAccess($this->currentCarePlan())) {
             return;
         }
         if ($this->skipsPatientOtp) {
