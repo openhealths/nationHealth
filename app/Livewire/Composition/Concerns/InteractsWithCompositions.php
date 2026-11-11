@@ -16,20 +16,42 @@ trait InteractsWithCompositions
             return [];
         }
 
-        $details = EHealth::composition()->getById(
+        return $this->fetchCompositionDetails(
             $composition->patientUuid,
             $composition->uuid,
             $composition->episodeOfCareUuid,
-            $composition->encounterUuid
-        )->validate();
+            $composition->encounterUuid,
+            array_filter([
+                'author.value' => $composition->authorUuid,
+                'type.coding.0.code' => $composition->type?->value,
+                'subject.type.coding.0.code' => $composition->prepersonId ? 'preperson' : 'person',
+            ], static fn ($value): bool => $value !== null)
+        );
+    }
 
-        Repository::composition()->assertDocumentContext($details, [
-            'identifier.value' => $composition->uuid,
-            'subject.value' => $composition->patientUuid,
-            'encounter.value' => $composition->encounterUuid,
-            'author.value' => $composition->authorUuid,
-            'type.coding.0.code' => $composition->type->value,
-        ]);
+    /** Search summaries omit author; only validated full details can supply unknown metadata. */
+    protected function fetchCompositionDetails(
+        string $patientUuid,
+        string $compositionUuid,
+        string $episodeUuid,
+        string $encounterUuid,
+        array $knownContext
+    ): array {
+        $details = EHealth::composition()->getById($patientUuid, $compositionUuid, $episodeUuid, $encounterUuid)->validate();
+        $expected = [
+            'identifier.value' => $compositionUuid,
+            'identifier.type.coding.0.code' => 'composition',
+            'subject.value' => $patientUuid,
+            'author.type.coding.0.code' => 'employee',
+            'encounter.value' => $encounterUuid,
+            'encounter.type.coding.0.code' => 'encounter',
+        ] + $knownContext;
+        // The native detail schema may omit episodeOfCare; its request URL always carries the exact episode.
+        if (array_key_exists('episodeOfCare', $details)) {
+            $expected['episodeOfCare.value'] = $episodeUuid;
+            $expected['episodeOfCare.type.coding.0.code'] = 'episode';
+        }
+        Repository::composition()->assertDocumentContext($details, $expected);
 
         return $details;
     }

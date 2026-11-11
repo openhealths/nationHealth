@@ -25,6 +25,7 @@ use App\Services\SignatureService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
@@ -786,12 +787,13 @@ class PatientCompositions extends BasePatientComponent
     /**
      * Upsert compositions returned by the eHealth search into the local DB.
      *
-     * Search rows are merged into the local record, then enriched when read context is available.
+     * Validate all readable details before atomically publishing the search snapshot.
      */
     private function syncLocalCompositions(array $compositions, bool $searchByFocus): void
     {
         $patient = $this->patient();
         $repository = Repository::composition();
+        $validated = [];
 
         foreach ($compositions as $item) {
             if (!is_array($item) || !data_get($item, 'identifier.value')) {
@@ -818,17 +820,38 @@ class PatientCompositions extends BasePatientComponent
                 ];
             }
 
-            $composition = $repository->store(
-                $item,
-                $patient,
-                data_get($item, 'episodeOfCare.value')
-            );
+            // Authorize the prospective resource without storing a partial search row.
+            $composition = $repository->findForPatient($patient, data_get($item, 'identifier.value'))
+                ?? new Composition([
+                    'uuid' => data_get($item, 'identifier.value'),
+                    $patient instanceof Preperson ? 'preperson_id' : 'person_id' => $patient->id,
+                ]);
+            $episodeUuid = data_get($item, 'episodeOfCare.value') ?? $composition->episodeOfCareUuid;
+            $encounterUuid = data_get($item, 'encounter.value') ?? $composition->encounterUuid;
 
-            // Synchronization loads the full record; opening its detail modal stays local.
-            if ($composition?->hasReadContext && Auth::user()->can('view', $composition)) {
-                $repository->store($this->fetchComposition($composition), $patient, $composition->episodeOfCareUuid);
+            // Search remains independently permitted; only readable resources receive full enrichment.
+            if (filled($episodeUuid) && filled($encounterUuid) && Auth::user()->can('view', $composition)) {
+                $item = $this->fetchCompositionDetails(
+                    $this->uuid,
+                    $composition->uuid,
+                    $episodeUuid,
+                    $encounterUuid,
+                    array_filter([
+                        'author.value' => data_get($item, 'author.value') ?? $composition->authorUuid,
+                        'type.coding.0.code' => data_get($item, 'type.coding.0.code') ?? $composition->type?->value,
+                        'subject.type.coding.0.code' => $patient instanceof Preperson ? 'preperson' : 'person',
+                    ], static fn ($value): bool => $value !== null)
+                );
             }
+            $validated[] = [$item, $episodeUuid];
         }
+
+        // A malformed later detail or storage failure must leave every previous local record unchanged.
+        DB::transaction(static function () use ($repository, $patient, $validated): void {
+            foreach ($validated as [$details, $episodeUuid]) {
+                $repository->store($details, $patient, $episodeUuid);
+            }
+        });
     }
 
     /**
