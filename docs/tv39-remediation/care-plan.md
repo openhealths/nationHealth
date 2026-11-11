@@ -1,0 +1,37 @@
+# TV39 care plan and activity remediation (#1196)
+
+Scope: approved edition 39, audit CP01–CP05, A01–A04, CarePlan portions of G01/G02/C01/U01. Base upstream/main `3ae4e34e3631ed4bba711c3b4ab6d96d701e0cc5`. Integration umbrella: #1201. Edition 40 is excluded.
+
+## Implementation plan and evidence ledger
+
+| Audit ID | Implemented change | Automated evidence |
+| --- | --- | --- |
+| CP01 | Include MED_COORDINATOR in eligible plan writers, managers and approval recipients. Resolve only the current user's linked active employees in the current legal entity. | `UserGetCarePlanWriterEmployeeTest`: MED_COORDINATOR selection, matching active healthcare-service role, future start exclusion. |
+| CP02 | Use the exact performing employee of the selected finished encounter, including draft save/reopen/sign. Do not substitute another doctor when the author's role is unavailable. Filter creation encounter choices through the same rule. | Writer tests: another eligible doctor exists, exact MED_COORDINATOR performer selected, inactive performer refused. |
+| CP03 | Add basedOn/partOf choices scoped to the patient and legal entity; preserve references through SQL mapper, draft editing and signing; explicit clearing removes references; show linked UUID/display. | `CarePlanTv39ContractTest::test_plan_relationships_round_trip_and_explicit_clear_survive_draft_reopening`, existing CarePlan mapper tests. |
+| CP04 | Patient search sends encounter UUID, based_on, part_of, period_date, managing_organization_id and explicit lifecycle status; fetches all validated registry pages; adds UI filters and local equivalent queries. | `CarePlanTv39SearchTest`: all six parameters, all pages, no protected detail reads; policy denial produces flash and no persistence. |
+| CP05 | Requisition search returns the permitted identity projection without requiring a local patient or protected detail access. Display surname, initials, age and plan metadata. | Contract tests: identity returned, missing age rejected. Search tests: public registry returned, detail reads never called, denial has no remote side effects. |
+| A01 | Require positive integer service quantities at save and signing. | Four invalid service quantity cases, valid integer case, existing payload repository tests. |
+| A02 | Load the full validated device catalog for program/classification, union multiples of all packaging counts for the same unit, cap by max_daily_count × inclusive period days; reload and enforce immediately before KEP. | Contract tests: pack sizes 2 and 3, inclusive one/two-day caps, reversed/invalid dates, signing accepts the other pack size and refuses quantity 5. DeviceDefinition dependency: 14 contract tests. |
+| A03 | Allow absent activity periods without a program; require both boundaries when a period is supplied; preserve alternate schedules on existing records. | No-program/no-period accepted; partial period refused; existing period/form-default and mapper scenarios. |
+| A04 | Medication activity requires quantity and a MEDICATION program; validate selected program at save and again before KEP. | Missing-program rejection; DEVICE program rejected; MEDICATION program accepted; existing medication payload tests. |
+| G01 | Validate complete CarePlan detail/summary/requisition and Activity resources against the official native response structure before camelCase conversion, persistence, signing snapshot or UI/processing use. Delegating APIs preserve validator registration; device/drug/service reads use validate(). | Full native snapshot equality; malformed nested references, coding systems, dates/RFC3339, histories, quantity and identity rejected; pagination and async submission tests in `CarePlanFhirApiTest`. |
+| G02 | Generate new CarePlan and Activity clinical IDs as RFC4122 UUIDv1; preserve stored IDs during editing. | Actual SQL save/edit writer test asserts version 1 for both new records and unchanged UUID after editing. |
+| C01 | Apply the literal TV39 3.10.4.5.1 prohibition: scheduled, in_progress and completed activities block plan cancellation. Update refusal text to explain all blocked states. | Lifecycle gate test: unfinished and completed block, cancelled final activities allow cancellation; existing linked-document blockers. |
+| U01 (CarePlan) | Re-read the plan and manageActivities policy before every owned activity write; maintain normal session flash denials. Validate the exact linked author and active role before signing. | Search and mutation tests exercise allowed and denied policy paths; denied draft writes have no repository side effects; invalid signing preserves KEP modal, field error and visible session feedback. Verified approval expiry/revocation is supplied by PR #1199 in the umbrella. |
+
+## Contract sources and normative decisions
+
+API rules were transcribed from the locally available official documentation archive dated 2026-10-22: PREPROD Medical Events 9.15.6 / General MIS 9.15.9, `openapi/preprod/medical-events.json`, Care Plan and Care Plan Activity endpoint responses. Required native nested reference identifiers, coding structures, quantity types and RFC3339 timestamps are checked before projection. This is not evidence of a real PREPROD request in this task.
+
+The archive contains explicit spelling inconsistencies: plan cancellation `cencelled` in the response schema versus `cancelled` in the lifecycle, activity reason `oservation` versus `observation`, and plan author `care_team` in the response enum versus `employee` in its response example. The validator accepts those documented spellings only; UUID/types/required fields remain strict. Full plan supporting_info follows the response schema's procedure/diagnostic_report reference types. An undocumented alternative response shape must be reconciled against a verified official contract rather than silently imported.
+
+For C01 the API cancellation rule is less restrictive than approved TV39: it allows final activities, whereas TV39 explicitly also blocks completed activities. This implementation follows the user-selected approved TV39. The deliberate restriction and test must be retained unless the requirement owner approves a different normative interpretation.
+
+## Verification and integration limits
+
+Tests run exclusively against dedicated PostgreSQL database `tv39_1196` with the root-provided guarded bootstrap and install-only schema. No migrations, workers, real SMS or KEP were run against the user's working database. Final automated run: **127 tests / 332 assertions / 0 failures**, including the 14-test shared DeviceDefinition contract dependency. Pint: **28 PHP files passed**. Five changed Blade views compile to valid PHP. The existing PHP 8.5 deprecation is reported separately from assertion failures.
+
+The care-plan show view includes the prescription registry once. That partial and its Livewire state belong to the RX block and must be combined in umbrella #1201 before integrated UI testing. DeviceDefinition response validation is a shared dependency supplied by commit `ccad72b9` (local cherry-pick `78cc135b`). PR #1199 supplies verified approval expiry state and requires careful repository/User conflict resolution.
+
+Manual PMD/SMD/MED_COORDINATOR and medium-staff workspace UAT, real KEP and PREPROD workflows remain integration verification steps. Automated checks do not claim that real external signing or patient confirmation has occurred.

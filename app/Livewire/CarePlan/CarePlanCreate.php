@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan;
 
-use App\Traits\SynchronizesCarePlans;
-use App\Livewire\Concerns\SubmitsClinicalOperations;
-
+use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Classes\eHealth\EHealth;
+
 use App\Core\Arr;
 use App\Enums\CarePlanStatus;
 use App\Enums\CarePlanTermsOfService;
 use App\Enums\Status;
-use App\Enums\User\Role;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\MedicalEvents\ClinicalStorageException;
+use App\Livewire\CarePlan\Concerns\HandlesCarePlanApprovalSms;
 use App\Livewire\CarePlan\Forms\CarePlanForm;
 use App\Livewire\CarePlan\Forms\PatientSearchForm;
+use App\Livewire\Concerns\SubmitsClinicalOperations;
 use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
@@ -25,16 +26,14 @@ use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
-use App\Repositories\Repository;
 use App\Repositories\CarePlanRepository;
-use App\Livewire\CarePlan\Concerns\HandlesCarePlanApprovalSms;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
-use App\Exceptions\MedicalEvents\ClinicalStorageException;
-use App\Services\MedicalEvents\MedicalRequestOwnership;
-use App\Services\MedicalEvents\Fhir;
-use App\Classes\eHealth\Api\Approval as ApprovalApi;
+use App\Repositories\Repository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
+use App\Services\MedicalEvents\Fhir;
+use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Traits\InteractsWithApprovals;
+use App\Traits\SynchronizesCarePlans;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Auth;
@@ -42,19 +41,20 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Livewire\WithFileUploads;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\WithFileUploads;
 use RuntimeException;
 use Throwable;
 
 class CarePlanCreate extends BasePatientComponent
 {
-    use SynchronizesCarePlans;
-    use SubmitsClinicalOperations;
-
-    use WithFileUploads;
-    use InteractsWithApprovals;
     use HandlesCarePlanApprovalSms;
+    use InteractsWithApprovals;
+
+    use SubmitsClinicalOperations;
+    use SynchronizesCarePlans;
+    use WithFileUploads;
 
     public bool $showSignatureModal = false;
     public bool $showMethodSelectionModal = false;
@@ -120,7 +120,7 @@ class CarePlanCreate extends BasePatientComponent
 
         if ($person !== null && $encounterRouteParam) {
             abort_unless($resolvedEncounter !== null && (int) $resolvedEncounter->person_id === $person->id, 404);
-            $this->authorize('view', [$resolvedEncounter, $person]);
+            abort_if(Auth::user()->cannot('view', [$resolvedEncounter, $person]), 404);
         }
 
         // If personId was passed, use it, unless it was sequential mapping of encounter
@@ -286,13 +286,26 @@ class CarePlanCreate extends BasePatientComponent
 
     protected function refreshAuthorDisplay(): void
     {
-        $employee = Auth::user()?->getCarePlanWriterEmployee($this->form->termsOfService ?: null);
-        if ($employee) {
-            $party = $employee->party;
-            $this->form->author = implode(' ', array_filter([
-                $party?->last_name, $party?->first_name, $party?->second_name,
-            ]));
+        $this->form->author = '';
+        try {
+            $employee = Repository::carePlan()->creationAuthorForEncounter($this->form->encounter, $this->personId);
+            $this->form->author = $employee->party?->fullName ?? '';
+        } catch (ValidationException) {
+            // The form keeps its selected encounter so the user sees the validation error.
         }
+    }
+
+    protected function validateAuthorAndRelationships(): void
+    {
+        $repository = Repository::carePlan();
+        $repository->creationAuthorForEncounter($this->form->encounter, $this->personId);
+        $repository->assertRelatedPlans($this->form->toArray(), $this->personId, $this instanceof CarePlanUpdate ? $this->carePlan->id : null);
+    }
+
+    #[Computed]
+    public function relatedCarePlanChoices(): array
+    {
+        return Repository::carePlan()->relatedPlanChoices($this->personId, $this instanceof CarePlanUpdate ? $this->carePlan->id : null);
     }
 
     private function loadDoctorsAndDictionaries(): void
@@ -684,6 +697,7 @@ class CarePlanCreate extends BasePatientComponent
         try {
             $this->synchronizeSystemFields();
             $this->form->validate();
+            $this->validateAuthorAndRelationships();
         } catch (ValidationException $exception) {
             $this->handleValidationFailed($exception);
 
@@ -698,7 +712,7 @@ class CarePlanCreate extends BasePatientComponent
             $repository->assertFhirStorageReady();
             $carePlan = $repository->create([
                 'person_id' => $this->resolvePersonId(),
-                'author_id' => Auth::user()?->getCarePlanWriterEmployee($this->form->termsOfService ?: null)?->id,
+                'author_id' => Repository::carePlan()->creationAuthorForEncounter($this->form->encounter, $this->personId)->id,
                 'legal_entity_id' => $legalEntity?->id,
                 'status' => CarePlanStatus::DRAFT->value,
                 'category' => $this->form->category,
@@ -716,6 +730,8 @@ class CarePlanCreate extends BasePatientComponent
                     'episodes' => $this->form->episodes,
                     'medical_records' => $this->form->medicalRecords,
                 ],
+                'based_on' => $this->form->basedOn ?: null,
+                'part_of' => $this->form->partOf ?: null,
                 'description' => $this->form->description ?: null,
                 'note' => $this->form->note ?: null,
                 'inform_with' => $this->form->informWith ?: null,
@@ -752,7 +768,7 @@ class CarePlanCreate extends BasePatientComponent
 
     protected function loadAvailableEncounters(): void
     {
-        $this->availableEncounters = $this->personId ? Repository::carePlan()->encounterChoices($this->personId) : [];
+        $this->availableEncounters = $this->personId ? Repository::carePlan()->encounterChoices($this->personId, forCreation: true) : [];
     }
 
     public function updatedFormEncounter($value): void
@@ -839,12 +855,21 @@ class CarePlanCreate extends BasePatientComponent
     {
         try {
             if ($this instanceof CarePlanUpdate) {
-                $this->authorize('update', $this->carePlan);
+                if (Auth::user()->cannot('update', $this->carePlan)) {
+                    Session::flash('error', __('care-plan.no_permission_update'));
+
+                    return;
+                }
             } else {
-                $this->authorize('create', CarePlan::class);
+                if (Auth::user()->cannot('create', CarePlan::class)) {
+                    Session::flash('error', __('care-plan.no_permission_create'));
+
+                    return;
+                }
             }
             $this->synchronizeSystemFields();
             $this->form->validate();
+            $this->validateAuthorAndRelationships();
             $this->validateCategoryForSigning();
         } catch (ValidationException $exception) {
             $this->handleValidationFailed($exception);
@@ -924,9 +949,10 @@ class CarePlanCreate extends BasePatientComponent
         try {
             $this->synchronizeSystemFields();
             $this->form->validate($this->form->rulesForSigning());
+            $this->validateAuthorAndRelationships();
             $this->validateCategoryForSigning();
         } catch (ValidationException $exception) {
-            $this->handleValidationFailed($exception, closeModal: true);
+            $this->handleValidationFailed($exception);
 
             return;
         }
@@ -939,21 +965,8 @@ class CarePlanCreate extends BasePatientComponent
             }
 
             $termsOfService = $this->form->termsOfService;
-            $author = Auth::user()?->getCarePlanWriterEmployee($termsOfService);
+            $author = $repository->creationAuthorForEncounter($this->form->encounter, $this->personId);
             $this->logCarePlanAuthorRoleDebug($author, $termsOfService);
-
-            if ($author && !$this->authorHasActiveRoleForTermsOfService($author, $termsOfService)) {
-                // Not a hard block: getCarePlanWriterEmployee() already tried its best to find a
-                // matching employee and fell back to this one. We still submit so eHealth remains
-                // the single source of truth for the "Employee does not have active role..." rule,
-                // but we log loudly here so the real cause is obvious without digging through the
-                // raw eHealth request/response.
-                Log::warning('[CarePlan] submitting with author lacking a matching active role for terms_of_service', [
-                    'author_uuid' => $author->uuid,
-                    'author_position' => $author->position,
-                    'terms_of_service' => $termsOfService,
-                ]);
-            }
 
             $repository->assertFhirStorageReady(beforeSubmission: true);
             $mapping = $repository->formContext(array_replace($this->form->toArray(), [

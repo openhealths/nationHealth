@@ -4,20 +4,27 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
-use Tests\TestCase;
 use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
 use App\Classes\eHealth\Api\CarePlanActivity as ActivityApi;
-use App\Models\CarePlan;
+use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
-use App\Repositories\CarePlanActivityRepository;
-use App\Services\MedicalEvents\EHealthJobResolver;
+use App\Core\EHealthJob;
 use App\Exceptions\EHealth\EHealthResponseException;
+use App\Jobs\CarePlanFullSync;
+use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
+use App\Livewire\CarePlan\Forms\CarePlanForm;
+use App\Models\CarePlan;
+use App\Models\LegalEntity;
+use App\Repositories\CarePlanActivityRepository;
+use App\Repositories\CarePlanRepository;
+use App\Services\MedicalEvents\EHealthJobResolver;
+use App\Traits\SynchronizesCarePlans;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Mockery;
-use App\Classes\eHealth\EHealthResponse;
-use App\Jobs\CarePlanFullSync;
-use App\Models\LegalEntity;
+use RuntimeException;
+use Tests\TestCase;
 
 class CarePlanFhirApiTest extends TestCase
 {
@@ -33,7 +40,7 @@ class CarePlanFhirApiTest extends TestCase
         $plan = $this->fixture('plan');
         $plan['status'] = 'draft';
         $plan['requisition'] = 'server-number';
-        $actual = \App\Livewire\CarePlan\Forms\CarePlanForm::buildCreateContent($plan);
+        $actual = CarePlanForm::buildCreateContent($plan);
 
         $this->assertSame('new', $actual['status']);
         $this->assertSame('order', $actual['intent']);
@@ -46,7 +53,7 @@ class CarePlanFhirApiTest extends TestCase
     public function test_activity_create_keeps_false_and_fractional_numbers_but_not_remote_remainder(): void
     {
         $activity = $this->fixture('activity');
-        $actual = \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCreateContent($activity);
+        $actual = CarePlanActivityForm::buildCreateContent($activity);
 
         $this->assertSame(1.2345, $actual['detail']['quantity']['value']);
         $this->assertFalse($actual['detail']['do_not_perform']);
@@ -62,7 +69,7 @@ class CarePlanFhirApiTest extends TestCase
         $activity['detail']['kind'] = 'device_request';
         $activity['detail']['quantity'] = ['value' => 1.0, 'system' => 'device_unit', 'code' => 'piece'];
         $activity['detail']['dailyAmount']['value'] = 0.5;
-        $actual = \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCreateContent($activity);
+        $actual = CarePlanActivityForm::buildCreateContent($activity);
         $decoded = json_decode(json_encode($actual, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), true, flags: JSON_THROW_ON_ERROR);
 
         $this->assertSame(1, $decoded['detail']['quantity']['value']);
@@ -76,9 +83,9 @@ class CarePlanFhirApiTest extends TestCase
         $activity['detail']['kind'] = 'device_request';
         $activity['detail']['quantity']['value'] = 1.5;
         try {
-            \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCreateContent($activity);
+            CarePlanActivityForm::buildCreateContent($activity);
             $this->fail('Fractional device quantities must not be truncated.');
-        } catch (\Illuminate\Validation\ValidationException $exception) {
+        } catch (ValidationException $exception) {
             $this->assertArrayHasKey('quantity.value', $exception->errors());
         }
     }
@@ -89,7 +96,7 @@ class CarePlanFhirApiTest extends TestCase
         $snapshot['inserted_at'] = '2026-10-19T10:20:30.123Z';
         $snapshot['remote_extension'] = ['false' => false, 'zero' => 0, 'empty' => []];
         $reason = ['coding' => [['system' => 'eHealth/care_plan_activity_cancel_reasons', 'code' => 'TEST']]];
-        $actual = \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCancelContent($snapshot, $reason);
+        $actual = CarePlanActivityForm::buildCancelContent($snapshot, $reason);
         $this->assertSame($reason, $actual['detail']['status_reason']);
         unset($actual['detail']['status_reason']);
         $this->assertSame($snapshot, $actual);
@@ -97,7 +104,7 @@ class CarePlanFhirApiTest extends TestCase
 
         $plan = Arr::toSnakeCase($this->fixture('plan'));
         $plan['activities'] = [$snapshot];
-        $actualPlan = \App\Livewire\CarePlan\Forms\CarePlanForm::buildCancelContent($plan, $reason);
+        $actualPlan = CarePlanForm::buildCancelContent($plan, $reason);
         unset($plan['activities']);
         $plan['status_reason'] = $reason;
         $this->assertSame($plan, $actualPlan);
@@ -108,7 +115,7 @@ class CarePlanFhirApiTest extends TestCase
         $reason = ['coding' => [['system' => 'eHealth/care_plan_activity_complete_reasons', 'code' => 'TEST']]];
         $outcomes = [['coding' => [['system' => 'eHealth/care_plan_activity_outcomes', 'code' => 'TEST']]]];
 
-        $this->assertSame(['detail' => ['status_reason' => $reason], 'outcome_codeable_concept' => $outcomes], \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCompleteContent($reason, $outcomes));
+        $this->assertSame(['detail' => ['status_reason' => $reason], 'outcome_codeable_concept' => $outcomes], CarePlanActivityForm::buildCompleteContent($reason, $outcomes));
     }
 
     public function test_signed_content_is_submitted_unchanged_without_polling_the_job(): void
@@ -134,7 +141,7 @@ class CarePlanFhirApiTest extends TestCase
                 parse_str(parse_url($request->url(), PHP_URL_QUERY) ?? '', $query);
                 $id = (int) $query['page'] === 1 ? $fixture['id'] : $secondId;
 
-                return Http::response(['data' => [['id' => $id]], 'paging' => ['total_pages' => 2]]);
+                return Http::response(['data' => [Arr::toSnakeCase(array_replace($fixture, ['id' => $id]))], 'paging' => ['total_pages' => 2]]);
             }
             $resource = $fixture;
             $resource['id'] = basename($path);
@@ -158,7 +165,7 @@ class CarePlanFhirApiTest extends TestCase
                 return Http::response(['error' => ['message' => 'Synthetic outage']], 503);
             }
             if (str_ends_with(parse_url($request->url(), PHP_URL_PATH), '/activities')) {
-                return Http::response(['data' => [['id' => $fixture['id']]], 'paging' => ['total_pages' => 2]]);
+                return Http::response(['data' => [Arr::toSnakeCase($fixture)], 'paging' => ['total_pages' => 2]]);
             }
 
             return Http::response(['data' => Arr::toSnakeCase($fixture)]);
@@ -184,7 +191,21 @@ class CarePlanFhirApiTest extends TestCase
 
     private function fixture(string $name): array
     {
-        return json_decode(file_get_contents(base_path('tests/Fixtures/CarePlan/'.$name.'.json')), true, flags: JSON_THROW_ON_ERROR);
+        $resource = json_decode(file_get_contents(base_path('tests/Fixtures/CarePlan/'.$name.'.json')), true, flags: JSON_THROW_ON_ERROR);
+        $reference = static fn (string $type, string $value): array => ['identifier' => ['type' => ['coding' => [['system' => 'eHealth/resources', 'code' => $type]]], 'value' => $value]];
+        $resource['insertedAt'] = $resource['updatedAt'] = '2026-10-19T10:20:30Z';
+        $resource['insertedBy'] = $resource['updatedBy'] = '47ee824a-eb47-48ef-8d30-1109e3c89f0c';
+        if ($name === 'activity') {
+            $resource['detail']['program'] = $reference('medical_program', '4eddd5ce-c39a-40c2-a2c7-5ee5e7e820ee');
+        } else {
+            unset($resource['period']['end']);
+            $resource['requisition'] = '1111-2222-3333-4444';
+            $resource['subject'] = $reference('person', '4eddd5ce-c39a-40c2-a2c7-5ee5e7e820ee');
+            $resource['managingOrganization'] = $reference('legal_entity', '346aad58-6164-4e32-98b5-d178cbf850db') + ['displayValue' => 'Synthetic clinic'];
+            $resource['statusHistory'] = [['status' => 'new', 'insertedAt' => $resource['insertedAt'], 'insertedBy' => $resource['insertedBy']]];
+        }
+
+        return $resource;
     }
 
     public function test_list_validation_returns_normalized_fields_without_discarding_metadata(): void
@@ -202,7 +223,7 @@ class CarePlanFhirApiTest extends TestCase
     {
         $plan = $this->fixture('plan');
         $plan['managingOrganization'] = [
-            'identifier' => ['value' => '346aad58-6164-4e32-98b5-d178cbf850db'],
+            'identifier' => ['type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'legal_entity']]], 'value' => '346aad58-6164-4e32-98b5-d178cbf850db'],
             'displayValue' => 'Synthetic clinic',
         ];
         Http::fake(['*' => Http::response(['data' => [Arr::toSnakeCase($plan)]])]);
@@ -231,10 +252,10 @@ class CarePlanFhirApiTest extends TestCase
         $empty->shouldReceive('getPaging')->once()->andReturn(['total_pages' => 1]);
         $activities->shouldReceive('getSummary')->once()->with('patient-test', $plan['id'], ['page' => 1])->andReturn($empty);
         $this->instance(ActivityApi::class, $activities);
-        $repository = Mockery::mock(\App\Repositories\CarePlanRepository::class);
+        $repository = Mockery::mock(CarePlanRepository::class);
         $repository->shouldReceive('resolvePatientContext')->once()->andReturn(['id' => 1, 'uuid' => 'patient-test']);
         $repository->shouldReceive('storeAggregate')->once()->with($plan, [], 1, 2);
-        $this->instance(\App\Repositories\CarePlanRepository::class, $repository);
+        $this->instance(CarePlanRepository::class, $repository);
         $this->instance(CarePlanApi::class, $api);
         $legalEntity = new LegalEntity();
         $legalEntity->id = 2;
@@ -258,9 +279,9 @@ class CarePlanFhirApiTest extends TestCase
         $ids = [$this->fixture('plan')['id'], '7a78997f-3b7b-4b7b-b1b1-40dd57ad982a'];
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn(array_map(static fn ($id): array => ['id' => $id], $ids));
-        $repository = Mockery::mock(\App\Repositories\CarePlanRepository::class);
+        $repository = Mockery::mock(CarePlanRepository::class);
         $repository->shouldReceive('storeSummaries')->once()->with(array_map(static fn ($id): array => ['id' => $id], $ids), 1, 2);
-        $this->instance(\App\Repositories\CarePlanRepository::class, $repository);
+        $this->instance(CarePlanRepository::class, $repository);
         $api = Mockery::mock(CarePlanApi::class);
         $api->shouldNotReceive('getDetails');
         $this->instance(CarePlanApi::class, $api);
@@ -274,7 +295,7 @@ class CarePlanFhirApiTest extends TestCase
                 $this->processResponse($response);
             }
 
-            public function nextJob(): ?\App\Core\EHealthJob
+            public function nextJob(): ?EHealthJob
             {
                 return $this->getNextEntityJob();
             }
@@ -286,7 +307,7 @@ class CarePlanFhirApiTest extends TestCase
         $this->assertSame($ids, array_map(static fn ($child): ?string => $child->resourceUuid, $batch->added));
         $this->assertTrue($batch->added[0]->standalone);
         $this->assertNull($job->nextJob());
-        $job->failed(new \RuntimeException('Synthetic failure'));
+        $job->failed(new RuntimeException('Synthetic failure'));
     }
 
     private function fakeApi(string $class): CarePlanApi|ActivityApi
@@ -326,7 +347,7 @@ class CarePlanFhirSynchronizationHarness
         fetchActivityCancelSnapshot as public;
     }
 
-    use \App\Traits\SynchronizesCarePlans {
+    use SynchronizesCarePlans {
         synchronizeResources as public;
         synchronizeSearch as public;
         fetchAllActivityResources as public;

@@ -300,7 +300,7 @@ abstract class CarePlanComponent extends Component
     public function hydrate(): void
     {
         if (isset($this->carePlan)) {
-            $this->authorize('view', $this->carePlan);
+            abort_if(Auth::user()->cannot('view', $this->carePlan), 404);
             $this->carePlan = Repository::carePlan()->findById($this->carePlan->id);
             if (property_exists($this, 'activity') && isset($this->activity)) {
                 $this->activity = $this->ownedActivity($this->activity->id);
@@ -329,7 +329,11 @@ abstract class CarePlanComponent extends Component
 
     protected function authorizeCarePlanWrite(): void
     {
-        $this->authorize('manage', $this->carePlan);
+        if (Auth::user()->cannot('manage', $this->carePlan)) {
+            $message = __('care-plan.no_permission_update');
+            Session::flash('error', $message);
+            throw ValidationException::withMessages(['carePlan' => $message]);
+        }
         if ($this->carePlan->requiresFhirImport()) {
             $message = __($this->carePlan->status === CarePlanStatus::DRAFT->value ? 'care-plan.draft_backfill_required' : 'care-plan.full_sync_required');
             Session::flash('error', $message);
@@ -349,7 +353,7 @@ abstract class CarePlanComponent extends Component
 
     protected function bootCarePlan(CarePlan $carePlan): void
     {
-        $this->authorize('view', $carePlan);
+        abort_if(Auth::user()->cannot('view', $carePlan), 404);
 
         $this->carePlan = Repository::carePlan()->findById($carePlan->id);
 
@@ -647,7 +651,9 @@ abstract class CarePlanComponent extends Component
     {
         $this->authorizeCarePlanWrite();
         if (in_array($actionType, ['sign_activity', 'cancel_activity', 'complete_activity'], true)) {
-            $this->authorizeCarePlanActivityWrite();
+            if (!$this->authorizeCarePlanActivityWrite()) {
+                return;
+            }
         }
         if ($this->guardTerminalCarePlanMutation()) {
             return;

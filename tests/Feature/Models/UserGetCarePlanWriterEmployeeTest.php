@@ -5,20 +5,30 @@ declare(strict_types=1);
 namespace Tests\Feature\Models;
 
 use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
+use App\Enums\Person\EncounterStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
+use App\Models\CarePlan;
 use App\Models\Division;
 use App\Models\Employee\Employee;
 use App\Models\EmployeeRole;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\User;
+use App\Repositories\CarePlanRepository;
+use App\Repositories\Repository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Mockery;
+use Ramsey\Uuid\Uuid;
 use Tests\TestCase;
 
 class UserGetCarePlanWriterEmployeeTest extends TestCase
@@ -30,18 +40,6 @@ class UserGetCarePlanWriterEmployeeTest extends TestCase
     private Division $division;
 
     private User $user;
-
-    protected function migrateDatabases()
-    {
-        $this->artisan('migrate:fresh', [
-            '--path' => [
-                database_path('migrations'),
-                database_path('migrations/install'),
-                database_path('migrations/update/0_1'),
-            ],
-            '--realpath' => true,
-        ]);
-    }
 
     protected function setUp(): void
     {
@@ -167,19 +165,17 @@ class UserGetCarePlanWriterEmployeeTest extends TestCase
         $this->assertNotSame($therapist->id, $result->id);
     }
 
-    public function test_it_falls_back_to_role_priority_when_no_employee_matches_terms_of_service(): void
+    public function test_it_rejects_when_no_employee_matches_terms_of_service(): void
     {
         $doctor = $this->createEmployee('P1', Role::DOCTOR->value);
 
         $healthcareService = $this->createHealthcareService('ENDOCRINOLOGY', 'INPATIENT');
         $this->createActiveRole($doctor, $healthcareService);
 
-        // Requesting OUTPATIENT while the only role available is INPATIENT: no exact match,
-        // must still fall back to a candidate instead of returning null.
+        // A writer without the required healthcare-service role must not be substituted.
         $result = $this->user->getCarePlanWriterEmployee('OUTPATIENT');
 
-        $this->assertNotNull($result);
-        $this->assertSame($doctor->id, $result->id);
+        $this->assertNull($result);
     }
 
     public function test_it_ignores_inactive_roles_when_matching_terms_of_service(): void
@@ -193,7 +189,84 @@ class UserGetCarePlanWriterEmployeeTest extends TestCase
 
         $result = $this->user->getCarePlanWriterEmployee('INPATIENT');
 
-        $this->assertNotNull($result);
-        $this->assertSame($doctor->id, $result->id);
+        $this->assertNull($result);
     }
+
+    public function test_medical_coordinator_can_write_with_a_matching_active_role(): void
+    {
+        $employee = $this->createEmployee('P1', Role::MED_COORDINATOR->value);
+        $this->createActiveRole($employee, $this->createHealthcareService('THERAPY', 'OUTPATIENT'));
+
+        $this->assertSame($employee->id, $this->user->getCarePlanWriterEmployee('OUTPATIENT', $employee->uuid)?->id);
+    }
+
+    public function test_selected_encounter_author_is_never_replaced_by_another_matching_employee(): void
+    {
+        $other = $this->createEmployee('P1', Role::DOCTOR->value);
+        $author = $this->createEmployee('P2', Role::SPECIALIST->value);
+        $service = $this->createHealthcareService('THERAPY', 'OUTPATIENT');
+        $this->createActiveRole($other, $service);
+        $this->createActiveRole($author, $service);
+
+        $this->assertSame($author->id, $this->user->getCarePlanWriterEmployee('OUTPATIENT', $author->uuid)?->id);
+        $this->assertNull($this->user->getCarePlanWriterEmployee('OUTPATIENT', (string) Str::uuid()));
+        $author->update(['is_active' => false]);
+        $this->assertNull($this->user->getCarePlanWriterEmployee('OUTPATIENT', $author->uuid));
+    }
+
+    public function test_unlinked_employee_of_the_same_party_is_not_a_writer(): void
+    {
+        $author = $this->createEmployee('P1', Role::DOCTOR->value);
+        $this->createActiveRole($author, $this->createHealthcareService('THERAPY', 'OUTPATIENT'));
+        $this->user->employees()->detach($author->id);
+        $author->update(['user_id' => null]);
+
+        $this->assertNull($this->user->getCarePlanWriterEmployee('OUTPATIENT', $author->uuid));
+    }
+    public function test_future_employee_start_date_is_not_an_active_care_plan_writer(): void
+    {
+        $employee = $this->createEmployee('P103', 'MED_COORDINATOR');
+        $employee->update(['start_date' => now()->addDay()->toDateString()]);
+        $this->assertNull($this->user->getCarePlanWriterEmployee());
+    }
+
+    public function test_creation_author_is_the_selected_finished_encounter_performer(): void
+    {
+        $this->createEmployee('P1', 'DOCTOR');
+        $author = $this->createEmployee('P103', 'MED_COORDINATOR');
+        $service = $this->createHealthcareService('SPECIALITY', 'OUTPATIENT');
+        $this->createActiveRole($author, $service);
+        $this->actingAs($this->user);
+        $encounter = new Encounter(['uuid' => (string) Str::uuid(), 'status' => EncounterStatus::FINISHED->value]);
+        $encounter->setRelation('performer', new Identifier(['value' => $author->uuid]));
+        $encounter->setRelation('class', null);
+        $repository = Mockery::mock(CarePlanRepository::class, [new CarePlan()])->makePartial();
+        $repository->shouldReceive('findEncounter')->with($encounter->uuid, 1)->andReturn($encounter);
+        $this->assertSame($author->uuid, $repository->creationAuthorForEncounter($encounter->uuid, 1)->uuid);
+        $author->update(['is_active' => false]);
+        $this->expectException(ValidationException::class);
+        $repository->creationAuthorForEncounter($encounter->uuid, 1);
+    }
+
+    public function test_draft_clinical_ids_are_v1_and_persist_after_reopening(): void
+    {
+        $person = Person::create(['uuid' => (string) Str::uuid(), 'gender' => 'FEMALE', 'birth_date' => '1990-01-01', 'status' => 'ACTIVE']);
+        $author = $this->createEmployee('P1', 'DOCTOR');
+        $plan = Repository::carePlan()->saveForm([
+            'title' => 'Synthetic plan', 'status' => 'draft', 'category' => 'TEST',
+            'termsOfService' => 'OUTPATIENT', 'author' => $author->uuid,
+            'periodStart' => '2026-11-11', 'periodEnd' => '2026-11-12',
+        ], $person->id, $this->legalEntity->id);
+        $this->assertSame(1, Uuid::fromString($plan->uuid)->getFields()->getVersion());
+        $reopened = Repository::carePlan()->saveForm(['title' => 'Changed title'], $person->id, $this->legalEntity->id, $plan->id);
+        $this->assertSame($plan->uuid, $reopened->uuid);
+        $activity = Repository::carePlanActivity()->saveForm([
+            'kind' => 'service_request', 'status' => 'draft', 'authorId' => $author->id,
+            'productReference' => (string) Str::uuid(), 'quantity' => 2,
+        ], $plan);
+        $this->assertSame(1, Uuid::fromString($activity->uuid)->getFields()->getVersion());
+        $updated = Repository::carePlanActivity()->saveForm(['quantity' => 3], $plan, $activity->id);
+        $this->assertSame($activity->uuid, $updated->uuid);
+    }
+
 }

@@ -3,17 +3,25 @@
 
     <div class="form-row-2">
         <div class="form-group group">
-            <select id="based_on" name="based_on" class="input-select peer" wire:model="form.based_on">
+            <select id="based_on" name="based_on" class="input-select peer" wire:model="form.basedOn">
                 <option value="">{{ __('care-plan.choose_care_plan') }}</option>
+                @foreach($this->relatedCarePlanChoices as $plan)
+                    <option value="{{ $plan['uuid'] }}">{{ $plan['label'] }}</option>
+                @endforeach
             </select>
             <label for="based_on" class="label"> {{ __('care-plan.based_care_plan') }} </label>
+            @error('form.basedOn')<p class="text-error">{{ $message }}</p>@enderror
         </div>
 
         <div class="form-group group">
-            <select id="part_of" name="part_of" class="input-select peer" wire:model="form.part_of">
+            <select id="part_of" name="part_of" class="input-select peer" wire:model="form.partOf">
                 <option value="">{{ __('care-plan.choose_care_plan') }}</option>
+                @foreach($this->relatedCarePlanChoices as $plan)
+                    <option value="{{ $plan['uuid'] }}">{{ $plan['label'] }}</option>
+                @endforeach
             </select>
             <label for="part_of" class="label"> {{ __('care-plan.part_care_plan') }} </label>
+            @error('form.partOf')<p class="text-error">{{ $message }}</p>@enderror
         </div>
     </div>
 
