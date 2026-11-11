@@ -230,7 +230,7 @@ class MedicationProgramFlowComparisonTest extends TestCase
     public function test_form_offers_the_default_and_keeps_search_enabled_when_the_program_dictionary_is_empty(): void
     {
         $html = view('livewire.encounter-package.parts.encounter-eprescription-form', [
-            'encounterReturnUrl' => '/dashboard/1/persons/1/encounter/21',
+            'encounterReturnUrl' => '/dashboard/1/persons/1/encounters/21/package',
             'showEncounterEPrescriptionDrawer' => true,
             'encounterEPrescriptionRequestIdToSign' => null,
             'encounterUuid' => 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',

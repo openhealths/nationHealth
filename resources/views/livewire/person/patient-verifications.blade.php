@@ -1,4 +1,5 @@
-@use('App\Enums\Person\{Gender, VerificationStatus}')
+@use('App\Enums\Person\Gender')
+@use('App\Enums\Person\VerificationStatus')
 @use('App\Livewire\Person\PatientVerifications')
 @use('App\Models\DeclarationRequest')
 @use('App\Models\MedicalEvents\Sql\{DiagnosticReport, Encounter, Episode, Procedure}')
@@ -178,7 +179,7 @@
 
                                     @can('create', Encounter::class)
                                         <a
-                                            href="{{ route('encounter.create', [legalEntity(), 'person' => $person->id]) }}"
+                                            href="{{ route('persons.encounters.create', [legalEntity(), 'person' => $person->id]) }}"
                                             class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800"
                                         >
                                             @icon('plus', 'w-4 h-4 text-blue-600')

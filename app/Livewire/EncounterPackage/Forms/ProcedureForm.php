@@ -63,6 +63,18 @@ class ProcedureForm extends Form
         return $attributes;
     }
 
+    /**
+     * Get the records the procedures refer to as their reasons.
+     *
+     * @return array
+     */
+    public function referencedRecords(): array
+    {
+        return collect($this->procedures)
+            ->flatMap(static fn (array $procedure): array => $procedure['reasonReferences'] ?? [])
+            ->all();
+    }
+
     protected function rules(): array
     {
         // A complication is picked among the conditions of the same package

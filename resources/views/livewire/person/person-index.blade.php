@@ -1,7 +1,8 @@
 @use('App\Models\MedicalEvents\Sql\{DiagnosticReport, Encounter, Episode, Procedure}')
 @use('App\Models\DeclarationRequest')
 @use('App\Models\Person\{Person, PersonRequest}')
-@use('App\Enums\Person\{Status, Gender}')
+@use('App\Enums\Person\Status')
+@use('App\Enums\Person\Gender')
 
 <div>
     <section>
@@ -122,7 +123,7 @@
 
                                 @can('create', Encounter::class)
                                     <button
-                                        wire:click="redirectTo('{{ $patient['id'] }}', 'encounter.create')"
+                                        wire:click="redirectTo('{{ $patient['id'] }}', 'persons.encounters.create')"
                                         class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800"
                                         type="button"
                                     >
@@ -353,7 +354,7 @@
 
                                                         @can('create', Encounter::class)
                                                             <a
-                                                                wire:click="redirectTo('{{ $patient['id'] }}', 'encounter.create', { type: 'discharge' })"
+                                                                wire:click="redirectTo('{{ $patient['id'] }}', 'persons.encounters.create', { type: 'discharge' })"
                                                                 class="dropdown-item"
                                                                 @click="close($refs.button)"
                                                             >
@@ -364,7 +365,7 @@
 
                                                         @can('create', Encounter::class)
                                                             <a
-                                                                wire:click="redirectTo('{{ $patient['id'] }}', 'encounter.create', { type: 'hospitalization_refusal' })"
+                                                                wire:click="redirectTo('{{ $patient['id'] }}', 'persons.encounters.create', { type: 'hospitalization_refusal' })"
                                                                 class="dropdown-item"
                                                                 @click="close($refs.button)"
                                                             >

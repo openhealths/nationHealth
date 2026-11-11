@@ -8,11 +8,13 @@ use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Person\Records\BasePatientComponent;
+use App\Models\Icd10;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\Fhir;
 use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
@@ -124,10 +126,69 @@ class ClinicalImpressionView extends BasePatientComponent
             ->firstOrFail();
     }
 
+    /**
+     * Name the referenced records by their codes, the way the encounter package lists them. A record not stored
+     * locally has no code, so it is named by its UUID.
+     *
+     * @param  array  $records  Problems, findings or supporting info with their dates and codes
+     * @return array
+     */
+    protected function namedRecords(array $records): array
+    {
+        $codedRecords = collect($records)->map(static fn (array $record): array => [
+            ...$record,
+            'code' => $record['codeCode'] ?? $record['code'] ?? null
+        ]);
+
+        $codeSystems = $codedRecords->pluck('codeSystem')->filter()->unique()->values()->all();
+
+        // ICD-10 AM codes are kept in their own table rather than among the dictionaries
+        $descriptions = dictionary()->basics()
+            ->getMultipleFormatted(array_diff($codeSystems, ['eHealth/ICD10_AM/condition_codes']), onlyActive: false)
+            ->toArray();
+        $descriptions['eHealth/ICD10_AM/condition_codes'] = Icd10::whereIn(
+            'code',
+            $codedRecords->where('codeSystem', 'eHealth/ICD10_AM/condition_codes')->pluck('code')->filter()
+        )->pluck('description', 'code')->all();
+
+        // The classifiers are nested, so the codes are looked up among the child values as well
+        if (in_array('eHealth/ICF/classifiers', $codeSystems, true)) {
+            $descriptions['eHealth/ICF/classifiers'] = dictionary()->basics()
+                ->byName('eHealth/ICF/classifiers', false)
+                ->flattenedChildValues()
+                ->toArray();
+        }
+
+        // Procedures and diagnostic reports are coded by the service they provide
+        $services = $codedRecords->whereIn('type', ['procedure', 'diagnostic_report'])->isNotEmpty()
+            ? dictionary()->services()->flattened()
+            : collect();
+
+        return $codedRecords->map(static function (array $record) use ($descriptions, $services): array {
+            $service = $services->firstWhere('id', $record['code']);
+            $description = $descriptions[$record['codeSystem'] ?? ''][$record['code'] ?? ''] ?? null;
+
+            return [
+                ...$record,
+                'name' => match (true) {
+                    $service !== null => "{$service['code']} / {$service['name']}",
+                    $description !== null => "{$record['code']} - {$description}",
+                    default => $record['code'] ?? ($record['id'] ?? ($record['uuid'] ?? '-'))
+                }
+            ];
+        })->all();
+    }
+
     public function render(): View
     {
+        $clinicalImpression = $this->clinicalImpression();
+        $references = Fhir::encounterPackageLoader()->clinicalImpressionsFromFhir([$clinicalImpression->toArray()])[0];
+
         return view('livewire.clinical-impression.clinical-impression-view')->with([
-            'clinicalImpression' => $this->clinicalImpression()
+            'clinicalImpression' => $clinicalImpression,
+            'problems' => $this->namedRecords($references['problems']),
+            'findings' => $this->namedRecords($references['findings']),
+            'supportingInfo' => $this->namedRecords($references['supportingInfo'])
         ]);
     }
 }

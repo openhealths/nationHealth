@@ -40,9 +40,11 @@
                             x-text="
                                 (() => {
                                     const dictName =
+                                        $wire.dictionaries['eHealth/ICD10_AM/condition_codes']?.[supporting.code] ||
                                         $wire.dictionaries['eHealth/LOINC/observation_codes'][supporting.code] ||
                                         $wire.dictionaries['eHealth/ICF/classifiers'][supporting.code] ||
                                         $wire.dictionaries['eHealth/ICPC2/condition_codes'][supporting.code] ||
+                                        $wire.dictionaries['eHealth/custom/observation_codes']?.[supporting.code] ||
                                         supporting.description;
 
                                     if (dictName) {

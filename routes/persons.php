@@ -206,11 +206,11 @@ Route::prefix('persons')->whereNumber('person')
                     ->name('clinical-impressions.view');
                 Route::get('/encounters', EncounterIndex::class)
                     ->can('viewAny', Encounter::class)
-                    ->name('encounters');
+                    ->name('encounters.index');
                 Route::get('/encounters/{encounter}', EncounterView::class)
                     ->can('view', ['encounter', 'person'])
                     ->whereNumber('encounter')
-                    ->name('encounters.view');
+                    ->name('encounters.show');
                 Route::get('/procedures', ProcedureIndex::class)
                     ->can('viewAny', Procedure::class)
                     ->name('procedures');
@@ -269,33 +269,32 @@ Route::prefix('persons')->whereNumber('person')
                 ->whereNumber('declarationRequest');
         });
 
-        Route::get('/{person}/encounter/{encounter}/care-plan/create', CarePlanCreate::class)
-            ->can('create', CarePlan::class)
-            ->whereNumber('encounter')
-            ->name('care-plans.create-by-encounter');
-
-        Route::prefix('{person}')->name('encounter.')->group(function () {
-            Route::get('/encounter/{encounter}/eprescription/create', EncounterEPrescriptionCreate::class)
+        Route::prefix('{person}')->name('persons.encounters.')->group(function () {
+            Route::get('/encounters/{encounter}/care-plans/create', CarePlanCreate::class)
+                ->can('create', CarePlan::class)
+                ->whereNumber('encounter')
+                ->name('care-plans.create');
+            Route::get('/encounters/{encounter}/eprescriptions/create', EncounterEPrescriptionCreate::class)
                 ->can('createMedicationRequest', ['encounter', 'person', 'legalEntity'])
                 ->whereNumber('encounter')
-                ->name('eprescription.create');
-            Route::get('/encounter/{encounter}/referral/create', EncounterReferralCreate::class)
+                ->name('eprescriptions.create');
+            Route::get('/encounters/{encounter}/referrals/create', EncounterReferralCreate::class)
                 ->can('createServiceRequest', ['encounter', 'person', 'legalEntity'])
                 ->whereNumber('encounter')
-                ->name('referral.create');
-            Route::get('/encounter/{encounter}/referral/{referral}/edit', EncounterReferralCreate::class)
+                ->name('referrals.create');
+            Route::get('/encounters/{encounter}/referrals/{referral}/edit', EncounterReferralCreate::class)
                 ->can('createServiceRequest', ['encounter', 'person', 'legalEntity'])
                 ->whereNumber(['encounter', 'referral'])
-                ->name('referral.edit');
+                ->name('referrals.edit');
 
-            Route::get('/encounter/create', EncounterPackageCreate::class)
+            Route::get('/encounters/create', EncounterPackageCreate::class)
                 ->can('create', Encounter::class)
                 ->name('create');
-            Route::get('/encounter/{encounter}', EncounterPackageView::class)
+            Route::get('/encounters/{encounter}/package', EncounterPackageView::class)
                 ->can('view', ['encounter', 'person'])
                 ->whereNumber('encounter')
-                ->name('view');
-            Route::get('/encounter/{encounter}/edit', EncounterPackageEdit::class)
+                ->name('package.show');
+            Route::get('/encounters/{encounter}/edit', EncounterPackageEdit::class)
                 ->can('create', Encounter::class)
                 ->can('view', ['encounter', 'person'])
                 ->whereNumber('encounter')
@@ -420,11 +419,11 @@ Route::prefix('prepersons')
                 ->name('clinical-impressions.view');
             Route::get('/encounters', EncounterIndex::class)
                 ->can('viewAny', Encounter::class)
-                ->name('encounters');
+                ->name('encounters.index');
             Route::get('/encounters/{encounter}', EncounterView::class)
                 ->can('view', ['encounter', 'preperson'])
                 ->whereNumber('encounter')
-                ->name('encounters.view');
+                ->name('encounters.show');
             Route::get('/procedures', ProcedureIndex::class)
                 ->can('viewAny', Procedure::class)
                 ->name('procedures');
@@ -468,18 +467,18 @@ Route::prefix('prepersons')
                 ->can('createNewborn', Composition::class)
                 ->name('compositions.newborn.create');
 
-            Route::get('/encounter/create', EncounterPackageCreate::class)
+            Route::get('/encounters/create', EncounterPackageCreate::class)
                 ->can('create', Encounter::class)
-                ->name('encounter.create');
-            Route::get('/encounter/{encounter}', EncounterPackageView::class)
+                ->name('encounters.create');
+            Route::get('/encounters/{encounter}/package', EncounterPackageView::class)
                 ->can('view', ['encounter', 'preperson'])
                 ->whereNumber('encounter')
-                ->name('encounter.view');
-            Route::get('/encounter/{encounter}/edit', EncounterPackageEdit::class)
+                ->name('encounters.package.show');
+            Route::get('/encounters/{encounter}/edit', EncounterPackageEdit::class)
                 ->can('create', Encounter::class)
                 ->can('view', ['encounter', 'preperson'])
                 ->whereNumber('encounter')
-                ->name('encounter.edit');
+                ->name('encounters.edit');
 
             Route::get('/diagnostic-report/create', DiagnosticReportCreate::class)
                 ->can('create', DiagnosticReport::class)

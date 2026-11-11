@@ -53,6 +53,7 @@
                                     $wire.dictionaries['eHealth/ICF/classifiers'][finding.codeCode] ||
                                     $wire.dictionaries['eHealth/ICD10_AM/condition_codes'][finding.codeCode] ||
                                     $wire.dictionaries['eHealth/ICPC2/condition_codes'][finding.codeCode] ||
+                                    $wire.dictionaries['eHealth/custom/observation_codes']?.[finding.codeCode] ||
                                     finding.description ||
                                     ''
                                 }`

@@ -15,7 +15,7 @@
         <div class="flex flex-wrap items-center gap-2">
             @can('create', Encounter::class)
                 <a
-                    href="{{ route('encounter.create', [legalEntity(), 'person' => $personId]) }}"
+                    href="{{ route('persons.encounters.create', [legalEntity(), 'person' => $personId]) }}"
                     class="button-primary flex items-center gap-2 px-4 py-2 text-sm shadow-sm"
                 >
                     @icon('plus', 'w-4 h-4')
@@ -84,7 +84,7 @@
                         @endcan
                         @can('create', Encounter::class)
                             <a
-                                href="{{ route('encounter.create', [legalEntity(), 'person' => $personId, 'type' => 'discharge']) }}"
+                                href="{{ route('persons.encounters.create', [legalEntity(), 'person' => $personId, 'type' => 'discharge']) }}"
                                 class="dropdown-item"
                             >
                                 @icon('hospital-bed', 'w-4 h-4 text-gray-500 shrink-0')
@@ -93,7 +93,7 @@
                         @endcan
                         @can('create', Encounter::class)
                             <a
-                                href="{{ route('encounter.create', [legalEntity(), 'person' => $personId, 'type' => 'hospitalization_refusal']) }}"
+                                href="{{ route('persons.encounters.create', [legalEntity(), 'person' => $personId, 'type' => 'hospitalization_refusal']) }}"
                                 class="dropdown-item"
                             >
                                 @icon('cancel', 'w-4 h-4 text-gray-500 shrink-0')

@@ -13,6 +13,7 @@
             currentImmunizations: $wire.entangle('immunizationForm.immunizations'),
             currentEpisodeId: $wire.entangle('form.episode.id'),
             reactionImmunizations: $wire.entangle('reactionImmunizations'),
+            referencedReactionImmunizations: $wire.referencedReactionImmunizations,
             selectedRecords: $wire.entangle('selectedRecords.observations'),
             cancelledRecords: $wire.cancelledRecords.observations,
             patientSpecimens: $wire.patientSpecimens,
@@ -20,6 +21,7 @@
             currentImmunizations: [],
             currentEpisodeId: '',
             reactionImmunizations: [],
+            referencedReactionImmunizations: [],
             selectedRecords: [],
             cancelledRecords: [],
             patientSpecimens: [],
@@ -30,7 +32,6 @@
         modalObservation: new Observation(),
         newObservation: false,
         item: 0,
-        divisionId: @js($isEncounterContext ? data_get($this->form->encounter, 'divisionId', '') : data_get($this->form->diagnosticReport, 'divisionId', '')),
         valueMap: $wire.entangle('observationValueMap'),
         componentMap: $wire.observationComponentMap,
         observationCategoriesDictionary: $wire.dictionaries['eHealth/observation_categories'],
@@ -41,6 +42,10 @@
         observationInterpretationsDictionary: $wire.dictionaries['eHealth/observation_interpretations'],
         vaccineCodesDictionary: @if($isEncounterContext) $wire.dictionaries['eHealth/vaccine_codes'] @else {} @endif,
         reactionEpisodeId: '',
+
+        get divisionId() {
+            return ($wire.form.encounter ?? $wire.form.diagnosticReport)?.divisionId ?? '';
+        },
 
         specimenOptions() {
             const specimenTypes = $wire.dictionaries['specimen_types'] ?? {};
@@ -57,7 +62,7 @@
                 ...packageSpecimens,
                 ...this.patientSpecimens
                     .filter((specimen) => specimen.status === 'available' && ! packageSpecimenIds.includes(specimen.uuid))
-                    .map((specimen) => ({ uuid: specimen.uuid, name: specimenTypes[specimen.typeCode] || specimen.uuid }))
+                    .map((specimen) => ({ uuid: specimen.uuid, name: specimen.name || specimen.uuid }))
             ];
         },
         showReactionDrawer: false,
@@ -99,7 +104,8 @@
         selectedReactionImmunization() {
             return this.uniqueReactionImmunizations([
                 ...this.currentImmunizations,
-                ...this.reactionImmunizations
+                ...this.reactionImmunizations,
+                ...this.referencedReactionImmunizations
             ]).find(immunization => immunization.uuid === this.modalObservation.reactionOn) || null;
         },
 
