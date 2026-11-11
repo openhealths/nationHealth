@@ -20,7 +20,12 @@
     </select>
     @if ($encounterEPrescriptionApprovalRequired && $this->encounterEPrescriptionSelectedPlan)
         <p>{{ __('care-plan.prescribing_patient_access_required') }}</p>
-        @livewire('care-plan.care-plan-approvals', ['legalEntity' => legalEntity(), 'carePlan' => $this->encounterEPrescriptionSelectedPlan], key('encounter-prescription-plan-access-'.$encounterEPrescriptionPlanId))
+        @php
+            $approvalContext = $this->encounterEPrescriptionApprovalContext;
+        @endphp
+        @if ($approvalContext !== [])
+            @livewire('care-plan.care-plan-approvals', ['legalEntity' => legalEntity(), 'carePlan' => $this->encounterEPrescriptionSelectedPlan, 'actingEmployeeUuid' => $approvalContext['actingEmployeeUuid']], key('encounter-prescription-plan-access-'.$encounterEPrescriptionPlanId.'-'.$approvalContext['actingEmployeeUuid']))
+        @endif
         <button type="button" wire:click="searchEncounterEPrescriptionCarePlans" class="button-minor">
             {{ __('medication-requests.refresh_plan_access') }}
         </button>

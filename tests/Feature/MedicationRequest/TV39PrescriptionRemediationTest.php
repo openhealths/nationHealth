@@ -9,12 +9,15 @@ use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
 use App\Classes\eHealth\Api\Patient\MedicationRequestRequest as MedicationRequestRequestApi;
 use App\Classes\eHealth\Api\Person as PersonApi;
 use App\Enums\User\Role;
+use App\Livewire\CarePlan\CarePlanApprovals;
 use App\Livewire\EncounterPackage\Concerns\ManagesEncounterEPrescription;
 use App\Livewire\EncounterPackage\Concerns\ResolvesEncounterStandaloneContext;
 use App\Livewire\Person\Records\PatientMedicationRequests;
 use App\Livewire\Person\Records\PatientMedicationRequestView;
 use App\Livewire\Person\Records\PatientPrescriptionRequests;
 use App\Livewire\Person\Records\PatientPrescriptionRequestView;
+use App\Models\CarePlan;
+use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Encounter;
@@ -33,6 +36,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Computed;
@@ -455,6 +459,55 @@ class TV39PrescriptionRemediationTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_rendered_approval_uses_selected_actor_and_remounts_without_falling_back(): void
+    {
+        [$plan] = $this->documentPlan();
+        $context = $this->context;
+        $encounter = $this->encounter;
+        $first = $context['employee'];
+        $second = $first->replicate();
+        $second->uuid = (string) Str::uuid();
+        $second->save();
+        $context['user']->employees()->attach($second->id);
+        $this->grantCarePlanEmployeeRole($second, 'OUTPATIENT');
+        $plan->approvals()->delete();
+        $this->assertSame($first->uuid, $context['user']->getCarePlanWriterEmployee('OUTPATIENT')->uuid);
+        $encounter->performer()->update(['value' => $second->uuid]);
+        Queue::fake();
+        PrescriptionApprovalActorCapture::$receivedActors = [];
+        Livewire::component('care-plan.care-plan-approvals', PrescriptionApprovalActorCapture::class);
+
+        try {
+            $component = Livewire::test(EncounterPrescriptionPlanHarness::class, $this->prescriptionHarness())
+                ->call('selectEncounterEPrescriptionCarePlan', $plan->id);
+            $component->assertSeeHtml('data-approval-actor="'.$second->uuid.'"');
+            $this->assertSame([$second->uuid], PrescriptionApprovalActorCapture::$receivedActors);
+
+            // The plan stays selected; a different actor must mount a new approval component.
+            $encounter->performer()->update(['value' => $first->uuid]);
+            $component->call('$refresh')->assertSeeHtml('data-approval-actor="'.$first->uuid.'"');
+            $this->assertSame([$second->uuid, $first->uuid], PrescriptionApprovalActorCapture::$receivedActors);
+
+            // Another writer remains available, but cannot receive this encounter's consent.
+            $first->update(['is_active' => false]);
+            $this->assertSame($second->uuid, $context['user']->getCarePlanWriterEmployee('OUTPATIENT')->uuid);
+            $component->call('searchEncounterEPrescriptionCarePlans')->assertDontSeeHtml('data-approval-actor=');
+            $this->assertSame([$second->uuid, $first->uuid], PrescriptionApprovalActorCapture::$receivedActors);
+
+            $first->update(['is_active' => true]);
+            $this->denyScope('medication_request_request:write');
+            $component->call('searchEncounterEPrescriptionCarePlans')->assertDontSeeHtml('data-approval-actor=')
+                ->assertSee(__('medication-requests.own_finished_encounter_required'));
+            $this->assertSame([$second->uuid, $first->uuid], PrescriptionApprovalActorCapture::$receivedActors);
+            $this->assertDatabaseCount('medication_request_requests', 0);
+            $this->assertSame(0, $plan->approvals()->count());
+            Http::assertNothingSent();
+            Queue::assertNothingPushed();
+        } finally {
+            Livewire::component('care-plan.care-plan-approvals', CarePlanApprovals::class);
+        }
+    }
+
     public function test_plan_selection_keeps_native_remaining_quantity_after_another_search(): void
     {
         [$plan, $activity] = $this->documentPlan();
@@ -566,5 +619,23 @@ class EncounterPrescriptionPlanHarness extends Component
     @include('livewire.encounter-package.parts.encounter-eprescription-form', ['encounterReturnUrl' => '/'])
 </div>
 BLADE;
+    }
+}
+
+class PrescriptionApprovalActorCapture extends Component
+{
+    public static array $receivedActors = [];
+
+    public string $actorUuid;
+
+    public function mount(LegalEntity $legalEntity, CarePlan $carePlan, string $actingEmployeeUuid): void
+    {
+        $this->actorUuid = $actingEmployeeUuid;
+        self::$receivedActors[] = $actingEmployeeUuid;
+    }
+
+    public function render(): string
+    {
+        return '<div data-approval-actor="'.$this->actorUuid.'"></div>';
     }
 }
