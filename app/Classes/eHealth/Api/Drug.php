@@ -6,6 +6,7 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\MedicationResponseContract;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -41,6 +42,8 @@ class Drug extends Request
      */
     public function getMany(array $filters = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(static fn (EHealthResponse $response): array => MedicationResponseContract::validate($response, 'drugs'));
+
         $mergedQuery = array_merge(
             [self::QUERY_PARAM_PAGE_SIZE => config('ehealth.api.page_size_max')],
             $filters

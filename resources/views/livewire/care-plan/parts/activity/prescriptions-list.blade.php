@@ -1,3 +1,5 @@
+@use('App\Enums\Person\MedicationRequestStatus')
+@use('Carbon\Carbon')
 @php
     $linkedPrescriptions = collect($activePrescriptions)->filter(function ($item) use ($activity) {
         return $activity->uuid && ($item['based_on_uuid'] ?? null) === $activity->uuid;
@@ -34,7 +36,7 @@
             @foreach ($linkedPrescriptions as $prescription)
                 @php
                     $rawStatus = (string) ($prescription['status'] ?? '');
-                    $status = \App\Enums\Person\MedicationRequestStatus::resolve($rawStatus);
+                    $status = MedicationRequestStatus::resolve($rawStatus);
                     $uuid = $prescription['uuid'] ?? '';
                     $requestNumber = $prescription['request_number'] ?? $prescription['requestNumber'] ?? $uuid;
                     $medicationQty = $prescription['medication_qty'] ?? $prescription['medicationQty'] ?? '—';
@@ -46,10 +48,10 @@
                         <span class="font-bold text-gray-900 dark:text-white">№ {{ $requestNumber }}</span>
                         <span class="text-gray-500">Кількість: {{ $medicationQty }}</span>
                         @if (!empty($startedAt) && !empty($endedAt))
-                            <span class="text-xs text-gray-400">Діє з {{ \Carbon\Carbon::parse($startedAt)->format('d.m.Y') }} по {{ \Carbon\Carbon::parse($endedAt)->format('d.m.Y') }}</span>
+                            <span class="text-xs text-gray-400">Діє з {{ Carbon::parse($startedAt)->format('d.m.Y') }} по {{ Carbon::parse($endedAt)->format('d.m.Y') }}</span>
                         @endif
-                        <span class="badge {{ \App\Enums\Person\MedicationRequestStatus::colorFor($rawStatus) }}">
-                            {{ \App\Enums\Person\MedicationRequestStatus::labelFor($rawStatus) }}
+                        <span class="badge {{ MedicationRequestStatus::colorFor($rawStatus) }}">
+                            {{ MedicationRequestStatus::labelFor($rawStatus) }}
                         </span>
                     </div>
                     <div class="flex items-center gap-3">
@@ -64,7 +66,7 @@
                                 <span class="text-xs">Підписати</span>
                             </button>
                         @endif
-                        @if ($status === \App\Enums\Person\MedicationRequestStatus::ACTIVE)
+                        @if ($status === MedicationRequestStatus::ACTIVE)
                             <button
                                 type="button"
                                 class="flex items-center gap-1 text-blue-500 transition-colors hover:text-blue-700"
@@ -82,7 +84,7 @@
                                 type="button"
                                 class="flex items-center gap-1 text-yellow-600 transition-colors hover:text-yellow-800"
                                 title="Повторно надіслати SMS"
-                                wire:click="resendPrescriptionSms('{{ $uuid }}')"
+                                wire:click="requestPrescriptionSms('{{ $uuid }}')"
                             >
                                 @icon('refresh', 'w-4 h-4')
                                 <span class="text-xs">SMS</span>
@@ -97,7 +99,7 @@
                                 <span class="text-xs">Історія</span>
                             </button>
                         @endif
-                        @if ($status?->isUnsigned() || $status === \App\Enums\Person\MedicationRequestStatus::ACTIVE)
+                        @if ($status?->isUnsigned() || $status === MedicationRequestStatus::ACTIVE)
                             <button
                                 type="button"
                                 class="flex items-center gap-1 text-orange-500 transition-colors hover:text-orange-700"
@@ -114,3 +116,16 @@
         </div>
     @endif
 </div>
+
+@if ($prescriptionSmsConfirmationId !== null)
+    <div class="rounded-xl border p-4">
+        <p>{{ __('medication-requests.sms_confirmation') }}</p>
+        <button class="button-primary" wire:click="resendPrescriptionSms('{{ $prescriptionSmsConfirmationId }}')">
+            {{ __('forms.confirm') }}
+        </button>
+        <button class="button-minor" wire:click="$set('prescriptionSmsConfirmationId', null)">
+            {{ __('forms.cancel') }}
+        </button>
+    </div>
+@endif
+@include('livewire.medication-request.dispenses', ['items' => $ePrescriptionDispenses])

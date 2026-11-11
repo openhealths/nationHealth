@@ -4,24 +4,40 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Encounter;
 
+use App\Classes\eHealth\Api\Division;
+use App\Classes\eHealth\EHealthResponse;
 use App\Enums\Person\EncounterStatus;
 use App\Livewire\EncounterPackage\Concerns\ManagesEncounterEPrescription;
 use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
 use App\Livewire\EncounterPackage\Concerns\ResolvesEncounterStandaloneContext;
+use App\Models\Employee\Employee;
+use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\EncounterHospitalization;
 use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+
 use App\Models\Person\Person;
+use App\Services\Dictionary\DictionaryManager;
+use GuzzleHttp\Psr7\Response as Psr7Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Response as HttpClientResponse;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Livewire\Component;
 use Livewire\Features\SupportEvents\Event;
+use Mockery;
+use Tests\Concerns\MocksBasicDictionaries;
 use Tests\TestCase;
 
 class EncounterStandalonePhase6Test extends TestCase
 {
     use DatabaseTransactions;
-    use \Tests\Concerns\MocksBasicDictionaries;
+    use MocksBasicDictionaries;
 
     protected Person $person;
 
@@ -53,9 +69,10 @@ class EncounterStandalonePhase6Test extends TestCase
 
     public function test_eprescription_drawer_opens_for_finished_encounter(): void
     {
-        $manager = \Mockery::mock(\App\Services\Dictionary\DictionaryManager::class);
+        $manager = Mockery::mock(DictionaryManager::class);
         $manager->shouldReceive('medicalPrograms')->andReturn(collect());
-        $this->instance(\App\Services\Dictionary\DictionaryManager::class, $manager);
+        $manager->shouldReceive('basics->byName->asCodeDescription->all')->andReturn(['community' => 'Community']);
+        $this->instance(DictionaryManager::class, $manager);
 
         $encounter = $this->createEncounter(EncounterStatus::FINISHED->value);
         $harness = $this->makeHarness($encounter->id);
@@ -123,7 +140,7 @@ class EncounterStandalonePhase6Test extends TestCase
         $pmgId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
         $otherId = '11111111-2222-3333-4444-555555555555';
 
-        $manager = \Mockery::mock(\App\Services\Dictionary\DictionaryManager::class);
+        $manager = Mockery::mock(DictionaryManager::class);
         $manager->shouldReceive('medicalPrograms')->andReturn(collect([
             [
                 'id' => $otherId,
@@ -138,7 +155,7 @@ class EncounterStandalonePhase6Test extends TestCase
                 'is_active' => true,
             ],
         ]));
-        $this->instance(\App\Services\Dictionary\DictionaryManager::class, $manager);
+        $this->instance(DictionaryManager::class, $manager);
 
         $encounter = $this->createEncounter(EncounterStatus::FINISHED->value);
         $harness = $this->makeHarness($encounter->id);
@@ -187,11 +204,11 @@ class EncounterStandalonePhase6Test extends TestCase
     {
         $groupId = (string) Str::uuid();
         $blockedId = (string) Str::uuid();
-        \Illuminate\Support\Facades\Cache::put('dictionaries.service', [
+        Cache::put('dictionaries.service', [
             ['id' => $groupId, 'code' => 'GROUP', 'name' => 'Повна група послуг', 'is_active' => true, 'request_allowed' => true],
             ['id' => $blockedId, 'code' => 'BLOCKED', 'name' => 'Без дозволу на направлення', 'is_active' => true, 'request_allowed' => false],
         ], now()->addDay());
-        \Illuminate\Support\Facades\Cache::put('dictionaries.service:fresh', true, now()->addDay());
+        Cache::put('dictionaries.service:fresh', true, now()->addDay());
         $harness = $this->makeHarness($this->createEncounter(EncounterStatus::FINISHED->value)->id);
         $harness->selectEncounterReferralServiceFromCatalog([
             'id' => $groupId, 'type' => 'service_group', 'name' => 'Untrusted name',
@@ -294,20 +311,20 @@ class EncounterStandalonePhase6Test extends TestCase
     {
         $destination = (string) Str::uuid();
         $division = (string) Str::uuid();
-        $api = \Mockery::mock(\App\Classes\eHealth\Api\Division::class);
+        $api = Mockery::mock(Division::class);
         foreach ([1 => [], 2 => [
             ['id' => $division, 'legal_entity_id' => $destination, 'status' => 'ACTIVE', 'type' => 'CLINIC'],
             ['id' => (string) Str::uuid(), 'legal_entity_id' => $destination, 'status' => 'ACTIVE', 'type' => 'CLINIC', 'is_active' => false],
             ['id' => (string) Str::uuid(), 'legal_entity_id' => (string) Str::uuid(), 'status' => 'ACTIVE', 'type' => 'CLINIC'],
             ['id' => (string) Str::uuid(), 'legal_entity_id' => $destination, 'status' => 'ACTIVE', 'type' => 'INVALID'],
         ]] as $page => $rows) {
-            $response = new \App\Classes\eHealth\EHealthResponse(new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            $response = new EHealthResponse(new Psr7Response(200, [], json_encode([
                 'data' => $rows,
                 'paging' => ['page_number' => $page, 'total_pages' => 2],
             ])));
             $api->shouldReceive('search')->once()->with($destination, $page)->andReturn($response);
         }
-        $this->instance(\App\Classes\eHealth\Api\Division::class, $api);
+        $this->instance(Division::class, $api);
         $harness = $this->makeHarness($this->createTransferEncounter($destination)->id);
         $harness->openEncounterReferralDrawer();
 
@@ -355,14 +372,14 @@ class EncounterStandalonePhase6Test extends TestCase
 
     public function test_legacy_drafts_without_context_show_an_error_and_remain_unchanged(): void
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
-        $legalEntity = \App\Models\LegalEntity::create([
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(), 'status' => 'ACTIVE', 'sync_status' => 'COMPLETED',
             'legal_entity_type_id' => $typeId, 'is_active' => true,
         ]);
         $this->instance('legalEntity', $legalEntity);
-        $employee = \App\Models\Employee\Employee::create([
+        $employee = Employee::create([
             'uuid' => (string) Str::uuid(), 'legal_entity_id' => $legalEntity->id,
             'employee_type' => 'DOCTOR', 'status' => 'APPROVED', 'is_active' => true,
             'position' => 'Doctor', 'start_date' => now()->toDateString(),
@@ -371,8 +388,8 @@ class EncounterStandalonePhase6Test extends TestCase
 
         foreach (['EPrescription', 'Referral'] as $kind) {
             $class = $kind === 'EPrescription'
-                ? \App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest::class
-                : \App\Models\MedicalEvents\Sql\ServiceRequestRequest::class;
+                ? MedicationRequestRequest::class
+                : ServiceRequestRequest::class;
             $attributes = $kind === 'EPrescription'
                 ? ['medication_id' => 'INN-1', 'medication_qty' => 1]
                 : ['service_id' => '37003-00'];
@@ -404,12 +421,12 @@ class EncounterStandalonePhase6Test extends TestCase
 
     private function createEncounter(string $status): Encounter
     {
-        $identifierId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => (string) Str::uuid()])->id;
-        $codingId = \App\Models\MedicalEvents\Sql\Coding::create([
+        $identifierId = Identifier::create(['value' => (string) Str::uuid()])->id;
+        $codingId = Coding::create([
             'code' => 'AMB',
             'system' => 'eHealth/encounter_classes',
         ])->id;
-        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
+        $ccId = CodeableConcept::create()->id;
 
         return Encounter::create([
             'uuid' => (string) Str::uuid(),
@@ -429,7 +446,7 @@ class EncounterStandalonePhase6Test extends TestCase
             'system' => 'eHealth/encounter_classes',
         ])->id;
         $identifierId = Identifier::create(['value' => (string) Str::uuid()])->id;
-        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
+        $ccId = CodeableConcept::create()->id;
         $destinationId = Identifier::create(['value' => $destinationUuid])->id;
         $dispositionId = Coding::create([
             'code' => 'transfer_general',
@@ -460,23 +477,23 @@ class EncounterStandalonePhase6Test extends TestCase
      */
     private function mockDestinationDivisions(array $rows): void
     {
-        $psr = new \GuzzleHttp\Psr7\Response(200, ['Content-Type' => 'application/json'], json_encode(['data' => $rows]));
-        $response = new \App\Classes\eHealth\EHealthResponse(new \Illuminate\Http\Client\Response($psr));
+        $psr = new Psr7Response(200, ['Content-Type' => 'application/json'], json_encode(['data' => $rows]));
+        $response = new EHealthResponse(new HttpClientResponse($psr));
 
-        $api = \Mockery::mock(\App\Classes\eHealth\Api\Division::class);
+        $api = Mockery::mock(Division::class);
         $api->shouldReceive('search')->andReturn($response);
-        $this->instance(\App\Classes\eHealth\Api\Division::class, $api);
+        $this->instance(Division::class, $api);
     }
 }
 
 /**
  * Lightweight host for encounter standalone traits (avoids full EncounterEdit mount).
  */
-class EncounterStandaloneHarness extends \Livewire\Component
+class EncounterStandaloneHarness extends Component
 {
-    use ResolvesEncounterStandaloneContext;
     use ManagesEncounterEPrescription;
     use ManagesEncounterReferrals;
+    use ResolvesEncounterStandaloneContext;
 
     public int $encounterId;
 

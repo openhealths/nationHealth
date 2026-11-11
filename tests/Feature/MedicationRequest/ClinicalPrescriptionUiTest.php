@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\MedicationRequest;
 
+use App\Classes\eHealth\Api\Drug as DrugApi;
 use App\Classes\eHealth\Api\Person as PersonApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Livewire\EncounterPackage\EncounterEPrescriptionCreate;
@@ -16,8 +17,8 @@ use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Policies\EncounterPolicy;
 use App\Services\Dictionary\Dictionaries\BasicDictionary;
-use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\Dictionary\Dictionaries\DrugDictionary;
+use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -49,7 +50,7 @@ class ClinicalPrescriptionUiTest extends TestCase
             Cache::forever($key.':fresh', true);
         }
         $response = Mockery::mock(EHealthResponse::class);
-        $response->shouldReceive('getData')->andReturn([]);
+        $response->shouldReceive('getData', 'validate')->andReturn([]);
         $this->mock(PersonApi::class)->shouldReceive('getAuthMethods')->andReturn($response);
         $this->partialMock(EncounterPolicy::class)->shouldReceive('createMedicationRequest')->andReturn(Response::allow());
     }
@@ -87,6 +88,10 @@ class ClinicalPrescriptionUiTest extends TestCase
     {
         $context = $this->context();
         $this->categories();
+        $drug = json_decode(file_get_contents(base_path('tests/Fixtures/medication-official-responses.json')), true, flags: JSON_THROW_ON_ERROR)['drugs'][0];
+        $drugResponse = Mockery::mock(EHealthResponse::class);
+        $drugResponse->shouldReceive('validate')->andReturn([$drug]);
+        $this->mock(DrugApi::class)->shouldReceive('getMany')->once()->andReturn($drugResponse);
         $lifecycle = Mockery::mock(MedicationRequestLifecycleService::class)->makePartial();
         $lifecycle->shouldReceive('resolveEncounterEmployeeContext')->andReturn([]);
         $lifecycle->shouldReceive('createEncounterDraft')->once()->with(Mockery::type(Encounter::class), Mockery::on(
@@ -96,9 +101,13 @@ class ClinicalPrescriptionUiTest extends TestCase
         Livewire::test(EncounterEPrescriptionCreate::class, $this->form($context))
             ->assertSee('Амбулаторно')->assertSee('При виписці')->assertDontSee('Неактивна категорія')
             ->set('encounterEPrescriptionForm.category', 'discharge')
-            ->set('encounterEPrescriptionForm.medication_id', (string) Str::uuid())
+            ->set('encounterEPrescriptionSearchQuery', 'Аміодарон')
+            ->call('searchEncounterEPrescriptionMedications')
+            ->call('selectEncounterEPrescriptionMedication', $drug['id'])
             ->set('encounterEPrescriptionForm.signature_text', 'Один раз на день')
             ->set('encounterEPrescriptionForm.inform_with', 'synthetic-auth')
+            ->set('encounterEPrescriptionForm.medication_qty', 30)
+            ->set('encounterEPrescriptionForm.phone_confirmed', true)
             ->call('validateEncounterEPrescription')->assertHasNoErrors()->assertSet('showSignatureModal', true);
     }
 

@@ -30,7 +30,7 @@ class EncounterEPrescriptionCreate extends EncounterDocumentCreate
 
     protected function afterEncounterEPrescriptionSigned(): void
     {
-        $this->returnToEncounter();
+        $this->redirectRoute('persons.prescription-requests.view', [legalEntity(), 'person' => $this->personId, 'requestId' => $this->encounterPrescriptionCreatedRequestId]);
     }
 
     public function render(): View

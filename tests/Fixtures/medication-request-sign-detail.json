@@ -1,70 +1,84 @@
 {
-  "id": "11111111-1111-4111-8111-111111111111",
+  "id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
   "status": "NEW",
-  "created_at": "2026-10-19",
-  "started_at": "2026-10-19",
-  "ended_at": "2026-11-01",
-  "intent": "order",
-  "category": "community",
-  "person": {
-    "id": "22222222-2222-4222-8222-222222222222",
-    "short_name": "Synthetic patient"
-  },
-  "employee": {
-    "id": "33333333-3333-4333-8333-333333333333"
+  "request_number": "0000-243P-1X53-EH38",
+  "created_at": "2017-08-17",
+  "started_at": "2017-08-17",
+  "ended_at": "2017-09-16",
+  "dispense_valid_from": "2017-08-17",
+  "dispense_valid_to": "2017-09-16",
+  "legal_entity": {
+    "id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+    "name": "Клініка Ноунейм",
+    "short_name": "Ноунейм",
+    "public_name": "Клініка Ноунейм",
+    "type": "MSP",
+    "edrpou": "5432345432",
+    "status": "ACTIVE"
   },
   "division": {
-    "id": "44444444-4444-4444-8444-444444444444"
+    "id": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+    "name": "Бориспільське відділення Клініки Ноунейм",
+    "addresses": [
+      {
+        "country": "UA"
+      }
+    ],
+    "phones": [
+      {
+        "type": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+        "number": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b"
+      }
+    ],
+    "email": "email@example.com",
+    "type": "CLINIC",
+    "legal_entity_id": "c8aadb87-ecb9-41ca-9ad4-ffdfe1dd89c9"
+  },
+  "employee": {
+    "id": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+    "position": "P6"
+  },
+  "person": {
+    "id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+    "short_name": "Петро І. І.",
+    "age": 35.0
   },
   "medication_info": {
-    "medication_id": "55555555-5555-4555-8555-555555555555",
-    "medication_qty": 0.123456789,
-    "medication_name": "Synthetic medication"
+    "medication_id": "4a63b858-c138-4921-9341-ae9e384bcbd6",
+    "medication_name": "Аміодарон 200мг таблетки",
+    "form": "PILL",
+    "dosage": {
+      "numerator_unit": "MG",
+      "numerator_value": 200.0,
+      "denumerator_unit": "PILL",
+      "denumerator_value": 1.0
+    },
+    "ingredients": [
+      {
+        "id": "1349a693-4db1-4a3f-9ac6-8c2f9e541982",
+        "name": "Інсулін деглюдек",
+        "name_original": "Insulin degludec",
+        "dosage": {
+          "numerator_unit": "MG",
+          "numerator_value": 200.0,
+          "denumerator_unit": "PILL",
+          "denumerator_value": 1.0
+        },
+        "is_primary": true
+      }
+    ],
+    "medication_qty": 10.34
   },
   "medical_program": {
-    "id": "66666666-6666-4666-8666-666666666666",
-    "name": "Synthetic program"
+    "id": "c7d52544-0bd4-4129-97b0-2d72633e0490",
+    "name": "Доступні ліки",
+    "funding_source": "NHS",
+    "mr_blank_type": "F-1"
   },
-  "based_on": [
-    {
-      "identifier": {
-        "value": "77777777-7777-4777-8777-777777777777",
-        "type": {
-          "coding": [
-            {
-              "system": "eHealth/resources",
-              "code": "care_plan"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "identifier": {
-        "value": "88888888-8888-4888-8888-888888888888",
-        "type": {
-          "coding": [
-            {
-              "system": "eHealth/resources",
-              "code": "activity"
-            },
-            {
-              "system": "urn:synthetic:secondary",
-              "code": "alternate",
-              "display": "Alternative",
-              "version": "1",
-              "user_selected": false
-            }
-          ],
-          "text": "Activity"
-        }
-      },
-      "display_value": "Synthetic activity"
-    }
-  ],
+  "intent": "plan",
+  "category": "community",
   "context": {
     "identifier": {
-      "value": "99999999-9999-4999-8999-999999999999",
       "type": {
         "coding": [
           {
@@ -72,152 +86,15 @@
             "code": "encounter"
           }
         ]
-      }
+      },
+      "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
     }
   },
-  "priority": "routine",
-  "container_dosage": {
-    "value": 0.25,
-    "unit": "ml",
-    "system": "MEDICATION_UNIT",
-    "code": "MILLILITER"
-  },
-  "note": "Synthetic clinical note",
   "dosage_instruction": [
     {
-      "sequence": 1,
-      "text": "Synthetic instruction",
-      "patient_instruction": "Synthetic patient instruction",
-      "additional_instruction": [
-        {
-          "coding": [
-            {
-              "system": "eHealth/SNOMED/additional_dosage_instructions",
-              "code": "311504000"
-            }
-          ],
-          "text": "Synthetic"
-        }
-      ],
-      "timing": {
-        "event": [
-          "2026-10-19T12:00:00+03:00"
-        ],
-        "repeat": {
-          "bounds_period": {
-            "start": "2026-10-19",
-            "end": "2026-11-01"
-          },
-          "frequency": 2,
-          "period": 1,
-          "period_unit": "d",
-          "time_of_day": [
-            "12:00:00",
-            "18:00:00"
-          ],
-          "offset": 0
-        }
-      },
-      "as_needed_boolean": false,
-      "site": {
-        "coding": [
-          {
-            "system": "eHealth/SNOMED/anatomical_structure_administration_site_codes",
-            "code": "344001"
-          }
-        ]
-      },
-      "route": {
-        "coding": [
-          {
-            "system": "eHealth/SNOMED/route_codes",
-            "code": "26643006"
-          }
-        ]
-      },
-      "method": {
-        "coding": [
-          {
-            "system": "eHealth/SNOMED/administration_methods",
-            "code": "419747000"
-          }
-        ]
-      },
-      "dose_and_rate": {
-        "type": {
-          "coding": [
-            {
-              "system": "eHealth/dose_and_rate",
-              "code": "ordered"
-            }
-          ]
-        },
-        "dose_range": {
-          "low": {
-            "value": 0,
-            "system": "eHealth/ucum/units",
-            "code": "mg",
-            "unit": "mg"
-          },
-          "high": {
-            "value": 0.125,
-            "system": "eHealth/ucum/units",
-            "code": "mg",
-            "unit": "mg"
-          }
-        },
-        "rate_ratio": {
-          "numerator": {
-            "value": 0.125,
-            "system": "eHealth/ucum/units",
-            "code": "mg",
-            "unit": "mg"
-          },
-          "denominator": {
-            "value": 8,
-            "system": "eHealth/ucum/units",
-            "code": "h",
-            "unit": "h"
-          }
-        }
-      },
-      "max_dose_per_period": {
-        "numerator": {
-          "value": 0.25,
-          "system": "eHealth/ucum/units",
-          "code": "mg",
-          "unit": "mg"
-        },
-        "denominator": {
-          "value": 2,
-          "system": "eHealth/ucum/units",
-          "code": "d",
-          "unit": "d"
-        }
-      },
-      "max_dose_per_administration": {
-        "value": 0.125,
-        "system": "eHealth/ucum/units",
-        "code": "mg",
-        "unit": "mg"
-      },
-      "max_dose_per_lifetime": {
-        "value": 10.5,
-        "system": "eHealth/ucum/units",
-        "code": "mg",
-        "unit": "mg"
-      }
+      "sequence": 1.0,
+      "text": "0.25mg PO every 6-12 hours as needed for menses from Jan 15-20, 2015.  Do not exceed more than 4mg per day",
+      "as_needed_boolean": true
     }
-  ],
-  "synthetic_metadata": {
-    "enabled": false,
-    "count": 0
-  },
-  "request_number": "0000-0000-0000-0001",
-  "dispense_valid_from": "2026-10-19",
-  "dispense_valid_to": "2026-11-01",
-  "legal_entity": {
-    "id": "77777777-7777-4777-8777-777777777777",
-    "name": "Synthetic legal entity"
-  }
+  ]
 }

@@ -102,18 +102,16 @@
                         </div>
                     </div>
 
-                    {{-- Use a real dark surface (gray-700) so body text stays readable in dark theme --}}
-                    <div class="rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">
-                        <h4 class="mb-2 font-semibold text-gray-800 dark:text-gray-100">
-                            Рецептурний лікарський засіб - деталі програми
-                        </h4>
-                        <ul class="list-inside list-disc space-y-1">
-                            <li>Джерело фінансування: НСЗУ (або інші за програмою)</li>
-                            <li>Тип рецептурного бланка: Ф-1</li>
-                            <li>Обов'язковість використання плану лікування: Так</li>
-                            <li>Максимальна тривалість курсу: Відповідно до програми</li>
-                        </ul>
-                    </div>
+                    <dl class="space-y-2 text-sm">
+                        @foreach ($ePrescriptionSelectedProgram['settings'] ?? [] as $setting => $value)
+                            <div>
+                                <dt>{{ __('medication-requests.program_settings.'.$setting) }}</dt>
+                                <dd>
+                                    {{ is_array($value) ? collect($value)->map(static fn ($item) => is_scalar($item) ? $item : data_get($item, 'name', data_get($item, 'code', '')))->filter()->implode(', ') : (is_bool($value) ? ($value ? __('forms.yes') : __('forms.no')) : $value) }}
+                                </dd>
+                            </div>
+                        @endforeach
+                    </dl>
                 </div>
 
                 {{-- Card 3: Лікарський засіб --}}
@@ -158,14 +156,14 @@
                                     type="number"
                                     step="any"
                                     min="0.01"
-                                    wire:model="ePrescriptionForm.max_dose_per_administration"
+                                    wire:model.live="ePrescriptionForm.max_dose_per_administration"
                                     class="block w-full rounded-l-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 @error('ePrescriptionForm.max_dose_per_administration') border-red-500 scroll-to-error @enderror"
                                 />
                                 <span class="inline-flex items-center rounded-r-md border border-l-0 border-gray-300 bg-gray-200 px-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400">
                                     {{ $ePrescriptionForm['medication_unit'] ?? 'од.' }}
                                 </span>
                             </div>
-                            @error ('ePrescriptionForm.max_dose_per_administration')
+                            @error('ePrescriptionForm.max_dose_per_administration')
                                 <p class="text-error">{{ $message }}</p>
                             @enderror
                         </div>
@@ -176,14 +174,14 @@
                                     type="number"
                                     step="any"
                                     min="0.01"
-                                    wire:model="ePrescriptionForm.max_dose_per_period"
+                                    wire:model.live="ePrescriptionForm.max_dose_per_period"
                                     class="block w-full rounded-l-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 @error('ePrescriptionForm.max_dose_per_period') border-red-500 scroll-to-error @enderror"
                                 />
                                 <span class="inline-flex items-center rounded-r-md border border-l-0 border-gray-300 bg-gray-200 px-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400">
                                     {{ $ePrescriptionForm['medication_unit'] ?? 'од.' }}
                                 </span>
                             </div>
-                            @error ('ePrescriptionForm.max_dose_per_period')
+                            @error('ePrescriptionForm.max_dose_per_period')
                                 <p class="text-error">{{ $message }}</p>
                             @enderror
                         </div>
@@ -216,37 +214,18 @@
                                     {{ $ePrescriptionForm['medication_unit'] ?? 'од.' }}
                                 </span>
                             </div>
-                            @error ('ePrescriptionForm.medication_qty')
+                            @error('ePrescriptionForm.medication_qty')
                                 <p class="text-error">{{ $message }}</p>
                             @enderror
                         </div>
-
-                        @if (!empty($ePrescriptionPackages))
-                            <div>
-                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Первинна упаковка*</label>
-                                <select
-                                    wire:model="ePrescriptionForm.container_dosage"
-                                    class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                                >
-                                    <option value="">Оберіть упаковку...</option>
-                                    @foreach ($ePrescriptionPackages as $package)
-                                        @php
-                                            $containerDosage = $package['container_dosage'] ?? [];
-                                            $value = $containerDosage['numerator_value'] ?? ($containerDosage['value'] ?? null);
-                                            $unit = $containerDosage['numerator_unit'] ?? ($containerDosage['numerator']['unit'] ?? 'од.');
-                                            $code = $containerDosage['code'] ?? ($containerDosage['numerator_unit'] ?? '');
-                                            $translatedUnit = match($unit) {
-                                                'PIECE' => 'шт.', 'ML' => 'мл', 'MG' => 'мг', 'G' => 'г', default => $unit
-                                            };
-                                        @endphp
-                                        <option value="{{ $value }}|{{ $unit }}|{{ $code }}">
-                                            {{ $value }} {{ $translatedUnit }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        @endif
                     </div>
+                    @include('livewire.medication-request.prescribing-fields', [
+                        'formName' => 'ePrescriptionForm', 'values' => $ePrescriptionForm,
+                        'drug' => $ePrescriptionSelectedProduct ?? [],
+                        'ingredientDoses' => $this->carePlanPrescriptionIngredientDoses,
+                        'containers' => $this->carePlanPrescriptionContainers,
+                        'notificationsDisabled' => $this->carePlanPrescriptionNotificationsDisabled,
+                    ])
 
                     <div class="mb-2">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Сигнатура (як приймати)*</label>
@@ -317,7 +296,7 @@
                                 @if (!$ePrescriptionSkipTreatmentPeriod) disabled @endif
                                 class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                             />
-                            @error ('ePrescriptionForm.started_at')
+                            @error('ePrescriptionForm.started_at')
                                 <p class="text-error">{{ $message }}</p>
                             @enderror
                         </div>
@@ -329,7 +308,7 @@
                                 wire:model.live="ePrescriptionForm.duration"
                                 class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                             />
-                            @error ('ePrescriptionForm.duration')
+                            @error('ePrescriptionForm.duration')
                                 <p class="text-error">{{ $message }}</p>
                             @enderror
                         </div>
@@ -346,28 +325,30 @@
 
                     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                         <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Метод автентифікації*</label>
-                            <select
-                                wire:model="ePrescriptionForm.inform_with"
-                                class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white @error('ePrescriptionForm.inform_with') border-red-500 scroll-to-error @enderror"
-                            >
-                                <option value="">Оберіть метод...</option>
-                                @foreach ($ePrescriptionAuthMethods as $method)
-                                    @php
-                                        $methodId = $method['uuid'] ?? $method['id'] ?? '';
-                                        $typeLabel = $method['type'] === 'OTP' ? 'СМС (OTP)' : ($method['type'] === 'THIRD_PERSON' ? 'Довірена особа' : 'Документи');
-                                        $valueLabel = $method['phone_number'] ?? $method['alias'] ?? '';
-                                    @endphp
-                                    @if ($methodId !== '')
-                                        <option value="{{ $methodId }}|{{ $method['type'] }}|{{ $valueLabel }}">
-                                            {{ $typeLabel }} {{ $valueLabel ? '('.$valueLabel.')' : '' }}
-                                        </option>
-                                    @endif
-                                @endforeach
-                            </select>
-                            @error('ePrescriptionForm.inform_with')
-                                <p class="text-error mt-1">{{ $message }}</p>
-                            @enderror
+                            @if (!$this->carePlanPrescriptionNotificationsDisabled)
+                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Метод автентифікації*</label>
+                                <select
+                                    wire:model.live="ePrescriptionForm.inform_with"
+                                    class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white @error('ePrescriptionForm.inform_with') border-red-500 scroll-to-error @enderror"
+                                >
+                                    <option value="">Оберіть метод...</option>
+                                    @foreach ($ePrescriptionAuthMethods as $method)
+                                        @php
+                                            $methodId = $method['uuid'] ?? $method['id'] ?? '';
+                                            $typeLabel = $method['type'] === 'OTP' ? 'СМС (OTP)' : ($method['type'] === 'THIRD_PERSON' ? 'Довірена особа' : 'Документи');
+                                            $valueLabel = $method['phone_number'] ?? $method['alias'] ?? '';
+                                        @endphp
+                                        @if ($methodId !== '')
+                                            <option value="{{ $methodId }}|{{ $method['type'] }}|{{ $valueLabel }}">
+                                                {{ $typeLabel }} {{ $valueLabel ? '('.$valueLabel.')' : '' }}
+                                            </option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                                @error('ePrescriptionForm.inform_with')
+                                    <p class="text-error mt-1">{{ $message }}</p>
+                                @enderror
+                            @endif
                         </div>
                         <div>
                             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Примітка</label>
