@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\JobStatus;
 use App\Enums\Specimen\Status as SpecimenStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
@@ -22,6 +23,53 @@ class ServiceRequestRequestPolicy
     public function search(User $user): Response
     {
         return $user->can('service_request:read') ? Response::allow() : Response::denyWithStatus(404);
+    }
+
+    public function viewRecord(User $user, ServiceRequestRequest $record): Response
+    {
+        $allowed = $this->search($user)->allowed() && $record->detailsSyncedAt !== null
+            && !in_array($record->status, ['draft', 'new'], true);
+
+        return $allowed ? Response::allow() : Response::denyWithStatus(404);
+    }
+
+    public function recall(User $user, ServiceRequestRequest $record): Response
+    {
+        return $this->changeRegisteredStatus($user, $record, 'service_request:recall');
+    }
+
+    public function cancel(User $user, ServiceRequestRequest $record): Response
+    {
+        return $this->changeRegisteredStatus($user, $record, 'service_request:cancel');
+    }
+
+    /** TV39 permits the author or another current employee of the author's legal entity. */
+    private function changeRegisteredStatus(User $user, ServiceRequestRequest $record, string $scope): Response
+    {
+        $allowed = $user->can($scope) && $this->viewRecord($user, $record)->allowed()
+            // Execution changes the legacy display status; ESOZ's clinical status governs recall and cancellation.
+            && $record->clinicalStatus === 'active' && $record->requesterLegalEntity?->value === legalEntity()->uuid
+            && !$record->ehealthLinks()->where('status', JobStatus::PENDING->value)->exists()
+            && $user->employees()->get()->contains(fn (Employee $employee): bool => $this->linkedEmployee($user, $employee));
+
+        return $allowed ? Response::allow() : Response::denyWithStatus(404);
+    }
+
+    public function registeredAction(User $user, array $native, string $action): Response
+    {
+        if (!$this->search($user)->allowed() || !in_array($action, ['view', 'print', 'recall', 'error'], true)
+            || in_array($native['status'] ?? '', ['draft', 'new'], true)) {
+            return Response::denyWithStatus(404);
+        }
+        if (in_array($action, ['view', 'print'], true)) {
+            return Response::allow();
+        }
+        $scope = $action === 'recall' ? 'service_request:recall' : 'service_request:cancel';
+        $allowed = $user->can($scope) && ($native['status'] ?? null) === 'active'
+            && data_get($native, 'requester_legal_entity.identifier.value') === legalEntity()->uuid
+            && $user->employees()->get()->contains(fn (Employee $employee): bool => $this->linkedEmployee($user, $employee));
+
+        return $allowed ? Response::allow() : Response::denyWithStatus(404);
     }
 
     /** A selected executor's own role determines whether they may use this referral. */

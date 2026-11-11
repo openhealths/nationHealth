@@ -7,16 +7,19 @@ namespace Tests\Feature\Referral;
 use App\Classes\eHealth\Api\Patient\ServiceRequest as PatientServiceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Livewire\DiagnosticReport\DiagnosticReportCreate;
 use App\Livewire\EncounterPackage\EncounterPackageComponent;
 use App\Livewire\Procedure\ProcedureCreate;
 use App\Models\Employee\Employee;
-use App\Models\Person\Person;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
-use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
+use App\Models\Person\Person;
+use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -40,7 +43,7 @@ class ServiceRequestFhirPersistenceTest extends TestCase
     public function test_complete_resource_round_trip_and_repeat_import_are_lossless(): void
     {
         $person = $this->person();
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
         $resource = $this->resource();
         $record = $repo->storeResource($resource, $person->id);
         $counts = [DB::table('identifiers')->count(), DB::table('codings')->count(), DB::table('quantities')->count()];
@@ -58,11 +61,11 @@ class ServiceRequestFhirPersistenceTest extends TestCase
     public function test_editing_a_form_preserves_unrepresented_metadata_and_reference_types(): void
     {
         $person = $this->person();
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
         $record = $repo->storeResource($this->resource(), $person->id);
         $form = $repo->formData($record);
         $form['note'] = 'Updated synthetic note';
-        $repo->store((new \App\Services\MedicalEvents\Mappers\ServiceRequestMapper())->toFhir($form, ['resource' => $repo->getResource($record)]), $person->id);
+        $repo->store((new ServiceRequestMapper())->toFhir($form, ['resource' => $repo->getResource($record)]), $person->id);
         $actual = $repo->getResource($record->id);
         $this->assertSame('Updated synthetic note', $actual['note']);
         $this->assertSame($this->resource()['code'], $actual['code']);
@@ -74,7 +77,7 @@ class ServiceRequestFhirPersistenceTest extends TestCase
     public function test_clearing_an_ordered_collection_does_not_delete_other_collections(): void
     {
         $person = $this->person();
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
         $resource = $this->resource();
         $repo->storeResource($resource, $person->id);
         $resource['supportingInfo'] = [];
@@ -87,7 +90,7 @@ class ServiceRequestFhirPersistenceTest extends TestCase
 
     public function test_cross_patient_uuid_cannot_overwrite_a_resource(): void
     {
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
         $record = $repo->storeResource($this->resource(), $this->person()->id);
         try {
             $repo->storeResource($this->resource(), $this->person()->id);
@@ -102,7 +105,7 @@ class ServiceRequestFhirPersistenceTest extends TestCase
         $resource = $this->resource();
         $resource['quantity']['value'] = '1.12345678901';
         try {
-            app(ServiceRequestRequestRepository::class)->storeResource($resource, $this->person()->id);
+            Repository::serviceRequest()->storeResource($resource, $this->person()->id);
             $this->fail('Precision must not be silently lost.');
         } catch (InvalidArgumentException) {
             $this->assertDatabaseMissing('service_request_requests', ['uuid' => $resource['id']]);
@@ -110,7 +113,7 @@ class ServiceRequestFhirPersistenceTest extends TestCase
     }
     public function test_exponent_and_large_decimal_precision_are_never_silently_lost(): void
     {
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
         $person = $this->person();
         foreach (['1e-20', '13123456789012.1234567890'] as $value) {
             $resource = $this->resource();
@@ -132,7 +135,7 @@ class ServiceRequestFhirPersistenceTest extends TestCase
         $resource = $this->resource();
         unset($resource['occurrencePeriod']);
         $resource['occurrenceDateTime'] = '2026-11-01T12:20:30.000+02:00';
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
         $record = $repo->storeResource($resource, $this->person()->id);
         $this->assertSame('2026-11-01T10:20:30.000000Z', $repo->getResource($record)['occurrenceDateTime']);
     }
@@ -141,7 +144,7 @@ class ServiceRequestFhirPersistenceTest extends TestCase
     {
         $person = $this->person();
         $record = ServiceRequestRequest::create(['uuid' => (string) Str::uuid(), 'person_id' => $person->id, 'status' => 'active', 'service_id' => 'synthetic-service', 'quantity' => 1]);
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
         $report = $repo->backfillResources($person->id);
         $this->assertSame([$record->id], $report['needsRemoteSync']);
         $this->assertSame(0, $report['converted']);
@@ -153,14 +156,14 @@ class ServiceRequestFhirPersistenceTest extends TestCase
     {
         $person = $this->person();
         $record = ServiceRequestRequest::create(['uuid' => (string) Str::uuid(), 'person_id' => $person->id, 'status' => 'draft', 'service_id' => 'synthetic-service', 'quantity' => 1]);
-        $report = app(ServiceRequestRequestRepository::class)->backfillResources($person->id, true);
+        $report = Repository::serviceRequest()->backfillResources($person->id, true);
         $this->assertCount(1, $report['errors']);
         $this->assertSame(0, $report['converted']);
         $this->assertNull($record->fresh()->detailsSyncedAt);
     }
     public function test_execution_progress_never_becomes_the_canonical_clinical_status(): void
     {
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
         $record = $repo->storeResource($this->resource(), $this->person()->id);
         $repo->applyExecutionResult($record, ['status' => 'processed'], null);
         $actual = $repo->getResource($record);
@@ -173,7 +176,7 @@ class ServiceRequestFhirPersistenceTest extends TestCase
     public function test_end_only_occurrence_period_survives_the_complete_migration_sequence(): void
     {
         $resource = $this->resource();
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
         $record = $repo->storeResource($resource, $this->person()->id);
         $resource['occurrencePeriod'] = ['end' => '2026-11-01T23:59:59.123456Z'];
         $repo->storeResource($resource, $record->personId);
@@ -203,7 +206,7 @@ class ServiceRequestFhirPersistenceTest extends TestCase
         $details = (new ReflectionMethod($component, 'getSearchedElectronicReferral'))->invoke($component, $resource['id']);
         (new ReflectionMethod($component, 'storeElectronicReferralsIfMissing'))->invoke($component, [['referral' => $details, 'employee' => new Employee()]]);
 
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
         $record = $repo->findByUuid($resource['id']);
         $this->assertNotNull($record);
         $this->assertEquals($resource, $repo->getResource($record));
@@ -214,7 +217,7 @@ class ServiceRequestFhirPersistenceTest extends TestCase
     {
         $person = $this->person();
         $resource = $this->resource();
-        $repo = app(ServiceRequestRequestRepository::class);
+        $repo = Repository::serviceRequest();
         $record = $repo->storeResource($resource, $person->id);
         $this->mock(PatientServiceRequestApi::class)->shouldNotReceive('getById');
         $component = $this->referralSearchComponent($person, $resource['id']);
@@ -228,7 +231,7 @@ class ServiceRequestFhirPersistenceTest extends TestCase
     public function test_a_local_referral_of_another_patient_is_not_silently_skipped(): void
     {
         $resource = $this->resource();
-        app(ServiceRequestRequestRepository::class)->storeResource($resource, $this->person()->id);
+        Repository::serviceRequest()->storeResource($resource, $this->person()->id);
         $this->mock(PatientServiceRequestApi::class)->shouldNotReceive('getById');
         $component = $this->referralSearchComponent($this->person(), $resource['id']);
 
@@ -280,7 +283,7 @@ class ServiceRequestFhirPersistenceTest extends TestCase
         try {
             (new ReflectionMethod($component, 'storeElectronicReferralIfMissing'))->invoke($component, $uuid, new Employee());
             $this->fail('Mismatched referral identity must block import.');
-        } catch (\Illuminate\Validation\ValidationException) {
+        } catch (ValidationException) {
             $this->assertDatabaseMissing('service_request_requests', ['uuid' => $uuid]);
             $this->assertDatabaseMissing('service_request_requests', ['uuid' => $resource['id']]);
         }
@@ -292,12 +295,12 @@ class ServiceRequestFhirPersistenceTest extends TestCase
         $uuid = $this->resource()['id'];
         $component = $this->referralSearchComponent($person, $uuid);
         $this->mock(PatientServiceRequestApi::class)->shouldReceive('getById')->once()
-            ->andThrow(new \App\Exceptions\EHealth\EHealthConnectionException('Synthetic remote failure'));
+            ->andThrow(new EHealthConnectionException('Synthetic remote failure'));
 
         try {
             (new ReflectionMethod($component, 'storeElectronicReferralIfMissing'))->invoke($component, $uuid, new Employee());
             $this->fail('A failed detail read must block import.');
-        } catch (\App\Exceptions\EHealth\EHealthConnectionException) {
+        } catch (EHealthConnectionException) {
             $this->assertDatabaseMissing('service_request_requests', ['uuid' => $uuid]);
         }
     }

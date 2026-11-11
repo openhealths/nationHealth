@@ -9,20 +9,27 @@ use App\Classes\eHealth\EHealthResponse;
 use App\Enums\Person\EncounterStatus;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Models\Permission;
 use App\Models\Person\Person;
+use App\Models\Relations\Party;
 use App\Models\User;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use GuzzleHttp\Psr7\Response as HttpResponse;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\GrantsReferralEmployeeRole;
 use Tests\TestCase;
 
 /**
@@ -34,6 +41,7 @@ use Tests\TestCase;
 class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
 {
     use DatabaseTransactions;
+    use GrantsReferralEmployeeRole;
 
     protected User $user;
 
@@ -49,7 +57,7 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
     {
         parent::setUp();
 
-        $party = \App\Models\Relations\Party::create([
+        $party = Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Іван',
             'last_name' => 'Петренко',
@@ -65,8 +73,8 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
             'party_id' => $party->id,
         ]);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'OUTPATIENT')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'OUTPATIENT']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'OUTPATIENT')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'OUTPATIENT']);
 
         $this->legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -90,6 +98,9 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
             'party_id' => $party->id,
         ]);
         $this->user->employees()->attach($this->employee->id);
+        $this->grantReferralEmployeeRole($this->user, $this->employee);
+        $this->user->givePermissionToParent(Permission::findOrCreate('service_request:write', 'web'));
+        $this->actingAs($this->user);
 
         $this->person = Person::create([
             'uuid' => (string) Str::uuid(),
@@ -101,13 +112,13 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
             'process_disclosure_data_consent' => true,
         ]);
 
-        $performer = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $this->employee->uuid]);
-        $episodeId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => (string) Str::uuid()])->id;
-        $codingId = \App\Models\MedicalEvents\Sql\Coding::create([
+        $performer = Identifier::create(['value' => $this->employee->uuid]);
+        $episodeId = Identifier::create(['value' => (string) Str::uuid()])->id;
+        $codingId = Coding::create([
             'code' => 'AMB',
             'system' => 'eHealth/encounter_classes',
         ])->id;
-        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
+        $ccId = CodeableConcept::create()->id;
 
         $this->encounter = Encounter::create([
             'uuid' => (string) Str::uuid(),
@@ -126,8 +137,7 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
         $lifecycle = app(ReferralRequestLifecycleService::class);
         $performer = (string) Str::uuid();
         $division = (string) Str::uuid();
-        $prequalifyResponse = Mockery::mock(EHealthResponse::class);
-        $prequalifyResponse->shouldReceive('getData')->andReturn(['data' => [['status' => 'VALID']]]);
+        $prequalifyResponse = $this->qualificationResponse();
         $this->mock(PatientServiceRequest::class, function ($mock) use ($performer, $division, $prequalifyResponse): void {
             $mock->shouldReceive('prequalify')->once()->withArgs(function (string $personUuid, array $payload) use ($performer, $division): bool {
                 $this->assertSame($this->person->uuid, $personUuid);
@@ -189,7 +199,7 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
     {
         $migration = require database_path('migrations/update/0_1/2026_10_01_142000_add_transfer_fields_to_service_request_requests_table.php');
         $columns = ['performer_id', 'location_reference_id', 'performer_type_id'];
-        $schema = \Illuminate\Support\Facades\Schema::getFacadeRoot();
+        $schema = Schema::getFacadeRoot();
         $this->assertTrue($schema->hasColumns('service_request_requests', $columns));
         $migration->up();
         $migration->down();
@@ -290,10 +300,7 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
         $serviceId = (string) Str::uuid();
         $programId = (string) Str::uuid();
 
-        $prequalifyResponse = Mockery::mock(EHealthResponse::class);
-        $prequalifyResponse->shouldReceive('getData')->andReturn([
-            'data' => [['status' => 'VALID']],
-        ]);
+        $prequalifyResponse = $this->qualificationResponse($programId);
 
         $patientApi = Mockery::mock(PatientServiceRequest::class)->makePartial();
         $patientApi->shouldReceive('prequalify')
@@ -342,5 +349,12 @@ class EncounterStandaloneReferralCreateDiagnosticTest extends TestCase
     private function transferUpgradePath(): string
     {
         return database_path('migrations/update/0_1/2026_10_13_120000_ensure_referral_transfer_reference_columns.php');
+    }
+
+    private function qualificationResponse(?string $programId = null): EHealthResponse
+    {
+        $data = $programId === null ? [] : [['program_id' => $programId, 'program_name' => 'Synthetic program', 'status' => 'VALID']];
+
+        return new EHealthResponse(new HttpResponse(200, [], json_encode(['data' => $data], JSON_THROW_ON_ERROR)), PatientServiceRequest::validateQualification(...));
     }
 }

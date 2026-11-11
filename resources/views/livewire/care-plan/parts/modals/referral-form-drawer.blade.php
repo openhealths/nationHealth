@@ -1,3 +1,5 @@
+@use('Illuminate\Support\Facades\Lang')
+
 {{-- Outgoing Referral Form Drawer Overlay --}}
 <div
     x-show="showReferralDrawer"
@@ -285,7 +287,7 @@
                             @foreach ($referralForm['reason_reference'] as $info)
                                 @php
                                     $reasonTypeKey = 'care-plan.reason_reference_types.' . strtolower((string) ($info['type'] ?? ''));
-                                    $reasonTypeLabel = \Illuminate\Support\Facades\Lang::has($reasonTypeKey)
+                                    $reasonTypeLabel = Lang::has($reasonTypeKey)
                                         ? __($reasonTypeKey)
                                         : ($info['type'] ?? '');
                                 @endphp
@@ -305,7 +307,7 @@
                             @foreach ($referralForm['supporting_info'] as $info)
                                 @php
                                     $supportTypeKey = 'care-plan.reason_reference_types.' . strtolower((string) ($info['type'] ?? ''));
-                                    $supportTypeLabel = \Illuminate\Support\Facades\Lang::has($supportTypeKey)
+                                    $supportTypeLabel = Lang::has($supportTypeKey)
                                         ? __($supportTypeKey)
                                         : ($info['type'] ?? '');
                                 @endphp

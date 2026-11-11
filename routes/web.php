@@ -276,7 +276,7 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
                         ->middleware('permission:service_request:read')
                         ->name('search');
                     Route::post('/{uuid}/process', [ReferralController::class, 'process'])
-                        ->middleware('permission:service_request:makeinprogress')
+                        ->middleware('permission:service_request:use')
                         ->name('process');
                     Route::post('/{uuid}/complete', [ReferralController::class, 'complete'])
                         ->middleware('permission:service_request:complete')

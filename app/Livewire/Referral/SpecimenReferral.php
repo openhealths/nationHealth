@@ -7,6 +7,7 @@ namespace App\Livewire\Referral;
 use App\Classes\eHealth\EHealth;
 use App\Core\BaseForm;
 use App\Enums\MedicalProgram\Type as MedicalProgramType;
+use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Concerns\SubmitsClinicalOperations;
 use App\Livewire\Referral\Forms\ServiceRequestForm;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
@@ -167,12 +168,28 @@ class SpecimenReferral extends Component
             'quantity' => ['required', 'numeric', 'min:0.01'],
             'note' => ['string', 'max:1000'],
         ]);
-        $record = app(ReferralRequestLifecycleService::class)->createSpecimenDraft($this->specimen(), $this->patient(), [
-            'service_id' => $this->serviceId, 'service_type' => collect($this->serviceChoices)->firstWhere('id', $this->serviceId)['type'],
-            'program_id' => $this->programId === '' ? null : $this->programId,
-            'started_at' => $this->startedAt, 'ended_at' => $this->endedAt,
-            'quantity' => $this->quantity, 'note' => $this->note,
-        ], $employee, $this->draftUuid, $prepareSigning);
+        try {
+            $record = app(ReferralRequestLifecycleService::class)->createSpecimenDraft($this->specimen(), $this->patient(), [
+                'service_id' => $this->serviceId, 'service_type' => collect($this->serviceChoices)->firstWhere('id', $this->serviceId)['type'],
+                'program_id' => $this->programId === '' ? null : $this->programId,
+                'started_at' => $this->startedAt, 'ended_at' => $this->endedAt,
+                'quantity' => $this->quantity, 'note' => $this->note,
+            ], $employee, $this->draftUuid, $prepareSigning);
+        } catch (ValidationException $exception) {
+            $this->setErrorBag($exception->validator->errors());
+            Session::flash('error', $exception->validator->errors()->first());
+
+            return false;
+        } catch (EHealthValidationException $exception) {
+            Session::flash('error', $exception->getTranslatedMessage());
+
+            return false;
+        } catch (Throwable $exception) {
+            report($exception);
+            Session::flash('error', __('referrals.messages.operation_failed'));
+
+            return false;
+        }
         $this->draftUuid = $record->uuid;
         Session::flash('success', __('referrals.draft_saved'));
         if ($prepareSigning) {
@@ -230,7 +247,12 @@ class SpecimenReferral extends Component
 
     public function checkStatus(): void
     {
-        if ($this->draftUuid === null || Auth::user()->cannot('search', ServiceRequestRequest::class)) {
+        if (Auth::user()->cannot('search', ServiceRequestRequest::class)) {
+            Session::flash('error', __('referrals.messages.use_forbidden'));
+
+            return;
+        }
+        if ($this->draftUuid === null) {
             return;
         }
         $record = Repository::serviceRequest()->requestForSpecimen($this->draftUuid, $this->specimen(), $this->patient());

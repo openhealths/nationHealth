@@ -16,6 +16,8 @@ use App\Services\MedicalEvents\InformWith;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use App\Services\MedicalEvents\MedicalRequestOwnership;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
@@ -42,19 +44,22 @@ class EncounterReferralCreate extends EncounterDocumentCreate
     public function mount(LegalEntity $legalEntity, ?Person $person = null, ?Preperson $preperson = null, ?Encounter $encounter = null, ?int $referral = null): void
     {
         $this->referralId = $referral;
+        $this->referralReadOnly = request()->routeIs('persons.encounters.referrals.show');
         parent::mount($legalEntity, $person, $preperson, $encounter);
     }
 
     protected function documentAbility(): string
     {
-        return 'createServiceRequest';
+        return $this->referralReadOnly ? 'view' : 'createServiceRequest';
     }
 
     protected function initializeComponent(): void
     {
         $referralId = $this->referralId;
         $submissionId = $referralId !== null ? (string) $referralId : request()->query('submission');
-        $this->openEncounterReferralDrawer();
+        if (!$this->referralReadOnly) {
+            $this->openEncounterReferralDrawer();
+        }
         $this->referralId = $referralId;
         if (!is_string($submissionId) || (!ctype_digit($submissionId) && !Str::isUuid($submissionId))) {
             return;
@@ -67,14 +72,32 @@ class EncounterReferralCreate extends EncounterDocumentCreate
             ? Repository::serviceRequest()->findForPatient((int) $submissionId, $this->patient())->uuid
             : $submissionId;
         $record = app(MedicalRequestOwnership::class)->serviceForEncounter($submissionUuid, $encounter);
+        if ($this->referralReadOnly && Auth::user()->cannot('viewRecord', $record)) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+            $this->returnToEncounter();
+
+            return;
+        }
         $resource = Repository::serviceRequest()->getResource($record);
+        $this->encounterReferralRequestIdToSign = $record->uuid;
         $fields = (new ServiceRequestMapper())->fromFhir($resource);
+        if ($this->referralReadOnly) {
+            $this->encounterReferralForm = $fields + ['care_plan_id' => 0, 'care_plan_activity_id' => 0, 'inform_with' => '', 'performer_type' => '', 'location_reference' => ''];
+        }
         foreach (array_keys($this->encounterReferralForm) as $field) {
             if (array_key_exists($field, $fields)) {
                 $this->encounterReferralForm[$field] = $fields[$field] ?? $this->encounterReferralForm[$field];
             }
         }
         $this->encounterReferralForm['program_id'] = $fields['program_id'] ?? '';
+        $activity = filled($fields['based_on_uuid'] ?? null)
+            ? Repository::serviceRequest()->activityContext($fields['based_on_uuid'], (int) $this->personId)
+            : [];
+        if ($activity !== []) {
+            // Keep the saved basis even when access expired; save/sign must reject it rather than silently detach it.
+            $this->encounterReferralForm['care_plan_id'] = $activity['care_plan_id'];
+            $this->encounterReferralForm['care_plan_activity_id'] = $activity['care_plan_activity_id'];
+        }
         $authMethodId = data_get($resource, 'informWith.authMethodId');
         $authMethod = collect($this->encounterReferralAuthMethods)->first(
             static fn (array $method): bool => ($method['uuid'] ?? null) === $authMethodId

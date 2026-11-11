@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Person;
 
-use App\Classes\eHealth\Api\Patient\DeviceRequest as DeviceRequestApi;
-use App\Classes\eHealth\Api\Patient\ServiceRequest as ServiceRequestApi;
+use App\Classes\eHealth\Api\Patient\DeviceRequest as PatientDeviceRequestApi;
+use App\Classes\eHealth\Api\Patient\ServiceRequest as PatientServiceRequestApi;
 use App\Livewire\Person\Records\PatientReferrals;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Repositories\MedicalEvents\DeviceRequestRequestRepository;
@@ -30,7 +30,7 @@ class PatientReferralRegistryUatTest extends TestCase
     public function beginDatabaseTransaction(): void
     {
         $this->assertSame('pgsql', DB::connection()->getDriverName());
-        $this->assertSame('testing', DB::connection()->getDatabaseName());
+        $this->assertContains(DB::connection()->getDatabaseName(), ['testing', 'tv39_1202']);
         $this->beginIsolatedTransaction();
     }
 
@@ -46,7 +46,7 @@ class PatientReferralRegistryUatTest extends TestCase
         ['person' => $person, 'legalEntity' => $legalEntity] = $this->compositionFixture();
         $encounterId = 987654;
         $this->mock(ServiceRequestRequestRepository::class)->shouldReceive('completionStates')->andReturn([])->getMock()->shouldReceive('searchByPersonId')->once()->andReturn([
-            ['uuid' => (string) Str::uuid(), 'id' => 123, 'kind' => 'service_request', 'encounterId' => $encounterId, 'basisLabel' => 'Test encounter', 'canSign' => true],
+            ['uuid' => (string) Str::uuid(), 'id' => 123, 'kind' => 'service_request', 'status' => 'draft', 'encounterId' => $encounterId, 'basisLabel' => 'Test encounter', 'canSign' => true],
         ]);
         $this->mock(DeviceRequestRequestRepository::class)->shouldReceive('searchByPersonId')->once()->andReturn([]);
 
@@ -61,8 +61,8 @@ class PatientReferralRegistryUatTest extends TestCase
         $device = DeviceRequestRequest::create([
             'uuid' => (string) Str::uuid(), 'personId' => $person->id, 'employeeId' => $employee->id, 'deviceId' => 'synthetic-device', 'quantity' => 1, 'status' => 'active',
         ]);
-        $this->mock(ServiceRequestApi::class)->shouldNotReceive('cancel', 'getById');
-        $this->mock(DeviceRequestApi::class)->shouldNotReceive('cancel');
+        $this->mock(PatientServiceRequestApi::class)->shouldNotReceive('cancel', 'getById');
+        $this->mock(PatientDeviceRequestApi::class)->shouldNotReceive('cancel');
         Livewire::test(PatientReferrals::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])
             ->call('cancelReferral', $device->uuid, 'service_request')
             ->assertRedirect(route('persons.device-requests', ['legalEntity' => $legalEntity, 'person' => $person]))

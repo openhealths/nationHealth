@@ -331,7 +331,7 @@ class ReferralTest extends TestCase
             'own new referral ready for use' => ['new', 'new', true, [], ['process']],
             'own active referral in progress' => ['active', 'in_progress', true, [], ['openCompleteModal', 'openCancelModal']],
             'own new referral in progress' => ['new', 'in_progress', true, [], []],
-            'own referral without take permission' => ['active', 'new', true, ['service_request:makeinprogress'], []],
+            'own referral without take permission' => ['active', 'new', true, ['service_request:use'], []],
             'own referral with only complete permission' => ['active', 'in_progress', true, ['service_request:use'], ['openCompleteModal']],
             'own referral with only release permission' => ['active', 'in_progress', true, ['service_request:complete'], ['openCancelModal']],
             'own referral without usage permissions' => ['active', 'in_progress', true, ['service_request:complete', 'service_request:use'], []],

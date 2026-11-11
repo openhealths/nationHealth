@@ -4,28 +4,61 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Livewire;
 
+use App\Core\BaseForm;
+use App\Enums\JobStatus;
 use App\Enums\Person\EncounterStatus;
 use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
 use App\Livewire\Referral\ReferralIndex;
+use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Models\Person\Person;
+use App\Models\User;
+use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
+use App\Services\Dictionary\Dictionaries\ServiceDictionary;
+use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Mockery;
 use RuntimeException;
+use Tests\Concerns\MocksBasicDictionaries;
 use Tests\TestCase;
 
 class EncounterReferralFlowTest extends TestCase
 {
-    use \Tests\Concerns\MocksBasicDictionaries;
+    use MocksBasicDictionaries;
+
+    private const string EMPLOYEE_UUID = '10050000-0000-4000-8000-000000000010';
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->mockBasicDictionaries(['SERVICE_REQUEST_PRIORITY' => ['routine' => 'Планове', 'urgent' => 'Ургентне']]);
+        Cache::forever(ServiceDictionary::KEY, [[
+            'id' => 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', 'code' => 'SYNTHETIC',
+            'name' => 'Synthetic service', 'category' => 'diagnostic_procedure',
+            'is_composition' => false, 'is_active' => true, 'request_allowed' => true,
+            'inserted_at' => '2026-01-01T09:00:00Z', 'updated_at' => '2026-01-01T09:00:00Z',
+            'inserted_by' => self::EMPLOYEE_UUID, 'updated_by' => self::EMPLOYEE_UUID,
+        ]]);
+        Cache::forever(ServiceDictionary::KEY.':fresh', true);
+        $employee = (new Employee())->forceFill(['id' => 10, 'uuid' => self::EMPLOYEE_UUID]);
+        $user = Mockery::mock(User::class)->makePartial();
+        $user->shouldReceive('activeDoctorEmployee')->andReturn($employee);
+        $user->shouldReceive('isAssistantOnly')->andReturn(false);
+        $user->shouldReceive('cannot')->with('create', Mockery::on(static fn (array $arguments): bool =>
+            $arguments[0] === ServiceRequestRequest::class
+            && $arguments[1] === $employee
+            && $arguments[2] === 'diagnostic_procedure'
+            && $arguments[3] instanceof Encounter))->andReturn(false);
+        Auth::shouldReceive('user')->andReturn($user);
+        $this->mock(ServiceRequestRequestRepository::class)->shouldReceive('authorForDraft')
+            ->with(10, self::EMPLOYEE_UUID)->andReturn($employee);
     }
 
     public function testFinishedEncounterOpensAndInitializesReferralDrawer(): void
@@ -40,7 +73,7 @@ class EncounterReferralFlowTest extends TestCase
 
         $this->assertTrue($component->showEncounterReferralDrawer);
         $this->assertSame('', $component->encounterReferralForm['service_id']);
-        $this->assertSame(now()->format('d.m.Y'), $component->encounterReferralForm['started_at']);
+        $this->assertSame(now()->addMinutes(30)->format('d.m.Y'), $component->encounterReferralForm['started_at']);
         $this->assertSame([], $component->encounterReferralServiceResults);
         $this->assertNull($component->encounterReferralSelectedService);
         $this->assertSame('', $component->encounterReferralWarningMessage);
@@ -79,12 +112,11 @@ class EncounterReferralFlowTest extends TestCase
         $component = $this->finishedEncounterComponent();
         $component->openEncounterReferralDrawer();
         $component->encounterReferralForm['service_id'] = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
-        Auth::shouldReceive('user')->once()->andReturnNull();
 
-        $employeeContext = ['employee_id' => 10];
+        $employeeContext = ['employee_id' => 10, 'employee_uuid' => self::EMPLOYEE_UUID];
         $lifecycle = Mockery::mock(ReferralRequestLifecycleService::class);
         $lifecycle->shouldReceive('resolveEncounterEmployeeContext')->once()
-            ->with($component->encounter, null)->andReturn($employeeContext);
+            ->with($component->encounter, 10)->andReturn($employeeContext);
         $lifecycle->shouldReceive('createEncounterDraft')->once()
             ->with($component->encounter, Mockery::type('array'), $employeeContext, null)
             ->andReturn('11111111-2222-4333-8444-555555555555');
@@ -132,9 +164,9 @@ class EncounterReferralFlowTest extends TestCase
         $component = $this->finishedEncounterComponent();
         $component->openEncounterReferralDrawer();
         $component->encounterReferralForm['service_id'] = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
-        Auth::shouldReceive('user')->once()->andReturnNull();
         $lifecycle = Mockery::mock(ReferralRequestLifecycleService::class);
-        $lifecycle->shouldReceive('resolveEncounterEmployeeContext')->once()->andReturn([]);
+        $lifecycle->shouldReceive('resolveEncounterEmployeeContext')->once()->with($component->encounter, 10)
+            ->andReturn(['employee_id' => 10, 'employee_uuid' => self::EMPLOYEE_UUID]);
         $lifecycle->shouldReceive('createEncounterDraft')->once()->andThrow(new RuntimeException('Draft failed'));
         $lifecycle->shouldNotReceive('prepareEncounterDraftForSigning');
         $this->instance(ReferralRequestLifecycleService::class, $lifecycle);
@@ -151,20 +183,20 @@ class EncounterReferralFlowTest extends TestCase
     public function testManualStatusCheckReportsCompletedReferralWithoutRemoteRequest(): void
     {
         $component = $this->finishedEncounterComponent();
-        $record = new \App\Models\MedicalEvents\Sql\ServiceRequestRequest();
+        $record = new ServiceRequestRequest();
         $record->uuid = '11111111-2222-4333-8444-555555555555';
         $record->status = 'active';
         $record->requestNumber = '0000-TEST-1234-5678';
         $component->encounterReferralRequestIdToSign = $record->uuid;
-        $component->encounterReferralSubmission = ['status' => \App\Enums\JobStatus::PENDING->value];
-        $component->form = Mockery::mock(\App\Core\BaseForm::class);
+        $component->encounterReferralSubmission = ['status' => JobStatus::PENDING->value];
+        $component->form = Mockery::mock(BaseForm::class);
         $component->form->shouldReceive('resetSigningFields')->once();
 
-        $ownership = Mockery::mock(new \App\Services\MedicalEvents\MedicalRequestOwnership());
+        $ownership = Mockery::mock(new MedicalRequestOwnership());
         $ownership->shouldReceive('serviceForEncounter')->once()->with($record->uuid, $component->encounter)->andReturn($record);
-        $this->instance(\App\Services\MedicalEvents\MedicalRequestOwnership::class, $ownership);
-        $this->mock(\App\Repositories\MedicalEvents\ServiceRequestRequestRepository::class)
-            ->shouldReceive('submissionState')->once()->with($record)->andReturn(['status' => \App\Enums\JobStatus::PROCESSED->value]);
+        $this->instance(MedicalRequestOwnership::class, $ownership);
+        $this->mock(ServiceRequestRequestRepository::class)
+            ->shouldReceive('submissionState')->once()->with($record)->andReturn(['status' => JobStatus::PROCESSED->value]);
         $this->mock(ReferralRequestLifecycleService::class)->shouldNotReceive('fetchRemoteReferral');
 
         $component->checkEncounterReferralSubmission(true);
@@ -181,20 +213,20 @@ class EncounterReferralFlowTest extends TestCase
     {
         $component = $this->finishedEncounterComponent();
         $component->encounter->person_id = 1;
-        $record = new \App\Models\MedicalEvents\Sql\ServiceRequestRequest();
+        $record = new ServiceRequestRequest();
         $record->uuid = '11111111-2222-4333-8444-555555555555';
         $record->status = 'draft';
         $component->encounterReferralRequestIdToSign = $record->uuid;
-        $pending = ['status' => \App\Enums\JobStatus::PENDING->value, 'error' => null];
+        $pending = ['status' => JobStatus::PENDING->value, 'error' => null];
         $component->encounterReferralSubmission = $pending;
-        $person = new \App\Models\Person\Person();
+        $person = new Person();
         $person->uuid = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 
-        $ownership = Mockery::mock(new \App\Services\MedicalEvents\MedicalRequestOwnership());
+        $ownership = Mockery::mock(new MedicalRequestOwnership());
         $ownership->shouldReceive('serviceForEncounter')->once()->with($record->uuid, $component->encounter)->andReturn($record);
-        $this->instance(\App\Services\MedicalEvents\MedicalRequestOwnership::class, $ownership);
-        $repository = $this->mock(\App\Repositories\MedicalEvents\ServiceRequestRequestRepository::class);
-        $repository->shouldReceive('person')->once()->with(1)->andReturn($person);
+        $this->instance(MedicalRequestOwnership::class, $ownership);
+        $repository = $this->mock(ServiceRequestRequestRepository::class);
+        $repository->shouldReceive('patientForEncounter')->once()->with($component->encounter)->andReturn($person);
         $repository->shouldReceive('submissionState')->once()->with($record)->andReturn($pending);
         $repository->shouldNotReceive('importResource');
         $this->mock(ReferralRequestLifecycleService::class)
@@ -231,7 +263,7 @@ class EncounterReferralHarness extends Component
 
     public Encounter $encounter;
 
-    public \App\Core\BaseForm $form;
+    public BaseForm $form;
 
     public ?int $prepersonId = null;
 

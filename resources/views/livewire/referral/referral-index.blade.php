@@ -165,8 +165,6 @@
         </div>
     </div>
 
-    @include('livewire.referral.parts.referral-status-modals')
-
     <!-- Cancel Usage Modal -->
     @if ($showCancelModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50" aria-modal="true" role="dialog">
@@ -228,9 +226,9 @@
     @if ($showUseModal)
         <div class="modal" role="dialog" aria-modal="true">
             <div class="modal-wrapper">
-                <form class="modal-content p-6" wire:submit="confirmUse">
-                    <h3 class="modal-header">{{ __('referrals.messages.use_options') }}</h3>
-                    <label for="referralExecutor" class="default-label">{{ __('referrals.messages.executor') }}</label>
+                <form class="modal-content w-full max-w-lg p-6" wire:submit="confirmUse">
+                    <h3 class="modal-header">{{ __('referrals.use_options') }}</h3>
+                    <label for="referralExecutor" class="default-label">{{ __('referrals.executor') }}</label>
                     <select id="referralExecutor" class="input-select w-full" wire:model="selectedExecutorId">
                         <option value="0">{{ __('forms.select') }}</option>
                         @foreach ($this->executorChoices as $employee)

@@ -11,6 +11,9 @@
         <script src="{{ asset('js/print-sandboxed.js') }}"></script>
     @endassets
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
+    @if ($registryPrintUuid !== null)
+        <div x-data x-init="$wire.loadReferralPrintoutForm(@js($registryPrintUuid)).then((html) => { if (html) window.printSandboxedHtml(html); })"></div>
+    @endif
     @include('livewire.encounter-package.parts.referral-redeem-modal')
     @include('livewire.person.records.parts.completed-referral-resource')
     @if ($syncBatchId !== null)

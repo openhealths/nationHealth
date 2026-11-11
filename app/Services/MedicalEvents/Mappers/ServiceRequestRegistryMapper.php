@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Lang;
 use Throwable;
 
 /** Project persisted referral data into registry and encounter-card display values. */
-final class ServiceRequestRegistryMapper
+class ServiceRequestRegistryMapper
 {
     private ?array $serviceNames = null;
 

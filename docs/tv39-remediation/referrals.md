@@ -23,6 +23,18 @@
 | G01 (R) | API contracts та response-before-consumption | ServiceRequest resource/list/specimen/qualify/prequalify/receipt/SMS, nested service dictionary та Division search мають валідатори. Delegation зберігає validator; перед mapper/storage/UI/cache застосовується validate(). Final submission перевіряє всі native ресурси списку до вибору/merge; malformed result залишає pending без мутацій. Окремо підтримано документовані status-only acknowledgements. `ServiceRequestContractTv39Test`, `ServiceRequestSubmissionTest`, `DivisionSearchContractTest`. Спільні DeviceDefinition reads належать G01 umbrella. |
 | G02 (R) | 1.1.7: RFC4122 UUID першої версії | Нові клінічні referral ID утворюються `Uuid::uuid1()`; старі UUID під час редагування зберігаються, UI/cache keys не змінюються. `ReferralTv39WorkflowTest`. |
 
+## Продуктові сценарії BA03/BA04/BA07/BA08
+
+BA03/BA07 використовують спільний provider пов'язаних клінічних документів. Таблиця нижче описує частину направлень; приймання інших модулів належить umbrella #1201.
+
+| Точка входу | Поведінка направлень | Перевірка |
+| --- | --- | --- |
+| Взаємодія | Створення з точним поточним автором і контекстом; перегляд зареєстрованого направлення через окремий read-only маршрут із policy. Для BA08 — пошук наявного ПЛ, вибір призначення, запит/перевірка approval конкретного виконавця, native залишок і одиниці, перевірка актуальних зв'язків перед та після KEP. | `EncounterDocumentPagesTest`, `EncounterReferralPlanLinkTest`, `ReferralRegisteredActionsTest`. |
+| Картка пацієнта / призначення ПЛ | Читання й друк потребують права читання; відкликання/помилка перевіряють поточну роль, scope, заклад видавця та active стан. Підпис із реєстру повторно перевіряє source encounter і актуальний доступ до призначення. Signing field errors лишають модаль відкритою. | `ReferralRegisteredActionsTest`, `EncounterReferralPlanLinkTest`, `ReferralTv39WorkflowTest`, `PatientReferralRegistryUatTest`. |
+| Загальний реєстр за точним номером (BA04) | Дії перегляду/друку/відкликання/помилки застосовуються до точного UUID. Перегляд веде до доступного джерела encounter/ПЛ або картки; незбережений результат проходить повну перевірку identity перед імпортом. Terminal стан зберігає перегляд/друк, а mutation дії доступні лише за відповідною policy. | `ReferralRegisteredActionsTest` перевіряє native результат, HTML меню, допустимий шлях і відмову без SQL/API/queue/signing. Browser suite перевіряє реальний dropdown і Livewire аргументи. |
+
+Provider ПЛ з `12781f70` та selected-actor helper з `e07fc925` інтегровані без заміни encounter author історичним автором ПЛ. BA02 capacity враховує підтверджені направлення за distinct UUID і вже створені призначення; draft/pending не збільшують capacity. Відсутній або прострочений verified approval блокує створення й підписання.
+
 ## Джерела контрактів
 
 Локальний офіційний архів ЕСОЗ `ehealth-documentation/openapi/preprod/medical-events.json` і `general-mis.json`, знімок 22.10.2026, та відповідні `references/preprod` сторінки Get Service Request Details, Get Service Requests in Specimen Context, Qualify/PreQualify/Use/Complete, Get Services Dictionary, Search Divisions. Деталі ресурсу, `used_by_legal_entity_history`, category/service group membership, identity/ref/envelope/paging правила звірені до реалізації. Medical Events paging використовує `page`, General MIS — `page_number`.

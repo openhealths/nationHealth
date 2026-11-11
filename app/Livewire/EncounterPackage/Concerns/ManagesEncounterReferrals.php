@@ -56,6 +56,60 @@ trait ManagesEncounterReferrals
 
     public string $encounterReferralWarningMessage = '';
 
+    public string $encounterReferralPlanSearch = '';
+
+    #[Computed]
+    public function encounterReferralPlanChoices(): array
+    {
+        $encounter = $this->resolveEncounterModelForStandalone();
+        if ($encounter === null || $encounter->getAttribute('person_id') === null) {
+            return [];
+        }
+        $actor = $this->encounterReferralEmployeeContext($encounter);
+
+        return Repository::carePlan()->documentPlanChoices($encounter->getAttribute('person_id'), $encounter->uuid, Auth::user(), $this->encounterReferralPlanSearch, $actor['employee_uuid']);
+    }
+
+    #[Computed]
+    public function encounterReferralActivityChoices(): array
+    {
+        $encounter = $this->resolveEncounterModelForStandalone();
+        $planId = (int) ($this->encounterReferralForm['care_plan_id'] ?? 0);
+        if ($encounter === null || $encounter->getAttribute('person_id') === null || $planId === 0) {
+            return [];
+        }
+        $actor = $this->encounterReferralEmployeeContext($encounter);
+
+        return Repository::carePlan()->documentActivityChoices($planId, $encounter->getAttribute('person_id'), $encounter->uuid, Auth::user(), 'service_request', $actor['employee_uuid']);
+    }
+
+    #[Computed]
+    public function encounterReferralApprovalContext(): array
+    {
+        $planId = (int) ($this->encounterReferralForm['care_plan_id'] ?? 0);
+        $choice = collect($this->encounterReferralPlanChoices)->firstWhere('id', $planId);
+        $encounter = $this->resolveEncounterModelForStandalone();
+        if ($choice === null || !$choice['approvalRequired'] || $encounter === null) {
+            return [];
+        }
+
+        return ['carePlan' => Repository::carePlan()->findById($planId), 'actingEmployeeUuid' => $this->encounterReferralEmployeeContext($encounter)['employee_uuid']];
+    }
+
+    #[On('care-plan-approvals-changed')]
+    public function refreshEncounterReferralPlanAccess(): void
+    {
+        // A pending approval does not grant access; the provider rechecks its verified status for the selected actor.
+        unset($this->encounterReferralPlanChoices, $this->encounterReferralActivityChoices, $this->encounterReferralApprovalContext);
+    }
+
+    private function encounterReferralEmployeeContext(Encounter $encounter): array
+    {
+        $draft = $this->encounterReferralRequestIdToSign === null ? null : MedicalEventsRepository::serviceRequest()->findByUuid($this->encounterReferralRequestIdToSign);
+
+        return app(ReferralRequestLifecycleService::class)->resolveEncounterEmployeeContext($encounter, $draft?->employeeId ?? Auth::user()->activeDoctorEmployee()?->id);
+    }
+
     #[Locked]
     public array $encounterReferralSubmission = [];
 
@@ -163,6 +217,9 @@ trait ManagesEncounterReferrals
             'performer' => $transfer['uuid'] ?? '',
             'location_reference' => '',
             'performer_type' => '',
+            'care_plan_id' => 0,
+            'care_plan_activity_id' => 0,
+            'based_on_uuid' => null,
         ];
 
         if ($transfer !== null) {
@@ -197,6 +254,28 @@ trait ManagesEncounterReferrals
             $this->resetValidation('encounterReferralForm.'.$key);
         }
         $this->encounterReferralWarningMessage = '';
+        if ($key === 'care_plan_id') {
+            $this->encounterReferralForm['care_plan_activity_id'] = 0;
+            $this->encounterReferralForm['based_on_uuid'] = null;
+        }
+        if ($key === 'care_plan_activity_id' && (int) $value > 0) {
+            $activity = collect($this->encounterReferralActivityChoices)->firstWhere('id', (int) $value);
+            if ($activity !== null) {
+                $this->encounterReferralForm['based_on_uuid'] = $activity['uuid'];
+                $serviceId = data_get($activity, 'productReference.identifier.value');
+                if (is_string($serviceId)) {
+                    $service = $this->resolveEncounterReferralServiceChoice(['id' => $serviceId]);
+                    if ($service !== null) {
+                        $this->encounterReferralForm['service_id'] = $serviceId;
+                        $this->encounterReferralSelectedService = $service;
+                        $this->applyEncounterReferralServiceCategory($service);
+                    }
+                }
+            }
+        }
+        if ($key === 'care_plan_activity_id' && (int) $value === 0) {
+            $this->encounterReferralForm['based_on_uuid'] = null;
+        }
     }
 
     public function searchEncounterReferralServices(): void
@@ -309,6 +388,11 @@ trait ManagesEncounterReferrals
 
     public function validateEncounterReferral(bool $sign = true): void
     {
+        if ($this->referralReadOnly ?? false) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+
+            return;
+        }
         if ($this->encounterReferralRequestIdToSign !== null) {
             $this->checkEncounterReferralSubmission();
             if (($this->encounterReferralSubmission['status'] ?? null) === JobStatus::PENDING->value || $this->encounterReferralRequestIdToSign === null) {
@@ -347,10 +431,7 @@ trait ManagesEncounterReferrals
         }
 
         try {
-            $employeeContext = app(ReferralRequestLifecycleService::class)->resolveEncounterEmployeeContext(
-                $encounter,
-                Auth::user()?->activeDoctorEmployee()?->id
-            );
+            $employeeContext = $this->encounterReferralEmployeeContext($encounter);
 
             $employee = MedicalEventsRepository::serviceRequest()->authorForDraft($employeeContext['employee_id'], $employeeContext['employee_uuid']);
             if ($employee === null || Auth::user()->cannot('create', [ServiceRequestRequest::class, $employee, $this->encounterReferralForm['category'], $encounter])) {
@@ -490,6 +571,11 @@ trait ManagesEncounterReferrals
 
     public function signEncounterReferral(): void
     {
+        if ($this->referralReadOnly ?? false) {
+            Session::flash('error', __('referrals.messages.action_unavailable'));
+
+            return;
+        }
         if (empty($this->encounterReferralRequestIdToSign)) {
             Session::flash('error', __('Не вибрано направлення для підписання'));
             $this->showSignatureModal = false;
@@ -541,6 +627,8 @@ trait ManagesEncounterReferrals
                 return;
             }
             $dbData = $lifecycle->buildSignDbData($requestRecord, null, $encounter, $employeeContext);
+            // Approval, product and remaining quantity may change while the KEP modal is open.
+            $dbData = MedicalEventsRepository::serviceRequest()->encounterActivityContext($encounter, $dbData, $employeeContext['employee_uuid']);
 
             $this->assertEncounterReferralPeriod($dbData);
             $validated = $this->form->validate($this->form->signingRules());
@@ -553,7 +641,7 @@ trait ManagesEncounterReferrals
                 'legal_entity_uuid' => $employeeContext['legal_entity_uuid'],
             ];
 
-            $resource = (new ServiceRequestMapper())->toFhir($dbData, $uuids + ['resource' => MedicalEventsRepository::serviceRequest()->getResource($requestRecord)]);
+            $resource = (new ServiceRequestMapper())->toFhir($dbData, $uuids + ['resource' => MedicalEventsRepository::serviceRequest()->getResource($requestRecord), 'carePlanUuid' => $dbData['care_plan_uuid'] ?? null]);
             $signPayload = ServiceRequestForm::buildCreateContent($resource);
 
             $signedContent = signatureService()->signData(
@@ -565,6 +653,19 @@ trait ManagesEncounterReferrals
             );
 
             $this->assertEncounterReferralPeriod($dbData);
+            // Repeat the source's existing policy checks after KEP and use the saved category, not mutable form state.
+            $encounter = $this->resolveEncounterModelForStandalone();
+            $author = MedicalEventsRepository::serviceRequest()->authorForDraft($employeeContext['employee_id'], $employeeContext['employee_uuid']);
+            if ($encounter === null || $author === null
+                || Auth::user()->cannot('create', [ServiceRequestRequest::class, $author, (string) ($dbData['category'] ?? ''), $encounter])) {
+                Session::flash('error', __('referrals.messages.action_unavailable'));
+
+                return;
+            }
+            $freshContext = MedicalEventsRepository::serviceRequest()->encounterActivityContext($encounter, $dbData, $employeeContext['employee_uuid']);
+            if ($freshContext !== $dbData) {
+                throw ValidationException::withMessages(['encounterReferralForm.care_plan_activity_id' => __('referrals.messages.activity_unavailable')]);
+            }
             $requestRecord = MedicalEventsRepository::serviceRequest()->storeResource($resource, $person, $requestRecord->employeeId, $requestRecord->divisionId);
             $finalResponse = $this->submitClinicalOperation($requestRecord, ['status' => 'active'], fn () => SubmissionApi::serviceRequest()->createSigned($person->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']));
             if ($finalResponse === null) {
@@ -970,9 +1071,9 @@ trait ManagesEncounterReferrals
             }
 
             $this->encounterReferralAuthMethods = collect($authMethods)->map(static function (array $method): array {
-                $uuid = (string) ($method['id'] ?? $method['uuid'] ?? '');
+                $uuid = (string) ($method['id'] ?? ($method['uuid'] ?? ''));
                 $type = (string) ($method['type'] ?? '');
-                $phone = (string) ($method['phone_number'] ?? $method['value'] ?? '');
+                $phone = (string) ($method['phone_number'] ?? ($method['value'] ?? ''));
 
                 return [
                     'uuid' => $uuid,

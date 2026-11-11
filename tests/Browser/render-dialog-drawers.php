@@ -12,6 +12,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\View\ViewServiceProvider;
+use RuntimeException;
 
 $projectRoot = dirname(__DIR__, 2);
 $app = new Application($projectRoot);
@@ -47,7 +48,8 @@ foreach ($pairs as $kind => [$formView, $searchView]) {
     preg_match('/@click="('.$searchModel[1].' = false)"/', $searchSource, $cancelMatch);
 
     // Device reopening is a Livewire action; simulate its asynchronous UI transition.
-    if ($kind === 'device' && str_contains($formSource, 'wire:click="openMedicalDeviceSearch"')) {
+    if (($kind === 'device' && str_contains($formSource, 'wire:click="openMedicalDeviceSearch"'))
+        || ($kind === 'service' && str_contains($formSource, 'wire:click="openServiceSearch"'))) {
         $openMatch[1] = 'setTimeout(() => '.$searchModel[1].' = true, 25)';
     }
 

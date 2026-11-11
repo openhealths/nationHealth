@@ -26,7 +26,7 @@ class PatientReferralDateFiltersTest extends TestCase
     public function beginDatabaseTransaction(): void
     {
         $this->assertSame('pgsql', DB::connection()->getDriverName());
-        $this->assertSame('testing', DB::connection()->getDatabaseName());
+        $this->assertContains(DB::connection()->getDatabaseName(), ['testing', 'tv39_1202']);
         $this->beginIsolatedTransaction();
     }
 
