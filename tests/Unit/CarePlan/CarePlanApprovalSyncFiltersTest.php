@@ -235,6 +235,65 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
         $this->assertSame($approval->id, MedicalEventsRepository::approval()->pendingCarePlanReadRequest($plan->person, $employee->uuid, [$plan->uuid])?->id);
     }
 
+    public function test_patient_snapshot_expires_missing_care_plan_grants_without_changing_other_consent_rules(): void
+    {
+        $plan = $this->makeCarePlan();
+        $person = $plan->person;
+        $employeeUuid = $plan->author->uuid;
+        $repository = MedicalEventsRepository::approval();
+        $data = $this->remoteGrant($plan, $employeeUuid, (string) Str::uuid());
+        $data['access_level'] = 'read';
+        $stale = $this->patientGrant($data, $person);
+        $otherEmployee = $this->patientGrant($this->remoteGrant($plan, (string) Str::uuid(), (string) Str::uuid()), $person);
+        $otherPerson = $this->patientGrant($this->remoteGrant($plan, $employeeUuid, (string) Str::uuid()), $this->makeCarePlan()->person);
+        $pending = $this->patientGrant(array_replace($data, ['id' => (string) Str::uuid(), 'is_verified' => false]), $person);
+        $repository->attachEhealthLink($pending, ['href' => '/jobs/pending']);
+        $episodeData = array_replace($data, ['id' => (string) Str::uuid()]);
+        $episodeData['granted_resources'][0]['identifier']['type']['coding'][0]['code'] = 'episode_of_care';
+        $episodeData['granted_resources'][0]['identifier']['value'] = (string) Str::uuid();
+        $episodeApproval = $this->patientGrant($episodeData, $person);
+        $unchanged = collect([$otherEmployee, $otherPerson, $pending])->mapWithKeys(
+            static fn (Approval $approval): array => [$approval->id => $approval->fresh()->getAttributes()]
+        );
+        $this->assertCount(1, $repository->verifiedCarePlanReadRequests($person, $employeeUuid, [$plan->uuid]));
+        $this->mock(ApprovalApi::class)->shouldReceive('getMany')->once()->andReturn($this->approvalPage([]));
+
+        $repository->syncApprovals($person, 'person', ['granted_to.identifier.value' => $employeeUuid]);
+
+        $this->assertNull($stale->fresh()->status);
+        $this->assertTrue($stale->fresh()->getAttribute('is_verified'));
+        $this->assertFalse($stale->fresh()->expiresAt->isFuture());
+        $this->assertCount(0, $repository->verifiedCarePlanReadRequests($person, $employeeUuid, [$plan->uuid]));
+        $this->assertSame('inactive', $episodeApproval->fresh()->status);
+        $this->assertTrue($episodeApproval->fresh()->expiresAt->isFuture());
+        foreach ([$otherEmployee, $otherPerson, $pending] as $approval) {
+            $this->assertSame($unchanged[$approval->id], $approval->fresh()->getAttributes());
+        }
+    }
+
+    public function test_failed_patient_snapshot_preserves_verified_care_plan_access(): void
+    {
+        $plan = $this->makeCarePlan();
+        $repository = MedicalEventsRepository::approval();
+        $data = $this->remoteGrant($plan, $plan->author->uuid, (string) Str::uuid());
+        $data['access_level'] = 'read';
+        $approval = $this->patientGrant($data, $plan->person);
+        $before = $approval->fresh()->getAttributes();
+        $this->mock(ApprovalApi::class)->shouldReceive('getMany')->once()->andThrow(new RuntimeException('Snapshot unavailable'));
+
+        $repository->syncApprovals($plan->person, 'person');
+
+        $this->assertSame($before, $approval->fresh()->getAttributes());
+        $this->assertCount(1, $repository->verifiedCarePlanReadRequests($plan->person, $plan->author->uuid, [$plan->uuid]));
+    }
+
+    private function patientGrant(array $data, Person $person): Approval
+    {
+        MedicalEventsRepository::approval()->sync($data, $person);
+
+        return Approval::whereUuid($data['id'])->firstOrFail();
+    }
+
     private function localGrant(CarePlan $plan, string $employeeUuid): Approval
     {
         $identifier = Identifier::create(['value' => $employeeUuid]);

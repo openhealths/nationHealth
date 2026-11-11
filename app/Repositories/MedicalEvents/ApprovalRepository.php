@@ -530,10 +530,19 @@ class ApprovalRepository extends BaseRepository
                         ->whereValue($additionalFilters['granted_to.identifier.value']));
                 }
 
-                // A complete snapshot can withdraw access; is_verified alone does not mean the grant is still valid.
-                $inactiveQuery->update($entity instanceof CarePlan
-                    ? ['expires_at' => now()]
-                    : ['status' => ApprovalStatus::INACTIVE->value]);
+                // Patient-owned care-plan consent uses expiry too; other patient resources retain their status rules.
+                if ($entity instanceof Person) {
+                    foreach ($inactiveQuery->with(['ehealthLinks.job', 'grantedResourceIdentifiers.type.coding'])->get() as $approval) {
+                        $approval->update($this->carePlanReadRequestUuids($approval) !== []
+                            ? ['expires_at' => now()]
+                            : ['status' => ApprovalStatus::INACTIVE->value]);
+                    }
+                } else {
+                    // A complete snapshot can withdraw access even when the approval is still verified.
+                    $inactiveQuery->update($entity instanceof CarePlan
+                        ? ['expires_at' => now()]
+                        : ['status' => ApprovalStatus::INACTIVE->value]);
+                }
             });
             $entity->unsetRelation('approvals');
         } catch (EHealthValidationException $e) {

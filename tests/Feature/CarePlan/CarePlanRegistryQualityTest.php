@@ -201,6 +201,27 @@ class CarePlanRegistryQualityTest extends TestCase
         Http::assertNothingSent();
     }
 
+    #[DataProvider('approvalVerificationFlags')]
+    public function test_approval_expiring_after_mount_is_hidden_on_the_next_render(bool $verified): void
+    {
+        [$plan, $approval, $legalEntity] = $this->approvalContext(['care_plan:read', 'approval:cancel']);
+        $approval->update(['is_verified' => $verified]);
+        $component = Livewire::test(CarePlanApprovals::class, ['legalEntity' => $legalEntity, 'carePlan' => $plan])
+            ->assertDontSee(__('care-plan.no_approvals_found'));
+
+        $this->travelTo(now()->addDays(2), function () use ($component): void {
+            $component->call('$refresh')->assertSee(__('care-plan.no_approvals_found'))
+                ->assertDontSeeHtml('wire:click="cancelApproval')
+                ->assertDontSeeHtml('wire:click="verifyExistingApproval');
+        });
+        Http::assertNothingSent();
+    }
+
+    public static function approvalVerificationFlags(): array
+    {
+        return ['verified' => [true], 'awaiting confirmation' => [false]];
+    }
+
     public function test_revocation_denial_has_visible_feedback_and_no_api_or_database_effects(): void
     {
         [$plan, $approval, $legalEntity] = $this->approvalContext(['care_plan:read']);
