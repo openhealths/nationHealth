@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\MedicalEvents;
 
 use App\Classes\eHealth\Api\Patient\MedicationRequestRequest as MedicationRequestApi;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Livewire\MedicationRequest\Forms\MedicationRequestSigningForm;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\Person\Person;
@@ -12,6 +14,7 @@ use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionMethod;
 use RuntimeException;
@@ -33,7 +36,7 @@ class MedicationRequestSignPayloadTest extends TestCase
         $record = MedicationRequestRequest::create(['uuid' => $native['id'], 'person_id' => $person->id, 'status' => 'NEW', 'ehealth_payload' => array_replace($native, ['seed' => 'stale-cache'])]);
         $encounter = new Encounter(['person_id' => $person->id]);
         Http::preventStrayRequests();
-        Http::fake(['*' => Http::response(['data' => $response], $httpStatus)]);
+        Http::fake(['*' => Http::response(json_encode(['data' => $response], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), $httpStatus)]);
         $factory = Http::getFacadeRoot();
         $api = new MedicationRequestApi($factory);
         $api->stub((function () {
@@ -56,14 +59,13 @@ class MedicationRequestSignPayloadTest extends TestCase
             && str_ends_with($request->url(), '/api/persons/'.$native['person']['id'].'/medication_request_requests/'.$native['id']));
     }
 
-    public function test_a_seed_returned_by_the_server_is_preserved_unchanged(): void
+    public function test_undocumented_seed_is_rejected_by_the_full_native_contract(): void
     {
         $native = array_replace($this->detail(), ['seed' => 'fresh-server-seed']);
         [$encounter, $record] = $this->prepare($native);
-        $payload = (new ReflectionMethod(MedicationRequestLifecycleService::class, 'buildSignPayload'))
+        $this->expectException(ValidationException::class);
+        (new ReflectionMethod(MedicationRequestLifecycleService::class, 'buildSignPayload'))
             ->invoke(app(MedicationRequestLifecycleService::class), $encounter, $record, '');
-
-        $this->assertSame($native, $payload);
     }
 
     public function test_a_short_summary_with_valid_identity_and_seed_cannot_be_signed(): void
@@ -71,7 +73,7 @@ class MedicationRequestSignPayloadTest extends TestCase
         $native = $this->detail();
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(__('medication-requests.signing_details_incomplete'));
-        \App\Livewire\MedicationRequest\Forms\MedicationRequestSigningForm::signableDetail([
+        MedicationRequestSigningForm::signableDetail([
             'id' => $native['id'],
             'person' => $native['person'],
             'status' => 'NEW',
@@ -96,16 +98,16 @@ class MedicationRequestSignPayloadTest extends TestCase
     public function test_inconsistent_details_fail_before_signing(string $field, mixed $value): void
     {
         $native = $this->detail();
-        $native[$field] = $value;
+        $native[$field] = $field === 'person' ? array_replace($native['person'], $value) : $value;
         [$encounter, $record] = $this->prepare($native);
-        $this->expectException(RuntimeException::class);
+        $this->expectException(in_array($field, ['medication_info', 'seed'], true) ? ValidationException::class : RuntimeException::class);
         (new ReflectionMethod(MedicationRequestLifecycleService::class, 'buildSignPayload'))->invoke(app(MedicationRequestLifecycleService::class), $encounter, $record, '');
     }
 
     public function test_failed_get_cannot_fall_back_to_cached_or_local_content(): void
     {
         [$encounter, $record] = $this->prepare([], 403);
-        $this->expectException(\App\Exceptions\EHealth\EHealthResponseException::class);
+        $this->expectException(EHealthResponseException::class);
         (new ReflectionMethod(MedicationRequestLifecycleService::class, 'buildSignPayload'))->invoke(app(MedicationRequestLifecycleService::class), $encounter, $record, '');
     }
 

@@ -1,270 +1,215 @@
-@php
-    $dashboardUrl = legalEntity() ? route('dashboard', [legalEntity()]) : url('/dashboard');
-    $patientUrl = route($prepersonId !== null ? 'prepersons.patient-data' : 'persons.patient-data', [legalEntity(), $prepersonId !== null ? 'preperson' : 'person' => $prepersonId ?? $personId]);
-    $requestsUrl = route($prepersonId !== null ? 'prepersons.medication-requests' : 'persons.medication-requests', [legalEntity(), $prepersonId !== null ? 'preperson' : 'person' => $prepersonId ?? $personId]);
-@endphp
+@use('App\Enums\Person\MedicationRequestStatus')
 
 <x-layouts.patient
+    :showLegacyMessages="false"
     :personId="$personId"
     :prepersonId="$prepersonId"
     :patientFullName="$patientFullName"
-    :hideNavigation="true"
-    title="{{ __('medication-requests.retsiepty') }}"
 >
-    <x-slot name="headerActions"></x-slot>
-    <div class="shift-content pl-3.5 mt-8 max-w-6xl">
-        <fieldset class="fieldset">
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
-                <!-- Ліва колонка -->
-                <div class="flex flex-col">
-                    <div class="text-xl font-bold text-gray-800 dark:text-gray-200 mb-6">{{ __('medication-requests.zahalna_informatsiya_pro_er') }}</div>
-
-                    <div class="form-row-1">
-                        <div class="form-group group">
-                            <input value="" type="text" class="input peer" disabled />
-                            <label class="label">{{ __('medication-requests.prohrama') }}</label>
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
+    <div class="space-y-6 p-6" x-data>
+        <a
+            class="button-minor"
+            href="{{ route('persons.medication-requests', [legalEntity(), 'person' => $personId]) }}"
+        >{{ __('forms.back') }}</a>
+        @if ($detail !== [])
+            <h1 class="text-xl font-bold">
+                {{ __('medication-requests.nomer_retseptu') }}: {{ $detail['request_number'] ?? $requestId }}
+            </h1>
+            <dl class="form-row-2 rounded-xl border p-6">
+                @foreach (['status', 'created_at', 'started_at', 'ended_at', 'dispense_valid_from', 'dispense_valid_to', 'intent', 'category', 'note', 'reject_reason', 'reject_reason_code', 'block_reason', 'block_reason_code', 'rejected_at', 'blocked_to'] as $field)
+                    @if (isset($detail[$field]))
+                        <div>
+                            <dt class="font-semibold">{{ __('medication-requests.fields.'.$field) }}</dt>
+                            <dd>
+                                {{ $field === 'status' ? (MedicationRequestStatus::resolve($detail[$field])?->label() ?? $detail[$field]) : (is_array($detail[$field]) ? data_get($detail, $field.'.text', '') : $detail[$field]) }}
+                            </dd>
                         </div>
-                    </div>
-
-                    <div class="form-row-1 mt-4">
-                        <div class="form-group group">
-                            <input value="" type="text" class="input peer" disabled />
-                            <label class="label">{{ __('medication-requests.nomer_retseptu') }}</label>
+                    @endif
+                @endforeach
+                @foreach (['person' => 'short_name', 'employee' => 'name', 'rejected_by' => 'name', 'blocked_by_legal_entity' => 'name', 'division' => 'name', 'legal_entity' => 'name', 'medical_program' => 'name', 'medication_info' => 'medication_name'] as $field => $name)
+                    @if (isset($detail[$field]))
+                        <div>
+                            <dt class="font-semibold">{{ __('medication-requests.fields.'.$field) }}</dt>
+                            <dd>{{ data_get($detail, $field.'.'.$name) ?? data_get($detail, $field.'.id') }}</dd>
                         </div>
-                    </div>
-
-                    <div class="form-row-1 mt-4">
-                        <div class="form-group group">
-                            <input value="" type="text" class="input peer" disabled />
-                            <label class="label">{{ __('medication-requests.status') }}</label>
+                    @endif
+                @endforeach
+                @foreach (['person.age', 'employee.position', 'medical_program.funding_source', 'medical_program.mr_blank_type', 'medication_info.form'] as $field)
+                    @if (data_get($detail, $field) !== null)
+                        <div>
+                            <dt class="font-semibold">
+                                {{ __('medication-requests.fields.'.str_replace('.', '_', $field)) }}
+                            </dt>
+                            <dd>{{ data_get($detail, $field) }}</dd>
                         </div>
+                    @endif
+                @endforeach
+                @if (isset($detail['container_dosage']))
+                    <div>
+                        <dt class="font-semibold">{{ __('medication-requests.primary_container') }}</dt>
+                        <dd>
+                            {{ data_get($detail, 'container_dosage.value') }} {{ data_get($detail, 'container_dosage.code') }}
+                        </dd>
                     </div>
-                </div>
-
+                @endif
                 <div>
-                    <fieldset class="border border-gray-400 dark:border-gray-600 rounded-2xl p-5 h-full">
-                        <legend class="text-lg font-bold text-gray-800 dark:text-gray-200 px-3">{{ __('medication-requests.detali_prohramy') }}</legend>
-                        <div class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                            {{ __('medication-requests.dzherelo_finansuvannya') }}:<br>
-                            {{ __('medication-requests.typ_retsepturnoho_blanka') }}:<br>
-                            {{ __('medication-requests.obov_yazkovist_vykorystannya_planu_likuv') }}:<br>
-                            {{ __('medication-requests.typy_korystuvachiv_yakym_dozvoleno_vypys') }}:<br>
-                            {{ __('medication-requests.perelik_spetsialnostey_likariv_smd_ta_pm') }}:<br>
-                            {{ __('medication-requests.mozhlyvist_vypysuvaty_er_na_takyy_samyy') }}:<br>
-                            {{ __('medication-requests.maksymalna_tryvalist_kursu_likuvannya_na') }}:<br>
-                            {{ __('medication-requests.mozhlyvist_vypysuvaty_er_nezalezhno_vid') }}:<br>
-                            {{ __('medication-requests.mozhlyvist_vypysuvaty_er_nezalezhno_vid') }}:<br>
-                            {{ __('medication-requests.mozhlyvist_chastkovoho_pohashennya_er') }}:<br>
-                            {{ __('medication-requests.spovishchennya_patsiyenta_pry_operatsiya') }}:<br>
-                            {{ __('medication-requests.katehoriyi_patsiyentiv_yakym_dozvoleno_s') }}:
-                        </div>
-                    </fieldset>
+                    <dt>{{ __('care-plan.quantity') }}</dt>
+                    <dd>{{ data_get($detail, 'medication_info.medication_qty') }}</dd>
                 </div>
-            </div>
-
-            <div class="text-xl font-bold text-gray-800 dark:text-gray-200 mt-10 mb-6">{{ __('medication-requests.informatsiya_shchodo_vypysanoho_lz') }}</div>
-            <div class="form-row-2">
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.nazva_lz') }}</label>
+                @foreach ($detail['based_on'] ?? [] as $reference)
+                    <div>
+                        <dt>{{ __('medication-requests.fields.based_on') }}</dt>
+                        <dd>{{ data_get($reference, 'identifier.value') }}</dd>
+                    </div>
+                @endforeach
+                <div>
+                    <dt>{{ __('medication-requests.fields.context') }}</dt>
+                    <dd>{{ data_get($detail, 'context.identifier.value') }}</dd>
                 </div>
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.skladovi_likarskoho_zasobu_mnn') }})</label>
-                </div>
-            </div>
-            <div class="form-row-2">
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.forma_vypusku_lz') }}</label>
-                </div>
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.obsyah_pervynnoyi_upakovky_vypysanoho_lz') }}</label>
-                </div>
-            </div>
-            <div class="form-row-2">
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.razova_doza') }}</label>
-                </div>
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.dobova_doza') }}</label>
-                </div>
-            </div>
-            <div class="form-row-1 mb-4 mt-2">
-                <div class="form-group group">
-                    <label class="block mb-1 text-[10.5px] text-gray-400">{{ __('medication-requests.syhnatura') }}*</label>
-                    <textarea class="textarea resize-none" disabled rows="3"></textarea>
-                </div>
-            </div>
-            <div class="form-row-2">
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.kilkist_vypysanoho_lz') }}</label>
-                </div>
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.kilkist_lz_shcho_dostupna_do_otrymannya') }}</label>
-                </div>
-            </div>
-
-            <div class="text-xl font-bold text-gray-800 dark:text-gray-200 mt-10 mb-6">{{ __('medication-requests.stroky_diyi_er') }}</div>
-            <div class="form-row-2">
-                <div class="form-group datepicker-wrapper relative w-full">
-                    <input value="" type="text" class="peer input pl-10 appearance-none" disabled />
-                    <label class="wrapped-label">{{ __('medication-requests.data_stvorennya_er') }}</label>
-                </div>
-            </div>
-            <div class="form-row-2">
-                <div class="form-group datepicker-wrapper relative w-full">
-                    <input value="" type="text" class="peer input pl-10 appearance-none" disabled />
-                    <label class="wrapped-label">{{ __('medication-requests.data_pochatku_kursu_likuvannya_vypysanym') }}</label>
-                </div>
-                <div class="form-group datepicker-wrapper relative w-full">
-                    <input value="" type="text" class="peer input pl-10 appearance-none" disabled />
-                    <label class="wrapped-label">{{ __('medication-requests.data_zavershennya_kursu_likuvannya_vypys') }}</label>
-                </div>
-            </div>
-            <div class="form-row-2">
-                <div class="form-group datepicker-wrapper relative w-full">
-                    <input value="" type="text" class="peer input pl-10 appearance-none" disabled />
-                    <label class="wrapped-label">{{ __('medication-requests.data_pershoho_dnya_koly_mozhlyvo_otrymat') }}</label>
-                </div>
-                <div class="form-group datepicker-wrapper relative w-full">
-                    <input value="" type="text" class="peer input pl-10 appearance-none" disabled />
-                    <label class="wrapped-label">{{ __('medication-requests.data_ostannoho_dnya_koly_mozhlyvo_otryma') }}</label>
-                </div>
-            </div>
-
-            <div class="text-xl font-bold text-gray-800 dark:text-gray-200 mt-10 mb-6">{{ __('medication-requests.informatsiya_pro_shusoz_v_yakomu_bulo_vy') }}</div>
-            <div class="form-row-2">
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.nazva_shusoz') }}</label>
-                </div>
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.kod_yedrpou_abo_rnokpp_u_razi_fop') }}</label>
-                </div>
-            </div>
-            <div class="form-row-2">
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.publichna_nazva') }}</label>
-                </div>
-            </div>
-
-            <div class="text-xl font-bold text-gray-800 dark:text-gray-200 mt-10 mb-6">{{ __('medication-requests.informatsiya_pro_likarya_ta_patsiyenta') }}</div>
-            <div class="form-row-2">
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.pib_likarya') }}</label>
-                </div>
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.kontaktni_dani_likarya') }}</label>
-                </div>
-            </div>
-            <div class="form-row-2">
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.pib_patsiyenta') }}</label>
-                </div>
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.kilkist_povnykh_rokiv_patsiyenta') }}</label>
-                </div>
-            </div>
-
-            <div class="text-xl font-bold text-gray-800 dark:text-gray-200 mt-10 mb-6">{{ __('medication-requests.pov_yazani_medychni_zapysy') }}</div>
-            <div class="form-row-2">
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">Id {{ __('medication-requests.planu_likuvannya_na_osnovi_yakoho_stvore') }}</label>
-                </div>
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">Id {{ __('medication-requests.vzayemodiyi_v_skladi_yakoyi_stvoreno_er') }}</label>
-                </div>
-            </div>
-
-            <div class="text-xl font-bold text-gray-800 dark:text-gray-200 mt-10 mb-6">{{ __('medication-requests.dani_pro_rezervuvannya_er') }}</div>
-            <div class="form-row-2">
-                <div class="form-group datepicker-wrapper relative w-full">
-                    <input value="" type="text" class="peer input pl-10 appearance-none" disabled />
-                    <label class="wrapped-label">{{ __('medication-requests.termin_rezervuvannya_er') }}</label>
-                </div>
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.az_shcho_zarezervuvav_er') }}</label>
-                </div>
-            </div>
-            <div class="form-row-2">
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.prychyna_rezervuvannya_er') }}</label>
-                </div>
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.opys_prychyny_rezervuvannya_er') }}</label>
-                </div>
-            </div>
-
-            <div class="text-xl font-bold text-gray-800 dark:text-gray-200 mt-10 mb-6">{{ __('medication-requests.vidkhylennya_er') }}</div>
-            <div class="form-row-2">
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.prychyna_vidkhylennya_er') }}</label>
-                </div>
-                <div class="form-group group">
-                    <input value="" type="text" class="input peer" disabled />
-                    <label class="label">{{ __('medication-requests.dodatkovi_roz_yasnennya_pro_prychynu_vid') }}</label>
-                </div>
-            </div>
-
-            <div class="text-xl font-bold text-gray-800 dark:text-gray-200 mt-10 mb-6">{{ __('medication-requests.dani_pro_pohashennya_er') }}</div>
-            <div class="bg-white dark:bg-gray-800 relative shadow-md sm:rounded-lg overflow-x-auto">
-                <table class="index-table">
-                    <thead class="index-table-thead">
+            </dl>
+            @if (data_get($detail, 'medication_info.ingredients', []) !== [])
+                <table class="w-full border">
+                    <thead>
                         <tr>
-                            <th scope="col" class="index-table-th">{{ __('medication-requests.data_pohashennya_er') }}</th>
-                            <th scope="col" class="index-table-th">{{ __('medication-requests.status_pohashennya') }}</th>
+                            <th>{{ __('medication-requests.dose_ingredient') }}</th>
+                            <th>{{ __('medication-requests.fields.dosage') }}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr class="index-table-tr">
-                            <td class="index-table-td-primary">�</td>
-                            <td class="index-table-td">
-                                <span class="badge-red">{{ __('medication-requests.prostrocheno') }}</span>
-                            </td>
-                        </tr>
-                        <tr class="index-table-tr">
-                            <td class="index-table-td-primary">�</td>
-                            <td class="index-table-td">
-                                <span class="badge-green">{{ __('medication-requests.pohasheno') }}</span>
-                            </td>
-                        </tr>
+                        @foreach ($detail['medication_info']['ingredients'] as $ingredient)
+                            <tr>
+                                <td>{{ $ingredient['name'] ?? $ingredient['id'] }}</td>
+                                <td>
+                                    {{ data_get($ingredient, 'dosage.numerator_value') }} {{ data_get($ingredient, 'dosage.numerator_unit') }} / {{ data_get($ingredient, 'dosage.denumerator_value') }} {{ data_get($ingredient, 'dosage.denumerator_unit') }}
+                                </td>
+                            </tr>
+                        @endforeach
                     </tbody>
                 </table>
+            @endif
+            <dl class="rounded-xl border p-6">
+                @foreach ($programSettings as $setting => $value)
+                    <div class="mb-2">
+                        <dt class="font-semibold">{{ __('medication-requests.program_settings.'.$setting) }}</dt>
+                        <dd>
+                            {{ is_array($value) ? collect($value)->map(static fn ($item) => is_scalar($item) ? $item : data_get($item, 'name', data_get($item, 'code', '')))->filter()->implode(', ') : (is_bool($value) ? ($value ? __('forms.yes') : __('forms.no')) : $value) }}
+                        </dd>
+                    </div>
+                @endforeach
+            </dl>
+            @foreach ($detail['dosage_instruction'] ?? [] as $dosage)
+                <div class="rounded-xl border p-6">
+                    <p>{{ $dosage['text'] ?? '' }}</p>
+                    <p>{{ $dosage['patient_instruction'] ?? ($dosage['patientInstruction'] ?? '') }}</p>
+                    @foreach (['route', 'site'] as $field)
+                        @if (isset($dosage[$field]))
+                            <p>
+                                {{ __('medication-requests.fields.'.$field) }}: {{ data_get($dosage, $field.'.text') ?? data_get($dosage, $field.'.coding.0.code') }}
+                            </p>
+                        @endif
+                    @endforeach
+                    @foreach ($dosage['additional_instruction'] ?? [] as $instruction)
+                        <p>
+                            {{ __('medication-requests.fields.additional_instruction') }}: {{ $instruction['text'] ?? data_get($instruction, 'coding.0.code') }}
+                        </p>
+                    @endforeach
+                    @foreach ($dosage['timing']['event'] ?? [] as $event)
+                        <p>{{ __('medication-requests.fields.timing') }}: {{ $event }}</p>
+                    @endforeach
+                    @if (isset($dosage['timing']['repeat']))
+                        @foreach ($dosage['timing']['repeat'] as $field => $value)
+                            @if (is_scalar($value) || (is_array($value) && array_is_list($value)))
+                                <p>
+                                    {{ __('medication-requests.timing.'.$field) }}: {{ is_array($value) ? collect($value)->map(static fn ($item) => is_scalar($item) ? $item : data_get($item, 'name', data_get($item, 'code', '')))->filter()->implode(', ') : $value }}
+                                </p>
+                            @endif
+                        @endforeach
+                    @endif
+                    @foreach (['dose_quantity', 'rate_quantity'] as $dose)
+                        @if (isset($dosage['dose_and_rate'][$dose]))
+                            <p>
+                                {{ __('medication-requests.fields.'.$dose) }}: {{ data_get($dosage, 'dose_and_rate.'.$dose.'.value') }} {{ data_get($dosage, 'dose_and_rate.'.$dose.'.unit') ?? data_get($dosage, 'dose_and_rate.'.$dose.'.code') }}
+                            </p>
+                        @endif
+                    @endforeach
+                    @foreach (['max_dose_per_administration', 'max_dose_per_period', 'max_dose_per_lifetime'] as $dose)
+                        @if (isset($dosage[$dose]))
+                            <p>
+                                {{ __('medication-requests.fields.'.$dose) }}: {{ data_get($dosage, $dose.'.value') ?? data_get($dosage, $dose.'.numerator.value') }} {{ data_get($dosage, $dose.'.unit') ?? data_get($dosage, $dose.'.numerator.unit') }}
+                            </p>
+                        @endif
+                    @endforeach
+                </div>
+            @endforeach
+            <div class="flex flex-wrap gap-3">
+                <button class="button-sync" wire:click="refreshDetail">
+                    {{ __('medication-requests.detail_sync') }}
+                </button>
+                @if (strtolower($detail['status']) === 'new')
+                    <button class="button-primary" wire:click="openSigning">
+                        {{ __('medication-requests.resume_signing') }}
+                    </button>
+                @endif
+                @if (in_array(strtolower($detail['status']), ['new', 'active'], true))
+                    <input
+                        class="input"
+                        wire:model="statusReason"
+                        placeholder="{{ __('medication-requests.fields.reject_reason_code') }}"
+                    />
+                    @error('statusReason')
+                        <p class="text-error">{{ $message }}</p>
+                    @enderror
+                    <input
+                        class="input"
+                        wire:model="rejectReason"
+                        placeholder="{{ __('medication-requests.fields.reject_reason') }}"
+                    />
+                    <button class="button-primary-outline-red" wire:click="reject">{{ __('forms.reject') }}</button>
+                @endif
+                @if (in_array(strtolower($detail['status']), ['active', 'completed', 'expired', 'blocked', 'signed'], true))
+                    <button class="button-minor" wire:click="loadPrintout">{{ __('forms.print') }}</button>
+                    <button class="button-minor" wire:click="loadDispenses">
+                        {{ __('medication-requests.dispense_history') }}
+                    </button>
+                    <button class="button-minor" wire:click="loadPriceCatalogue">
+                        {{ __('medication-requests.price_catalogue') }}
+                    </button>
+                    <a
+                        class="button-minor"
+                        href="{{ $priceCatalogueUrl !== '' ? $priceCatalogueUrl : config('ehealth.national_price_catalogue_url') }}"
+                        target="_blank"
+                        rel="noopener"
+                    >{{ __('medication-requests.price_catalogue') }}</a>
+                @endif
             </div>
-
-        </fieldset>
-
-        <div class="flex items-center gap-4 mt-12 pb-10">
-            <a href="{{ $requestsUrl }}" class="button-minor px-6 py-2.5">{{ __('medication-requests.nazad') }}</a>
-            <button type="button" class="button-primary-outline flex items-center gap-2 px-6 py-2.5">
-                @icon('refresh', 'w-4 h-4') {{ __('medication-requests.pereviryty_pohashennya') }}
-            </button>
-            <button type="button" class="button-primary-outline flex items-center gap-2 px-6 py-2.5">
-                @icon('printer', 'w-4 h-4') {{ __('medication-requests.nadrukuvaty_pam_yatku') }}
-            </button>
-            <button type="button" class="button-primary-outline flex items-center gap-2 px-6 py-2.5">
-                @icon('message-circle', 'w-4 h-4') {{ __('medication-requests.nadislaty_sms') }}
-            </button>
-            <button type="button" class="button-primary-outline-red px-6 py-2.5">{{ __('medication-requests.vidminyty_retsept') }}</button>
-        </div>
+            @if (strtolower($detail['status']) === 'active' && !($programSettings['request_notification_disabled'] ?? false))
+                <label class="flex items-center gap-2"
+                    ><input
+                        type="checkbox"
+                        wire:model="smsConfirmed"
+                    />{{ __('medication-requests.sms_confirmation') }}</label>
+                @error('smsConfirmed')
+                    <p class="text-error">{{ $message }}</p>
+                @enderror
+                <button class="button-minor" wire:click="resendSms">
+                    {{ __('medication-requests.sms_confirmation') }}
+                </button>
+            @endif
+            @include('livewire.medication-request.dispenses', ['items' => $dispenses])
+            @if ($printoutHtml !== '')
+                <iframe
+                    x-ref="prescriptionPrintout"
+                    class="h-[700px] w-full"
+                    sandbox="allow-same-origin allow-modals"
+                    srcdoc="{{ $printoutHtml }}"
+                    title="{{ __('forms.print') }}"
+                ></iframe>
+                <button class="button-primary" @click="$refs.prescriptionPrintout.contentWindow.print()">
+                    {{ __('forms.print') }}
+                </button>
+            @endif
+        @endif
     </div>
+    <x-signature-modal method="sign" />
 </x-layouts.patient>

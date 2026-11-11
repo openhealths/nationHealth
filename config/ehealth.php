@@ -45,6 +45,9 @@ $specialistSpecialityTypes = [
 ];
 
 return [
+    // Official National Price Catalogue published by MOZ/DEC, verified 2026-11-11.
+    'national_price_catalogue_url' => 'https://ecatalog.moz.gov.ua/',
+
     'api' => [
         'domain' => env('EHEALTH_API_URL', 'private-anon-cb2ce4f7fc-uaehealthapi.apiary-mock.com'),
         'token' => env('EHEALTH_X_CUSTOM_PSK', 'X-Custom-PSK'),

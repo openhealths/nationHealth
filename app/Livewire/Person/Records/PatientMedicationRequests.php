@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person\Records;
 
-use App\Classes\eHealth\Api\MedicationRequest as MedicationRequestApi;
+use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
+use InvalidArgumentException;
 use Livewire\Attributes\Locked;
 use Throwable;
 
@@ -46,6 +48,14 @@ class PatientMedicationRequests extends BasePatientComponent
     public string $filterEndedAtFrom = '';
     public string $filterEndedAtTo = '';
 
+    public array $additionalFilters = [
+        'medication_id' => '', 'encounter_id' => '', 'medical_program_id' => '',
+        'legal_entity_id' => '', 'employee_id' => '', 'care_plan_id' => '', 'episode_id' => '',
+        'created_from' => '', 'created_to' => '',
+        'dispense_valid_from_start' => '', 'dispense_valid_from_end' => '',
+        'dispense_valid_to_start' => '', 'dispense_valid_to_end' => '',
+    ];
+
     public ?string $expandedUuid = null;
 
     protected function initializeComponent(): void
@@ -68,6 +78,7 @@ class PatientMedicationRequests extends BasePatientComponent
         $this->medicationRequests = $repo->searchByPersonId(
             $this->personId,
             [
+                ...array_filter($this->additionalFilters, static fn ($value): bool => $value !== ''),
                 'status' => $this->filterStatus !== '' ? $this->filterStatus : null,
                 'request_number' => $this->searchRequestNumber !== '' ? $this->searchRequestNumber : null,
                 'started_at_from' => $this->filterStartedAtFrom !== '' ? $this->filterStartedAtFrom : null,
@@ -82,6 +93,7 @@ class PatientMedicationRequests extends BasePatientComponent
         $this->prescriptions = $repo->searchEHealthPrescriptionsByPersonId(
             $this->personId,
             [
+                ...array_filter($this->additionalFilters, static fn ($value): bool => $value !== ''),
                 'status' => $this->filterStatus !== '' ? $this->filterStatus : null,
                 'request_number' => $this->searchRequestNumber !== '' ? $this->searchRequestNumber : null,
                 'started_at_from' => $this->filterStartedAtFrom !== '' ? $this->filterStartedAtFrom : null,
@@ -124,6 +136,7 @@ class PatientMedicationRequests extends BasePatientComponent
             'filterStartedAtTo',
             'filterEndedAtFrom',
             'filterEndedAtTo',
+            'additionalFilters',
         ]);
         $this->applyFilters();
     }
@@ -134,7 +147,9 @@ class PatientMedicationRequests extends BasePatientComponent
      */
     public function searchInEHealth(): void
     {
-        $this->authorizeSearch();
+        if (!$this->authorizeSearch()) {
+            return;
+        }
 
         if ($this->personId === null) {
             return;
@@ -145,20 +160,36 @@ class PatientMedicationRequests extends BasePatientComponent
         $this->eHealthResults = [];
 
         try {
-            $params = array_filter([
-                'request_number' => $this->searchRequestNumber !== '' ? $this->searchRequestNumber : null,
-                'status' => $this->filterStatus !== '' ? strtolower($this->filterStatus) : null,
+            $this->validate([
+                'additionalFilters.created_from' => ['nullable', 'date'],
+                'additionalFilters.created_to' => ['nullable', 'date', 'after_or_equal:additionalFilters.created_from'],
+                'filterStartedAtFrom' => ['nullable', 'date'], 'filterStartedAtTo' => ['nullable', 'date', 'after_or_equal:filterStartedAtFrom'],
+                'filterEndedAtFrom' => ['nullable', 'date'], 'filterEndedAtTo' => ['nullable', 'date', 'after_or_equal:filterEndedAtFrom'],
+                'additionalFilters.dispense_valid_from_start' => ['nullable', 'date'],
+                'additionalFilters.dispense_valid_from_end' => ['nullable', 'date', 'after_or_equal:additionalFilters.dispense_valid_from_start'],
+                'additionalFilters.dispense_valid_to_start' => ['nullable', 'date'],
+                'additionalFilters.dispense_valid_to_end' => ['nullable', 'date', 'after_or_equal:additionalFilters.dispense_valid_to_start'],
             ]);
-
+            $params = array_filter(array_replace($this->additionalFilters, [
+                'request_number' => $this->searchRequestNumber,
+                'status' => $this->filterStatus,
+                'started_at_from' => $this->filterStartedAtFrom, 'started_at_to' => $this->filterStartedAtTo,
+                'ended_at_from' => $this->filterEndedAtFrom, 'ended_at_to' => $this->filterEndedAtTo,
+            ]), static fn ($value): bool => $value !== '');
+            $apiParams = $params;
             if ($this->activeTab === 'requests') {
-                // MedicationRequestRequests – drafts / requests
-                $response = MedicationRequestApi::getRequestsBySearchParams($this->uuid, $params);
-            } else {
-                // MedicationRequests – signed prescriptions
-                $response = MedicationRequestApi::getBySearchParams($this->uuid, $params);
+                // MRR list has fewer native filters. Apply its unsupported date/number filters after all pages are validated.
+                $apiParams = array_intersect_key($params, array_flip(['legal_entity_id', 'employee_id', 'episode_id', 'care_plan_id', 'encounter_id', 'status', 'intent']));
             }
-
-            $this->eHealthResults = $response['data'] ?? $response ?? [];
+            $items = app(MedicationRequestLifecycleService::class)->searchPatient($this->uuid, $this->activeTab === 'requests', $apiParams);
+            foreach ($items as $item) {
+                if (data_get($item, 'person.id') !== $this->uuid) {
+                    throw new InvalidArgumentException(__('medication-requests.detail_unavailable'));
+                }
+            }
+            $this->eHealthResults = $this->activeTab === 'requests'
+                ? app(MedicationRequestLifecycleService::class)->filterDocuments($items, $params)
+                : $items;
             $this->isSearchMode = true;
 
             if (empty($this->eHealthResults)) {
@@ -185,7 +216,9 @@ class PatientMedicationRequests extends BasePatientComponent
      */
     public function saveFromEHealth(string $uuid): void
     {
-        $this->authorizeSearch();
+        if (!$this->authorizeSearch()) {
+            return;
+        }
 
         if ($this->personId === null) {
             return;
@@ -201,13 +234,12 @@ class PatientMedicationRequests extends BasePatientComponent
         }
 
         try {
-            Repository::medicationRequest()->upsertFromEHealth(
-                (array) $record,
-                $this->personId,
-                $this->activeTab === 'requests'
-                    ? MedicationRequestRequest::TYPE_REQUEST
-                    : MedicationRequestRequest::TYPE_PRESCRIPTION
-            );
+            $resourceType = $this->activeTab === 'requests' ? MedicationRequestRequest::TYPE_REQUEST : MedicationRequestRequest::TYPE_PRESCRIPTION;
+            $detail = $resourceType === MedicationRequestRequest::TYPE_REQUEST
+                ? EHealth::medicationRequestRequest()->getById($this->uuid, $uuid)->validate()
+                : EHealth::medicationRequest()->getById($this->uuid, $uuid)->validate();
+            app(MedicationRequestLifecycleService::class)->assertPatientSnapshot($detail, $this->uuid, $uuid);
+            Repository::medicationRequest()->storeResource((new MedicationRequestMapper())->fromEHealth($detail), $this->personId, resourceType: $resourceType, native: $detail);
             Session::flash('success', __('medication-requests.import_saved'));
         } catch (Throwable $e) {
             Log::error('PatientMedicationRequests import failed', ['exception_type' => $e::class]);
@@ -219,14 +251,24 @@ class PatientMedicationRequests extends BasePatientComponent
         $this->resetSearch();
     }
 
-    protected function authorizeSearch(): void
+    protected function authorizeSearch(): bool
     {
-        $this->authorize($this->activeTab === 'requests' ? 'medication_request_request:read' : 'medication_request:read');
+        if (Auth::user()->cannot($this->activeTab === 'requests' ? 'medication_request_request:read' : 'medication_request:read')) {
+            Session::flash('error', __('medication-requests.permission_denied'));
+
+            return false;
+        }
+
+        return true;
     }
 
     public function synchronizeSignedPrescriptions(): void
     {
-        abort_unless(Auth::user()->can('medication_request:read'), 403);
+        if (Auth::user()->cannot('medication_request:read')) {
+            Session::flash('error', __('medication-requests.permission_denied'));
+
+            return;
+        }
         if ($this->personId === null) {
             return;
         }

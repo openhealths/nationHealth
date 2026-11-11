@@ -26,7 +26,7 @@ class MedicationRequest
      */
     public static function preQualify(array $payload): array
     {
-        return EHealth::medicationRequest()->prequalify($payload)->getData();
+        return EHealth::medicationRequest()->prequalify($payload)->validate();
     }
 
     /**
@@ -38,7 +38,7 @@ class MedicationRequest
      */
     public static function createMedicationRequest(array $payload): array
     {
-        return EHealth::medicationRequest()->createRequest($payload)->getData();
+        return EHealth::medicationRequest()->createRequest($payload)->validate();
     }
 
     /**
@@ -51,7 +51,7 @@ class MedicationRequest
      */
     public static function signMedicationRequest(string $id, array $payload): array
     {
-        return EHealth::medicationRequest()->signRequest($id, $payload)->getData();
+        return EHealth::medicationRequest()->signRequest($id, $payload)->validate();
     }
 
     /**
@@ -67,7 +67,7 @@ class MedicationRequest
         // Person UUID is required by the new API; resolve from the request payload if present.
         $personUuid = $payload['person_id'] ?? '';
 
-        return EHealth::medicationRequest()->reject($personUuid, $id, $payload)->getData();
+        return EHealth::medicationRequest()->reject($personUuid, $id, $payload)->validate();
     }
 
     /**
@@ -80,7 +80,7 @@ class MedicationRequest
      */
     public static function rejectUnsignedMedicationRequest(string $id, array $payload): array
     {
-        return EHealth::medicationRequest()->rejectRequest($id)->getData();
+        return EHealth::medicationRequest()->rejectRequest($id)->validate();
     }
 
     /**
@@ -92,7 +92,7 @@ class MedicationRequest
      */
     public static function getById(string $patientId, string $id, array $query = []): array
     {
-        return EHealth::medicationRequest()->getById($patientId, $id, $query)->getData();
+        return EHealth::medicationRequest()->getById($patientId, $id, $query)->validate();
     }
 
     /**
@@ -105,7 +105,7 @@ class MedicationRequest
      */
     public static function getBySearchParams(string $patientId, array $query = []): array
     {
-        return EHealth::medicationRequest()->getBySearchParams($patientId, $query)->getData();
+        return EHealth::medicationRequest()->getBySearchParams($patientId, $query)->validate();
     }
 
     /**
@@ -118,7 +118,7 @@ class MedicationRequest
      */
     public static function getRequestsBySearchParams(string $patientId, array $query = []): array
     {
-        return EHealth::medicationRequest()->getRequestsBySearchParams($patientId, $query)->getData();
+        return EHealth::medicationRequest()->getRequestsBySearchParams($patientId, $query)->validate();
     }
 
     /**
@@ -126,7 +126,7 @@ class MedicationRequest
      */
     public static function resendSms(string $patientId, string $id): array
     {
-        return EHealth::medicationRequest()->resendSms($patientId, $id)->getData();
+        return EHealth::medicationRequest()->resendSms($patientId, $id)->validate();
     }
 
     /**
@@ -134,7 +134,7 @@ class MedicationRequest
      */
     public static function qualify(string $id, array $payload = []): array
     {
-        return EHealth::medicationRequest()->qualify($id, $payload)->getData();
+        return EHealth::medicationRequest()->qualify($id, $payload)->validate();
     }
 
     /**
@@ -142,7 +142,7 @@ class MedicationRequest
      */
     public static function getByCarePlan(string $carePlanId, array $query = []): array
     {
-        return EHealth::medicationRequest()->getByCarePlan($carePlanId, $query)->getData();
+        return EHealth::medicationRequest()->getByCarePlan($carePlanId, $query)->validate();
     }
 
     /**
@@ -150,7 +150,7 @@ class MedicationRequest
      */
     public static function getDetails(string $patientId, string $id, array $query = []): array
     {
-        return EHealth::medicationRequest()->getDetails($patientId, $id, $query)->getData();
+        return EHealth::medicationRequest()->getDetails($patientId, $id, $query)->validate();
     }
 
     /**
@@ -158,7 +158,7 @@ class MedicationRequest
      */
     public static function getPrintoutForm(string $patientId, string $id): array
     {
-        return EHealth::medicationRequest()->getPrintoutForm($patientId, $id)->getData();
+        return EHealth::medicationRequest()->getPrintoutForm($patientId, $id)->validate();
     }
 
     /**
@@ -166,7 +166,7 @@ class MedicationRequest
      */
     public static function block(string $patientId, string $id, array $payload = []): array
     {
-        return EHealth::medicationRequest()->block($patientId, $id, $payload)->getData();
+        return EHealth::medicationRequest()->block($patientId, $id, $payload)->validate();
     }
 
     /**
@@ -174,7 +174,7 @@ class MedicationRequest
      */
     public static function unblock(string $patientId, string $id, array $payload = []): array
     {
-        return EHealth::medicationRequest()->unblock($patientId, $id, $payload)->getData();
+        return EHealth::medicationRequest()->unblock($patientId, $id, $payload)->validate();
     }
 
     /**
@@ -182,7 +182,7 @@ class MedicationRequest
      */
     public static function getInCompositionContext(string $patientId, string $compositionId, string $id, array $query = []): array
     {
-        return EHealth::medicationRequest()->getInCompositionContext($patientId, $compositionId, $id, $query)->getData();
+        return EHealth::medicationRequest()->getInCompositionContext($patientId, $compositionId, $id, $query)->validate();
     }
 
     /**
@@ -190,7 +190,7 @@ class MedicationRequest
      */
     public static function getByIdByPharmacy(string $id, array $query = []): array
     {
-        return EHealth::medicationRequest()->getByIdByPharmacy($id, $query)->getData();
+        return EHealth::medicationRequest()->getByIdByPharmacy($id, $query)->validate();
     }
 
     /**
@@ -198,7 +198,7 @@ class MedicationRequest
      */
     public static function blockByPharmacy(string $id, array $payload = []): array
     {
-        return EHealth::medicationRequest()->blockByPharmacy($id, $payload)->getData();
+        return EHealth::medicationRequest()->blockByPharmacy($id, $payload)->validate();
     }
 
     /**
@@ -206,7 +206,7 @@ class MedicationRequest
      */
     public static function unblockByPharmacy(string $id, array $payload = []): array
     {
-        return EHealth::medicationRequest()->unblockByPharmacy($id, $payload)->getData();
+        return EHealth::medicationRequest()->unblockByPharmacy($id, $payload)->validate();
     }
 
     /**
@@ -214,7 +214,7 @@ class MedicationRequest
      */
     public static function rejectByPharmacy(string $id, array $payload = []): array
     {
-        return EHealth::medicationRequest()->rejectByPharmacy($id, $payload)->getData();
+        return EHealth::medicationRequest()->rejectByPharmacy($id, $payload)->validate();
     }
 
     /**
@@ -225,6 +225,6 @@ class MedicationRequest
      */
     public static function searchByPharmacy(array $query = []): array
     {
-        return EHealth::medicationRequest()->searchByPharmacy($query)->getData();
+        return EHealth::medicationRequest()->searchByPharmacy($query)->validate();
     }
 }
