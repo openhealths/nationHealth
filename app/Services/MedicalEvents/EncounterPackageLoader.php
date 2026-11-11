@@ -261,8 +261,18 @@ class EncounterPackageLoader
      */
     private function loadClinicalImpressions(string $encounterId): array
     {
-        $clinicalImpressions = Repository::clinicalImpression()->get($encounterId);
+        return $this->clinicalImpressionsFromFhir(Repository::clinicalImpression()->get($encounterId));
+    }
 
+    /**
+     * Convert stored clinical impressions to the flat form structure, with the date and code of every record they
+     * refer to as a problem, finding, supporting info or previous impression.
+     *
+     * @param  array  $clinicalImpressions  Clinical impressions with their relationships, as stored locally
+     * @return array
+     */
+    public function clinicalImpressionsFromFhir(array $clinicalImpressions): array
+    {
         if (!$clinicalImpressions) {
             return [];
         }
@@ -270,6 +280,10 @@ class EncounterPackageLoader
         $allSupportingInfo = collect($clinicalImpressions)
             ->flatMap(static fn (array $clinicalImpression) => data_get($clinicalImpression, 'supportingInfo', []))
             ->filter();
+
+        $uuidsByType = $allSupportingInfo
+            ->groupBy(static fn (array $item) => data_get($item, 'identifier.type.coding.0.code'))
+            ->map(static fn ($group) => $group->pluck('identifier.value')->filter()->unique()->values()->toArray());
 
         $conditionUuids = collect($clinicalImpressions)
             ->flatMap(static fn (array $clinicalImpression) => array_merge(
@@ -279,7 +293,8 @@ class EncounterPackageLoader
                 collect(data_get($clinicalImpression, 'findings', []))
                     ->filter(static fn (array $finding) => data_get($finding, 'itemReference.identifier.type.coding.0.code') === 'condition')
                     ->pluck('itemReference.identifier.value')
-                    ->toArray()
+                    ->toArray(),
+                $uuidsByType->get('condition', [])
             ))
             ->filter()->unique()->values()->toArray();
 
@@ -290,15 +305,12 @@ class EncounterPackageLoader
                     ->pluck('itemReference.identifier.value')
                     ->toArray()
             )
+            ->concat($uuidsByType->get('observation', []))
             ->filter()->unique()->values()->toArray();
 
         $previousUuids = collect($clinicalImpressions)
             ->pluck('previous.identifier.value')
             ->filter()->unique()->values()->toArray();
-
-        $uuidsByType = $allSupportingInfo
-            ->groupBy(static fn (array $item) => data_get($item, 'identifier.type.coding.0.code'))
-            ->map(static fn ($group) => $group->pluck('identifier.value')->filter()->unique()->values()->toArray());
 
         $detailsMap = array_merge(
             Repository::condition()->getDetailsMapByUuids($conditionUuids),

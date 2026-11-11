@@ -211,6 +211,7 @@
                 @icon('calendar-week', 'w-5 h-5 svg-input absolute left-2.5 pointer-events-none')
                 <input
                     x-model="modalObservation.effectivePeriodRange"
+                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
                     type="text"
                     name="effectivePeriodRange"
                     id="effectivePeriodRange"

@@ -1,11 +1,20 @@
 <div
     class="space-y-6 p-5"
+    data-condition-label="{{ __('conditions.condition_or_diagnosis') }}"
+    data-observation-label="{{ __('observations.medical_label') }}"
+    data-diagnostic-report-label="{{ __('diagnostic-reports.label') }}"
     x-data="{
         showReferencesDrawer: false,
         selectedReferences: $wire.entangle('form.encounter.supportingInfo'),
 
         init() {
-            this.selectedReferences = (this.selectedReferences ?? []).filter(reference => reference?.uuid && reference?.type);
+            this.selectedReferences = (this.selectedReferences ?? [])
+                .filter((reference) => reference?.uuid && reference?.type)
+                .map((reference) => ({
+                    ...reference,
+                    typeLabel: reference.typeLabel || this.referenceTypeLabel(reference.type),
+                    name: reference.name || this.referenceName(reference.code),
+                }));
         },
 
         openReferencesDrawer() {
@@ -16,32 +25,43 @@
             return this.selectedReferences.some((reference) => reference.uuid === recordId);
         },
 
-        addReference(record) {
-            const typeLabels = {
-                condition: '{{ __("conditions.condition_or_diagnosis") }}',
-                observation: '{{ __("observations.medical_label") }}',
-                diagnostic_report: '{{ __("diagnostic-reports.label") }}',
+        referenceTypeLabel(type) {
+            const labels = {
+                condition: this.$root.dataset.conditionLabel,
+                observation: this.$root.dataset.observationLabel,
+                diagnostic_report: this.$root.dataset.diagnosticReportLabel,
             };
 
-            const dictionaries = $wire.dictionaries;
-            const name =
-                dictionaries['eHealth/ICPC2/condition_codes']?.[record.code] ||
-                dictionaries['eHealth/ICD10_AM/condition_codes']?.[record.code] ||
-                dictionaries['eHealth/LOINC/observation_codes']?.[record.code] ||
-                dictionaries['eHealth/custom/observation_codes']?.[record.code] ||
-                dictionaries['eHealth/ICF/classifiers']?.[record.code] ||
-                record.description ||
-                '';
+            return labels[type] || type;
+        },
 
+        referenceName(code, description = '') {
+            const dictionaries = $wire.dictionaries;
+
+            return (
+                dictionaries['eHealth/ICPC2/condition_codes']?.[code] ||
+                dictionaries['eHealth/ICD10_AM/condition_codes']?.[code] ||
+                dictionaries['eHealth/LOINC/observation_codes']?.[code] ||
+                dictionaries['eHealth/custom/observation_codes']?.[code] ||
+                dictionaries['eHealth/ICF/classifiers']?.[code] ||
+                description ||
+                ''
+            );
+        },
+
+        addReference(record) {
             if (! this.isReferenceAdded(record.uuid)) {
-                this.selectedReferences = [...this.selectedReferences, {
-                    uuid: record.uuid,
-                    type: record.type,
-                    typeLabel: typeLabels[record.type] || record.type,
-                    code: record.code,
-                    name: name,
-                    date: record.ehealthInsertedAt,
-                }];
+                this.selectedReferences = [
+                    ...this.selectedReferences,
+                    {
+                        uuid: record.uuid,
+                        type: record.type,
+                        typeLabel: this.referenceTypeLabel(record.type),
+                        code: record.code,
+                        name: this.referenceName(record.code, record.description),
+                        date: record.ehealthInsertedAt,
+                    },
+                ];
             }
 
             this.showReferencesDrawer = false;
@@ -53,10 +73,10 @@
 
         removeReference(uuid, type) {
             this.selectedReferences = this.selectedReferences.filter(
-                reference => !(reference.uuid === uuid && reference.type === type)
+                (reference) => ! (reference.uuid === uuid && reference.type === type),
             );
         },
-     }"
+    }"
     @encounter-supporting-info-selected.window="addReference($event.detail.record)"
 >
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">

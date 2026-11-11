@@ -293,6 +293,19 @@ class Observation extends Model
     }
 
     /**
+     * Filter observations fetched from eHealth. An observation stored from the data sent from here lacks the insertion
+     * date.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    #[Scope]
+    protected function fetchedFromEHealth(Builder $query): Builder
+    {
+        return $query->whereNotNull('ehealth_inserted_at');
+    }
+
+    /**
      * Leave out the records of an encounter package eHealth has not accepted yet, which is still a draft, including the
      * draft encounters of the persons and prepersons merged into a person.
      *
@@ -583,6 +596,7 @@ class Observation extends Model
             'specimen.type.coding',
             'device.type.coding',
             'basedOn.type.coding',
+            'reactionOn.type.coding',
             'referenceRanges.low',
             'referenceRanges.high',
             'components.code.coding',

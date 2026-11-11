@@ -1098,7 +1098,7 @@
                                     for="conditionReportOrigin"
                                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                 >
-                                    {{ __('medical-events.information_source') }}
+                                    {{ __('medical-events.information_source') }}<span class="text-red-600"> *</span>
                                 </label>
                                 <div class="relative">
                                     <select
@@ -1309,6 +1309,8 @@
                                       modalCondition.onsetTime?.trim() &&
                                       modalCondition.assertedDate?.trim() &&
                                       modalCondition.assertedTime?.trim() &&
+                                      (modalCondition.primarySource !== false ||
+                                          modalCondition.reportOriginCode?.trim()) &&
                                       conditionDatesAreValid()
                                   )"
                         >

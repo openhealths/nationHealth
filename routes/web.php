@@ -339,7 +339,7 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
                 $person = Repository::carePlan()->findPatient((int) $encounter->person_id) ?? abort(404);
                 \Illuminate\Support\Facades\Gate::authorize('view', [$encounter, $person]);
 
-                return redirect()->route('care-plans.create-by-encounter', ['legalEntity' => $legalEntity, 'person' => $person, 'encounter' => $encounter]);
+                return redirect()->route('persons.encounters.care-plans.create', ['legalEntity' => $legalEntity, 'person' => $person, 'encounter' => $encounter]);
             };
             Route::get('/encounters/{encounter}/care-plan/create', $redirectEncounterCarePlan)
                 ->whereNumber('encounter')
