@@ -86,7 +86,7 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
      */
     public function createCarePlanDraft(CarePlan $carePlan, ?CarePlanActivity $activity, array $formData = [], array $employeeContext = []): string
     {
-        Gate::authorize('manageActivities', $carePlan);
+        Gate::authorize('manageActivities', [$carePlan, $employeeContext['employee_uuid'] ?? null]);
         $formData = $this->validateDraftForm($formData, (string) $carePlan->person->uuid, $activity?->dailyAmount === null ? null : (float) $activity->dailyAmount);
         $signatureText = trim((string) ($formData['signature_text'] ?? ''));
         if ($signatureText === '' && empty($formData['dosage_instructions'])) {
@@ -163,7 +163,7 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
      */
     public function createEncounterDraft(Encounter $encounter, array $formData = [], array $employeeContext = []): string
     {
-        $actor = Repository::employee()->activeForLegalEntity(Auth::user(), legalEntity(), ['DOCTOR', 'SPECIALIST']);
+        $actor = Repository::employee()->activeForLegalEntity(Auth::user(), legalEntity(), ['DOCTOR', 'SPECIALIST', 'MED_COORDINATOR'], $employeeContext['employee_uuid'] ?? null);
         $eligible = $actor !== null && ($employeeContext['employee_uuid'] ?? null) === $actor->uuid
             && MedicalEventsRepository::medicationRequest()->eligibleEncounters((int) $encounter->person_id, $actor->uuid)->contains('id', $encounter->id);
         if (!$eligible) {

@@ -38,6 +38,7 @@ use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -47,6 +48,7 @@ use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\Feature\Composition\UsesCompositionDictionaries;
 use Tests\Support\GrantsReferralEmployeeRole;
@@ -57,6 +59,7 @@ class EncounterDocumentPagesTest extends TestCase
     use CompositionTestFixtures {
         fakeEHealth as private fakeBaseEHealth;
     }
+    use CreatesFhirCarePlans;
     use DatabaseTransactions;
     use GrantsReferralEmployeeRole;
     use UsesCompositionDictionaries;
@@ -934,6 +937,7 @@ class EncounterDocumentPagesTest extends TestCase
     {
         $fixture = $this->compositionFixture(scopes: ['encounter:read', 'service_request:write', 'medication_request_request:write', 'care_plan:write']);
         $this->grantReferralEmployeeRole($fixture['user'], $fixture['employee'], 'ehealth');
+        $this->grantCarePlanEmployeeRole($fixture['employee'], 'OUTPATIENT');
         $fixture['user']->forceFill(['email_verified_at' => now()])->save();
         $this->actingAs($fixture['user'], 'ehealth');
         $this->withSession(['ehealth_legal_entity_uuid' => $fixture['legalEntity']->uuid]);
@@ -943,12 +947,17 @@ class EncounterDocumentPagesTest extends TestCase
 
     private function encounter(Person $person, EncounterStatus $status = EncounterStatus::FINISHED): Encounter
     {
-        return Encounter::create([
+        $employee = Auth::user()->employees()->whereLegalEntityId(legalEntity()->id)->firstOrFail();
+        $encounter = Encounter::create([
             'uuid' => (string) Str::uuid(), 'person_id' => $person->id, 'status' => $status->value,
             'episode_id' => Identifier::create(['value' => (string) Str::uuid()])->id,
+            'performer_id' => Identifier::create(['value' => $employee->uuid])->id,
             'class_id' => Coding::create(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id,
             'type_id' => CodeableConcept::create()->id, 'ehealth_inserted_at' => now(),
         ]);
+        $encounter->period()->create(['start' => now()->startOfDay()->utc(), 'end' => now()->utc()]);
+
+        return $encounter;
     }
 
     public function test_document_policy_rejects_missing_write_scope_and_foreign_legal_entity(): void

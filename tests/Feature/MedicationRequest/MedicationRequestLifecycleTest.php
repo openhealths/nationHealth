@@ -39,6 +39,7 @@ use Mockery;
 use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\Concerns\CreatesFhirRequestIdentifiers;
 use Tests\Concerns\MocksBasicDictionaries;
+use Tests\Support\GrantsReferralEmployeeRole;
 use Tests\TestCase;
 
 class MedicationRequestLifecycleTest extends TestCase
@@ -46,6 +47,7 @@ class MedicationRequestLifecycleTest extends TestCase
     use CreatesFhirCarePlans;
     use CreatesFhirRequestIdentifiers;
     use DatabaseTransactions;
+    use GrantsReferralEmployeeRole;
     use MocksBasicDictionaries;
 
     protected Person $person;
@@ -153,6 +155,7 @@ class MedicationRequestLifecycleTest extends TestCase
         }
 
         $this->grantMedicalEventAbilities($this->user);
+        $this->grantReferralEmployeeRole($this->user, $this->employee);
 
         // 5. Create Care Plan & Medication Care Plan Activity
         $carePlan = $this->createFhirCarePlan([

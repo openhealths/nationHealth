@@ -21,6 +21,11 @@ class MedicationRequestRequestPolicy
             ? 'medication_request_request:read' : 'medication_request:read');
     }
 
+    public function checkValidity(User $user, MedicationRequestRequest $record): Response
+    {
+        return $this->view($user, $record);
+    }
+
     public function sign(User $user, MedicationRequestRequest $record): Response
     {
         $permission = $this->scope($user, $record, 'medication_request_request:sign');
@@ -29,9 +34,9 @@ class MedicationRequestRequestPolicy
         }
         $context = MedicalEventsRepository::medicationRequest()->clinicalContext($record);
         if ($context instanceof CarePlan) {
-            return $user->can('manageActivities', $context) ? Response::allow() : Response::denyAsNotFound();
+            return $user->can('manageActivities', [$context, $record->employee?->uuid]) ? Response::allow() : Response::denyAsNotFound();
         }
-        $employee = Repository::employee()->activeForLegalEntity($user, legalEntity(), ['DOCTOR', 'SPECIALIST']);
+        $employee = Repository::employee()->activeForLegalEntity($user, legalEntity(), ['DOCTOR', 'SPECIALIST', 'MED_COORDINATOR'], $record->employee?->uuid);
         if (!$context instanceof Encounter || $employee === null || (int) $record->employeeId !== (int) $employee->id
             || $user->cannot('view', [$context, Person::findOrFail($record->personId)])) {
             return Response::denyAsNotFound();

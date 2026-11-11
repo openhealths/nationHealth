@@ -10,9 +10,12 @@ use App\Enums\Person\EncounterStatus;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Exceptions\MedicalEvents\ClinicalStorageException;
 use App\Livewire\MedicationRequest\Forms\PrescriptionRules;
+use App\Models\CarePlan;
+use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
 use App\Services\Dictionary\MedicationProgramPicker;
 use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use App\Services\MedicalEvents\MedicalRequestOwnership;
@@ -27,6 +30,7 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Throwable;
 
 trait ManagesEncounterEPrescription
@@ -55,6 +59,23 @@ trait ManagesEncounterEPrescription
     /** @var list<array{id: string, name: string}> */
     public array $encounterEPrescriptionPrograms = [];
 
+    public string $encounterEPrescriptionPlanSearch = '';
+
+    #[Locked]
+    public array $encounterEPrescriptionPlanChoices = [];
+
+    #[Locked]
+    public array $encounterEPrescriptionActivityChoices = [];
+
+    #[Locked]
+    public ?int $encounterEPrescriptionPlanId = null;
+
+    #[Locked]
+    public ?int $encounterEPrescriptionActivityId = null;
+
+    #[Locked]
+    public bool $encounterEPrescriptionApprovalRequired = false;
+
     public string $encounterEPrescriptionSearchQuery = '';
 
     /** @var list<array<string, mixed>> */
@@ -74,6 +95,135 @@ trait ManagesEncounterEPrescription
         }
     }
 
+    /** BA08 reuses CP search and consent; searching alone has no remote or clinical side effects. */
+    #[On('care-plan-approvals-changed')]
+    public function searchEncounterEPrescriptionCarePlans(): void
+    {
+        $encounter = $this->resolveEncounterModelForStandalone();
+        if ($encounter === null || !$this->guardEncounterPrescriptionCreate($encounter)) {
+            return;
+        }
+        try {
+            $this->validate(['encounterEPrescriptionPlanSearch' => ['string', 'max:255']]);
+            $this->encounterEPrescriptionPlanChoices = Repository::carePlan()->documentPlanChoices(
+                $this->personId,
+                $encounter->uuid,
+                Auth::user(),
+                $this->encounterEPrescriptionPlanSearch,
+                $encounter->performer?->value
+            );
+            if ($this->encounterEPrescriptionPlanId !== null) {
+                $plan = collect(Repository::carePlan()->documentPlanChoices(
+                    $this->personId,
+                    $encounter->uuid,
+                    Auth::user(),
+                    actingEmployeeUuid: $encounter->performer?->value
+                ))->firstWhere('id', $this->encounterEPrescriptionPlanId);
+                if ($plan !== null && !collect($this->encounterEPrescriptionPlanChoices)->contains('id', $plan['id'])) {
+                    $this->encounterEPrescriptionPlanChoices[] = $plan;
+                }
+                $this->encounterEPrescriptionApprovalRequired = $plan === null || $plan['approvalRequired'];
+                $this->encounterEPrescriptionActivityChoices = $this->encounterEPrescriptionApprovalRequired ? [] : Repository::carePlan()->documentActivityChoices(
+                    $this->encounterEPrescriptionPlanId,
+                    $this->personId,
+                    $encounter->uuid,
+                    Auth::user(),
+                    'medication_request',
+                    $encounter->performer?->value
+                );
+            }
+        } catch (Throwable $exception) {
+            $this->encounterEPrescriptionPlanChoices = $this->encounterEPrescriptionActivityChoices = [];
+            Session::flash('error', $exception->getMessage());
+        }
+    }
+
+    public function selectEncounterEPrescriptionCarePlan(int $planId): void
+    {
+        $encounter = $this->resolveEncounterModelForStandalone();
+        if ($encounter === null || !$this->guardEncounterPrescriptionCreate($encounter)) {
+            return;
+        }
+        $this->invalidateEncounterEPrescriptionDraft();
+        $this->encounterEPrescriptionPlanId = $this->encounterEPrescriptionActivityId = null;
+        $this->encounterEPrescriptionActivityChoices = [];
+        $this->encounterEPrescriptionApprovalRequired = false;
+        if ($planId === 0) {
+            return;
+        }
+        $this->searchEncounterEPrescriptionCarePlans();
+        $choice = collect($this->encounterEPrescriptionPlanChoices)->firstWhere('id', $planId);
+        if ($choice === null) {
+            Session::flash('error', __('care-plan.related_plan_unavailable'));
+
+            return;
+        }
+        $this->encounterEPrescriptionPlanId = $planId;
+        $this->encounterEPrescriptionApprovalRequired = $choice['approvalRequired'];
+        $this->searchEncounterEPrescriptionCarePlans();
+    }
+
+    public function selectEncounterEPrescriptionActivity(int $activityId): void
+    {
+        $encounter = $this->resolveEncounterModelForStandalone();
+        if ($encounter === null || !$this->guardEncounterPrescriptionCreate($encounter)) {
+            return;
+        }
+        $this->searchEncounterEPrescriptionCarePlans();
+        $choice = collect($this->encounterEPrescriptionActivityChoices)->firstWhere('id', $activityId);
+        if ($choice === null || $this->encounterEPrescriptionApprovalRequired) {
+            Session::flash('error', __('care-plan.related_plan_unavailable'));
+
+            return;
+        }
+        $activity = Repository::carePlanActivity()->findOwned($this->encounterEPrescriptionPlanId, $activityId);
+        $resource = Repository::carePlanActivity()->getResource($activity);
+        $this->invalidateEncounterEPrescriptionDraft();
+        $this->encounterEPrescriptionActivityId = $activityId;
+        $this->encounterEPrescriptionForm['program_id'] = data_get($resource, 'detail.program.identifier.value', '');
+        $this->encounterEPrescriptionSelectedMedication = null;
+        $this->encounterEPrescriptionSearchResults = [];
+        $this->encounterEPrescriptionForm['medication_id'] = '';
+    }
+
+    #[Computed]
+    public function encounterEPrescriptionSelectedPlan(): ?CarePlan
+    {
+        return $this->encounterEPrescriptionPlanId === null ? null : Repository::carePlan()->findById($this->encounterEPrescriptionPlanId);
+    }
+
+    private function guardEncounterPrescriptionCreate(Encounter $encounter): bool
+    {
+        if (Auth::user()->cannot('createMedicationRequest', [$encounter, Person::findOrFail($this->personId), legalEntity()])) {
+            Session::flash('error', __('medication-requests.own_finished_encounter_required'));
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /** A selected Activity must still be offered for this patient, encounter and exact current author at submission. */
+    private function encounterEPrescriptionActivityForCreate(Encounter $encounter): ?CarePlanActivity
+    {
+        if ($this->encounterEPrescriptionPlanId === null) {
+            return null;
+        }
+        $choices = Repository::carePlan()->documentActivityChoices(
+            $this->encounterEPrescriptionPlanId,
+            $this->personId,
+            $encounter->uuid,
+            Auth::user(),
+            'medication_request',
+            $encounter->performer?->value
+        );
+        if (!collect($choices)->contains('id', $this->encounterEPrescriptionActivityId)) {
+            throw ValidationException::withMessages(['activity' => __('care-plan.related_plan_unavailable')]);
+        }
+
+        return Repository::carePlanActivity()->findOwned($this->encounterEPrescriptionPlanId, $this->encounterEPrescriptionActivityId);
+    }
+
     public function openEncounterEPrescriptionDrawer(): void
     {
         $encounter = $this->resolveEncounterModelForStandalone();
@@ -91,6 +241,12 @@ trait ManagesEncounterEPrescription
             return;
         }
 
+        if (!$this->guardEncounterPrescriptionCreate($encounter)) {
+            return;
+        }
+        $this->encounterEPrescriptionPlanId = $this->encounterEPrescriptionActivityId = null;
+        $this->encounterEPrescriptionPlanChoices = $this->encounterEPrescriptionActivityChoices = [];
+        $this->encounterEPrescriptionApprovalRequired = false;
         $this->loadEncounterEPrescriptionAuthMethods($encounter);
         $this->loadEncounterEPrescriptionPrograms();
         $this->invalidateEncounterEPrescriptionDraft();
@@ -350,15 +506,20 @@ trait ManagesEncounterEPrescription
             }
 
             $employeeContext = app(MedicationRequestLifecycleService::class)->resolveEncounterEmployeeContext(
-                $encounter,
-                Auth::user()?->activeDoctorEmployee()?->id
+                $encounter
             );
 
             $formData = $this->encounterEPrescriptionForm;
             $formData['program_id'] = MedicationProgramPicker::resolve($formData['program_id'] ?? null);
 
-            $this->encounterEPrescriptionRequestIdToSign = app(MedicationRequestLifecycleService::class)
-                ->createEncounterDraft($encounter, $formData, $employeeContext);
+            if (!$this->guardEncounterPrescriptionCreate($encounter)) {
+                return;
+            }
+            $activity = $this->encounterEPrescriptionActivityForCreate($encounter);
+            $formData['encounter_id'] = $encounter->id;
+            $this->encounterEPrescriptionRequestIdToSign = $activity === null
+                ? app(MedicationRequestLifecycleService::class)->createEncounterDraft($encounter, $formData, $employeeContext)
+                : app(MedicationRequestLifecycleService::class)->createCarePlanDraft($activity->carePlan, $activity, $formData, $employeeContext);
             $this->encounterEPrescriptionDraftForm = $this->encounterEPrescriptionForm;
 
             $this->actionType = 'sign_eprescription';
@@ -384,6 +545,19 @@ trait ManagesEncounterEPrescription
 
     public function prepareEncounterEPrescriptionSigning(): void
     {
+        if ($this->encounterEPrescriptionPlanId !== null) {
+            $encounter = $this->resolveEncounterModelForStandalone();
+            if ($encounter === null || !$this->guardEncounterPrescriptionCreate($encounter)) {
+                return;
+            }
+            try {
+                $this->encounterEPrescriptionActivityForCreate($encounter);
+            } catch (ValidationException $exception) {
+                Session::flash('error', $exception->getMessage());
+
+                return;
+            }
+        }
         if ($this->encounterEPrescriptionDraftForm !== $this->encounterEPrescriptionForm) {
             $this->invalidateEncounterEPrescriptionDraft();
             Session::flash('warning', __('medication-requests.draft_form_changed'));
@@ -444,7 +618,14 @@ trait ManagesEncounterEPrescription
             return;
         }
 
+        if (!$this->guardEncounterPrescriptionCreate($encounter)) {
+            return;
+        }
+
         try {
+            if ($this->encounterEPrescriptionPlanId !== null) {
+                $this->encounterEPrescriptionActivityForCreate($encounter);
+            }
             $requestRecord = app(MedicalRequestOwnership::class)
                 ->medicationForEncounter(
                     (string) $this->encounterEPrescriptionRequestIdToSign,

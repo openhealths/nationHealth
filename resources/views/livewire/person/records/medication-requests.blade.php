@@ -1,7 +1,12 @@
 @use('App\Enums\Person\MedicationRequestStatus')
 @use('App\Models\MedicalEvents\Sql\Encounter')
 
-<x-layouts.patient :showLegacyMessages="false" :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
+<x-layouts.patient
+    :showLegacyMessages="false"
+    :personId="$personId"
+    :prepersonId="$prepersonId"
+    :patientFullName="$patientFullName"
+>
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
     <x-slot name="headerActions">
@@ -257,8 +262,8 @@
             <div class="space-y-4">
                 @forelse ($rows as $record)
                     @php
-                        $recordUuid = $record['uuid'] ?? $record['id'] ?? '';
-                        $importId = $record['id'] ?? $record['uuid'] ?? '';
+                        $recordUuid = $record['uuid'] ?? ($record['id'] ?? '');
+                        $importId = $record['id'] ?? ($record['uuid'] ?? '');
                         $status = MedicationRequestStatus::resolve($record['status'] ?? '');
                     @endphp
                     <div
@@ -269,7 +274,7 @@
                             <div class="record-inner-column min-w-0 flex-1">
                                 <div class="record-inner-label">{{ __('Номер') }}</div>
                                 <div class="record-inner-value text-[16px] break-words">
-                                    {{ $record['requestNumber'] ?? $record['request_number'] ?? '—' }}
+                                    {{ $record['requestNumber'] ?? ($record['request_number'] ?? '—') }}
                                 </div>
                                 @if (!empty($record['categoryLabel']))
                                     <div class="record-inner-subvalue mt-1">{{ $record['categoryLabel'] }}</div>
@@ -278,8 +283,8 @@
                             <div class="record-inner-column-bordered w-full shrink-0 md:w-36">
                                 <div class="record-inner-label">{{ __('forms.status.label') }}</div>
                                 <div>
-                                    <span class="{{ $record['statusBadge'] ?? $status?->color() ?? 'badge-dark' }}">
-                                        {{ $record['statusLabel'] ?? $status?->label() ?? ($record['status'] ?? '—') }}
+                                    <span class="{{ $record['statusBadge'] ?? ($status?->color() ?? 'badge-dark') }}">
+                                        {{ $record['statusLabel'] ?? ($status?->label() ?? ($record['status'] ?? '—')) }}
                                     </span>
                                 </div>
                             </div>
@@ -348,13 +353,13 @@
                                     <div class="min-w-0">
                                         <div class="record-inner-label">{{ __('Медикамент') }}</div>
                                         <div class="record-inner-value break-words">
-                                            {{ $record['medicationName'] ?? data_get($record, 'medication_info.medication_name') ?? data_get($record, 'medication.name') ?? '—' }}
+                                            {{ $record['medicationName'] ?? (data_get($record, 'medication_info.medication_name') ?? (data_get($record, 'medication.name') ?? '—')) }}
                                         </div>
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label">{{ __('Кількість') }}</div>
                                         <div class="record-inner-value">
-                                            {{ $record['medicationQty'] ?? $record['medication_qty'] ?? '—' }}
+                                            {{ $record['medicationQty'] ?? ($record['medication_qty'] ?? '—') }}
                                         </div>
                                     </div>
                                     <div class="min-w-0">
@@ -364,7 +369,7 @@
                                     <div class="min-w-0">
                                         <div class="record-inner-label">{{ __('Програма') }}</div>
                                         <div class="record-inner-value break-words">
-                                            {{ $record['programName'] ?? data_get($record, 'medical_program.name') ?? '—' }}
+                                            {{ $record['programName'] ?? (data_get($record, 'medical_program.name') ?? '—') }}
                                         </div>
                                     </div>
                                     <div class="min-w-0">

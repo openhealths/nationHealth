@@ -1198,7 +1198,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         $diagnosisCodes = collect($resource['addresses'] ?? [])->flatMap(function (array $address) use ($conditions): array {
             $condition = $conditions->get(data_get($address, 'reference.identifier.value'));
 
-            return $condition?->code ? MedicalEventsRepository::codeableConcept()->toResource($condition->code)['coding'] ?? [] : ($address['coding'] ?? []);
+            return $condition?->code ? (MedicalEventsRepository::codeableConcept()->toResource($condition->code)['coding'] ?? []) : ($address['coding'] ?? []);
         })
             ->where('system', 'eHealth/ICD10_AM/condition_codes')->pluck('code')->all();
         $diagnosisNames = Icd10::whereIn('code', $diagnosisCodes)->pluck('description', 'code');

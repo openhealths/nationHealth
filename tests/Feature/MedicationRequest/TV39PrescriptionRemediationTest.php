@@ -9,8 +9,11 @@ use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
 use App\Classes\eHealth\Api\Patient\MedicationRequestRequest as MedicationRequestRequestApi;
 use App\Classes\eHealth\Api\Person as PersonApi;
 use App\Enums\User\Role;
+use App\Livewire\EncounterPackage\Concerns\ManagesEncounterEPrescription;
+use App\Livewire\EncounterPackage\Concerns\ResolvesEncounterStandaloneContext;
 use App\Livewire\Person\Records\PatientMedicationRequests;
 use App\Livewire\Person\Records\PatientMedicationRequestView;
+use App\Livewire\Person\Records\PatientPrescriptionRequests;
 use App\Livewire\Person\Records\PatientPrescriptionRequestView;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Coding;
@@ -18,7 +21,8 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Policies\EncounterPolicy;
-use App\Repositories\MedicalEvents\Repository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
@@ -29,7 +33,10 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Livewire\Attributes\Computed;
+use Livewire\Component;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\Feature\Composition\CompositionTestFixtures;
@@ -87,7 +94,7 @@ class TV39PrescriptionRemediationTest extends TestCase
 
     private function store(array $native, bool $request = true): MedicationRequestRequest
     {
-        return Repository::medicationRequest()->storeResource(
+        return MedicalEventsRepository::medicationRequest()->storeResource(
             (new MedicationRequestMapper())->fromEHealth($native),
             $this->context['person']->id,
             employeeId: $this->context['employee']->id,
@@ -124,6 +131,72 @@ class TV39PrescriptionRemediationTest extends TestCase
         }
 
         return Http::response(json_encode($body, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION));
+    }
+
+    #[DataProvider('validityStates')]
+    public function test_validity_uses_native_resource_status_without_certifying_a_pending_request(bool $request, string $status, string $message): void
+    {
+        $native = $this->native($request);
+        $record = $this->store($native, $request);
+        $native['status'] = $status;
+        $this->fakeApis(['*' => $this->response($native)]);
+
+        Livewire::test($request ? PatientPrescriptionRequestView::class : PatientMedicationRequestView::class, $this->parameters($record->uuid))
+            ->call('checkValidity')->assertSee(__('medication-requests.'.$message))
+            ->assertSet('detail.status', $status);
+
+        $this->assertSame($status, $record->fresh()->status);
+        Http::assertSentCount(1);
+        Http::assertSent(static fn (Request $http): bool => $http->method() === 'GET');
+    }
+
+    public static function validityStates(): array
+    {
+        return [
+            'new request' => [true, 'NEW', 'validity_unconfirmed'],
+            'signed request' => [true, 'SIGNED', 'validity_unconfirmed'],
+            'rejected request' => [true, 'REJECTED', 'validity_rejected'],
+            'active prescription' => [false, 'ACTIVE', 'validity_active'],
+            'rejected prescription' => [false, 'REJECTED', 'validity_rejected'],
+        ];
+    }
+
+    public function test_denied_validity_check_has_visible_feedback_without_http_or_storage_changes(): void
+    {
+        $native = $this->native(false);
+        $record = $this->store($native, false);
+        $component = Livewire::test(PatientMedicationRequestView::class, $this->parameters($record->uuid));
+        $this->context['user']->revokePermissionTo('medication_request:read');
+
+        $component->call('checkValidity')->assertSee(__('medication-requests.permission_denied'));
+        $this->assertEquals($native, $record->fresh()->ehealthPayload);
+        Http::assertNothingSent();
+    }
+
+    public function test_validity_rejects_malformed_or_other_patient_data_before_storage(): void
+    {
+        $native = $this->native(false);
+        $record = $this->store($native, false);
+        foreach (['malformed', 'other_patient'] as $case) {
+            $bad = $native;
+            if ($case === 'malformed') {
+                unset($bad['medication_info']['medication_qty']);
+            } else {
+                $bad['person']['id'] = (string) Str::uuid();
+            }
+            $this->fakeApis(['*' => $this->response($bad)]);
+            Livewire::test(PatientMedicationRequestView::class, $this->parameters($record->uuid))
+                ->call('checkValidity')->assertSee(__('medication-requests.detail_unavailable'));
+            $this->assertEquals($native, $record->fresh()->ehealthPayload);
+        }
+    }
+
+    public function test_legacy_prescription_route_serves_the_same_two_tab_registry(): void
+    {
+        Livewire::test(PatientPrescriptionRequests::class, $this->parameters(''))
+            ->assertSee('Заявки на електронний рецепт')->assertSee('Електронні рецепти')
+            ->assertSet('activeTab', 'requests')->call('switchTab', 'prescriptions')
+            ->assertSet('activeTab', 'prescriptions');
     }
 
     public function test_new_request_survives_navigation_and_opens_signing_without_a_second_create(): void
@@ -238,7 +311,7 @@ class TV39PrescriptionRemediationTest extends TestCase
         $plan = $this->createFhirCarePlan(['person_id' => $this->context['person']->id, 'legal_entity_id' => $this->context['legalEntity']->id, 'author_id' => $this->context['employee']->id]);
         $request = $this->native();
         $prescription = $this->native(false);
-        $repo = Repository::medicationRequest();
+        $repo = MedicalEventsRepository::medicationRequest();
         $this->assertSame(2, $repo->importCarePlanDocuments($plan, [$prescription], [$request]));
         $this->assertDatabaseHas('medication_request_requests', ['uuid' => $request['id'], 'resource_type' => MedicationRequestRequest::TYPE_REQUEST]);
         $this->assertDatabaseHas('medication_request_requests', ['uuid' => $prescription['id'], 'resource_type' => MedicationRequestRequest::TYPE_PRESCRIPTION]);
@@ -308,6 +381,82 @@ class TV39PrescriptionRemediationTest extends TestCase
         Http::assertSent(static fn (Request $request): bool => str_ends_with($request->url(), '/medication_requests/'.$record->uuid.'/price_catalog_link'));
     }
 
+    private function documentPlan(): array
+    {
+        $this->grantMedicalEventAbilities($this->context['user'], ['care_plan:read']);
+        $this->grantCarePlanEmployeeRole($this->context['employee'], 'OUTPATIENT');
+        $plan = $this->createFhirCarePlan([
+            'person_id' => $this->context['person']->id, 'legal_entity_id' => $this->context['legalEntity']->id,
+            'author_id' => $this->context['employee']->id, 'encounter_id' => $this->encounter->id,
+            'status' => 'active', 'title' => 'BA08 Plan', 'period_end' => now()->addMonth()->toDateString(),
+        ]);
+        $this->grantCarePlanWriteApproval($plan, $this->context['employee']);
+        $activity = $this->createFhirCarePlanActivity([
+            'care_plan_id' => $plan->id, 'author_id' => $this->context['employee']->id,
+            'kind' => 'medication_request', 'status' => 'scheduled', 'quantity' => 10,
+            'quantity_code' => 'TAB', 'quantity_system' => 'UCUM',
+            'remaining_quantity' => 0, 'remaining_quantity_code' => 'TAB', 'remaining_quantity_system' => 'UCUM',
+            'product_reference' => (string) Str::uuid(), 'product_reference_type' => 'medication',
+        ]);
+        $resource = Repository::carePlanActivity()->getResource($activity);
+        $resource['detail']['remainingQuantity'] = ['value' => 0, 'system' => 'UCUM', 'code' => 'TAB', 'unit' => 'таб.'];
+        Repository::carePlanActivity()->storeResource($resource, $plan, $activity->id);
+
+        return [$plan, $activity];
+    }
+
+    private function prescriptionHarness(): array
+    {
+        return ['legalEntity' => $this->context['legalEntity'], 'person' => $this->context['person'], 'encounter' => $this->encounter];
+    }
+
+    public function test_medical_coordinator_can_open_creation_for_own_finished_encounter(): void
+    {
+        $this->context['employee']->update(['employee_type' => 'MED_COORDINATOR']);
+        Livewire::test(EncounterPrescriptionPlanHarness::class, $this->prescriptionHarness())
+            ->call('openEncounterEPrescriptionDrawer')->assertSet('showEncounterEPrescriptionDrawer', true);
+        Http::assertNothingSent();
+    }
+
+    public function test_denied_creation_shows_feedback_before_api_or_storage(): void
+    {
+        $this->context['user']->revokePermissionTo('medication_request_request:write');
+        $this->mock(MedicationRequestLifecycleService::class)->shouldNotReceive('createEncounterDraft')->shouldNotReceive('createCarePlanDraft');
+        Livewire::test(EncounterPrescriptionPlanHarness::class, $this->prescriptionHarness())
+            ->call('openEncounterEPrescriptionDrawer')->assertSet('showEncounterEPrescriptionDrawer', false)
+            ->assertSee(__('medication-requests.own_finished_encounter_required'));
+        $this->assertDatabaseCount('medication_request_requests', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_plan_selection_keeps_native_remaining_quantity_after_another_search(): void
+    {
+        [$plan, $activity] = $this->documentPlan();
+        $plan->approvals()->update(['status' => 'NEW']);
+        Livewire::test(EncounterPrescriptionPlanHarness::class, $this->prescriptionHarness())
+            ->call('searchEncounterEPrescriptionCarePlans')->call('selectEncounterEPrescriptionCarePlan', $plan->id)
+            ->call('selectEncounterEPrescriptionActivity', $activity->id)
+            ->assertSet('encounterEPrescriptionActivityId', $activity->id)->assertSee('таб.')
+            ->set('encounterEPrescriptionPlanSearch', 'unrelated search')->call('searchEncounterEPrescriptionCarePlans')
+            ->assertSet('encounterEPrescriptionApprovalRequired', false)->assertCount('encounterEPrescriptionActivityChoices', 1);
+        Http::assertNothingSent();
+        $this->assertDatabaseCount('medication_request_requests', 0);
+    }
+
+    public function test_revoked_approval_stops_signing_with_visible_feedback_and_no_effects(): void
+    {
+        [$plan, $activity] = $this->documentPlan();
+        $component = Livewire::test(EncounterPrescriptionPlanHarness::class, $this->prescriptionHarness())
+            ->call('selectEncounterEPrescriptionCarePlan', $plan->id)->call('selectEncounterEPrescriptionActivity', $activity->id)
+            ->call('primeSigning');
+        $plan->approvals()->update(['is_verified' => false]);
+        $this->mock(MedicationRequestLifecycleService::class)->shouldNotReceive('signPrescription');
+        $component->call('signEncounterEPrescription')->assertSet('showSignatureModal', true)
+            ->assertSee(__('care-plan.related_plan_unavailable'));
+        $this->assertDatabaseCount('medication_request_requests', 0);
+        Http::assertNothingSent();
+    }
+
     public function test_old_or_other_doctor_encounter_cannot_create_a_request(): void
     {
         $lifecycle = app(MedicationRequestLifecycleService::class);
@@ -325,5 +474,71 @@ class TV39PrescriptionRemediationTest extends TestCase
         }
         Http::assertNothingSent();
         $this->assertDatabaseCount('medication_request_requests', 0);
+    }
+}
+
+class EncounterPrescriptionPlanHarness extends Component
+{
+    use ManagesEncounterEPrescription;
+    use ResolvesEncounterStandaloneContext;
+
+    public int $encounterId;
+    public int $personId;
+    public bool $showSignatureModal = false;
+    public ?string $actionType = null;
+
+    public function mount($legalEntity, $person, $encounter): void
+    {
+        $this->encounterId = $encounter->id;
+        $this->personId = $person->id;
+    }
+
+    protected function loadEncounterEPrescriptionAuthMethods(Encounter $encounter): void
+    {
+    }
+    protected function loadEncounterEPrescriptionPrograms(): void
+    {
+    }
+    #[Computed]
+    public function encounterEPrescriptionCategories(): array
+    {
+        return ['community' => 'Community'];
+    }
+    #[Computed]
+    public function encounterPrescriptionQuantities(): array
+    {
+        return [];
+    }
+    #[Computed]
+    public function encounterPrescriptionIngredientDoses(): array
+    {
+        return [];
+    }
+    #[Computed]
+    public function encounterPrescriptionContainers(): array
+    {
+        return [];
+    }
+    #[Computed]
+    public function encounterPrescriptionNotificationsDisabled(): bool
+    {
+        return false;
+    }
+
+    public function primeSigning(): void
+    {
+        $this->encounterEPrescriptionRequestIdToSign = (string) Str::uuid();
+        $this->encounterEPrescriptionDraftForm = $this->encounterEPrescriptionForm;
+        $this->showSignatureModal = true;
+    }
+
+    public function render(): string
+    {
+        return <<<'BLADE'
+<div>
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
+    @include('livewire.encounter-package.parts.encounter-eprescription-form', ['encounterReturnUrl' => '/'])
+</div>
+BLADE;
     }
 }

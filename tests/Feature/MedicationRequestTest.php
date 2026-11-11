@@ -5,17 +5,24 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
+use App\Livewire\MedicationRequest\MedicationRequestForm;
+use App\Livewire\MedicationRequest\MedicationRequestIndex;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\Relations\Party;
+
 use App\Models\User;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Mockery;
 use Tests\Concerns\MocksBasicDictionaries;
 use Tests\TestCase;
-use Mockery;
 
 class MedicationRequestTest extends TestCase
 {
@@ -43,8 +50,8 @@ class MedicationRequestTest extends TestCase
         parent::setUp();
         $this->mockBasicDictionaries();
 
-        $party = \App\Models\Relations\Party::create([
-            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+        $party = Party::create([
+            'uuid' => (string) Str::uuid(),
             'first_name' => 'Іван',
             'last_name' => 'Петренко',
             'tax_id' => '9876543210',
@@ -53,17 +60,17 @@ class MedicationRequestTest extends TestCase
         ]);
 
         $this->user = User::create([
-            'uuid' => (string) \Illuminate\Support\Str::uuid(),
-            'email' => 'test_' . \Illuminate\Support\Str::random(6) . '@example.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'uuid' => (string) Str::uuid(),
+            'email' => 'test_' . Str::random(6) . '@example.com',
+            'password' => Hash::make('password'),
             'party_id' => $party->id,
         ]);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $this->legalEntity = LegalEntity::create([
-            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'uuid' => (string) Str::uuid(),
             'status' => 'ACTIVE',
             'sync_status' => 'COMPLETED',
             'legal_entity_type_id' => $typeId,
@@ -72,7 +79,7 @@ class MedicationRequestTest extends TestCase
         $this->instance('legalEntity', $this->legalEntity);
 
         $this->employee = Employee::create([
-            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'uuid' => (string) Str::uuid(),
             'full_name' => 'Д-р Іван Петренко',
             'employee_type' => 'DOCTOR',
             'status' => 'APPROVED',
@@ -89,7 +96,7 @@ class MedicationRequestTest extends TestCase
     public function test_it_can_prequalify_medication_request(): void
     {
         Http::fake([
-            '*' => Http::response(['data' => [['status' => 'valid']]], 200),
+            '*' => Http::response(['data' => json_decode(file_get_contents(base_path('tests/Fixtures/medication-official-responses.json')), true, flags: JSON_THROW_ON_ERROR)['prequalify']], 200),
         ]);
         $this->bindFakedMedicationRequestClient();
 
@@ -97,7 +104,7 @@ class MedicationRequestTest extends TestCase
             'person_id' => 'patient-123',
         ]);
 
-        $this->assertSame('valid', $result[0]['status']);
+        $this->assertSame('VALID', $result[0]['status']);
         Http::assertSent(static function (Request $request): bool {
             return $request->method() === 'POST'
                 && str_contains($request->url(), '/api/medication_request_requests/prequalify')
@@ -125,7 +132,7 @@ class MedicationRequestTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        Livewire::test(\App\Livewire\MedicationRequest\MedicationRequestIndex::class, ['legalEntity' => $this->legalEntity])
+        Livewire::test(MedicationRequestIndex::class, ['legalEntity' => $this->legalEntity])
             ->assertStatus(200)
             ->assertSee('Електронні рецепти');
     }
@@ -138,7 +145,7 @@ class MedicationRequestTest extends TestCase
         $mockService->shouldReceive('preQualify')->once()->andReturn([]);
         $this->app->instance(MedicationRequestLifecycleService::class, $mockService);
 
-        Livewire::test(\App\Livewire\MedicationRequest\MedicationRequestForm::class, ['legalEntity' => $this->legalEntity])
+        Livewire::test(MedicationRequestForm::class, ['legalEntity' => $this->legalEntity])
             ->set('patientId', 'uuid-123')
             ->set('medicalProgram', 'program-123')
             ->set('dosageInstruction', 'Take 1 pill')

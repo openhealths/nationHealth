@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\MedicationRequest\Forms;
 
 use Illuminate\Support\Facades\Log;
+
 use Livewire\Form;
+use RuntimeException  ;
 
 class MedicationRequestSigningForm extends Form
 {
@@ -39,7 +41,7 @@ class MedicationRequestSigningForm extends Form
             if (!$valid) {
                 Log::warning('Medication request signing snapshot rejected', $checks);
 
-                throw new \RuntimeException(__('medication-requests.' . $messages[$check]));
+                throw new RuntimeException(__('medication-requests.' . $messages[$check]));
             }
         }
 

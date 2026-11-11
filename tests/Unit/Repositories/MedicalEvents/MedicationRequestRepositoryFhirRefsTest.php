@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Repositories\MedicalEvents;
 
 use App\Enums\Person\MedicationRequestStatus;
+
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
@@ -13,8 +14,9 @@ use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
-use App\Repositories\MedicalEvents\MedicationRequestRepository;
+use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -32,8 +34,8 @@ class MedicationRequestRepositoryFhirRefsTest extends TestCase
     {
         parent::setUp();
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $this->legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -77,7 +79,7 @@ class MedicationRequestRepositoryFhirRefsTest extends TestCase
         $activityUuid = (string) Str::uuid();
         $encounterUuid = (string) Str::uuid();
 
-        $id = app(MedicationRequestRepository::class)->store([
+        $id = Repository::medicationRequest()->store([
             'uuid' => (string) Str::uuid(),
             'employee_id' => $this->employee->id,
             'status' => MedicationRequestStatus::DRAFT->value,
@@ -121,7 +123,7 @@ class MedicationRequestRepositoryFhirRefsTest extends TestCase
             'quantity' => 10,
         ]);
 
-        $repo = app(MedicationRequestRepository::class);
+        $repo = Repository::medicationRequest();
         $repo->store([
             'uuid' => (string) Str::uuid(),
             'employee_id' => $this->employee->id,

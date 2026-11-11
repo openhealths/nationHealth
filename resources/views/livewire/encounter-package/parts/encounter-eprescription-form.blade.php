@@ -1,3 +1,41 @@
+<fieldset class="fieldset-card space-y-4 p-6 sm:p-8">
+    <legend class="legend">{{ __('device-requests.plan.title') }}</legend>
+    <label for="encounter-prescription-plan-search" class="label"> {{ __('medication-requests.plan_search') }} </label>
+    <input
+        id="encounter-prescription-plan-search"
+        wire:model="encounterEPrescriptionPlanSearch"
+        wire:keydown.enter.prevent="searchEncounterEPrescriptionCarePlans"
+        class="input w-full"
+    />
+    <button type="button" wire:click="searchEncounterEPrescriptionCarePlans" class="button-minor">
+        {{ __('forms.search') }}
+    </button>
+    <select wire:change="selectEncounterEPrescriptionCarePlan($event.target.value)" class="input-select w-full">
+        <option value="0">{{ __('medication-requests.without_plan') }}</option>
+        @foreach ($encounterEPrescriptionPlanChoices as $choice)
+            <option value="{{ $choice['id'] }}" @selected($encounterEPrescriptionPlanId === $choice['id'])>
+                {{ $choice['label'] }}
+            </option>
+        @endforeach
+    </select>
+    @if ($encounterEPrescriptionApprovalRequired && $this->encounterEPrescriptionSelectedPlan)
+        <p>{{ __('care-plan.prescribing_patient_access_required') }}</p>
+        @livewire('care-plan.care-plan-approvals', ['legalEntity' => legalEntity(), 'carePlan' => $this->encounterEPrescriptionSelectedPlan], key('encounter-prescription-plan-access-'.$encounterEPrescriptionPlanId))
+        <button type="button" wire:click="searchEncounterEPrescriptionCarePlans" class="button-minor">
+            {{ __('medication-requests.refresh_plan_access') }}
+        </button>
+    @elseif ($encounterEPrescriptionPlanId)
+        <select wire:change="selectEncounterEPrescriptionActivity($event.target.value)" class="input-select w-full">
+            <option value="0">{{ __('medication-requests.choose_plan_activity') }}</option>
+            @foreach ($encounterEPrescriptionActivityChoices as $choice)
+                <option value="{{ $choice['id'] }}" @selected($encounterEPrescriptionActivityId === $choice['id'])>
+                    {{ $choice['description'] ?: $choice['uuid'] }} · {{ __('medication-requests.remaining') }}: {{ data_get($choice, 'remainingQuantity.value', '—') }} {{ data_get($choice, 'remainingQuantity.unit', data_get($choice, 'remainingQuantity.code', '')) }}
+                </option>
+            @endforeach
+        </select>
+    @endif
+    <x-input-error for="activity" />
+</fieldset>
 <form wire:submit.prevent="validateEncounterEPrescription" class="space-y-6">
     <fieldset class="fieldset-card p-6 sm:p-8">
         <legend class="legend">{{ __('care-plan.medication') }}</legend>
@@ -10,6 +48,7 @@
                     id="encounterEPrescriptionProgram"
                     class="input-select peer w-full"
                     wire:model.live="encounterEPrescriptionForm.program_id"
+                    @disabled($encounterEPrescriptionActivityId)
                 >
                     <option value="">{{ __('care-plan.prescription_medication') }}</option>
                     @foreach ($encounterEPrescriptionPrograms as $program)

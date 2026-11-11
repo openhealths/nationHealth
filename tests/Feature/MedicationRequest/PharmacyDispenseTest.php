@@ -6,7 +6,9 @@ namespace Tests\Feature\MedicationRequest;
 
 use App\Classes\eHealth\Api\Patient\MedicationDispense as MedicationDispenseApi;
 use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
+
 use App\Classes\eHealth\EHealthResponse;
+use App\Enums\Status;
 use App\Livewire\MedicationRequest\MedicationRequestIndex;
 use App\Models\Division;
 use App\Models\Employee\Employee;
@@ -16,8 +18,9 @@ use App\Models\User;
 use App\Services\SignatureService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
@@ -41,8 +44,8 @@ class PharmacyDispenseTest extends TestCase
         config(['cipher.api.domain' => 'https://cipher.invalid']);
         Cache::put('knedp_certificate_authority', [], 60);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PHARMACY')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PHARMACY']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PHARMACY')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PHARMACY']);
 
         $this->pharmacy = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -84,7 +87,7 @@ class PharmacyDispenseTest extends TestCase
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Pharmacist',
             'employee_type' => 'PHARMACIST',
-            'status' => \App\Enums\Status::APPROVED->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $this->pharmacy->id,
             'division_id' => $division->id,
             'is_active' => true,

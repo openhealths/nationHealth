@@ -334,9 +334,9 @@
                                     <option value="">Оберіть метод...</option>
                                     @foreach ($ePrescriptionAuthMethods as $method)
                                         @php
-                                            $methodId = $method['uuid'] ?? $method['id'] ?? '';
+                                            $methodId = $method['uuid'] ?? ($method['id'] ?? '');
                                             $typeLabel = $method['type'] === 'OTP' ? 'СМС (OTP)' : ($method['type'] === 'THIRD_PERSON' ? 'Довірена особа' : 'Документи');
-                                            $valueLabel = $method['phone_number'] ?? $method['alias'] ?? '';
+                                            $valueLabel = $method['phone_number'] ?? ($method['alias'] ?? '');
                                         @endphp
                                         @if ($methodId !== '')
                                             <option value="{{ $methodId }}|{{ $method['type'] }}|{{ $valueLabel }}">

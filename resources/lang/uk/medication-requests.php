@@ -3,6 +3,11 @@
 declare(strict_types=1);
 
 return [
+    'remaining' => 'Залишок',
+    'refresh_plan_access' => 'Оновити доступ до плану',
+    'choose_plan_activity' => 'Оберіть призначення',
+    'without_plan' => 'Без плану лікування',
+    'plan_search' => 'Пошук плану за назвою, номером або UUID',
     'category_dictionary_unavailable' => 'Не вдалося завантажити активні категорії рецептів. Оновіть довідники ЕСОЗ перед створенням рецепта.',
     'search_local' => 'Шукати в картці',
     'search_in_ehealth' => 'Шукати в ЕСОЗ',
@@ -116,8 +121,8 @@ return [
     'status_new' => 'Новий (заявка)',
     'zaiavok_na_retsepti_za_obranimi_fil_tram' => 'Заявок на рецепти за обраними фільтрами не знайдено',
     'shevchenko_tg' => 'Шевченко Т.Г.',
-    'retsiepty' => 'Рецепти',
-    'zaiavky_na_retsiepty' => 'Заявки на рецепти',
+    'retsiepty' => 'Електронні рецепти',
+    'zaiavky_na_retsiepty' => 'Заявки на електронний рецепт',
 
     'per_day' => 'день',
     'select_container' => 'Оберіть пакування',
@@ -214,4 +219,12 @@ return [
         'dispense_valid_to_start' => 'Дійсність для відпуску закінчується з',
         'dispense_valid_to_end' => 'Дійсність для відпуску закінчується до',
     ],
+    'check_validity' => 'Перевірити дійсність',
+    'validity_active' => 'ЕСОЗ підтвердила активний рецепт. Відхилення рецепта не підтверджено.',
+    'validity_rejected' => 'ЕСОЗ підтвердила відхилення рецепта або заявки.',
+    'validity_expired' => 'Строк дії рецепта завершився.',
+    'validity_blocked' => 'Рецепт заблокований в ЕСОЗ.',
+    'validity_completed' => 'Рецепт погашений в ЕСОЗ.',
+    'validity_entered_in_error' => 'Рецепт позначений помилковим в ЕСОЗ.',
+    'validity_unconfirmed' => 'Заявка ще не підтверджує виданий активний рецепт. Перевірте статус після завершення обробки.',
 ];

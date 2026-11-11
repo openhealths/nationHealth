@@ -47,6 +47,7 @@ use PHPUnit\Framework\Attributes\RunClassInSeparateProcess;
 use RuntimeException;
 use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\Concerns\CreatesFhirRequestIdentifiers;
+use Tests\Support\GrantsReferralEmployeeRole;
 use Tests\TestCase;
 
 #[RunClassInSeparateProcess]
@@ -56,6 +57,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
     use CreatesFhirCarePlans;
     use CreatesFhirRequestIdentifiers;
     use DatabaseTransactions;
+    use GrantsReferralEmployeeRole;
 
     protected Person $person;
 
@@ -152,6 +154,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         $this->user->employees()->attach($this->employee->id);
         $this->actingAs($this->user);
         $this->grantMedicalEventAbilities($this->user);
+        $this->grantReferralEmployeeRole($this->user, $this->employee);
         $this->grantCarePlanWriteApproval($this->carePlan, $this->employee);
 
         $this->activity = $this->createFhirCarePlanActivity([

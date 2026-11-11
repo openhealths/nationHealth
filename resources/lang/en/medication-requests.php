@@ -3,6 +3,11 @@
 declare(strict_types=1);
 
 return [
+    'remaining' => 'Remaining quantity',
+    'refresh_plan_access' => 'Refresh plan access',
+    'choose_plan_activity' => 'Select an activity',
+    'without_plan' => 'Without a care plan',
+    'plan_search' => 'Search a plan by title, number or UUID',
     'search_local' => 'Search patient card',
     'search_in_ehealth' => 'Search eHealth',
     'signed_details_pending' => 'ESOZ accepted the signature. Full details are pending. Use Synchronize signed prescriptions in the patient registry; do not sign again.',
@@ -84,4 +89,12 @@ return [
         'dispense_valid_from_start' => 'Dispensing starts from', 'dispense_valid_from_end' => 'Dispensing starts until',
         'dispense_valid_to_start' => 'Dispensing ends from', 'dispense_valid_to_end' => 'Dispensing ends until',
     ],
+    'check_validity' => 'Check validity',
+    'validity_active' => 'eHealth confirmed an active prescription. Rejection has not been confirmed.',
+    'validity_rejected' => 'eHealth confirmed rejection of the prescription or request.',
+    'validity_expired' => 'The prescription has expired.',
+    'validity_blocked' => 'The prescription is blocked in eHealth.',
+    'validity_completed' => 'The prescription has been dispensed in eHealth.',
+    'validity_entered_in_error' => 'The prescription is marked as entered in error in eHealth.',
+    'validity_unconfirmed' => 'The request does not yet confirm an issued active prescription. Check its status after processing completes.',
 ];

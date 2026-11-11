@@ -21,8 +21,10 @@ use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 
 use App\Models\Person\Person;
+use App\Policies\EncounterPolicy;
 use App\Services\Dictionary\DictionaryManager;
 use GuzzleHttp\Psr7\Response as Psr7Response;
+use Illuminate\Auth\Access\Response as PolicyResponse;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Response as HttpClientResponse;
 use Illuminate\Support\Facades\Cache;
@@ -32,10 +34,12 @@ use Livewire\Component;
 use Livewire\Features\SupportEvents\Event;
 use Mockery;
 use Tests\Concerns\MocksBasicDictionaries;
+use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\TestCase;
 
 class EncounterStandalonePhase6Test extends TestCase
 {
+    use CompositionTestFixtures;
     use DatabaseTransactions;
     use MocksBasicDictionaries;
 
@@ -76,6 +80,7 @@ class EncounterStandalonePhase6Test extends TestCase
 
         $encounter = $this->createEncounter(EncounterStatus::FINISHED->value);
         $harness = $this->makeHarness($encounter->id);
+        $this->authenticatePrescriptionHarness($harness);
         $harness->addError('encounterEPrescriptionForm.medication_id', 'Old medication error');
         $harness->addError('encounterReferralForm.service_id', 'Unrelated referral error');
 
@@ -398,6 +403,9 @@ class EncounterStandalonePhase6Test extends TestCase
                 'person_id' => $this->person->id, 'status' => 'new',
             ]));
             $harness = $this->makeHarness($encounter->id);
+            if ($kind === 'EPrescription') {
+                $this->authenticatePrescriptionHarness($harness);
+            }
             $harness->{'encounter'.$kind.'RequestIdToSign'} = $draft->uuid;
             $harness->showSignatureModal = true;
             $harness->{'signEncounter'.$kind}();
@@ -409,6 +417,16 @@ class EncounterStandalonePhase6Test extends TestCase
             $this->assertNull($draft->fresh()->contextId);
             $this->assertFalse(session()->has('success'));
         }
+    }
+
+    private function authenticatePrescriptionHarness(EncounterStandaloneHarness $harness): void
+    {
+        $context = $this->compositionFixture(scopes: ['medication_request_request:write']);
+        $this->partialMock(EncounterPolicy::class)->shouldReceive('view')->andReturn(PolicyResponse::allow());
+        $encounter = Encounter::findOrFail($harness->encounterId);
+        $encounter->update(['performer_id' => Identifier::create(['value' => $context['employee']->uuid])->id]);
+        $encounter->period()->create(['start' => now()->startOfDay()->utc(), 'end' => now()->utc()]);
+        $harness->personId = $this->person->id;
     }
 
     private function makeHarness(int $encounterId): EncounterStandaloneHarness
@@ -496,6 +514,8 @@ class EncounterStandaloneHarness extends Component
     use ResolvesEncounterStandaloneContext;
 
     public int $encounterId;
+
+    public int $personId;
 
     public bool $showSignatureModal = false;
 
