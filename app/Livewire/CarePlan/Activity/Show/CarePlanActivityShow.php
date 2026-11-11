@@ -138,9 +138,8 @@ class CarePlanActivityShow extends CarePlanComponent
 
                 if (is_array($device)) {
                     return (string) ($device['device_names'][0]['name']
-                        ?? $device['name']
-                        ?? $device['model_number']
-                        ?? $reference);
+                        ?? ($device['name']
+                            ?? ($device['model_number'] ?? $reference)));
                 }
             } catch (Exception $exception) {
                 Log::warning('CarePlanActivityShow: failed to resolve device label: ' . $exception->getMessage());
