@@ -21,6 +21,7 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Policies\EncounterPolicy;
+use App\Repositories\CarePlanRepository;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
@@ -30,6 +31,7 @@ use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -38,6 +40,7 @@ use Livewire\Component;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
+use RuntimeException;
 use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\Feature\Composition\UsesCompositionDictionaries;
@@ -166,7 +169,7 @@ class TV39PrescriptionRemediationTest extends TestCase
         $native = $this->native(false);
         $record = $this->store($native, false);
         $component = Livewire::test(PatientMedicationRequestView::class, $this->parameters($record->uuid));
-        $this->context['user']->revokePermissionTo('medication_request:read');
+        $this->denyScope('medication_request:read');
 
         $component->call('checkValidity')->assertSee(__('medication-requests.permission_denied'));
         $this->assertEquals($native, $record->fresh()->ehealthPayload);
@@ -250,12 +253,12 @@ class TV39PrescriptionRemediationTest extends TestCase
     {
         $native = $this->native();
         $record = $this->store($native);
-        $this->context['user']->revokePermissionTo('medication_request_request:sign');
+        $this->denyScope('medication_request_request:sign');
         Livewire::test(PatientPrescriptionRequestView::class, $this->parameters($record->uuid))
             ->call('openSigning')->assertSet('showSignatureModal', false)
             ->assertSee(__('medication-requests.permission_denied'));
         $record->update(['status' => 'ACTIVE', 'resource_type' => MedicationRequestRequest::TYPE_PRESCRIPTION]);
-        $this->context['user']->revokePermissionTo('medication_request:resend');
+        $this->denyScope('medication_request:resend');
         Livewire::test(PatientMedicationRequestView::class, $this->parameters($record->uuid))
             ->set('smsConfirmed', true)->call('resendSms')->assertSet('smsConfirmed', true)
             ->assertSee(__('medication-requests.permission_denied'));
@@ -405,6 +408,16 @@ class TV39PrescriptionRemediationTest extends TestCase
         return [$plan, $activity];
     }
 
+    private function denyScope(string $scope): void
+    {
+        $user = $this->context['user'];
+        // Seeded roles can inherit the scope after its direct grant is revoked.
+        $user->syncRoles([]);
+        $user->revokePermissionTo($scope);
+        $user->unsetRelation('roles')->unsetRelation('permissions');
+        $this->assertFalse($user->can($scope));
+    }
+
     private function prescriptionHarness(): array
     {
         return ['legalEntity' => $this->context['legalEntity'], 'person' => $this->context['person'], 'encounter' => $this->encounter];
@@ -420,11 +433,24 @@ class TV39PrescriptionRemediationTest extends TestCase
 
     public function test_denied_creation_shows_feedback_before_api_or_storage(): void
     {
-        $this->context['user']->revokePermissionTo('medication_request_request:write');
+        $this->denyScope('medication_request_request:write');
         $this->mock(MedicationRequestLifecycleService::class)->shouldNotReceive('createEncounterDraft')->shouldNotReceive('createCarePlanDraft');
         Livewire::test(EncounterPrescriptionPlanHarness::class, $this->prescriptionHarness())
             ->call('openEncounterEPrescriptionDrawer')->assertSet('showEncounterEPrescriptionDrawer', false)
             ->assertSee(__('medication-requests.own_finished_encounter_required'));
+        $this->assertDatabaseCount('medication_request_requests', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_unexpected_plan_search_error_has_translated_feedback_without_exposing_details(): void
+    {
+        Exceptions::fake();
+        $error = new RuntimeException('Private database diagnostic');
+        $this->mock(CarePlanRepository::class)->shouldReceive('documentPlanChoices')->once()->andThrow($error);
+        Livewire::test(EncounterPrescriptionPlanHarness::class, $this->prescriptionHarness())
+            ->call('searchEncounterEPrescriptionCarePlans')->assertSet('encounterEPrescriptionPlanChoices', [])
+            ->assertSee(__('care-plan.related_plan_unavailable'))->assertDontSee($error->getMessage());
+        Exceptions::assertReported(static fn (RuntimeException $reported): bool => $reported === $error);
         $this->assertDatabaseCount('medication_request_requests', 0);
         Http::assertNothingSent();
     }

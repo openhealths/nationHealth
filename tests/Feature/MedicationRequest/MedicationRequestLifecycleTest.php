@@ -29,6 +29,7 @@ use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use App\Services\SignatureService;
 use Carbon\CarbonImmutable;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -36,10 +37,12 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
+use ReflectionMethod;
 use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\Concerns\CreatesFhirRequestIdentifiers;
 use Tests\Concerns\MocksBasicDictionaries;
 use Tests\Support\GrantsReferralEmployeeRole;
+use Tests\Support\NativeClinicalFixtures;
 use Tests\TestCase;
 
 class MedicationRequestLifecycleTest extends TestCase
@@ -175,9 +178,9 @@ class MedicationRequestLifecycleTest extends TestCase
             'author_id' => $this->employee->id,
             'status' => 'scheduled',
             'kind' => 'medication_request',
-            'product_reference' => 'INN-101',
+            'product_reference' => 'a3968b0d-ab41-4121-b295-6684ebc3e5b2',
             'quantity' => 60.0,
-            'program' => 'program-1',
+            'program' => '8d08ce22-82dd-4ac4-bdb9-432fd5aad5dd',
         ]);
     }
 
@@ -190,7 +193,7 @@ class MedicationRequestLifecycleTest extends TestCase
             'uuid' => $uuid,
             'employee_id' => $this->employee->id,
             'status' => 'draft',
-            'medication_id' => 'INN-101',
+            'medication_id' => 'a3968b0d-ab41-4121-b295-6684ebc3e5b2',
             'medication_qty' => 60.0,
             'medication_program_id' => 'program-affordable-medicines',
             'intent' => 'order',
@@ -222,7 +225,7 @@ class MedicationRequestLifecycleTest extends TestCase
         $this->assertDatabaseHas('medication_request_requests', [
             'id' => $id,
             'uuid' => $uuid,
-            'medication_id' => 'INN-101',
+            'medication_id' => 'a3968b0d-ab41-4121-b295-6684ebc3e5b2',
             'person_id' => $this->person->id,
             'based_on_id' => $expectedBasedOnId,
         ]);
@@ -245,7 +248,7 @@ class MedicationRequestLifecycleTest extends TestCase
             'uuid' => (string) Str::uuid(),
             'status' => 'draft',
             'intent' => 'order',
-            'medication_id' => 'INN-101',
+            'medication_id' => 'a3968b0d-ab41-4121-b295-6684ebc3e5b2',
             'medication_qty' => 30.0,
             'medication_program_id' => 'program-affordable-medicines',
             'based_on_uuid' => $this->carePlanActivity->uuid,
@@ -276,7 +279,7 @@ class MedicationRequestLifecycleTest extends TestCase
 
         $this->assertEquals($payload['uuid'], $fhir['id']);
         $this->assertEquals('draft', $fhir['status']);
-        $this->assertEquals('INN-101', $fhir['medicationReference']['identifier']['value']);
+        $this->assertEquals('a3968b0d-ab41-4121-b295-6684ebc3e5b2', $fhir['medicationReference']['identifier']['value']);
         $this->assertEquals('program-affordable-medicines', $fhir['program']['identifier']['value']);
         $this->assertEquals($this->carePlanActivity->uuid, $fhir['basedOn'][0]['identifier']['value']);
         $this->assertEquals('Take in the morning', $fhir['note']);
@@ -289,7 +292,7 @@ class MedicationRequestLifecycleTest extends TestCase
 
         $payload = $mapper->toCreateRequestPayload(
             [
-                'medication_id' => 'INN-101',
+                'medication_id' => 'a3968b0d-ab41-4121-b295-6684ebc3e5b2',
                 'medication_qty' => 10.0,
                 'started_at' => '2026-06-24',
                 'ended_at' => '2026-07-03',
@@ -375,7 +378,7 @@ class MedicationRequestLifecycleTest extends TestCase
         $drugResponse = Mockery::mock(EHealthResponse::class);
         $drugResponse->shouldReceive('getData', 'validate')->andReturn([
             [
-                'id' => 'INN-101',
+                'id' => 'a3968b0d-ab41-4121-b295-6684ebc3e5b2',
                 'name' => 'Test Drug',
                 'innm_dosage_form' => 'ml',
                 'ingredients' => [['id' => 'ingredient-1', 'name' => 'Ingredient', 'is_primary' => true, 'dosage' => ['numerator_value' => 1.0, 'numerator_unit' => 'MG', 'denumerator_value' => 1.0, 'denumerator_unit' => 'ML']]],
@@ -395,7 +398,7 @@ class MedicationRequestLifecycleTest extends TestCase
         $programResponse = Mockery::mock(EHealthResponse::class);
         $programResponse->shouldReceive('getData', 'validate')->andReturn([
             [
-                'id' => 'program-1',
+                'id' => '8d08ce22-82dd-4ac4-bdb9-432fd5aad5dd',
                 'name' => 'Affordable Medicines',
                 'settings' => [
                     'skip_treatment_period' => true,
@@ -423,10 +426,26 @@ class MedicationRequestLifecycleTest extends TestCase
         $this->instance(PersonApi::class, $mockPersonApi);
 
         $mockActivityApi = Mockery::mock(CarePlanActivityDependency::class);
-        $activityResponse = Mockery::mock(EHealthResponse::class);
-        $activityResponse->shouldReceive('successful')->andReturn(true);
-        $activityResponse->shouldReceive('getData')->andReturn(['id' => $this->carePlanActivity->uuid]);
-        $activityResponse->shouldReceive('validate')->once()->andReturn(['id' => $this->carePlanActivity->uuid, 'detail' => ['remainingQuantity' => ['value' => 30]]]);
+        // The registration guard and remaining quantity lookup validate the same native resource.
+        $activityData = [
+            'id' => $this->carePlanActivity->uuid,
+            'care_plan' => NativeClinicalFixtures::reference('care_plan', $this->carePlanActivity->carePlan->uuid),
+            'author' => [NativeClinicalFixtures::reference('employee', $this->employee->uuid)],
+            'detail' => [
+                'kind' => 'medication_request', 'status' => 'scheduled', 'do_not_perform' => false,
+                'product_reference' => NativeClinicalFixtures::reference('medication', 'a3968b0d-ab41-4121-b295-6684ebc3e5b2'),
+                'remaining_quantity' => ['value' => 30, 'system' => 'MEDICATION_UNIT', 'code' => 'ML'],
+                'remaining_quantity_type' => 'for_request',
+            ],
+            'inserted_at' => now()->utc()->toIso8601String(), 'updated_at' => now()->utc()->toIso8601String(),
+            'inserted_by' => $this->employee->uuid, 'updated_by' => $this->employee->uuid,
+        ];
+        $validator = new ReflectionMethod(CarePlanActivityDependency::class, 'validateDetails');
+        $activityApi = new CarePlanActivityDependency();
+        $activityResponse = new EHealthResponse(
+            new Response(200, [], json_encode(['data' => $activityData], JSON_THROW_ON_ERROR)),
+            static fn (EHealthResponse $response): array => $validator->invoke($activityApi, $response)
+        );
         $mockActivityApi->shouldReceive('getDetails')->andReturn($activityResponse);
         $this->instance(CarePlanActivityDependency::class, $mockActivityApi);
 
@@ -443,7 +462,7 @@ class MedicationRequestLifecycleTest extends TestCase
             ->call('initEPrescriptionForm', $this->carePlanActivity->id)
             ->assertSet('showEPrescriptionDrawer', true)
             ->assertSet('ePrescriptionRemainingQty', 30.0)
-            ->assertSet('ePrescriptionForm.medication_id', 'INN-101')
+            ->assertSet('ePrescriptionForm.medication_id', 'a3968b0d-ab41-4121-b295-6684ebc3e5b2')
             ->assertSet('ePrescriptionForm.medication_qty', 10)
             ->set('ePrescriptionForm.duration', 15)
             ->call('calculateTreatmentDates')
@@ -466,7 +485,7 @@ class MedicationRequestLifecycleTest extends TestCase
             'employee_id' => $this->employee->id,
             'person_id' => $this->person->id,
             'status' => 'active',
-            'medication_id' => 'INN-101',
+            'medication_id' => 'a3968b0d-ab41-4121-b295-6684ebc3e5b2',
             'medication_qty' => 30.0,
             'intent' => 'order',
             'based_on_id' => $fhirRefs['based_on_id'],
@@ -532,7 +551,7 @@ class MedicationRequestLifecycleTest extends TestCase
             'person_id' => $this->person->id,
             'status' => 'active',
             'resource_type' => MedicationRequestRequest::TYPE_PRESCRIPTION,
-            'medication_id' => 'INN-101',
+            'medication_id' => 'a3968b0d-ab41-4121-b295-6684ebc3e5b2',
             'medication_qty' => 30.0,
             'intent' => 'order',
             'based_on_id' => $fhirRefs['based_on_id'],
