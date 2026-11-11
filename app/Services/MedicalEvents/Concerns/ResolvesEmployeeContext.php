@@ -30,14 +30,15 @@ trait ResolvesEmployeeContext
     {
         $carePlan->loadMissing(['encounter.performer', 'encounter.division']);
 
+        // An explicitly selected and authorized actor creates this request, even when another doctor performed the encounter.
+        if ($actingEmployeeId !== null) {
+            return $this->buildEmployeeContext(Employee::find($actingEmployeeId), $carePlan->encounter);
+        }
+
         $employee = $this->resolveEmployeeByUuid($carePlan->encounter?->performer?->value);
 
         if (!$employee && $activity?->author_id) {
             $employee = Employee::find($activity->author_id);
-        }
-
-        if (!$employee && $actingEmployeeId) {
-            $employee = Employee::find($actingEmployeeId);
         }
 
         return $this->buildEmployeeContext($employee, $carePlan->encounter);
@@ -53,11 +54,12 @@ trait ResolvesEmployeeContext
      */
     public function resolveEncounterEmployeeContext(Encounter $encounter, ?int $actingEmployeeId = null): array
     {
-        $employee = $this->resolveEmployeeByUuid($encounter->performer?->value);
-
-        if (!$employee && $actingEmployeeId) {
-            $employee = Employee::find($actingEmployeeId);
+        // Keep the caller's authorized selection; a missing actor must not silently substitute the historical performer.
+        if ($actingEmployeeId !== null) {
+            return $this->buildEmployeeContext(Employee::find($actingEmployeeId), $encounter);
         }
+
+        $employee = $this->resolveEmployeeByUuid($encounter->performer?->value);
 
         return $this->buildEmployeeContext($employee, $encounter);
     }

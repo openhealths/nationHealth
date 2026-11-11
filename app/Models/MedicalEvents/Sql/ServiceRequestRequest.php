@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Models\MedicalEvents\Sql;
 
 use App\Casts\UtcDateTimeCast;
+use App\Contracts\SubmittedToEHealth;
 use App\Models\CarePlan;
+use App\Models\EhealthLink;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
@@ -16,8 +18,11 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToEHealth
+class ServiceRequestRequest extends Model implements SubmittedToEHealth
 {
     use HasCamelCasing;
 
@@ -27,6 +32,7 @@ class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToE
         'uuid',
         'employee_id',
         'person_id',
+        'preperson_id',
         'division_id',
         'status',
         'request_number',
@@ -60,6 +66,11 @@ class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToE
         'requester_employee_id',
         'requester_legal_entity_id',
         'subject_identifier_id',
+        'used_by_employee_id',
+        'used_by_legal_entity_id',
+        'completed_with_id',
+        'status_history',
+        'expiration_date',
         'quantity_id',
         'remaining_quantity_id',
         'occurrence_date_time',
@@ -73,6 +84,8 @@ class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToE
         'details_synced_at' => 'datetime',
         'supporting_info' => 'array',
         'reason_reference' => 'array',
+        'status_history' => 'array',
+        'expiration_date' => UtcDateTimeCast::class,
     ];
 
     public function statusReasonConcept(): BelongsTo
@@ -100,6 +113,21 @@ class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToE
     {
         return $this->belongsTo(Identifier::class, 'subject_identifier_id');
     }
+
+    public function usedByEmployee(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'used_by_employee_id');
+    }
+
+    public function usedByLegalEntity(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'used_by_legal_entity_id');
+    }
+
+    public function completedWith(): BelongsTo
+    {
+        return $this->belongsTo(Identifier::class, 'completed_with_id');
+    }
     public function quantityQuantity(): BelongsTo
     {
         return $this->belongsTo(Quantity::class, 'quantity_id');
@@ -108,36 +136,36 @@ class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToE
     {
         return $this->belongsTo(Quantity::class, 'remaining_quantity_id');
     }
-    public function occurrencePeriod(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    public function occurrencePeriod(): MorphOne
     {
         return $this->morphOne(Period::class, 'periodable');
     }
 
-    private function referenceCollection(string $collection): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    private function referenceCollection(string $collection): BelongsToMany
     {
         return $this->belongsToMany(Identifier::class, 'service_request_references', 'service_request_id', 'identifier_id')->withPivotValue('collection', $collection)->withPivot('position')->orderByPivot('position');
     }
-    public function basedOnReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function basedOnReferences(): BelongsToMany
     {
         return $this->referenceCollection('basedOn');
     }
-    public function supportingInfoReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function supportingInfoReferences(): BelongsToMany
     {
         return $this->referenceCollection('supportingInfo');
     }
-    public function reasonReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function reasonReferences(): BelongsToMany
     {
         return $this->referenceCollection('reasonReference');
     }
-    public function permittedReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function permittedReferences(): BelongsToMany
     {
         return $this->referenceCollection('permittedResources');
     }
-    public function specimenReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function specimenReferences(): BelongsToMany
     {
         return $this->referenceCollection('specimens');
     }
-    public function focusReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function focusReferences(): BelongsToMany
     {
         return $this->referenceCollection('focus');
     }
@@ -145,6 +173,19 @@ class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToE
     public function person(): BelongsTo
     {
         return $this->belongsTo(Person::class);
+    }
+
+    public function preperson(): BelongsTo
+    {
+        return $this->belongsTo(Preperson::class);
+    }
+
+    #[Scope]
+    protected function forPatient(Builder $query, Person|Preperson $patient): Builder
+    {
+        return $patient instanceof Preperson
+            ? $query->wherePrepersonId($patient->id)->whereNull('person_id')
+            : $query->wherePersonId($patient->id)->whereNull('preperson_id');
     }
 
     public function employee(): BelongsTo
@@ -254,8 +295,8 @@ class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToE
         });
     }
 
-    public function ehealthLinks(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    public function ehealthLinks(): MorphMany
     {
-        return $this->morphMany(\App\Models\EhealthLink::class, 'linkable');
+        return $this->morphMany(EhealthLink::class, 'linkable');
     }
 }

@@ -8,9 +8,13 @@ use App\Classes\eHealth\EHealth;
 use App\Enums\CarePlanStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Livewire\MedicationRequest\Forms\PrescriptionRules;
 use App\Models\CarePlanActivity;
-use App\Repositories\CarePlanActivityRepository;
+use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
 use App\Services\MedicalEvents\CarePlanActivityEHealthGuard;
+use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Carbon\Carbon;
@@ -19,13 +23,19 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use RuntimeException;
+use Throwable;
 
 trait ManagesCarePlanEPrescription
 {
-    public function initEPrescriptionForm(int $activityId, CarePlanActivityRepository $activityRepository): void
+    public function initEPrescriptionForm(int $activityId): void
     {
-        $this->authorizeCarePlanActivityWrite();
+        if (!$this->authorizeCarePlanActivityWrite()) {
+            return;
+        }
 
         try {
             $activity = $this->ownedActivity($activityId);
@@ -80,22 +90,16 @@ trait ManagesCarePlanEPrescription
             $this->ePrescriptionSelectedProduct = $this->resolveDrugForActivity($activity);
             if ($this->ePrescriptionSelectedProduct && !empty($this->ePrescriptionSelectedProduct['packages'])) {
                 $this->ePrescriptionPackages = $this->ePrescriptionSelectedProduct['packages'];
-                $minQty = $this->resolveMedicationPackageStep($this->ePrescriptionSelectedProduct);
-                $multiples = [];
-                for ($i = 1; $i <= 10; $i++) {
-                    $multiples[] = $minQty * $i;
-                }
-                $this->ePrescriptionMultiples = $multiples;
+                $this->ePrescriptionMultiples = PrescriptionRules::quantities($this->ePrescriptionSelectedProduct);
             }
         } catch (Exception $e) {
             Log::warning('CarePlanShow: failed to fetch drug details: ' . $e->getMessage());
         }
 
         if (!$this->ePrescriptionSelectedProduct) {
-            $this->ePrescriptionSelectedProduct = [
-                'name' => $activity->productReference,
-                'innm_dosage_form' => 'од.',
-            ];
+            Session::flash('error', __('care-plan.medication_not_available_for_program'));
+
+            return;
         }
 
         $this->ePrescriptionSelectedProgram = null;
@@ -112,26 +116,28 @@ trait ManagesCarePlanEPrescription
         // The patient's authentication method is legally significant: it must come from the
         // eHealth registry, never from a local fallback.
         $this->ePrescriptionAuthMethods = [];
-        try {
-            $this->ePrescriptionAuthMethods = EHealth::person()->getAuthMethods($this->carePlan->person->uuid)->getData();
-        } catch (Exception $e) {
-            Log::channel('e_health_errors')->error('CarePlanShow: failed to fetch patient auth methods', [
-                'care_plan_id' => $this->carePlan->id,
-                'activity_id' => $activity->id,
-                'exception' => $e->getMessage(),
-            ]);
-            Session::flash('error', __('care-plan.auth_methods_unavailable'));
+        if (!$this->carePlanPrescriptionNotificationsDisabled) {
+            try {
+                $this->ePrescriptionAuthMethods = EHealth::person()->getAuthMethods($this->carePlan->person->uuid)->validate();
+            } catch (Exception $e) {
+                Log::channel('e_health_errors')->error('CarePlanShow: failed to fetch patient auth methods', [
+                    'care_plan_id' => $this->carePlan->id,
+                    'activity_id' => $activity->id,
+                    'exception' => $e->getMessage(),
+                ]);
+                Session::flash('error', __('care-plan.auth_methods_unavailable'));
 
-            return;
+                return;
+            }
+
+            if (empty($this->ePrescriptionAuthMethods)) {
+                Session::flash('error', __('care-plan.auth_methods_empty'));
+
+                return;
+            }
         }
 
-        if (empty($this->ePrescriptionAuthMethods)) {
-            Session::flash('error', __('care-plan.auth_methods_empty'));
-
-            return;
-        }
-
-        $issuedQty = \App\Repositories\MedicalEvents\Repository::medicationRequest()->issuedCarePlanQuantity($activity->uuid);
+        $issuedQty = MedicalEventsRepository::medicationRequest()->issuedCarePlanQuantity($activity->uuid);
 
         $activityQty = $activity->quantity;
         $this->ePrescriptionRemainingQty = $activityQty === null
@@ -159,7 +165,8 @@ trait ManagesCarePlanEPrescription
             $this->ePrescriptionWarningMessage = __('У призначенні плану лікування не вказано кількість. Перевірте дані в ЕСОЗ перед підписанням рецепту.');
         }
 
-        $unit = $this->ePrescriptionSelectedProduct['innm_dosage_form'] ?? 'од.';
+        $unit = (new MedicationRequestMapper())->medicationUnit($this->ePrescriptionSelectedProduct);
+        $this->ePrescriptionMultiples = PrescriptionRules::quantities($this->ePrescriptionSelectedProduct, $this->ePrescriptionRemainingQty);
         $packageStep = $this->resolveMedicationPackageStep($this->ePrescriptionSelectedProduct ?? []);
 
         if ($packageStep > 0 && $this->ePrescriptionRemainingQty > 0 && $this->ePrescriptionRemainingQty < $packageStep) {
@@ -227,6 +234,10 @@ trait ManagesCarePlanEPrescription
             'medication_id' => $resolvedMedicationId,
             'started_at' => now()->toDateString(),
             'duration' => 10,
+            'dose_input_unit' => 'denominator',
+            'dose_ingredient_id' => $this->ePrescriptionSelectedProduct['ingredients'][0]['id'] ?? '',
+            'dose_warning_confirmed' => false,
+            'phone_confirmed' => false,
             'ended_at' => '',
             'medication_qty' => $defaultQty,
             'medication_unit' => $unit,
@@ -243,9 +254,9 @@ trait ManagesCarePlanEPrescription
         // Prefer OTP/THIRD_PERSON option value with pipe encoding when available.
         if (!empty($this->ePrescriptionAuthMethods)) {
             $first = $this->ePrescriptionAuthMethods[0];
-            $methodId = $first['uuid'] ?? $first['id'] ?? '';
+            $methodId = $first['uuid'] ?? ($first['id'] ?? '');
             $type = $first['type'] ?? '';
-            $valueLabel = $first['phone_number'] ?? $first['alias'] ?? '';
+            $valueLabel = $first['phone_number'] ?? ($first['alias'] ?? '');
             if ($methodId !== '') {
                 $this->ePrescriptionForm['inform_with'] = "{$methodId}|{$type}|{$valueLabel}";
             }
@@ -265,6 +276,12 @@ trait ManagesCarePlanEPrescription
     {
         $this->ePrescriptionWarningMessage = '';
         $this->ePrescriptionShowDailyDoseWarning = false;
+        if (in_array($name, ['max_dose_per_period', 'max_dose_per_administration', 'dose_input_unit', 'dose_ingredient_id'], true)) {
+            $this->ePrescriptionForm['dose_warning_confirmed'] = false;
+        }
+        if ($name === 'inform_with') {
+            $this->ePrescriptionForm['phone_confirmed'] = false;
+        }
 
         if (str_contains($name, 'started_at') || str_contains($name, 'duration')) {
             $this->calculateTreatmentDates();
@@ -285,8 +302,8 @@ trait ManagesCarePlanEPrescription
                 return;
             }
 
-            $maxPeriod = (int) ($this->ePrescriptionSelectedProgram['settings']['request_max_period_day'] ?? 90);
-            if ($duration > $maxPeriod) {
+            $maxPeriod = PrescriptionRules::programSetting($this->ePrescriptionSelectedProgram, 'request_max_period_day');
+            if ($maxPeriod !== null && $duration > (int) $maxPeriod) {
                 $this->ePrescriptionWarningMessage = __('Тривалість курсу лікування (:duration днів) перевищує максимальний період курсу за обраною програмою (:max_period днів).', ['duration' => $duration, 'max_period' => $maxPeriod]);
             } else {
                 $this->ePrescriptionWarningMessage = '';
@@ -302,11 +319,9 @@ trait ManagesCarePlanEPrescription
     public function confirmExceededDailyDose(bool $confirm): void
     {
         $this->ePrescriptionShowDailyDoseWarning = false;
+        $this->ePrescriptionForm['dose_warning_confirmed'] = $confirm;
         if ($confirm) {
-            if (!str_starts_with($this->ePrescriptionForm['signature_text'], '(!)')) {
-                $this->ePrescriptionForm['signature_text'] = '(!) ' . $this->ePrescriptionForm['signature_text'];
-            }
-            $this->submitEPrescriptionRequest();
+            $this->validateEPrescription();
         }
     }
 
@@ -319,7 +334,7 @@ trait ManagesCarePlanEPrescription
             $this->validate([
                 'ePrescriptionForm.encounter_id' => 'required|integer|min:1',
                 'ePrescriptionForm.medication_id' => 'required|string|uuid',
-                'ePrescriptionForm.inform_with' => 'required|string',
+                'ePrescriptionForm.inform_with' => 'nullable|string',
                 'ePrescriptionForm.signature_text' => 'required|string',
                 'ePrescriptionForm.max_dose_per_administration' => 'required|numeric|min:0.01',
                 'ePrescriptionForm.max_dose_per_period' => 'required|numeric|min:0.01',
@@ -343,7 +358,7 @@ trait ManagesCarePlanEPrescription
                 'ePrescriptionForm.duration' => __('medication-requests.treatment_duration'),
                 'ePrescriptionForm.ended_at' => __('encounters.eprescription.course_end'),
             ]);
-        } catch (\Illuminate\Validation\ValidationException $exception) {
+        } catch (ValidationException $exception) {
             $this->ePrescriptionWarningMessage = $exception->validator->errors()->first();
             $this->setErrorBag($exception->validator->getMessageBag());
             Session::flash('error', $this->ePrescriptionWarningMessage);
@@ -352,24 +367,24 @@ trait ManagesCarePlanEPrescription
             return;
         }
 
+        try {
+            $this->ePrescriptionForm = PrescriptionRules::normalize(
+                $this->ePrescriptionForm,
+                $this->ePrescriptionSelectedProduct ?? [],
+                $this->ePrescriptionSelectedProgram ?? [],
+                (float) ($this->ePrescriptionSelectedActivity['daily_amount'] ?? ($this->ePrescriptionSelectedActivity['dailyAmount'] ?? 0))
+            );
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $field => $messages) {
+                $this->addError('ePrescriptionForm.'.$field, $messages[0]);
+            }
+            $this->ePrescriptionShowDailyDoseWarning = array_key_exists('dose_warning_confirmed', $exception->errors());
+            $this->ePrescriptionWarningMessage = $exception->validator->errors()->first();
+            Session::flash($this->ePrescriptionShowDailyDoseWarning ? 'warning' : 'error', $this->ePrescriptionWarningMessage);
+
+            return;
+        }
         $qty = (float) $this->ePrescriptionForm['medication_qty'];
-        $maxDosage = (float) ($this->ePrescriptionSelectedProduct['packages'][0]['max_request_dosage'] ?? ($this->ePrescriptionSelectedProduct['max_request_dosage'] ?? 0));
-        $packageStep = $this->resolveMedicationPackageStep($this->ePrescriptionSelectedProduct ?? []);
-
-        if ($packageStep > 0 && !$this->isMedicationQtyDivisible($qty, $this->ePrescriptionSelectedProduct ?? [])) {
-            $message = __('care-plan.medication_qty_packaging', ['count' => $packageStep]);
-            $this->failEPrescriptionField($message, 'ePrescriptionForm.medication_qty');
-
-            return;
-        }
-
-        if ($maxDosage > 0 && $qty > $maxDosage) {
-            $unit = $this->ePrescriptionForm['medication_unit'] ?? '';
-            $this->ePrescriptionWarningMessage = __('Увага! За даним рецептом перевищено максимально допустиму кількість лікарського засобу [:medication], що дозволена до виписування в 1 рецепті. Максимально допустима кількість ЛЗ становить :quantity :unit. Будь-ласка, поверніться та скоригуйте електронний рецепт!', ['medication' => $this->ePrescriptionSelectedProduct['name'], 'quantity' => $maxDosage, 'unit' => $unit]);
-            Session::flash('error', $this->ePrescriptionWarningMessage);
-
-            return;
-        }
 
         if ($qty > $this->ePrescriptionRemainingQty && $this->ePrescriptionSelectedActivity['quantity'] !== null) {
             $this->ePrescriptionWarningMessage = __('Кількість ЛЗ в рецепті (:quantity) перевищує залишкову кількість у плані лікування (:remaining). Виписування неможливе.', ['quantity' => $qty, 'remaining' => $this->ePrescriptionRemainingQty]);
@@ -379,7 +394,7 @@ trait ManagesCarePlanEPrescription
         }
 
         if (!$this->ePrescriptionSkipTreatmentPeriod) {
-            $lastActivePrescription = \App\Repositories\MedicalEvents\Repository::medicationRequest()->lastActiveForTreatment($this->carePlan->personId, $this->ePrescriptionForm['medication_id']);
+            $lastActivePrescription = MedicalEventsRepository::medicationRequest()->lastActiveForTreatment($this->carePlan->personId, $this->ePrescriptionForm['medication_id']);
 
             if ($lastActivePrescription && $lastActivePrescription->endedAt) {
                 $lastEnd = Carbon::parse($lastActivePrescription->endedAt);
@@ -398,39 +413,6 @@ trait ManagesCarePlanEPrescription
                     }
                 }
             }
-        }
-
-        $dailyDose = (float) $this->ePrescriptionForm['max_dose_per_period'];
-        $drugName = (string) ($this->ePrescriptionSelectedProduct['name'] ?? __('ЛЗ'));
-        $unit = (string) ($this->ePrescriptionForm['medication_unit'] ?? 'од.');
-        $maxDailyDosage = (float) ($this->ePrescriptionSelectedProduct['max_daily_dosage'] ?? 0);
-        $recommendedDailyDose = (float) ($this->ePrescriptionSelectedProduct['daily_dosage'] ?? 0);
-        $planDailyAmount = (float) ($this->ePrescriptionSelectedActivity['daily_amount'] ?? 0);
-
-        if ($maxDailyDosage > 0 && $dailyDose > $maxDailyDosage) {
-            $message = __('care-plan.eprescription_max_daily_dosage_exceeded', [
-                'name' => $drugName,
-                'max' => $maxDailyDosage,
-                'unit' => $unit,
-            ]);
-            $this->ePrescriptionWarningMessage = $message;
-            Session::flash('error', $message);
-
-            return;
-        }
-
-        $exceededRecommended = $recommendedDailyDose > 0 && $dailyDose > $recommendedDailyDose;
-        $exceededPlan = $planDailyAmount > 0 && $dailyDose > $planDailyAmount;
-
-        if ($exceededRecommended || $exceededPlan) {
-            $this->ePrescriptionShowDailyDoseWarning = true;
-            $warning = $exceededPlan
-                ? __('care-plan.eprescription_plan_daily_amount_warning', ['name' => $drugName])
-                : __('care-plan.eprescription_daily_dose_warning', ['name' => $drugName]);
-            $this->ePrescriptionWarningMessage = $warning;
-            Session::flash('warning', $warning);
-
-            return;
         }
 
         $this->submitEPrescriptionRequest();
@@ -475,35 +457,44 @@ trait ManagesCarePlanEPrescription
         }
     }
 
+    #[Locked]
+    public array $carePlanImportedPrescriptions = [];
+
+    public array $carePlanPrescriptionFilters = ['employee_id' => '', 'status' => '', 'request_number' => '', 'created_from' => '', 'created_to' => '', 'started_at_from' => '', 'started_at_to' => '', 'ended_at_from' => '', 'ended_at_to' => ''];
+
+    #[Locked]
+    public ?string $prescriptionSmsConfirmationId = null;
+
+    #[Locked]
+    public array $ePrescriptionDispenses = [];
+
     public function syncEPrescriptions(): void
     {
+        if (Auth::user()->cannot('care_plan:read') || Auth::user()->cannot('medication_request:read') || Auth::user()->cannot('medication_request_request:read')) {
+            Session::flash('error', __('medication-requests.permission_denied'));
+
+            return;
+        }
         try {
-            $personUuid = $this->carePlan->person->uuid ?? null;
-            if (!$personUuid) {
-                Session::flash('error', __('Не знайдено ідентифікатор пацієнта в ЕСОЗ'));
-
-                return;
-            }
-
-            $activityUuids = $this->carePlan->activities->pluck('uuid')->toArray();
-            $localRequests = app(CarePlanActivityRepository::class)->linkedDocuments($activityUuids, 'medication_request');
-
-            if ($localRequests->isEmpty()) {
-                Session::flash('info', __('Немає виписаних рецептів для синхронізації у цьому плані лікування'));
-
-                return;
-            }
-
-            $activeItems = EHealth::medicationRequest()->getBySearchParams((string) $personUuid, [])->getData();
-            $draftItems = EHealth::medicationRequest()->getRequestsBySearchParams((string) $personUuid, [])->getData();
-            $updatedCount = \App\Repositories\MedicalEvents\Repository::medicationRequest()->synchronizeCarePlanDocuments($localRequests, $activeItems, $draftItems);
-
+            $filters = array_filter($this->carePlanPrescriptionFilters, static fn (string $value): bool => $value !== '');
+            $lifecycle = app(MedicationRequestLifecycleService::class);
+            $activeItems = $lifecycle->getByCarePlan($this->carePlan->uuid, $filters);
+            $draftItems = $lifecycle->getRequestsByCarePlan($this->carePlan->uuid, array_intersect_key($filters, array_flip(['employee_id', 'status'])));
+            $draftItems = $lifecycle->filterDocuments($draftItems, $filters);
+            // Match confirmed prescriptions against the pre-import requests. A newly
+            // imported MR must not hide its older unsigned MRR with the same number.
+            $localRequests = Repository::carePlanActivity()->linkedDocuments($this->carePlan->activities->pluck('uuid')->all(), 'medication_request');
+            $updatedCount = MedicalEventsRepository::medicationRequest()->importCarePlanDocuments($this->carePlan, $activeItems, $draftItems);
+            MedicalEventsRepository::medicationRequest()->synchronizeCarePlanDocuments($localRequests, $activeItems, $draftItems);
+            $this->carePlanImportedPrescriptions = array_merge(
+                array_map(static fn (array $item): array => $item + ['_resource_type' => MedicationRequestRequest::TYPE_PRESCRIPTION], $activeItems),
+                array_map(static fn (array $item): array => $item + ['_resource_type' => MedicationRequestRequest::TYPE_REQUEST], $draftItems)
+            );
             $this->refreshCarePlan();
-            Session::flash('success', __('Синхронізовано з ЕСОЗ. Оновлено статусів: :count', ['count' => $updatedCount]));
-
-        } catch (Exception $e) {
-            Log::error('ManagesCarePlanEPrescription sync error: ' . $e->getMessage());
-            Session::flash('error', __('Помилка при синхронізації з ЕСОЗ: ') . $e->getMessage());
+            Session::flash('success', __('medication-requests.care_plan_sync', ['count' => $updatedCount]));
+        } catch (Exception $exception) {
+            Log::warning('Care-plan prescription synchronization failed', ['exceptionType' => $exception::class]);
+            Session::flash('error', __('medication-requests.search_failed'));
         }
     }
 
@@ -516,7 +507,9 @@ trait ManagesCarePlanEPrescription
             return;
         }
 
-        $this->authorizeCarePlanActivityWrite();
+        if (!$this->authorizeCarePlanActivityWrite()) {
+            return;
+        }
 
         try {
             $requestRecord = app(MedicalRequestOwnership::class)
@@ -527,7 +520,7 @@ trait ManagesCarePlanEPrescription
                 $requestRecord,
                 array_merge($this->form, [
                     'request_notification_disabled' => filter_var(
-                        $this->ePrescriptionSelectedProgram['settings']['request_notification_disabled'] ?? false,
+                        PrescriptionRules::programSetting($this->ePrescriptionSelectedProgram, 'request_notification_disabled', false),
                         FILTER_VALIDATE_BOOLEAN
                     ),
                     'medication_unit' => $this->ePrescriptionForm['medication_unit'] ?? 'од.',
@@ -551,7 +544,7 @@ trait ManagesCarePlanEPrescription
             $this->ePrescriptionRequestIdToSign = null;
             try {
                 $this->refreshCarePlan();
-            } catch (\Throwable $exception) {
+            } catch (Throwable $exception) {
                 Log::warning('Signed prescription page refresh is pending', ['exceptionType' => $exception::class]);
                 Session::flash('warning', trim(($result['warning_message'] ?? '')."\n".__('care-plan.eprescription_signed_refresh_pending')));
             }
@@ -577,7 +570,9 @@ trait ManagesCarePlanEPrescription
 
     public function rejectPrescription(string $requestId): void
     {
-        $this->authorizeCarePlanActivityWrite();
+        if (!$this->authorizeCarePlanActivityWrite()) {
+            return;
+        }
 
         try {
             $requestRecord = app(MedicalRequestOwnership::class)
@@ -617,7 +612,9 @@ trait ManagesCarePlanEPrescription
             return;
         }
 
-        $this->authorizeCarePlanActivityWrite();
+        if (!$this->authorizeCarePlanActivityWrite()) {
+            return;
+        }
 
         try {
             $requestRecord = app(MedicalRequestOwnership::class)
@@ -654,76 +651,59 @@ trait ManagesCarePlanEPrescription
         }
     }
 
-    public function resendPrescriptionSms(string $prescriptionId): void
+    public function requestPrescriptionSms(string $prescriptionId): void
     {
-        $this->authorizeCarePlanActivityWrite();
-        try {
-            app(MedicalRequestOwnership::class)
-                ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
-
-            $response = app(MedicationRequestLifecycleService::class)->resendSms($this->carePlan->person->uuid, $prescriptionId);
-            if ($response->successful()) {
-                Session::flash('success', __('СМС з кодом погашення успішно надіслано повторно пацієнту.'));
-            } else {
-                Session::flash('error', __('Не вдалося повторно надіслати СМС: ') . json_encode($response->getData()));
-            }
-        } catch (ModelNotFoundException) {
-            Session::flash('error', __('care-plan.document_context_unavailable'));
-            $this->showSignatureModal = false;
-            $this->actionType = '';
+        $record = app(MedicalRequestOwnership::class)->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+        if (Auth::user()->cannot('resend', $record)) {
+            Session::flash('error', __('medication-requests.permission_denied'));
 
             return;
-        } catch (Exception $e) {
-            Log::error('CarePlanShow: failed to resend SMS: ' . $e->getMessage());
-            Session::flash('error', __('Помилка надсилання СМС: ') . $e->getMessage());
+        }
+        $this->prescriptionSmsConfirmationId = $prescriptionId;
+    }
+
+    public function resendPrescriptionSms(string $prescriptionId): void
+    {
+        $record = app(MedicalRequestOwnership::class)->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+        if (Auth::user()->cannot('resend', $record) || $this->prescriptionSmsConfirmationId !== $prescriptionId) {
+            Session::flash('error', __('medication-requests.sms_confirmation'));
+
+            return;
+        }
+        $this->prescriptionSmsConfirmationId = null;
+        try {
+            app(MedicationRequestLifecycleService::class)->resendSms($this->carePlan->person->uuid, $prescriptionId);
+            Session::flash('success', __('medication-requests.sms_sent'));
+        } catch (Exception $exception) {
+            Log::warning('Prescription SMS resend failed', ['exceptionType' => $exception::class]);
+            Session::flash('error', __('medication-requests.sms_unavailable'));
         }
     }
 
     public function loadPrintoutForm(string $prescriptionId): string
     {
         try {
-            app(MedicalRequestOwnership::class)
+            $record = app(MedicalRequestOwnership::class)
                 ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+            if (Auth::user()->cannot('view', $record)) {
+                Session::flash('error', __('medication-requests.permission_denied'));
 
-            $printout = app(MedicationRequestLifecycleService::class)->fetchPrintoutFromEhealth(
+                return '';
+            }
+
+            // Only the validated official patient leaflet may be presented as a prescription printout.
+            $this->printableContent = app(MedicationRequestLifecycleService::class)->fetchPrintoutFromEhealth(
                 $this->carePlan->person->uuid,
                 $prescriptionId
-            );
-
-            if (is_array($printout) && isset($printout['printout_form'])) {
-                $printout = $printout['printout_form'];
-            }
-
-            if (is_string($printout) && (str_contains($printout, '<html') || str_contains($printout, '<div'))) {
-                $this->printableContent = $printout;
-                $this->dispatch('printoutLoaded');
-
-                return $this->printableContent;
-            }
-
-            $ehealthData = is_array($printout) ? $printout : null;
-
-            $this->printableContent = app(MedicationRequestLifecycleService::class)->buildFallbackPrintoutHtml(
-                $this->carePlan,
-                $prescriptionId,
-                $this->ePrescriptionForm['signature_text'] ?? null,
-                $ehealthData,
-                Auth::user()?->party?->full_name
             );
             $this->dispatch('printoutLoaded');
 
             return $this->printableContent;
-        } catch (ModelNotFoundException) {
-            Session::flash('error', __('care-plan.document_context_unavailable'));
-            $this->showSignatureModal = false;
-            $this->actionType = '';
+        } catch (Exception $exception) {
+            Log::warning('Prescription printout unavailable', ['exceptionType' => $exception::class]);
+            Session::flash('error', __('medication-requests.printout_unavailable'));
 
             return '';
-        } catch (Exception $e) {
-            Log::error('CarePlanShow: failed to load printout form: ' . $e->getMessage());
-            Session::flash('error', __('Не вдалося завантажити форму пам’ятки.'));
-
-            return '<h3>' . e(__('Не вдалося сформувати дані для друку. Спробуйте ще раз.')) . '</h3>';
         }
     }
 
@@ -741,44 +721,48 @@ trait ManagesCarePlanEPrescription
             $filters['medical_program_id'] = $activity->program;
         }
 
-        $data = EHealth::drug()->getMany($filters)->getData();
+        $data = EHealth::drug()->getMany($filters)->validate();
         if (!empty($data[0])) {
             return $data[0];
         }
 
-        $fallback = EHealth::drug()->getMany(['innm_id' => $activity->productReference])->getData();
+        $fallback = EHealth::drug()->getMany(['innm_id' => $activity->productReference])->validate();
 
         return $fallback[0] ?? null;
     }
 
     protected function resolveMedicationPackageStep(array $drug): float
     {
-        $packages = $drug['packages'] ?? [];
-        if (!is_array($packages) || empty($packages)) {
-            return 1.0;
-        }
+        $steps = collect($drug['packages'] ?? [])->map(static fn (array $package): float => (float) ($package['package_min_qty'] ?? ($package['min_qty'] ?? ($package['package_qty'] ?? 0))))->filter(static fn (float $step): bool => $step > 0);
 
-        $package = $packages[0];
-        $minQty = (float) ($package['package_min_qty'] ?? 0);
-        if ($minQty > 0) {
-            return $minQty;
-        }
-
-        $packageQty = (float) ($package['package_qty'] ?? 0);
-
-        return $packageQty > 0 ? $packageQty : 1.0;
+        return $steps->min() ?? 0.0;
     }
 
     protected function isMedicationQtyDivisible(float $qty, array $drug): bool
     {
-        $step = $this->resolveMedicationPackageStep($drug);
-        if ($step <= 0) {
-            return true;
+        return PrescriptionRules::isAllowedQuantity($qty, $drug);
+    }
+
+    #[Computed]
+    public function carePlanPrescriptionContainers(): array
+    {
+        return PrescriptionRules::containers($this->ePrescriptionSelectedProduct ?? []);
+    }
+
+    #[Computed]
+    public function carePlanPrescriptionIngredientDoses(): array
+    {
+        try {
+            return (new MedicationRequestMapper())->ingredientDoses((float) ($this->ePrescriptionForm['max_dose_per_period'] ?? 0), $this->ePrescriptionForm, $this->ePrescriptionSelectedProduct ?? []);
+        } catch (Exception) {
+            return [];
         }
+    }
 
-        $quotient = $qty / $step;
-
-        return abs($quotient - round($quotient)) < 1e-6;
+    #[Computed]
+    public function carePlanPrescriptionNotificationsDisabled(): bool
+    {
+        return filter_var(PrescriptionRules::programSetting($this->ePrescriptionSelectedProgram, 'request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
     }
 
     /**
@@ -794,7 +778,9 @@ trait ManagesCarePlanEPrescription
 
     public function blockPrescription(string $prescriptionId): void
     {
-        $this->authorizeCarePlanActivityWrite();
+        if (!$this->authorizeCarePlanActivityWrite()) {
+            return;
+        }
 
         try {
             $requestRecord = app(MedicalRequestOwnership::class)
@@ -803,7 +789,7 @@ trait ManagesCarePlanEPrescription
             app(MedicationRequestLifecycleService::class)->block($this->carePlan->person->uuid, $prescriptionId, [
                 'status_reason' => 'Призупинення або блокування призначення',
             ]);
-            \App\Repositories\MedicalEvents\Repository::medicationRequest()->saveStatus($requestRecord, 'blocked');
+            MedicalEventsRepository::medicationRequest()->saveStatus($requestRecord, 'blocked');
             $this->refreshCarePlan();
             Session::flash('success', __('Рецепт успішно заблоковано в ЕСОЗ.'));
         } catch (ModelNotFoundException) {
@@ -820,14 +806,16 @@ trait ManagesCarePlanEPrescription
 
     public function unblockPrescription(string $prescriptionId): void
     {
-        $this->authorizeCarePlanActivityWrite();
+        if (!$this->authorizeCarePlanActivityWrite()) {
+            return;
+        }
 
         try {
             $requestRecord = app(MedicalRequestOwnership::class)
                 ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
 
             app(MedicationRequestLifecycleService::class)->unblock($this->carePlan->person->uuid, $prescriptionId, []);
-            \App\Repositories\MedicalEvents\Repository::medicationRequest()->saveStatus($requestRecord, 'active');
+            MedicalEventsRepository::medicationRequest()->saveStatus($requestRecord, 'active');
             $this->refreshCarePlan();
             Session::flash('success', __('Рецепт успішно розблоковано в ЕСОЗ.'));
         } catch (ModelNotFoundException) {
@@ -844,37 +832,21 @@ trait ManagesCarePlanEPrescription
 
     public function checkDispenseHistory(string $prescriptionId): void
     {
-        try {
-            app(MedicalRequestOwnership::class)
-                ->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
-
-            $dispenses = app(MedicationRequestLifecycleService::class)->getDispenseHistory($this->carePlan->person->uuid, $prescriptionId);
-            $items = $dispenses['data'] ?? ($dispenses[0] ?? []);
-
-            if (empty($items) || !is_array($items)) {
-                Session::flash('info', __('Погашень рецепту в аптеці наразі не виявлено (рецепт ще не відпущено).'));
-
-                return;
-            }
-
-            $count = count($items);
-            $latestStatus = $items[0]['status'] ?? __('невідомо');
-            Session::flash('success', __('Знайдено :count записів відпуску ліків в аптеці. Останній статус: :status.', ['count' => $count, 'status' => $latestStatus]));
-        } catch (ModelNotFoundException) {
-            Session::flash('error', __('care-plan.document_context_unavailable'));
-            $this->showSignatureModal = false;
-            $this->actionType = '';
+        $record = app(MedicalRequestOwnership::class)->medicationForPerson($prescriptionId, (int) $this->carePlan->personId);
+        if (Auth::user()->cannot('dispenses', $record)) {
+            Session::flash('error', __('medication-requests.permission_denied'));
 
             return;
-        } catch (Exception $e) {
-            Log::warning('CarePlanShow: check dispense history returned 404 or error: ' . $e->getMessage());
-            if (str_contains($e->getMessage(), '404') || str_contains(strtolower($e->getMessage()), 'not found')) {
-                Session::flash('info', __('Погашень (відпуску ліків) за цим рецептом в ЕСОЗ наразі не виявлено (аптеки ще не відпускали ліки за цим номером).'));
-
-                return;
+        }
+        try {
+            $this->ePrescriptionDispenses = app(MedicationRequestLifecycleService::class)->getDispenseHistory($this->carePlan->person->uuid, $prescriptionId);
+            if ($this->ePrescriptionDispenses === []) {
+                Session::flash('info', __('medication-requests.dispenses_empty'));
             }
-            Log::error('CarePlanShow: failed to check dispense history: ' . $e->getMessage());
-            Session::flash('error', __('Не вдалося отримати історію погашень: ') . $e->getMessage());
+        } catch (Exception $exception) {
+            $this->ePrescriptionDispenses = [];
+            Log::warning('Prescription dispense history failed', ['exceptionType' => $exception::class]);
+            Session::flash('error', __('medication-requests.detail_unavailable'));
         }
     }
 }

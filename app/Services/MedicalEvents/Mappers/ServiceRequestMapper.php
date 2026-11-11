@@ -6,9 +6,11 @@ namespace App\Services\MedicalEvents\Mappers;
 
 use App\Contracts\FhirMapperContract;
 use App\Core\Arr;
-use App\Services\MedicalEvents\InformWith;
 use App\Services\MedicalEvents\FhirResource;
+use App\Services\MedicalEvents\InformWith;
+use Brick\Math\BigDecimal;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 class ServiceRequestMapper implements FhirMapperContract
@@ -94,7 +96,7 @@ class ServiceRequestMapper implements FhirMapperContract
             }
         }
         if (array_key_exists('contextUuid', $input) || isset($options['encounterUuid']) || isset($options['episodeUuid'])) {
-            $value = $input['contextUuid'] ?? $options['encounterUuid'] ?? $options['episodeUuid'] ?? null;
+            $value = $input['contextUuid'] ?? ($options['encounterUuid'] ?? ($options['episodeUuid'] ?? null));
             $type = $input['contextType'] ?? (isset($options['encounterUuid']) ? 'encounter' : (isset($options['episodeUuid']) ? 'episode_of_care' : data_get($resource, 'context.identifier.type.coding.0.code')));
             $this->set($resource, 'context', $value ? $this->reference($value, $type, $resource['context'] ?? null) : null);
         }
@@ -111,9 +113,11 @@ class ServiceRequestMapper implements FhirMapperContract
             }
         }
         $previousCarePlan = collect($resource['basedOn'] ?? [])->first(fn (array $ref): bool => data_get($ref, 'identifier.type.coding.0.code') === 'care_plan');
-        if (!empty($options['carePlanUuid']) && data_get($previousCarePlan, 'identifier.value') !== $options['carePlanUuid']) {
+        if (array_key_exists('carePlanUuid', $options) && data_get($previousCarePlan, 'identifier.value') !== $options['carePlanUuid']) {
             $items = array_values(array_filter($resource['basedOn'] ?? [], static fn (array $ref): bool => data_get($ref, 'identifier.type.coding.0.code') !== 'care_plan'));
-            array_unshift($items, $this->reference($options['carePlanUuid'], 'care_plan', collect($resource['basedOn'] ?? [])->first(fn (array $ref): bool => data_get($ref, 'identifier.type.coding.0.code') === 'care_plan')));
+            if (!empty($options['carePlanUuid'])) {
+                array_unshift($items, $this->reference($options['carePlanUuid'], 'care_plan', $previousCarePlan));
+            }
             $resource['basedOn'] = $items;
         }
         if (array_key_exists('quantity', $input)) {
@@ -125,7 +129,7 @@ class ServiceRequestMapper implements FhirMapperContract
                 if (!is_numeric($input['quantity']) || !is_finite((float) $input['quantity'])) {
                     throw new InvalidArgumentException('Quantity must be a finite number.');
                 }
-                if (!\Brick\Math\BigDecimal::of((string) $input['quantity'])->isEqualTo((string) (float) $input['quantity'])) {
+                if (!BigDecimal::of((string) $input['quantity'])->isEqualTo((string) (float) $input['quantity'])) {
                     throw new InvalidArgumentException('Quantity cannot be represented without loss in the JSON numeric contract.');
                 }
                 $resource['quantity'] = array_replace($resource['quantity'] ?? [], ['value' => (float) $input['quantity']]);
@@ -164,7 +168,7 @@ class ServiceRequestMapper implements FhirMapperContract
                     }
                     $old = collect($resource[$field] ?? [])->first(fn (array $ref): bool => data_get($ref, 'identifier.value') === ($item['uuid'] ?? null));
 
-                    return $this->reference($item['uuid'] ?? '', isset($item['type']) ? (strtoupper($item['type']) === $item['type'] ? strtolower($item['type']) : \Illuminate\Support\Str::snake($item['type'])) : null, $old);
+                    return $this->reference($item['uuid'] ?? '', isset($item['type']) ? (strtoupper($item['type']) === $item['type'] ? strtolower($item['type']) : Str::snake($item['type'])) : null, $old);
                 }, $items);
             }
         }
@@ -252,9 +256,7 @@ class ServiceRequestMapper implements FhirMapperContract
         $content['status'] = 'active';
         $content['intent'] ??= 'order';
         $content['priority'] ??= 'routine';
-        if (data_get($content, 'category.coding.0.code') !== 'transfer_of_care') {
-            unset($content['performer'], $content['locationReference'], $content['performerType']);
-        }
+        // Hospitalization also needs a specialty; optional performer references must survive signing.
 
         return Arr::toSnakeCase(array_filter($content, static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []));
     }
@@ -268,7 +270,7 @@ class ServiceRequestMapper implements FhirMapperContract
             $result[$key] = data_get($resource, $path);
         }
         $result['based_on_uuid'] = data_get($activity, 'identifier.value');
-        foreach (['supportingInfo' => 'supporting_info', 'reasonReference' => 'reason_reference'] as $field => $key) {
+        foreach (['supportingInfo' => 'supporting_info', 'reasonReference' => 'reason_reference', 'permittedResources' => 'permitted_resources', 'specimens' => 'specimens', 'focus' => 'focus'] as $field => $key) {
             $result[$key] = array_map(static fn (array $ref): array => ['uuid' => data_get($ref, 'identifier.value'), 'type' => data_get($ref, 'identifier.type.coding.0.code')], $resource[$field] ?? []);
         }
 

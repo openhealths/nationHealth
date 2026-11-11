@@ -4,18 +4,31 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
+use App\Classes\eHealth\SchemaResponseContract;
+use App\Enums\Person\EncounterStatus;
 use App\Enums\Person\MedicationRequestStatus;
+use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
+use App\Models\Division;
+use App\Models\Employee\Employee;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\Person\Person;
 use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
-use App\Models\Employee\Employee;
-use App\Models\Division;
-use App\Models\MedicalEvents\Sql\Coding;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
+use App\Services\MedicalEvents\ActivityRemainingQuantityGuard;
+use App\Services\MedicalEvents\InformWith;
 use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Throwable;
@@ -98,8 +111,27 @@ class MedicationRequestRepository extends BaseRepository
 
         return $this->storageTransaction(function () use ($resource, $personId, $employeeId, $divisionId, $source, $resourceType, $native): MedicationRequestRequest {
             $request = $this->model->newQuery()->whereUuid($resource['id'])->lockForUpdate()->first();
-            if ($request !== null && ((int) $request->personId !== $personId || $request->resourceType !== $resourceType)) {
-                throw new InvalidArgumentException('Medication identity or resource type does not match.');
+            if ($request !== null) {
+                if ((int) $request->personId !== $personId) {
+                    throw new InvalidArgumentException('Medication identity or resource type does not match.');
+                }
+                if ($request->resourceType !== $resourceType) {
+                    // Historical list caches classified every external record as a signed prescription.
+                    // Only a complete authoritative MRR detail may correct that unsynchronized projection.
+                    $legacyRequestImport = $request->source === MedicationRequestRequest::SOURCE_EHEALTH
+                        && $request->detailsSyncedAt === null
+                        && $request->resourceType === MedicationRequestRequest::TYPE_PRESCRIPTION
+                        && $resourceType === MedicationRequestRequest::TYPE_REQUEST
+                        && $source === MedicationRequestRequest::SOURCE_EHEALTH
+                        && $native !== null;
+                    if (!$legacyRequestImport) {
+                        throw new InvalidArgumentException('Medication identity or resource type does not match.');
+                    }
+                    SchemaResponseContract::validateOperationData($native, 'request_detail', 'medication');
+                    if ($native['id'] !== $resource['id'] || $native['person']['id'] !== $this->personUuid($personId)) {
+                        throw new InvalidArgumentException('Medication identity or resource type does not match.');
+                    }
+                }
             }
             $canonical = $request?->detailsSyncedAt !== null;
             $request ??= $this->model->newInstance();
@@ -111,7 +143,7 @@ class MedicationRequestRepository extends BaseRepository
                 $values = $field === 'basedOn' ? ($resource[$field] ?? []) : (isset($resource[$field]) ? [$resource[$field]] : []);
                 $existing = $existingReferences->filter(fn ($reference) => $reference->pivot->field === $field)->values();
                 foreach (array_values($values) as $position => $value) {
-                    $reference = Repository::identifier()->update($existing->get($position) ?? Repository::identifier()->store($value['identifier']['value']), $value);
+                    $reference = MedicalEventsRepository::identifier()->update($existing->get($position) ?? MedicalEventsRepository::identifier()->store($value['identifier']['value']), $value);
                     $referenceIds[$reference->id] = ['field' => $field, 'position' => $position];
                     if ($field === 'context') {
                         $contextId = $reference->id;
@@ -132,11 +164,11 @@ class MedicationRequestRepository extends BaseRepository
                 'medicationProgramId' => data_get($resource, 'program.identifier.value'),
                 'startedAt' => data_get($resource, 'period.start'), 'endedAt' => data_get($resource, 'period.end'),
                 'intentId' => isset($resource['intent']) ? Coding::firstOrCreate(['system' => self::REQUEST_INTENT_SYSTEM, 'code' => $resource['intent']])->id : null,
-                'priorityId' => isset($resource['priority']) ? \App\Models\MedicalEvents\Sql\CodeableConcept::firstOrCreate(['text' => $resource['priority']])->id : null,
+                'priorityId' => isset($resource['priority']) ? CodeableConcept::firstOrCreate(['text' => $resource['priority']])->id : null,
                 'categoryId' => $category?->id, 'basedOnId' => $activityId, 'contextId' => $contextId,
                 'note' => $resource['note'] ?? null,
                 'containerDosage' => is_string($resource['containerDosage'] ?? null) ? $resource['containerDosage'] : null,
-                'informWith' => \App\Services\MedicalEvents\InformWith::authMethodId($resource['informWith'] ?? null),
+                'informWith' => InformWith::authMethodId($resource['informWith'] ?? null),
                 'source' => $request->exists ? $request->source : $source, 'resourceType' => $resourceType,
                 'detailsSyncedAt' => now(),
                 'authoredOn' => $resource['createdAt'] ?? null,
@@ -149,19 +181,19 @@ class MedicationRequestRepository extends BaseRepository
                 'rejectReasonCode' => $resource['rejectReasonCode'] ?? null,
                 'blockReason' => $resource['blockReason'] ?? null,
                 'blockReasonCode' => $resource['blockReasonCode'] ?? null,
-                'quantityId' => Repository::quantity()->replaceComplete($canonical ? $request->quantityQuantity : null, $resource['quantity'] ?? null)?->id,
-                'containerQuantityId' => Repository::quantity()->replaceComplete($canonical ? $request->containerQuantity : null, is_array($resource['containerDosage'] ?? null) ? $resource['containerDosage'] : null)?->id,
+                'quantityId' => MedicalEventsRepository::quantity()->replaceComplete($canonical ? $request->quantityQuantity : null, $resource['quantity'] ?? null)?->id,
+                'containerQuantityId' => MedicalEventsRepository::quantity()->replaceComplete($canonical ? $request->containerQuantity : null, is_array($resource['containerDosage'] ?? null) ? $resource['containerDosage'] : null)?->id,
             ]);
             if ($native !== null) {
                 $request->ehealthPayload = $native;
             }
             $request->save();
-            Repository::period()->sync($request, $resource['period'] ?? null, preservePrecision: true);
+            MedicalEventsRepository::period()->sync($request, $resource['period'] ?? null, preservePrecision: true);
             $request->references()->sync($referenceIds);
             foreach ($existingReferences as $reference) {
                 if (!array_key_exists($reference->id, $referenceIds)) {
                     foreach ($reference->type as $concept) {
-                        Repository::codeableConcept()->delete($concept);
+                        MedicalEventsRepository::codeableConcept()->delete($concept);
                     }
                     $reference->delete();
                 }
@@ -205,7 +237,7 @@ class MedicationRequestRepository extends BaseRepository
         foreach (['dispenseValidFrom', 'dispenseValidTo', 'rejectedAt', 'blockedTo', 'rejectReason', 'rejectReasonCode', 'blockReason', 'blockReasonCode'] as $field) {
             if ($request->{$field} !== null) {
                 $resource[$field] = in_array($field, ['rejectedAt', 'blockedTo'], true)
-                    ? \Carbon\CarbonImmutable::parse($request->{$field}, 'UTC')->utc()->toIso8601ZuluString()
+                    ? CarbonImmutable::parse($request->{$field}, 'UTC')->utc()->toIso8601ZuluString()
                     : $request->{$field};
             }
         }
@@ -213,22 +245,22 @@ class MedicationRequestRepository extends BaseRepository
             $resource['informWith'] = ['authMethodId' => $request->informWith];
         }
         if ($request->category !== null) {
-            $resource['category'] = Repository::codeableConcept()->toResource($request->category);
+            $resource['category'] = MedicalEventsRepository::codeableConcept()->toResource($request->category);
         }
         if ($request->quantityQuantity !== null) {
-            $resource['quantity'] = Repository::quantity()->toResource($request->quantityQuantity);
+            $resource['quantity'] = MedicalEventsRepository::quantity()->toResource($request->quantityQuantity);
         }
         if ($request->containerQuantity !== null) {
-            $resource['containerDosage'] = Repository::quantity()->toResource($request->containerQuantity);
+            $resource['containerDosage'] = MedicalEventsRepository::quantity()->toResource($request->containerQuantity);
         } elseif ($request->containerDosage !== null) {
             $resource['containerDosage'] = $request->containerDosage;
         }
         if ($request->period !== null) {
-            $resource['period'] = array_filter(Repository::period()->toResource($request->period, preservePrecision: true), static fn ($value) => $value !== null);
+            $resource['period'] = array_filter(MedicalEventsRepository::period()->toResource($request->period, preservePrecision: true), static fn ($value) => $value !== null);
         }
         $resource['basedOn'] = [];
         foreach ($request->references as $reference) {
-            $value = Repository::identifier()->toReference($reference);
+            $value = MedicalEventsRepository::identifier()->toReference($reference);
             $field = $reference->pivot->field;
             if ($field === 'basedOn') {
                 $resource[$field][] = $value;
@@ -301,7 +333,7 @@ class MedicationRequestRepository extends BaseRepository
             if (!$quantity->isEqualTo(json_encode((float) $value, JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR))) {
                 throw new InvalidArgumentException('Medication quantity cannot round-trip through the JSON numeric contract.');
             }
-            if (!$quantity->isEqualTo($quantity->toScale(10, \Brick\Math\RoundingMode::DOWN)) || $quantity->abs()->isGreaterThanOrEqualTo('100000000000000')) {
+            if (!$quantity->isEqualTo($quantity->toScale(10, RoundingMode::DOWN)) || $quantity->abs()->isGreaterThanOrEqualTo('100000000000000')) {
                 throw new InvalidArgumentException('Medication quantity exceeds decimal(24,10) storage precision.');
             }
         }
@@ -369,6 +401,31 @@ class MedicationRequestRepository extends BaseRepository
         }
         if (!empty($filters['request_number'])) {
             $query->where('request_number', 'like', '%'.$filters['request_number'].'%');
+        }
+
+        foreach (['medication_id', 'medical_program_id' => 'medication_program_id'] as $key => $column) {
+            $filter = is_int($key) ? $column : $key;
+            if (!empty($filters[$filter])) {
+                $query->where($column, $filters[$filter]);
+            }
+        }
+        foreach (['legal_entity_id' => 'legal_entity->id', 'employee_id' => 'employee->id', 'episode_id' => 'episode_id'] as $filter => $path) {
+            if (!empty($filters[$filter])) {
+                $query->where('ehealth_payload->'.$path, $filters[$filter]);
+            }
+        }
+        if (!empty($filters['encounter_id'])) {
+            $query->whereHas('context', fn (Builder $context) => $context->whereValue($filters['encounter_id']));
+        }
+        if (!empty($filters['care_plan_id'])) {
+            $query->whereHas('references', fn (Builder $reference) => $reference->where('medication_request_references.field', 'basedOn')->whereValue($filters['care_plan_id']));
+        }
+        foreach (['created_from' => ['authored_on', '>='], 'created_to' => ['authored_on', '<='],
+            'dispense_valid_from_start' => ['dispense_valid_from', '>='], 'dispense_valid_from_end' => ['dispense_valid_from', '<='],
+            'dispense_valid_to_start' => ['dispense_valid_to', '>='], 'dispense_valid_to_end' => ['dispense_valid_to', '<=']] as $filter => [$column, $operator]) {
+            if (!empty($filters[$filter])) {
+                $query->whereDate($column, $operator, $filters[$filter]);
+            }
         }
 
         $requests = $query
@@ -552,12 +609,12 @@ class MedicationRequestRepository extends BaseRepository
             })->first();
     }
 
-    public function assertActivityBasis(\App\Models\CarePlan $plan, CarePlanActivity $activity, array $formData): void
+    public function assertActivityBasis(CarePlan $plan, CarePlanActivity $activity, array $formData): void
     {
         if ((int) $activity->carePlanId !== (int) $plan->id) {
             throw new InvalidArgumentException('The medication activity belongs to another Care Plan.');
         }
-        $repository = app(\App\Repositories\CarePlanActivityRepository::class);
+        $repository = Repository::carePlanActivity();
         if ($activity->detailsSyncedAt !== null && method_exists($repository, 'getResource')) {
             $detail = $repository->getResource($activity)['detail'];
             $kind = $detail['kind'] ?? null;
@@ -629,7 +686,7 @@ class MedicationRequestRepository extends BaseRepository
         $request->refresh();
     }
 
-    public function pendingSignedPrescriptions(int $personId): \Illuminate\Support\Collection
+    public function pendingSignedPrescriptions(int $personId): Collection
     {
         return $this->model->newQuery()->wherePersonId($personId)
             ->where('resource_type', MedicationRequestRequest::TYPE_REQUEST)
@@ -640,22 +697,22 @@ class MedicationRequestRepository extends BaseRepository
     {
         return (float) $this->quantityRecords($activityUuid)
             ->when($exceptUuid, fn ($query) => $query->where('uuid', '!=', $exceptUuid))
-            ->whereNotIn('status', \App\Services\MedicalEvents\ActivityRemainingQuantityGuard::occupyingStatusesExcluded())
+            ->whereNotIn('status', ActivityRemainingQuantityGuard::occupyingStatusesExcluded())
             ->sum('medication_qty');
     }
 
-    public function eligibleEncounters(int $personId, ?string $employeeUuid): \Illuminate\Support\Collection
+    public function eligibleEncounters(int $personId, ?string $employeeUuid): Collection
     {
         if ($employeeUuid === null || $employeeUuid === '') {
             return collect();
         }
 
-        $localDay = \Carbon\CarbonImmutable::now((string) config('app.timezone'))->startOfDay();
+        $localDay = CarbonImmutable::now((string) config('app.timezone'))->startOfDay();
         $startUtc = $localDay->utc()->format('Y-m-d H:i:s');
         $endUtc = $localDay->addDay()->utc()->format('Y-m-d H:i:s');
 
         return Encounter::query()->where('person_id', $personId)
-            ->where('status', \App\Enums\Person\EncounterStatus::FINISHED)
+            ->where('status', EncounterStatus::FINISHED)
             ->whereHas('performer', fn ($query) => $query->whereValue($employeeUuid))
             ->whereHas('period', fn ($query) => $query->where('end', '>=', $startUtc)->where('end', '<', $endUtc))
             ->with(['period', 'performer'])->orderByDesc('id')->get();
@@ -669,7 +726,7 @@ class MedicationRequestRepository extends BaseRepository
     }
 
     /** Prefer the linked MR's current status and quantity over its signed MRR. */
-    private function quantityRecords(string $activityUuid): \Illuminate\Database\Eloquent\Builder
+    private function quantityRecords(string $activityUuid): Builder
     {
         return $this->model->newQuery()->whereHas('basedOn', fn ($query) => $query->whereValue($activityUuid))
             ->where(function ($query) use ($activityUuid): void {
@@ -686,7 +743,7 @@ class MedicationRequestRepository extends BaseRepository
     }
 
     /** Hide a signed request only when its actual prescription is stored for the same patient and activity. */
-    public function carePlanDocumentsForDisplay(\Illuminate\Database\Eloquent\Collection $records): \Illuminate\Database\Eloquent\Collection
+    public function carePlanDocumentsForDisplay(EloquentCollection $records): EloquentCollection
     {
         $prescriptions = $records->filter(fn (MedicationRequestRequest $record): bool => $record->resourceType === MedicationRequestRequest::TYPE_PRESCRIPTION)->keyBy('uuid');
 
@@ -715,7 +772,11 @@ class MedicationRequestRepository extends BaseRepository
         int $personId,
         string $resourceType = MedicationRequestRequest::TYPE_PRESCRIPTION
     ): MedicationRequestRequest {
-        $uuid = $eHealthData['id'] ?? $eHealthData['uuid'] ?? null;
+        $uuid = $eHealthData['id'] ?? ($eHealthData['uuid'] ?? null);
+        $personUuid = data_get($eHealthData, 'person.id') ?? ($eHealthData['person_id'] ?? null);
+        if ($personUuid !== null && $personUuid !== $this->personUuid($personId)) {
+            throw new InvalidArgumentException('The medication list belongs to another patient.');
+        }
 
         if (!is_string($uuid) || !Str::isUuid($uuid)) {
             throw new InvalidArgumentException('eHealth medication record must have a UUID.');
@@ -747,11 +808,11 @@ class MedicationRequestRepository extends BaseRepository
             // List responses are partial; do not erase the local author, references or medication details.
             $request->fill(array_filter([
                 'status' => $eHealthData['status'] ?? null,
-                'request_number' => $eHealthData['request_number'] ?? $eHealthData['requisition'] ?? null,
+                'request_number' => $eHealthData['request_number'] ?? ($eHealthData['requisition'] ?? null),
                 'started_at' => $eHealthData['started_at'] ?? null,
                 'ended_at' => $eHealthData['ended_at'] ?? null,
-                'medication_id' => $eHealthData['medication_id'] ?? data_get($eHealthData, 'medication_info.id'),
-                'medication_qty' => $eHealthData['medication_qty'] ?? null,
+                'medication_id' => $eHealthData['medication_id'] ?? data_get($eHealthData, 'medication_info.medication_id'),
+                'medication_qty' => $eHealthData['medication_qty'] ?? data_get($eHealthData, 'medication_info.medication_qty'),
                 'medication_program_id' => $eHealthData['medical_program_id'] ?? data_get($eHealthData, 'medical_program.id'),
             ], static fn ($value) => $value !== null));
             $request->resourceType = $resourceType;
@@ -799,7 +860,56 @@ class MedicationRequestRepository extends BaseRepository
         $record->save();
     }
 
-    public function synchronizeCarePlanDocuments(\Illuminate\Support\Collection $localRequests, array $activeItems, array $draftItems): int
+    public function clinicalContext(MedicationRequestRequest $record): CarePlan|Encounter|null
+    {
+        $planReference = $record->references()->wherePivot('field', 'basedOn')->with('type.coding')->get()
+            ->first(fn ($reference): bool => (new MedicationRequestMapper())->referenceType(MedicalEventsRepository::identifier()->toReference($reference)) === 'care_plan');
+        if ($planReference !== null) {
+            return CarePlan::query()->whereUuid($planReference->value)->wherePersonId($record->personId)->first();
+        }
+
+        return Encounter::query()->whereUuid($record->context?->value)->wherePersonId($record->personId)->first();
+    }
+
+    /** Import every patient-checked care-plan document, including records issued by another MIS. */
+    public function importCarePlanDocuments(CarePlan $carePlan, array $activeItems, array $draftItems): int
+    {
+        $personUuid = $this->personUuid((int) $carePlan->personId);
+        $rows = [];
+        foreach ([MedicationRequestRequest::TYPE_PRESCRIPTION => $activeItems, MedicationRequestRequest::TYPE_REQUEST => $draftItems] as $type => $items) {
+            foreach ($items as $item) {
+                if (data_get($item, 'person.id') !== $personUuid) {
+                    throw new InvalidArgumentException('The care-plan medication response belongs to another patient.');
+                }
+                $resource = (new MedicationRequestMapper())->fromEHealth($item);
+                // Keep local lifecycle values canonical while retaining untouched native status for signing.
+                $status = MedicationRequestStatus::resolve($resource['status']);
+                if ($status === null) {
+                    throw new InvalidArgumentException('The care-plan medication response returned an invalid status.');
+                }
+                $resource['status'] = $status->value;
+                $plan = collect($resource['basedOn'] ?? [])->first(fn (array $ref): bool => (new MedicationRequestMapper())->referenceType($ref) === 'care_plan');
+                if ($plan !== null && data_get($plan, 'identifier.value') !== $carePlan->uuid) {
+                    throw new InvalidArgumentException('The medication basis belongs to another care plan.');
+                }
+                // The patient-checked care-plan endpoint supplies the plan basis when its list omits it.
+                if ($plan === null) {
+                    $resource['basedOn'][] = ['identifier' => ['value' => $carePlan->uuid, 'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'care_plan']]]]];
+                }
+                $rows[] = [$resource, $type, $item];
+            }
+        }
+
+        return $this->storageTransaction(function () use ($carePlan, $rows): int {
+            foreach ($rows as [$resource, $type, $native]) {
+                $this->storeResource($resource, (int) $carePlan->personId, resourceType: $type, native: $native);
+            }
+
+            return count($rows);
+        });
+    }
+
+    public function synchronizeCarePlanDocuments(Collection $localRequests, array $activeItems, array $draftItems): int
     {
         return $this->storageTransaction(function () use ($localRequests, $activeItems, $draftItems): int {
             $records = $this->model->newQuery()->whereKey($localRequests->pluck('id')->all())
@@ -848,7 +958,7 @@ class MedicationRequestRepository extends BaseRepository
                     // A known signing link supplies a local basis for the partial MR cache.
                     // It remains noncanonical until its complete details are imported.
                     if ($prescription->basedOnId === null && $match->basedOn !== null) {
-                        $basis = Repository::identifier()->update(Repository::identifier()->store($match->basedOn->value), Repository::identifier()->toReference($match->basedOn));
+                        $basis = MedicalEventsRepository::identifier()->update(MedicalEventsRepository::identifier()->store($match->basedOn->value), MedicalEventsRepository::identifier()->toReference($match->basedOn));
                         $prescription->basedOnId = $basis->id;
                     }
                     $prescription->medicationQty ??= $match->medicationQty;

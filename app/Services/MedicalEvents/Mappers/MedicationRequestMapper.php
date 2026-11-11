@@ -6,8 +6,8 @@ namespace App\Services\MedicalEvents\Mappers;
 
 use App\Contracts\FhirMapperContract;
 use App\Core\Arr;
-use App\Services\MedicalEvents\InformWith;
 use App\Services\MedicalEvents\FhirResource;
+use App\Services\MedicalEvents\InformWith;
 use Brick\Math\BigDecimal;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -35,7 +35,7 @@ class MedicationRequestMapper implements FhirMapperContract
         if (($resource['dispenseRequest'] ?? null) === []) {
             unset($resource['dispenseRequest']);
         }
-        $id = $input['uuid'] ?? $input['id'] ?? $resource['id'] ?? null;
+        $id = $input['uuid'] ?? ($input['id'] ?? ($resource['id'] ?? null));
         if ($requireId && (!is_string($id) || $id === '')) {
             throw new InvalidArgumentException('Medication mapping requires an allocated resource id.');
         }
@@ -376,8 +376,8 @@ class MedicationRequestMapper implements FhirMapperContract
     public function dosageInstructionsFromForm(array $formData, array $medication): array
     {
         $unit = $this->medicationUnit($medication);
-        $administration = $this->number($formData['max_dose_per_administration'] ?? null);
-        $daily = $this->number($formData['max_dose_per_period'] ?? null);
+        $administration = $this->doseInMedicationUnits($this->number($formData['max_dose_per_administration'] ?? null), $formData, $medication);
+        $daily = $this->doseInMedicationUnits($this->number($formData['max_dose_per_period'] ?? null), $formData, $medication);
         if ($administration <= 0 || $daily <= 0) {
             throw new InvalidArgumentException(__('care-plan.eprescription_dose_required'));
         }
@@ -404,6 +404,40 @@ class MedicationRequestMapper implements FhirMapperContract
         }
 
         return [$instruction];
+    }
+
+    /** Numerator input is converted once; ESOZ always receives denominator medication units. */
+    public function doseInMedicationUnits(float $dose, array $form, array $medication): float
+    {
+        if (($form['dose_input_unit'] ?? 'denominator') === 'denominator') {
+            return $dose;
+        }
+        if (($form['dose_input_unit'] ?? '') !== 'numerator') {
+            throw new InvalidArgumentException(__('medication-requests.dose_conversion_unavailable'));
+        }
+        $ingredient = collect($medication['ingredients'] ?? [])->firstWhere('id', $form['dose_ingredient_id'] ?? null);
+        $numerator = data_get($ingredient, 'dosage.numerator_value');
+        $denominator = data_get($ingredient, 'dosage.denumerator_value');
+        if (!is_numeric($numerator) || !is_numeric($denominator) || (float) $numerator <= 0 || (float) $denominator <= 0) {
+            throw new InvalidArgumentException(__('medication-requests.dose_conversion_unavailable'));
+        }
+
+        return $dose * (float) $denominator / (float) $numerator;
+    }
+
+    public function ingredientDoses(float $dose, array $form, array $medication): array
+    {
+        $quantity = $this->doseInMedicationUnits($dose, $form, $medication);
+
+        return collect($medication['ingredients'] ?? [])->map(static function (array $ingredient) use ($quantity): array {
+            $numerator = data_get($ingredient, 'dosage.numerator_value');
+            $denominator = data_get($ingredient, 'dosage.denumerator_value');
+            if (!is_numeric($numerator) || !is_numeric($denominator) || (float) $denominator <= 0) {
+                throw new InvalidArgumentException(__('medication-requests.dose_conversion_unavailable'));
+            }
+
+            return ['name' => $ingredient['name'], 'value' => $quantity * (float) $numerator / (float) $denominator, 'unit' => data_get($ingredient, 'dosage.numerator_unit')];
+        })->all();
     }
 
     private function assertDosage(array $dosage): void

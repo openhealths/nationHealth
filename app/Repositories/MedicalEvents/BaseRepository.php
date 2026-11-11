@@ -4,27 +4,34 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
+use App\Enums\JobStatus;
+use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\MedicalEvents\ClinicalStorageException;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 abstract class BaseRepository
 {
     /** Check before submission so a missing migration cannot leave a remote document without a local record. */
-    protected function assertStorageSchema(array $requirements, string $messageKey, string $exceptionClass = \App\Exceptions\MedicalEvents\ClinicalStorageException::class): void
+    protected function assertStorageSchema(array $requirements, string $messageKey, string $exceptionClass = ClinicalStorageException::class): void
     {
         $missing = [];
         foreach ($requirements as $table => $columns) {
-            $actualColumns = \Illuminate\Support\Facades\Schema::getColumnListing($table);
+            $actualColumns = Schema::getColumnListing($table);
             $absent = array_values(array_diff($columns, $actualColumns));
             if ($actualColumns === [] || $absent !== []) {
                 $missing[$table] = $actualColumns === [] ? ['tableMissing'] : $absent;
             }
         }
         if ($missing !== []) {
-            \Illuminate\Support\Facades\Log::error('Clinical storage schema is incomplete', [
+            Log::error('Clinical storage schema is incomplete', [
                 'operation' => static::class, 'missingSchema' => $missing,
             ]);
             throw new $exceptionClass(__($messageKey));
@@ -39,7 +46,7 @@ abstract class BaseRepository
         }
         $remoteStatus = data_get($resource, $statusPath);
         $links = $record->ehealthLinks()->whereStatus(
-            \App\Enums\JobStatus::PENDING->value
+            JobStatus::PENDING->value
         )->whereNull('href')->with('job')->lockForUpdate()->get();
         foreach ($links as $link) {
             $request = $link->job->request_data;
@@ -49,10 +56,10 @@ abstract class BaseRepository
             if ($expectedStatus === null || $expectedStatus === $originalStatus || $remoteStatus !== $expectedStatus) {
                 continue;
             }
-            $status = \App\Enums\JobStatus::PROCESSED->value;
+            $status = JobStatus::PROCESSED->value;
             $link->job()->update(['status' => $status, 'response_data' => ['status' => 'processed', 'result' => $resource, 'reconciledBy' => 'fullResourceImport']]);
             $link->update(['status' => $status, 'error' => null, 'error_code' => null]);
-            \Illuminate\Support\Facades\Log::info('Clinical submission reconciled from full resource', [
+            Log::info('Clinical submission reconciled from full resource', [
                 'submissionId' => $link->id, 'resourceType' => $record::class, 'remoteStatus' => $remoteStatus,
             ]);
         }
@@ -70,16 +77,16 @@ abstract class BaseRepository
         return [
             'id' => $link?->id,
             'status' => $link?->status,
-            'error' => is_array($error) ? (new \App\Exceptions\EHealth\EHealthValidationException(['error' => $error]))->getFormattedMessage() : null,
+            'error' => is_array($error) ? (new EHealthValidationException(['error' => $error]))->getFormattedMessage() : null,
         ];
     }
 
     protected function storageTransaction(callable $callback): mixed
     {
         try {
-            return \Illuminate\Support\Facades\DB::transaction($callback);
-        } catch (\Illuminate\Database\QueryException $exception) {
-            throw \App\Exceptions\MedicalEvents\ClinicalStorageException::fromQueryException($exception, static::class);
+            return DB::transaction($callback);
+        } catch (QueryException $exception) {
+            throw ClinicalStorageException::fromQueryException($exception, static::class);
         }
     }
 
@@ -194,7 +201,7 @@ abstract class BaseRepository
 
         $identifier = Repository::identifier()->store(
             $newData['identifier']['value'],
-            $newData['displayValue'] ?? $newData['display_value'] ?? null
+            ($newData['displayValue'] ?? ($newData['display_value'] ?? null))
         );
         if (isset($newData['identifier']['type'])) {
             Repository::codeableConcept()->attach($identifier, $newData);
@@ -231,7 +238,7 @@ abstract class BaseRepository
                 } else {
                     $identifier = Repository::identifier()->store(
                         $item['identifier']['value'],
-                        $item['displayValue'] ?? $item['display_value'] ?? null
+                        ($item['displayValue'] ?? ($item['display_value'] ?? null))
                     );
                     if (isset($item['identifier']['type'])) {
                         Repository::codeableConcept()->attach($identifier, $item);
@@ -243,7 +250,7 @@ abstract class BaseRepository
             foreach ($items as $item) {
                 $identifier = Repository::identifier()->store(
                     $item['identifier']['value'],
-                    $item['displayValue'] ?? $item['display_value'] ?? null
+                    ($item['displayValue'] ?? ($item['display_value'] ?? null))
                 );
                 if (isset($item['identifier']['type'])) {
                     Repository::codeableConcept()->attach($identifier, $item);

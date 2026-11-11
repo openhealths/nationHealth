@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\MedicalEvents;
 
-use App\Services\MedicalEvents\Mappers\CarePlanMapper;
+use App\Services\MedicalEvents\Mappers\ApprovalMapper;
 use App\Services\MedicalEvents\Mappers\CarePlanActivityMapper;
+use App\Services\MedicalEvents\Mappers\CarePlanMapper;
 use App\Services\MedicalEvents\Mappers\ClinicalImpressionMapper;
 use App\Services\MedicalEvents\Mappers\ConditionMapper;
+use App\Services\MedicalEvents\Mappers\DetectedIssueMapper;
 use App\Services\MedicalEvents\Mappers\DeviceAssociationMapper;
+use App\Services\MedicalEvents\Mappers\DeviceDispenseMapper;
 use App\Services\MedicalEvents\Mappers\DeviceMapper;
 use App\Services\MedicalEvents\Mappers\DeviceRequestMapper;
 use App\Services\MedicalEvents\Mappers\DiagnosticReportMapper;
@@ -19,12 +22,9 @@ use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use App\Services\MedicalEvents\Mappers\ObservationMapper;
 use App\Services\MedicalEvents\Mappers\ProcedureMapper;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
-use App\Services\MedicalEvents\Mappers\DetectedIssueMapper;
-use App\Services\MedicalEvents\Mappers\DeviceDispenseMapper;
 use App\Services\MedicalEvents\Mappers\SpecimenMapper;
-use App\Services\MedicalEvents\Mappers\ApprovalMapper;
 
-final class Fhir
+class Fhir
 {
     public static function carePlan(): CarePlanMapper
     {
