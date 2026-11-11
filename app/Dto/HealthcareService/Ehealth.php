@@ -7,8 +7,6 @@ namespace App\Dto\HealthcareService;
 use App\Dto\EhealthMapping;
 use App\Livewire\Division\Forms\HealthcareServiceForm;
 use Symfony\Component\ObjectMapper\Attribute\Map;
-use Symfony\Component\ObjectMapper\ObjectMapper;
-use Symfony\Component\PropertyAccess\PropertyAccess;
 
 /**
  * Healthcare service payload in the format expected by the eHealth API.
@@ -38,16 +36,4 @@ class Ehealth
 
     #[Map(source: 'notAvailable', transform: [Model::class, 'formNotAvailable'])]
     public ?array $notAvailable = null;
-
-    /**
-     * Maps the form into the eHealth payload DTO.
-     * The strict property accessor is kept: the form declares every field, so a wrong source name fails loudly.
-     *
-     * @param  HealthcareServiceForm  $form
-     * @return self
-     */
-    public static function fromForm(HealthcareServiceForm $form): self
-    {
-        return new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessor())->map($form, self::class);
-    }
 }

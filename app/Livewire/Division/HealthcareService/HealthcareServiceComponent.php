@@ -145,7 +145,7 @@ class HealthcareServiceComponent extends Component
      */
     protected function createInEHealth(): EHealthResponse|PromiseInterface|null
     {
-        $healthcareServiceEhealthMapped = EhealthData::fromForm($this->form)->toArray();
+        $healthcareServiceEhealthMapped = objectMapper()->map($this->form, EhealthData::class)->toArray();
 
         try {
             return EHealth::healthcareService()->create($healthcareServiceEhealthMapped);

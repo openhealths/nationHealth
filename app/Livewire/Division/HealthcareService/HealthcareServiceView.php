@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Division\HealthcareService;
 
+use App\Dto\HealthcareService\Form as FormData;
 use App\Models\Division;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;
@@ -17,7 +18,7 @@ class HealthcareServiceView extends HealthcareServiceComponent
         $this->baseMount($legalEntity, $division);
 
         $healthcareService->loadMissing(['category.coding', 'type.coding']);
-        $this->form->fillFromModel($healthcareService);
+        $this->form->fill(objectMapper()->map($healthcareService, FormData::class)->toArray());
     }
 
     public function render(): View

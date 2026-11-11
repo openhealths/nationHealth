@@ -12,16 +12,13 @@ use App\Livewire\Division\Forms\HealthcareServiceForm;
 use App\Models\HealthcareService;
 use Symfony\Component\ObjectMapper\Attribute\Map;
 use Symfony\Component\ObjectMapper\Condition\SourceClass;
-use Symfony\Component\ObjectMapper\ObjectMapper;
-use Symfony\Component\PropertyAccess\PropertyAccess;
 
 /**
  * Healthcare service form or validated eHealth response mapped to model attributes.
  * HealthcareServiceResponse is used for mapping eHealth response data,
  * HealthcareServiceForm is used for mapping form data of a draft.
  * Properties without #[Map] are taken from the source property with the same name;
- * the lenient property accessor reads null for those missing in the source,
- * so non-nullable ones that the form lacks are mapped only from the response.
+ * those the form lacks keep their defaults, so non-nullable ones are mapped only from the response.
  */
 #[Map(source: HealthcareServiceResponse::class)]
 #[Map(source: HealthcareServiceForm::class)]
@@ -66,21 +63,6 @@ class Model implements ModelContract
     public ?string $ehealthUpdatedAt = null;
 
     public ?string $ehealthUpdatedBy = null;
-
-    /**
-     * Maps the validated eHealth response or the form into this DTO.
-     * The lenient property accessor reads null for optional fields the response may omit.
-     *
-     * @param  HealthcareServiceResponse|HealthcareServiceForm  $source
-     * @return self
-     */
-    public static function fromSource(HealthcareServiceResponse|HealthcareServiceForm $source): self
-    {
-        return new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
-            ->disableExceptionOnInvalidPropertyPath()
-            ->getPropertyAccessor())
-            ->map($source, self::class);
-    }
 
     /**
      * The form keeps an empty coding structure when no type is selected.

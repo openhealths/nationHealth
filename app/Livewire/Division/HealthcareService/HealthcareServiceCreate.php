@@ -40,7 +40,7 @@ class HealthcareServiceCreate extends HealthcareServiceComponent
         }
 
         try {
-            $healthcareServiceData = HealthcareServiceData::fromSource($this->form);
+            $healthcareServiceData = objectMapper()->map($this->form, HealthcareServiceData::class);
 
             Repository::healthcareService()->saveMapped(
                 $healthcareServiceData,
@@ -75,7 +75,7 @@ class HealthcareServiceCreate extends HealthcareServiceComponent
         }
 
         try {
-            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
+            $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
 
             Repository::healthcareService()->saveMapped(
                 $healthcareServiceData,

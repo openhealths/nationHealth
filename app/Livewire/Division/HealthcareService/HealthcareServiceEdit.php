@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Division\HealthcareService;
 
+use App\Dto\HealthcareService\Form as FormData;
 use App\Dto\HealthcareService\Model as HealthcareServiceData;
 use App\Models\Division;
 use App\Models\HealthcareService;
@@ -23,7 +24,7 @@ class HealthcareServiceEdit extends HealthcareServiceComponent
         $this->healthcareServiceId = $healthcareService->id;
         $healthcareService->loadMissing(['category.coding', 'type.coding']);
 
-        $this->form->fillFromModel($healthcareService);
+        $this->form->fill(objectMapper()->map($healthcareService, FormData::class)->toArray());
     }
 
     public function create(): void
@@ -45,7 +46,7 @@ class HealthcareServiceEdit extends HealthcareServiceComponent
         }
 
         try {
-            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
+            $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
 
             Repository::healthcareService()->saveMapped($healthcareServiceData, $healthcareService, legalEntity());
 

@@ -44,6 +44,9 @@ use Illuminate\Support\ServiceProvider;
 use App\Repositories\EHealthDatabaseBatchRepository;
 use Illuminate\Bus\BatchFactory;
 use Livewire\Livewire;
+use Symfony\Component\ObjectMapper\ObjectMapper;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
+use Symfony\Component\PropertyAccess\PropertyAccess;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -71,6 +74,12 @@ class AppServiceProvider extends ServiceProvider
                 config('queue.batches.table', 'job_batches')
             );
         });
+
+        // The strict property accessor makes a wrong #[Map] source name fail instead of mapping null.
+        $this->app->singleton(
+            ObjectMapperInterface::class,
+            static fn (): ObjectMapper => new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessor())
+        );
     }
 
     /**
