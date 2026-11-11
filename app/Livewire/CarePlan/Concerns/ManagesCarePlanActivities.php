@@ -56,6 +56,7 @@ trait ManagesCarePlanActivities
     public function updatedSelectedProgram(): void
     {
         $this->activityForm['program'] = $this->selectedProgram;
+        $kindLower = strtolower((string) ($this->activityForm['kind'] ?? ''));
         if (str_contains($kindLower, 'device') && $this->selectedProduct !== null && filled($this->selectedProgram)) {
             try {
                 $this->loadDeviceQuantityCatalog($this->selectedProduct, $this->selectedProgram);
