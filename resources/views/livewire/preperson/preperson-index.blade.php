@@ -162,7 +162,7 @@
                                 <span class="text-sm">{{ __('patients.view_record') }}</span>
                             </a>
                             <a
-                                href="{{ route('prepersons.encounter.create', [legalEntity(), $preperson->id]) }}"
+                                href="{{ route('prepersons.encounters.create', [legalEntity(), $preperson->id]) }}"
                                 class="flex cursor-pointer items-center gap-1.5 font-medium text-blue-600 hover:text-blue-800"
                             >
                                 @icon('plus', 'w-4 h-4')

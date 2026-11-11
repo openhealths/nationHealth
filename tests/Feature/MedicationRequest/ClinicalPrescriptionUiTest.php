@@ -149,7 +149,7 @@ class ClinicalPrescriptionUiTest extends TestCase
         if ($tab === 'prescriptions') {
             $component->call('switchTab', $tab);
         }
-        $component->assertSeeHtml('href="'.route('encounter.view', [$context['legalEntity'], 'person' => $context['person']->id, 'encounter' => $context['encounter']->id]).'"')
+        $component->assertSeeHtml('href="'.route('persons.encounters.package.show', [$context['legalEntity'], 'person' => $context['person']->id, 'encounter' => $context['encounter']->id]).'"')
             ->assertSeeHtml('href="'.route('care-plans.show', [$context['legalEntity'], $plan->id]).'"');
     }
 

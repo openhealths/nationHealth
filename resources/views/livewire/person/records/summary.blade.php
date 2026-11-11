@@ -14,8 +14,8 @@
             <a
                 href="{{
                     $prepersonId
-                    ? route('prepersons.encounter.create', [legalEntity(), 'preperson' => $prepersonId])
-                    : route('encounter.create', [legalEntity(), 'person' => $personId])
+                    ? route('prepersons.encounters.create', [legalEntity(), 'preperson' => $prepersonId])
+                    : route('persons.encounters.create', [legalEntity(), 'person' => $personId])
                 }}"
                 class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
             >

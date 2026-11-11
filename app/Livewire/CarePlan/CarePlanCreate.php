@@ -752,7 +752,7 @@ class CarePlanCreate extends BasePatientComponent
         if ($encounterUuid) {
             $encounter = Repository::carePlan()->findEncounter($encounterUuid, $this->personId);
             if ($encounter) {
-                $this->redirectRoute('encounter.view', [legalEntity(), $this->personId, $encounter->id], navigate: true);
+                $this->redirectRoute('persons.encounters.package.show', [legalEntity(), $this->personId, $encounter->id], navigate: true);
 
                 return;
             }

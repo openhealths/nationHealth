@@ -101,13 +101,13 @@ class EncounterPackageCreate extends EncounterPackageComponent
         $formattedData = $this->packageBuilder->build($validated, $this->episodeType, Status::DRAFT);
 
         try {
-            $this->syncRegisteredConditions($validated['conditions'] ?? []);
+            $this->syncReferencedRecords();
         } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error while getting registered conditions');
+            $exception->handle('Error while getting the records the package refers to');
 
             return;
         } catch (Throwable $exception) {
-            $this->handleDatabaseErrors($exception, 'Failed to store registered conditions');
+            $this->handleDatabaseErrors($exception, 'Failed to store the records the package refers to');
 
             return;
         }
@@ -124,7 +124,7 @@ class EncounterPackageCreate extends EncounterPackageComponent
 
         if ($this->prepersonId !== null) {
             $this->redirectRoute(
-                'prepersons.encounter.edit',
+                'prepersons.encounters.edit',
                 [legalEntity(), 'preperson' => $this->prepersonId, 'encounter' => $encounterId],
                 navigate: true
             );
@@ -132,7 +132,7 @@ class EncounterPackageCreate extends EncounterPackageComponent
             return;
         }
 
-        $this->redirectRoute('encounter.edit', [legalEntity(), $this->personId, $encounterId], navigate: true);
+        $this->redirectRoute('persons.encounters.edit', [legalEntity(), $this->personId, $encounterId], navigate: true);
     }
 
     /**
@@ -185,14 +185,14 @@ class EncounterPackageCreate extends EncounterPackageComponent
         $formattedData = $this->packageBuilder->build($validatedData, $this->episodeType);
 
         try {
-            $this->syncRegisteredConditions($validatedData['conditions'] ?? []);
+            $this->syncReferencedRecords();
         } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error while getting registered conditions');
+            $exception->handle('Error while getting the records the package refers to');
             $this->showSignatureModal = false;
 
             return;
         } catch (Throwable $exception) {
-            $this->handleDatabaseErrors($exception, 'Failed to store registered conditions');
+            $this->handleDatabaseErrors($exception, 'Failed to store the records the package refers to');
             $this->showSignatureModal = false;
 
             return;
@@ -269,7 +269,7 @@ class EncounterPackageCreate extends EncounterPackageComponent
 
             // The draft and its episode are stored already, so signing is retried from the draft's edit page
             $this->redirectRoute(
-                $this->prepersonId !== null ? 'prepersons.encounter.edit' : 'encounter.edit',
+                $this->prepersonId !== null ? 'prepersons.encounters.edit' : 'persons.encounters.edit',
                 $this->prepersonId !== null
                     ? [legalEntity(), 'preperson' => $this->prepersonId, 'encounter' => $createdEncounterId]
                     : [legalEntity(), 'person' => $this->personId, 'encounter' => $createdEncounterId],
@@ -296,13 +296,13 @@ class EncounterPackageCreate extends EncounterPackageComponent
     {
         if ($this->prepersonId !== null) {
             $this->redirectRoute(
-                'prepersons.encounter.view',
+                'prepersons.encounters.package.show',
                 [legalEntity(), 'preperson' => $this->prepersonId, 'encounter' => $encounterId],
                 navigate: true
             );
         } else {
             $this->redirectRoute(
-                'encounter.view',
+                'persons.encounters.package.show',
                 [legalEntity(), 'person' => $this->personId, 'encounter' => $encounterId],
                 navigate: true
             );

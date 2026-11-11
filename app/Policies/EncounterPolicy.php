@@ -87,6 +87,30 @@ class EncounterPolicy
     }
 
     /**
+     * Determine whether the user can delete the encounter package: a draft that is not waiting for eHealth,
+     * created by the user. The draft is stored with the user's employee as its performer, so the author is
+     * the one whose employee in the current legal entity performs it.
+     */
+    public function delete(User $user, Encounter $encounter): Response
+    {
+        if ($encounter->status !== EncounterStatus::DRAFT
+            || $user->cannot('encounter:write')
+            || $encounter->ehealthLinks()->latest('id')->value('status') === JobStatus::PENDING->value) {
+            return Response::denyWithStatus(404);
+        }
+
+        $performerId = $encounter->performer?->value;
+
+        // The party's employees load once per request, so a page of drafts is checked without a query per row
+        $isAuthor = $performerId !== null
+            && $user->party?->employees
+                ->where('legalEntityId', legalEntity()->id)
+                ->contains('uuid', $performerId);
+
+        return $isAuthor ? Response::allow() : Response::denyWithStatus(404);
+    }
+
+    /**
      * Determine whether the user can mark the encounter and its package as entered in error.
      * A draft never reached eHealth and an encounter already marked as such cannot be cancelled again,
      * so a finished one is the only one left to cancel. The episode it belongs to has to be ours;

@@ -157,6 +157,7 @@ class ConditionMapper implements FhirMapperContract
                         'id' => $uuid,
                         'ehealthInsertedAt' => $detailsMap[$uuid]['ehealthInsertedAt'] ?? '',
                         'codeCode' => $detailsMap[$uuid]['codeCode'],
+                        'codeSystem' => $detailsMap[$uuid]['codeSystem'] ?? null,
                         'type' => $detailsMap[$uuid]['type']
                     ];
                 },

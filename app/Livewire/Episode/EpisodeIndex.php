@@ -93,6 +93,33 @@ class EpisodeIndex extends BasePatientComponent
             : $this->paginateLocalEpisodes();
     }
 
+    /**
+     * Delete the draft episode of the patient.
+     *
+     * @param  string  $uuid  UUID of the episode
+     * @return void
+     */
+    public function deleteDraft(string $uuid): void
+    {
+        $episode = Episode::forPatient($this->patient())->whereUuid($uuid)->firstOrFail();
+
+        if (Auth::user()->cannot('delete', $episode)) {
+            Session::flash('error', __('episodes.policy.delete'));
+
+            return;
+        }
+
+        try {
+            Repository::episode()->deleteDraft($episode);
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to delete episode draft');
+
+            return;
+        }
+
+        Session::flash('success', __('episodes.messages.draft_deleted'));
+    }
+
     protected function getSyncStatus(string $entityType): ?string
     {
         return $this->syncStatus ?: null;
@@ -225,7 +252,10 @@ class EpisodeIndex extends BasePatientComponent
             ->paginate(config('pagination.per_page'));
 
         $paginator->setCollection(
-            collect(Arr::toCamelCase($paginator->getCollection()->makeVisible('id')->toArray()))
+            $paginator->getCollection()->map(static fn (Episode $episode): array => [
+                ...Arr::toCamelCase($episode->makeVisible('id')->toArray()),
+                'canDelete' => Auth::user()->can('delete', $episode)
+            ])
         );
 
         return $paginator;

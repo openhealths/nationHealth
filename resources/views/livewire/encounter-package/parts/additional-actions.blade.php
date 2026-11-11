@@ -7,13 +7,13 @@
             'label' => __('encounters.add_prescription'),
             'unavailable' => __('encounters.prescription_creation_unavailable'),
             'href' => $personId !== null && $this->isFinished && Auth::user()->can('medication_request_request:write')
-                ? route('encounter.eprescription.create', ['legalEntity' => legalEntity(), 'person' => $personId, 'encounter' => $encounterId]) : null,
+                ? route('persons.encounters.eprescriptions.create', ['legalEntity' => legalEntity(), 'person' => $personId, 'encounter' => $encounterId]) : null,
         ],
         'outgoing-referrals' => [
             'label' => __('encounters.add_referral'),
             'unavailable' => __('encounters.referral_creation_unavailable'),
             'href' => ($personId !== null || $prepersonId !== null) && $this->isFinished && Auth::user()->can('service_request:write')
-                ? route($prepersonId !== null ? 'prepersons.encounter.referral.create' : 'encounter.referral.create', ['legalEntity' => legalEntity(), $prepersonId !== null ? 'preperson' : 'person' => $prepersonId ?? $personId, 'encounter' => $encounterId]) : null,
+                ? route($prepersonId !== null ? 'prepersons.encounter.referral.create' : 'persons.encounters.referrals.create', ['legalEntity' => legalEntity(), $prepersonId !== null ? 'preperson' : 'person' => $prepersonId ?? $personId, 'encounter' => $encounterId]) : null,
         ],
         'medical-reports' => [
             'label' => __('encounters.add_medical_report'),
@@ -21,7 +21,7 @@
         ],
         'care-plans' => [
             'label' => __('encounters.add_care_plan'),
-            'href' => $personId !== null ? route('care-plans.create-by-encounter', ['legalEntity' => legalEntity(), 'person' => $personId, 'encounter' => $encounterId]) : null,
+            'href' => $personId !== null ? route('persons.encounters.care-plans.create', ['legalEntity' => legalEntity(), 'person' => $personId, 'encounter' => $encounterId]) : null,
         ],
         'device-requests' => [
             'label' => __('encounters.open_device_requests'),

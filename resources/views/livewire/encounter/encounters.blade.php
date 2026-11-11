@@ -9,8 +9,8 @@
             <a
                 href="{{
                     $prepersonId
-                    ? route('prepersons.encounter.create', [legalEntity(), 'preperson' => $prepersonId])
-                    : route('encounter.create', [legalEntity(), 'person' => $personId])
+                    ? route('prepersons.encounters.create', [legalEntity(), 'preperson' => $prepersonId])
+                    : route('persons.encounters.create', [legalEntity(), 'person' => $personId])
                 }}"
                 class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
             >
@@ -40,7 +40,10 @@
     </x-slot>
 
     <div class="breadcrumb-form shift-content p-4">
-        <div class="mt-6 w-full" x-data="{ showAdditionalParams: $wire.entangle('showAdditionalParams') }">
+        <div
+            class="mt-6 w-full"
+            x-data="{ showAdditionalParams: $wire.entangle('showAdditionalParams'), deletingUuid: '' }"
+        >
             <div class="mb-4 flex items-center gap-1 font-semibold text-gray-900 dark:text-gray-100">
                 @icon('search-outline', 'w-4.5 h-4.5')
                 <p>{{ __('encounters.search') }}</p>
@@ -253,8 +256,8 @@
                                             <a
                                                 href="{{
                                                     $prepersonId
-                                                    ? route('prepersons.encounter.view', [legalEntity(), 'preperson' => $prepersonId, 'encounter' => data_get($encounter, 'id')])
-                                                    : route('encounter.view', [legalEntity(), 'person' => $personId, 'encounter' => data_get($encounter, 'id')])
+                                                    ? route('prepersons.encounters.package.show', [legalEntity(), 'preperson' => $prepersonId, 'encounter' => data_get($encounter, 'id')])
+                                                    : route('persons.encounters.package.show', [legalEntity(), 'person' => $personId, 'encounter' => data_get($encounter, 'id')])
                                                 }}"
                                                 wire:navigate
                                                 class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
@@ -266,8 +269,8 @@
                                             <a
                                                 href="{{
                                                     $prepersonId
-                                                    ? route('prepersons.encounters.view', [legalEntity(), 'preperson' => $prepersonId, 'encounter' => data_get($encounter, 'id')])
-                                                    : route('persons.encounters.view', [legalEntity(), 'person' => $personId, 'encounter' => data_get($encounter, 'id')])
+                                                    ? route('prepersons.encounters.show', [legalEntity(), 'preperson' => $prepersonId, 'encounter' => data_get($encounter, 'id')])
+                                                    : route('persons.encounters.show', [legalEntity(), 'person' => $personId, 'encounter' => data_get($encounter, 'id')])
                                                 }}"
                                                 wire:navigate
                                                 class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
@@ -284,6 +287,21 @@
                                             >
                                                 @icon('alert-circle', 'w-5 h-5 text-gray-500')
                                                 {{ __('medical-events.mark_as_error') }}
+                                            </button>
+                                        @endif
+
+                                        @if (data_get($encounter, 'canDelete'))
+                                            <button
+                                                type="button"
+                                                data-uuid="{{ data_get($encounter, 'uuid') }}"
+                                                @click="
+                                                    close($refs.button);
+                                                    deletingUuid = $el.dataset.uuid;
+                                                "
+                                                class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-500 dark:hover:bg-gray-600"
+                                            >
+                                                @icon('trash', 'w-5 h-5')
+                                                {{ __('encounters.delete_draft') }}
                                             </button>
                                         @endif
                                     </div>
@@ -343,6 +361,40 @@
 
                 <div class="mt-6">{{ $this->paginatedEncounters->links() }}</div>
             </div>
+
+            <x-modal id="encounter-delete-draft-modal" alpine-model="deletingUuid" maxWidth="xl">
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="encounter-delete-draft-title"
+                    class="bg-white p-6 text-left md:p-8 dark:bg-gray-800"
+                >
+                    <h3 id="encounter-delete-draft-title" class="mb-4 text-xl font-bold text-gray-900 dark:text-white">
+                        {{ __('encounters.delete_draft_title') }}
+                    </h3>
+
+                    <p class="mb-6 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+                        {{ __('encounters.delete_draft_description') }}
+                    </p>
+
+                    <div class="flex items-center justify-start gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+                        <button type="button" @click="deletingUuid = ''" class="button-minor">
+                            {{ __('forms.cancel') }}
+                        </button>
+
+                        <button
+                            type="button"
+                            @click="
+                                $wire.deleteDraft(deletingUuid);
+                                deletingUuid = '';
+                            "
+                            class="button-danger"
+                        >
+                            {{ __('encounters.delete_draft') }}
+                        </button>
+                    </div>
+                </div>
+            </x-modal>
         </div>
     </div>
 

@@ -78,7 +78,7 @@ abstract class EncounterDocumentCreate extends BasePatientComponent
     #[Computed]
     public function encounterUrl(): string
     {
-        return route($this->prepersonId !== null ? 'prepersons.encounters.view' : 'encounter.view', ['legalEntity' => $this->legalEntityId, $this->prepersonId !== null ? 'preperson' : 'person' => $this->prepersonId ?? $this->personId, 'encounter' => $this->encounterId]);
+        return route($this->prepersonId !== null ? 'prepersons.encounters.package.show' : 'persons.encounters.package.show', ['legalEntity' => $this->legalEntityId, $this->prepersonId !== null ? 'preperson' : 'person' => $this->prepersonId ?? $this->personId, 'encounter' => $this->encounterId]);
     }
 
     protected function returnToEncounter(): void

@@ -10,7 +10,6 @@ use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\EpisodeCurrentDiagnosis;
 use App\Models\MedicalEvents\Sql\EpisodeDiagnosesHistory;
 use App\Models\MedicalEvents\Sql\EpisodeDiagnosesHistoryItem;
-use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use Illuminate\Support\Facades\DB;
@@ -143,7 +142,8 @@ class EpisodeRepository extends BaseRepository
     }
 
     /**
-     * Delete a draft episode together with the records that belong to it.
+     * Delete a draft episode together with every row it refers to: identifiers, codeable concepts, codings, its period
+     * and the records of its diagnoses and status history.
      *
      * @param  Episode  $episode
      * @return void
@@ -151,34 +151,11 @@ class EpisodeRepository extends BaseRepository
      */
     public function deleteDraft(Episode $episode): void
     {
-        DB::transaction(function () use ($episode) {
-            $type = $episode->type;
-            $careManager = $episode->careManager;
-            $managingOrganization = $episode->managingOrganization;
-
-            $episode->period?->delete();
-            $episode->delete();
-
-            $type->delete();
-            $this->deleteIdentifier($careManager);
-            $this->deleteIdentifier($managingOrganization);
+        DB::transaction(static function () use ($episode): void {
+            Repository::encounter()->deleteWithLoadedRows(collect([
+                Episode::withRelationships()->findOrFail($episode->id)
+            ]));
         });
-    }
-
-    /**
-     * Delete an identifier with the codeable concepts and codings attached to it.
-     *
-     * @param  Identifier  $identifier
-     * @return void
-     */
-    private function deleteIdentifier(Identifier $identifier): void
-    {
-        foreach ($identifier->type as $codeableConcept) {
-            $codeableConcept->coding()->delete();
-            $codeableConcept->delete();
-        }
-
-        $identifier->delete();
     }
 
     /**
@@ -191,13 +168,13 @@ class EpisodeRepository extends BaseRepository
     {
         return collect(
             $this->model->whereIn('uuid', $uuids)
-                ->select(['uuid', 'name', 'created_at'])
+                ->select(['uuid', 'name', 'ehealth_inserted_at'])
                 ->get()
                 ->toArray()
         )
             ->mapWithKeys(fn (array $episode) => [
                 $episode['uuid'] => [
-                    'ehealthInsertedAt' => convertToAppDateFormat($episode['createdAt'] ?? null),
+                    'ehealthInsertedAt' => convertToAppDateFormat($episode['ehealthInsertedAt'] ?? null),
                     'codeCode' => $episode['name'] ?? null,
                     'type' => 'episode_of_care'
                 ],

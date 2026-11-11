@@ -222,7 +222,7 @@ class EncounterMapper implements FhirMapperContract
         $mappedParticipants = collect($data['participant'] ?? [])
             ->pluck('uuid')
             ->push($uuids['employee'] ?? null)
-            ->concat($asserterUuids)
+            ->concat($asserterUuids->all())
             ->filter()
             ->unique()
             ->map(fn (string $uuid) => FhirResource::make()
@@ -322,6 +322,7 @@ class EncounterMapper implements FhirMapperContract
                         'type' => $type,
                         'date' => $details['ehealthInsertedAt'] ?? null,
                         'code' => $details['codeCode'] ?? null,
+                        'codeSystem' => $details['codeSystem'] ?? null,
                         'name' => '',
                         'typeLabel' => ''
                     ];

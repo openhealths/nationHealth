@@ -30,11 +30,13 @@ use App\Livewire\EncounterPackage\Forms\ProcedureForm;
 use App\Livewire\EncounterPackage\Forms\SpecimenForm;
 use App\Models\Employee\Employee;
 use App\Models\Equipment;
+use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\EpisodeCurrentDiagnosis;
 use App\Models\MedicalEvents\Sql\Immunization;
+use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
@@ -46,7 +48,6 @@ use App\Services\MedData\MedData;
 use App\Services\MedicalEvents\Fhir;
 use App\Traits\FormTrait;
 use App\Traits\SearchesElectronicReferrals;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -447,6 +448,14 @@ class EncounterPackageComponent extends Component
      * @var array
      */
     public array $reactionImmunizations = [];
+
+    /**
+     * Immunizations the observations of the package already refer to as the one they are a reaction on, so that a
+     * reopened draft names them before any search runs.
+     *
+     * @var array
+     */
+    public array $referencedReactionImmunizations = [];
 
     /**
      * List of dictionary names.
@@ -870,17 +879,33 @@ class EncounterPackageComponent extends Component
             ->values()
             ->toArray();
 
+        // A stored specimen keeps the type it was registered with, which the dictionary may have retired since
+        $specimenTypeNames = dictionary()->basics()->getMultipleFormatted(['specimen_types'], onlyActive: false)
+            ->toArray()['specimen_types'] ?? [];
+
         $this->patientSpecimens = Specimen::forPatient($this->patient())
             ->notEnteredInError()
             ->notDraft()
-            ->with('type.coding')
+            ->with(['type.coding', 'collection.collectedPeriod'])
             ->get(['id', 'uuid', 'accession_identifier', 'status', 'type_id'])
-            ->map(static fn (Specimen $specimen): array => [
-                'uuid' => $specimen->uuid,
-                'accessionIdentifier' => $specimen->accessionIdentifier,
-                'status' => $specimen->status->value,
-                'typeCode' => $specimen->type->coding->first()?->code ?? ''
-            ])
+            ->map(static function (Specimen $specimen) use ($specimenTypeNames): array {
+                $typeCode = $specimen->type->coding->first()?->code ?? '';
+                $typeName = $specimenTypeNames[$typeCode] ?? '';
+                $collectedAt = $specimen->collection?->collectedDateTime ?? $specimen->collection?->collectedPeriod?->start;
+
+                return [
+                    'uuid' => $specimen->uuid,
+                    'accessionIdentifier' => $specimen->accessionIdentifier,
+                    'status' => $specimen->status->value,
+                    'typeCode' => $typeCode,
+                    // The accession number tells apart the specimens of one type
+                    'name' => implode(', ', array_filter([
+                        $specimen->accessionIdentifier,
+                        $typeName,
+                        $collectedAt ? __('specimens.collection') . ': ' . $collectedAt : ''
+                    ]))
+                ];
+            })
             ->values()
             ->toArray();
 
@@ -1082,6 +1107,8 @@ class EncounterPackageComponent extends Component
             return;
         }
 
+        $this->loadIcd10Descriptions($episodeCondition['evidenceDetails']);
+
         array_unshift($this->conditionForm->conditions, $episodeCondition);
         array_unshift($this->form->encounter['diagnoses'], [
             'roleCode' => $diagnosis->role->coding->first()?->code,
@@ -1090,35 +1117,39 @@ class EncounterPackageComponent extends Component
     }
 
     /**
-     * Load patient immunizations that may be referenced from observation.reaction_on.
+     * Search eHealth for the patient's immunizations of the episode that an observation may refer to as the one it is
+     * a reaction on. Only an immunization eHealth holds can be referred to, so the local records are not offered.
      *
-     * @param  string|null  $episodeId  Episode UUID to narrow the immunizations to its encounters
+     * @param  string|null  $episodeId  Episode UUID the immunizations are searched in
      * @return void
      */
     public function searchReactionImmunizations(?string $episodeId = null): void
     {
-        $patient = $this->patient();
+        $this->reactionImmunizations = [];
 
-        $query = Immunization::forPatient($patient)
-            ->with('vaccineCode.coding')
-            ->whereStatus(ImmunizationStatus::COMPLETED->value)
-            ->whereNotGiven(false);
-
-        if ($episodeId) {
-            // The identifier value is a string column, so the encounter UUIDs are matched as strings
-            $encounterUuids = Encounter::forPatient($patient)->forEpisode($episodeId)->pluck('uuid');
-
-            $query->whereHas(
-                'context',
-                static fn (Builder $context): Builder => $context->whereIn('value', $encounterUuids)
-            );
+        if ($this->patientUuid === null || empty($episodeId)) {
+            return;
         }
 
-        $this->reactionImmunizations = $query->get()
-            ->map(static fn (Immunization $immunization): array => [
-                'uuid' => $immunization->uuid,
-                'vaccineCode' => $immunization->vaccineCode?->coding?->first()?->code,
-                'date' => convertToAppDateFormat($immunization->date),
+        try {
+            $immunizations = EHealth::immunization()
+                ->getBySearchParams($this->patientUuid, ['episode_id' => $episodeId])
+                ->validate();
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while searching for immunizations');
+
+            return;
+        }
+
+        $this->reactionImmunizations = collect($immunizations)
+            ->filter(
+                static fn (array $immunization): bool => data_get($immunization, 'status') === ImmunizationStatus::COMPLETED->value
+                    && data_get($immunization, 'not_given') === false
+            )
+            ->map(static fn (array $immunization): array => [
+                'uuid' => data_get($immunization, 'uuid'),
+                'vaccineCode' => data_get($immunization, 'vaccine_code.coding.0.code'),
+                'date' => convertToAppDateFormat(data_get($immunization, 'date')),
                 'episodeId' => $episodeId,
                 'notGiven' => false,
                 'status' => ImmunizationStatus::COMPLETED->value
@@ -1156,32 +1187,149 @@ class EncounterPackageComponent extends Component
     }
 
     /**
-     * Store locally the previously registered conditions the diagnoses reference and the patient's records lack,
-     * since a draft is reopened from the local records only.
+     * Load the immunizations the observations of the package refer to as the one they are a reaction on.
      *
-     * @param  array  $conditions  Validated conditions of the package
+     * @param  array  $observations  Observations of the package
      * @return void
-     * @throws EHealthConnectionException|EHealthException|Throwable
      */
-    protected function syncRegisteredConditions(array $conditions): void
+    protected function loadReferencedReactionImmunizations(array $observations): void
     {
-        $registeredIds = collect($conditions)
-            ->filter(static fn (array $condition): bool => ($condition['isRegistered'] ?? false) === true)
-            ->pluck('uuid');
+        $immunizationIds = collect($observations)->pluck('reactionOn')->filter()->unique()->values();
 
-        if ($this->patientUuid === null || $registeredIds->isEmpty()) {
+        if ($immunizationIds->isEmpty()) {
             return;
         }
 
-        $storedIds = collect(MedicalEventsRepository::condition()->getByUuids($registeredIds->all()))->pluck('uuid');
+        $this->referencedReactionImmunizations = Immunization::forPatient($this->patient())
+            ->with('vaccineCode.coding')
+            ->whereIn('uuid', $immunizationIds)
+            ->get()
+            ->map(static fn (Immunization $immunization): array => [
+                'uuid' => $immunization->uuid,
+                'vaccineCode' => $immunization->vaccineCode?->coding?->first()?->code,
+                'date' => convertToAppDateFormat($immunization->date),
+                'notGiven' => (bool) $immunization->notGiven,
+                'status' => $immunization->status->value
+            ])
+            ->values()
+            ->all();
+    }
 
-        $missingConditions = $registeredIds->diff($storedIds)
+    /**
+     * Store locally the records the package refers to that are missing or stored only partially,
+     * since a draft is reopened from the local records only.
+     *
+     * @return void
+     * @throws EHealthConnectionException|EHealthException|Throwable
+     */
+    protected function syncReferencedRecords(): void
+    {
+        if ($this->patientUuid === null) {
+            return;
+        }
+
+        $references = collect([
+            ...$this->conditionForm->referencedRecords(),
+            ...$this->clinicalImpressionForm->referencedRecords(),
+            ...$this->procedureForm->referencedRecords()
+        ]);
+
+        $encounterIds = $references->where('type', 'encounter')->pluck('id')->unique()->values()->all();
+        $this->syncReferencedEncounters($encounterIds);
+
+        // The package's own new records are not in eHealth yet, and the package stores them itself
+        $conditionIds = $references->where('type', 'condition')
+            ->pluck('id')
+            // The code of an encounter's primary diagnosis is kept in its condition
+            ->concat(MedicalEventsRepository::encounter()->primaryConditionUuids($encounterIds))
+            ->diff($this->conditionForm->newConditionIds());
+        $observationIds = $references->where('type', 'observation')
+            ->pluck('id')
+            ->diff(array_column($this->observationForm->observations, 'uuid'));
+
+        $this->syncReferencedConditionsAndObservations(
+            $conditionIds->filter()->unique()->values()->all(),
+            $observationIds->filter()->unique()->values()->all()
+        );
+        $this->syncReactionImmunizations();
+    }
+
+    /**
+     * Store the encounters picked from eHealth, unless they are stored with their diagnoses already. An encounter
+     * stored from the patient summary lacks them, and the primary one names the encounter.
+     *
+     * @param  array  $encounterIds
+     * @return void
+     * @throws EHealthConnectionException|EHealthException|Throwable
+     */
+    protected function syncReferencedEncounters(array $encounterIds): void
+    {
+        $missingEncounters = collect($encounterIds)
+            ->diff(Encounter::whereIn('uuid', $encounterIds)->has('diagnoses')->pluck('uuid'))
+            ->map(fn (string $encounterId): array => EHealth::encounter()->getById($this->patientUuid, $encounterId)->validate())
+            ->values()
+            ->all();
+
+        if ($missingEncounters !== []) {
+            MedicalEventsRepository::encounter()->sync($this->patient(), $missingEncounters);
+        }
+    }
+
+    /**
+     * Store the conditions and observations picked from eHealth, unless they were fetched from eHealth already.
+     * One stored from the data sent from here lacks the insertion date the package lists it with.
+     *
+     * @param  array  $conditionIds
+     * @param  array  $observationIds
+     * @return void
+     * @throws EHealthConnectionException|EHealthException|Throwable
+     */
+    protected function syncReferencedConditionsAndObservations(array $conditionIds, array $observationIds): void
+    {
+        $missingConditions = collect($conditionIds)
+            ->diff(Condition::whereIn('uuid', $conditionIds)->fetchedFromEHealth()->pluck('uuid'))
             ->map(fn (string $conditionId): array => EHealth::condition()->getById($this->patientUuid, $conditionId)->validate())
+            ->values()
+            ->all();
+
+        $missingObservations = collect($observationIds)
+            ->diff(Observation::whereIn('uuid', $observationIds)->fetchedFromEHealth()->pluck('uuid'))
+            ->map(fn (string $observationId): array => EHealth::observation()->getById($this->patientUuid, $observationId)->validate())
             ->values()
             ->all();
 
         if ($missingConditions !== []) {
             MedicalEventsRepository::condition()->sync($this->patient(), $missingConditions);
+        }
+
+        if ($missingObservations !== []) {
+            MedicalEventsRepository::observation()->sync($this->patient(), $missingObservations);
+        }
+    }
+
+    /**
+     * Store the immunizations picked from eHealth as the ones observations are a reaction on. An immunization of this
+     * very package is not in eHealth yet, and the package stores it itself.
+     *
+     * @return void
+     * @throws EHealthConnectionException|EHealthException|Throwable
+     */
+    protected function syncReactionImmunizations(): void
+    {
+        $immunizationIds = collect($this->observationForm->observations)
+            ->pluck('reactionOn')
+            ->filter()
+            ->unique()
+            ->diff(array_column($this->immunizationForm->immunizations, 'uuid'))
+            ->values();
+
+        $missingImmunizations = $immunizationIds->diff(Immunization::whereIn('uuid', $immunizationIds)->pluck('uuid'))
+            ->flatMap(fn (string $immunizationId): array => EHealth::immunization()->getById($this->patientUuid, $immunizationId)->validate())
+            ->values()
+            ->all();
+
+        if ($missingImmunizations !== []) {
+            MedicalEventsRepository::immunization()->sync($this->patient(), $missingImmunizations);
         }
     }
 

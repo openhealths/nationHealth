@@ -134,6 +134,7 @@ class ClinicalImpressionMapper implements FhirMapperContract
                     'type' => $type,
                     'ehealthInsertedAt' => $details['ehealthInsertedAt'] ?? null,
                     'code' => $details['codeCode'] ?? null,
+                    'codeSystem' => $details['codeSystem'] ?? null
                 ];
             })
             ->values()

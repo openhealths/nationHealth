@@ -43,7 +43,12 @@ readonly class AfterOrEqualDateTime implements ValidationRule
         $start = CarbonImmutable::createFromFormat(config('app.date_format') . ' H:i', $this->startDate . ' ' . $this->startTime);
 
         if ($end->lessThan($start)) {
-            $fail(__('validation.after_or_equal', ['date' => __('validation.attributes.' . $this->startAttributeKey)]));
+            // The date part of the compared moments may differ while the field holds only the time, so both are named
+            $fail(__('validation.after_or_equal_date_time', [
+                'date' => __('validation.attributes.' . $this->startAttributeKey),
+                'value' => $this->endDate . ' ' . $value,
+                'start' => $this->startDate . ' ' . $this->startTime
+            ]));
         }
     }
 }
