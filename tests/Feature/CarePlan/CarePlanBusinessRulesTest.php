@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
+use App\Livewire\CarePlan\CarePlanApprovals;
 use App\Livewire\CarePlan\CarePlanShow;
 use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
 use App\Models\CarePlan;
@@ -65,6 +66,29 @@ class CarePlanBusinessRulesTest extends TestCase
         $this->serviceUuid = (string) Str::uuid();
         Http::preventStrayRequests();
         Cache::put('knedp_certificate_authority', [], 60);
+    }
+
+    public function test_approval_form_preserves_explicit_actor_and_never_substitutes_an_unavailable_actor(): void
+    {
+        Livewire::test(CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $this->plan,
+            'actingEmployeeUuid' => $this->employee->uuid])
+            ->assertSet('newApproval.employee_uuid', $this->employee->uuid);
+        Livewire::test(CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $this->plan,
+            'actingEmployeeUuid' => (string) Str::uuid()])
+            ->assertSet('newApproval.employee_uuid', '');
+        Http::assertNothingSent();
+    }
+
+    public function test_approval_form_mount_denial_is_visible_before_loading_context(): void
+    {
+        $foreign = LegalEntity::create(['uuid' => (string) Str::uuid(), 'status' => 'ACTIVE',
+            'legal_entity_type_id' => $this->legalEntity->legalEntityTypeId]);
+        $this->plan->update(['legal_entity_id' => $foreign->id]);
+        Livewire::test(CarePlanApprovals::class, ['legalEntity' => $this->legalEntity, 'carePlan' => $this->plan,
+            'actingEmployeeUuid' => $this->employee->uuid])
+            ->assertSee(__('care-plan.approval_access_denied'))->assertSet('carePlanId', 0)
+            ->assertSet('employees', [])->assertSet('approvals', []);
+        Http::assertNothingSent();
     }
 
     private function draftData(string $unit = 'PIECE'): array
