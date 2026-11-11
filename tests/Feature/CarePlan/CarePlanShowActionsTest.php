@@ -46,7 +46,6 @@ use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
-use App\Repositories\CarePlanRepository;
 use App\Repositories\Repository;
 use App\Models\Role as RoleModel;
 use App\Models\Permission;
@@ -59,7 +58,6 @@ use App\Services\SignatureService;
 use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
 use App\Enums\JobStatus;
 use App\Models\MedicalEvents\Sql\Episode;
-use App\Repositories\CarePlanActivityRepository;
 use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
 use App\Livewire\Dictionary\ServiceCatalog;
 use App\Models\CarePlanActivity;
@@ -441,7 +439,7 @@ class CarePlanShowActionsTest extends TestCase
         $this->actingAs($this->user);
 
         $carePlan = $this->makeSignedNewPlan();
-        app(CarePlanRepository::class)->update($carePlan, ['termsOfService' => 'INPATIENT']);
+        Repository::carePlan()->update($carePlan, ['termsOfService' => 'INPATIENT']);
 
         session()->put(config('ehealth.api.oauth.bearer_token'), 'synthetic-token');
         $response = Mockery::mock(EHealthResponse::class);
@@ -475,7 +473,7 @@ class CarePlanShowActionsTest extends TestCase
         $this->actingAs($this->user);
 
         $carePlan = $this->makeSignedNewPlan();
-        app(CarePlanRepository::class)->update($carePlan, ['termsOfService' => 'OUTPATIENT']);
+        Repository::carePlan()->update($carePlan, ['termsOfService' => 'OUTPATIENT']);
 
         $authResponse = Mockery::mock(EHealthResponse::class);
         $authResponse->shouldReceive('getData', 'validate')->andReturn([
@@ -574,6 +572,12 @@ class CarePlanShowActionsTest extends TestCase
             fn (array $payload): bool => $payload['authorize_with'] === $authId
         ))->andReturn($created);
         $api->shouldReceive('verify')->once()->with($this->person->uuid, $approvalId, $requiresOtp ? ['code' => 1234] : [])->andReturn($verified);
+        $details = Mockery::mock(EHealthResponse::class);
+        $details->shouldReceive('successful')->once()->andReturnTrue();
+        $details->shouldReceive('validate')->once()->andReturn([
+            'id' => $approvalId, 'is_verified' => true, 'expires_at' => now()->addYear()->toIso8601String(),
+        ]);
+        $api->shouldReceive('getApprovalDetails')->once()->with($this->person->uuid, $approvalId)->andReturn($details);
         $api->shouldNotReceive('resendSms');
 
         $component = Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
@@ -795,7 +799,7 @@ class CarePlanShowActionsTest extends TestCase
             'author_id' => $this->employee->id,
             'supporting_info' => ['episodes' => [['uuid' => $episode->uuid]]],
         ]);
-        $repository = app(CarePlanRepository::class);
+        $repository = Repository::carePlan();
         $before = $repository->getResource($plan->id)['supportingInfo'];
         $presented = $repository->findById($plan->id);
         $this->assertSame('Контроль лікування', $presented->supportingInfo['episodes'][0]['name']);
@@ -842,7 +846,7 @@ class CarePlanShowActionsTest extends TestCase
             'based_on_id' => $basedOn->id, 'status' => 'draft', 'service_id' => (string) Str::uuid(),
         ]);
         $link = $referral->ehealthLinks()->create(['entity' => 'job', 'status' => 'PENDING']);
-        $repository = app(CarePlanActivityRepository::class);
+        $repository = Repository::carePlanActivity();
         $this->assertSame('PENDING', $repository->submissionStates($activity)[$referral->uuid]['status']);
         Livewire::test(CarePlanActivityShow::class, ['carePlan' => $plan, 'activity' => $activity])
             ->assertOk()->assertSee('Очікується')->assertSeeHtml('wire:poll.3s="checkSubmissionStatus"');
@@ -928,11 +932,11 @@ class CarePlanShowActionsTest extends TestCase
             ->set('activityForm.quantity', '45')->set('activityForm.quantity_code', 'MINUTE')
             ->call('saveActivity')->assertHasNoErrors();
 
-        $activity = app(CarePlanActivityRepository::class)->findOwned(
+        $activity = Repository::carePlanActivity()->findOwned(
             $plan->id,
             CarePlanActivity::whereCarePlanId($plan->id)->value('id')
         );
-        $resource = app(CarePlanActivityRepository::class)->getResource($activity);
+        $resource = Repository::carePlanActivity()->getResource($activity);
         $this->assertEquals(45, $resource['detail']['quantity']['value']);
         $this->assertSame('SERVICE_UNIT', $resource['detail']['quantity']['system']);
         $this->assertSame('MINUTE', $resource['detail']['quantity']['code']);
@@ -950,7 +954,7 @@ class CarePlanShowActionsTest extends TestCase
             ->assertHasErrors('activityForm.quantity_code')
             ->set('activityForm.quantity_code', 'PIECE')->call('saveActivity')->assertHasNoErrors();
         $groupActivity = CarePlanActivity::whereCarePlanId($plan->id)->orderByDesc('id')->firstOrFail();
-        $groupResource = app(CarePlanActivityRepository::class)->getResource($groupActivity);
+        $groupResource = Repository::carePlanActivity()->getResource($groupActivity);
         $this->assertSame('service_group', data_get($groupResource, 'detail.productReference.identifier.type.coding.0.code'));
     }
 
@@ -981,7 +985,7 @@ class CarePlanShowActionsTest extends TestCase
             ->assertSet('activityForm.id', $activityId);
         $this->assertSame(1, CarePlanActivity::whereCarePlanId($plan->id)->count());
         $this->assertSame($uuid, $activity->fresh()->uuid);
-        $this->assertSame('Updated after closing KEP', app(CarePlanActivityRepository::class)->getResource($activityId)['detail']['description']);
+        $this->assertSame('Updated after closing KEP', Repository::carePlanActivity()->getResource($activityId)['detail']['description']);
 
         $component->call('initActivityForm', 'service_request')->assertSet('activityForm.id', null)
             ->call('selectCarePlanServiceFromCatalog', ['id' => $serviceId])

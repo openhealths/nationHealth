@@ -1,7 +1,5 @@
 @use('Carbon\Carbon')
 @use('App\Enums\Person\AuthenticationMethod')
-@use('App\Enums\Person\ApprovalStatus')
-@use('Carbon\CarbonImmutable')
 
 <div
     @if (!$skipsPatientOtp) wire:init="loadAuthMethods" @endif
@@ -39,25 +37,15 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @php
-                        $visibleApprovals = collect($approvals)->filter(function (array $approval): bool {
-                            $status = ApprovalStatus::resolve($approval['status'] ?? null);
-                            $expiresAt = $approval['expiresAt'] ?? ($approval['expires_at'] ?? null);
-
-                            return ($approval['requestPending'] ?? false)
-                                || (($expiresAt === null || CarbonImmutable::parse($expiresAt)->isFuture())
-                                    && ($status?->isGranted() || $status?->isAwaitingPatient()));
-                        });
-                    @endphp
-                    @forelse ($visibleApprovals as $approval)
+                    @forelse ($approvals as $approval)
                         <tr class="index-table-tr">
                             <td class="index-table-td">
                                 <div class="flex flex-col">
                                     <span class="font-medium text-gray-900 dark:text-white">
-                                        {{ $approval['grantedToDetails']['name'] ?? $approval['granted_to_details']['name'] ?? '-' }}
+                                        {{ $approval['grantedToDetails']['name'] ?? ($approval['granted_to_details']['name'] ?? '-') }}
                                     </span>
                                     <span class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ $approval['grantedToDetails']['description'] ?? $approval['granted_to_details']['description'] ?? '' }}
+                                        {{ $approval['grantedToDetails']['description'] ?? ($approval['granted_to_details']['description'] ?? '') }}
                                         @if ($approval['sharedCarePlanApproval'] ?? false)
                                             {{ __('care-plan.shared_approval') }}
                                         @endif
@@ -66,13 +54,10 @@
                             </td>
                             <td class="index-table-td">
                                 @php
-                                    $approvalStatus = ApprovalStatus::resolve($approval['status'] ?? null);
-                                    if ($approvalStatus?->isGranted() && !($approval['isVerified'] ?? ($approval['is_verified'] ?? false))) {
-                                        $approvalStatus = ApprovalStatus::PENDING;
-                                    }
+                                    $isVerified = $approval['isVerified'] ?? ($approval['is_verified'] ?? false);
                                 @endphp
-                                <span class="badge {{ ApprovalStatus::colorFor($approvalStatus?->value) }}">
-                                    {{ ApprovalStatus::labelFor($approvalStatus?->value) }}
+                                <span class="badge {{ $isVerified ? 'badge-green' : 'badge-yellow' }}">
+                                    {{ __($isVerified ? 'care-plan.approval_status.active' : 'care-plan.approval_status.pending') }}
                                 </span>
                             </td>
                             <td class="index-table-td">
@@ -89,7 +74,7 @@
                                     >
                                         {{ __('care-plan.submission_check') }}
                                     </button>
-                                @elseif ($approvalStatus?->isGranted())
+                                @elseif ($isVerified)
                                     <button
                                         type="button"
                                         wire:click="cancelApproval('{{ $approval['uuid'] }}')"
@@ -100,7 +85,7 @@
                                     >
                                         {{ __('care-plan.revoke_approval') }}
                                     </button>
-                                @elseif ($approvalStatus?->isAwaitingPatient())
+                                @elseif (!$isVerified)
                                     <div class="flex items-center justify-end gap-2">
                                         <button
                                             type="button"
@@ -224,7 +209,10 @@
                                     class="input-select peer"
                                     wire:model.live="selectedAuthMethodUuid"
                                     id="selectedAuthMethodUuid"
-                                    x-effect="if ($wire.selectedAuthMethodUuid && $el.value !== $wire.selectedAuthMethodUuid) $nextTick(() => $el.value = $wire.selectedAuthMethodUuid)"
+                                    x-effect="
+                                        if ($wire.selectedAuthMethodUuid && $el.value !== $wire.selectedAuthMethodUuid)
+                                            $nextTick(() => ($el.value = $wire.selectedAuthMethodUuid));
+                                    "
                                 >
                                     <option value="">{{ __('care-plan.choose_auth_method') }}</option>
                                     @foreach ($authMethods as $method)

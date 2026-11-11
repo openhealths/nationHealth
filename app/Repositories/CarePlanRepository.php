@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
-use App\Repositories\Repository;
 use App\Enums\CarePlanStatusFilter;
 use App\Enums\CarePlanCompletenessFilter;
 use Illuminate\Validation\ValidationException;
@@ -47,7 +46,6 @@ use App\Models\EmployeeRole;
 use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
 use App\Models\User;
 use App\Models\Declaration;
-use App\Enums\Person\ApprovalStatus;
 use Illuminate\Support\Facades\Bus;
 use App\Models\LegalEntity;
 use App\Jobs\CarePlanInpatientApprovalProcessing;
@@ -85,7 +83,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         if (isset($data['encounterId'])) {
             $encounterUuid = Encounter::whereKey($data['encounterId'])->value('uuid');
         }
-        $data['uuid'] = $data['uuid'] ?? $resource['id'] ?? Str::uuid()->toString();
+        $data['uuid'] = $data['uuid'] ?? ($resource['id'] ?? Str::uuid()->toString());
         if ($authorUuid !== null) {
             $data['author'] = $authorUuid;
         }
@@ -1030,8 +1028,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         // getAttribute('is_verified') avoids the camelCase collision with Approval::isVerified().
         return $plan->approvals->contains(fn ($approval): bool => $approval->grantedTo?->value === $employeeUuid
             && $approval->getAttribute('is_verified') && $approval->accessLevel === 'write'
-            && $approval->expiresAt !== null && $approval->expiresAt->isFuture()
-            && ApprovalStatus::resolve($approval->status)?->isGranted() === true);
+            && $approval->expiresAt !== null && $approval->expiresAt->isFuture());
     }
 
     public function displayedDetails(CarePlan $plan, array $dictionaries): array
@@ -1040,7 +1037,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         $conceptLabel = static function (?array $concept, string $dictionary) use ($dictionaries): string {
             $labels = collect($concept['coding'] ?? [])->map(
                 fn (array $coding): ?string =>
-                $dictionaries[$dictionary][$coding['code'] ?? ''] ?? $coding['display'] ?? null
+                $dictionaries[$dictionary][$coding['code'] ?? ''] ?? ($coding['display'] ?? null)
             )->filter()->unique()->all();
 
             return implode(', ', $labels) ?: ($concept['text'] ?? '—');
@@ -1072,7 +1069,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
             $concept = $condition?->code ? MedicalEventsRepository::codeableConcept()->toResource($condition->code) : $address;
             foreach ($concept['coding'] ?? [] as $coding) {
                 $code = $coding['code'] ?? '';
-                $name = $diagnosisNames[$code] ?? $dictionaries['icpc2_codes'][$code] ?? $coding['display'] ?? $concept['text'] ?? '';
+                $name = $diagnosisNames[$code] ?? ($dictionaries['icpc2_codes'][$code] ?? ($coding['display'] ?? ($concept['text'] ?? '')));
                 $diagnoses[] = trim($code.($name && $name !== $code ? ' — '.$name : ''));
             }
         }
@@ -1207,9 +1204,9 @@ class CarePlanRepository extends MedicalEventsBaseRepository
     public function applySubmissionResult(EhealthLink $link, array $jobData): void
     {
         $record = $link->linkable;
-        $data = $jobData['response_data'] ?? $jobData['result'] ?? $jobData['data'] ?? [];
+        $data = $jobData['response_data'] ?? ($jobData['result'] ?? ($jobData['data'] ?? []));
         $data = $data[0] ?? $data;
-        $data = $data['response_data'] ?? $data['result'] ?? $data['data'] ?? $data;
+        $data = $data['response_data'] ?? ($data['result'] ?? ($data['data'] ?? $data));
         $data = $data[0] ?? $data;
         $data = $data['data'] ?? $data;
         $data = Arr::toCamelCase($data);
