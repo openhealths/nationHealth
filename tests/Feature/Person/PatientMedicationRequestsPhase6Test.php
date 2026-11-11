@@ -564,7 +564,7 @@ class PatientMedicationRequestsPhase6Test extends TestCase
             $component->call('switchTab', $tab)
                 ->assertSet('expandedUuid', null)
                 ->assertSeeHtml('href="'.route('care-plans.show', [$this->legalEntity, 7]).'"')
-                ->assertSeeHtml('href="'.route('encounter.view', [$this->legalEntity, 'person' => $this->person->id, 'encounter' => 9]).'"');
+                ->assertSeeHtml('href="'.route('persons.encounters.package.show', [$this->legalEntity, 'person' => $this->person->id, 'encounter' => 9]).'"');
         }
     }
 }
