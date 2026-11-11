@@ -1094,13 +1094,13 @@ trait ManagesCarePlanReferrals
     private function findDeviceDefinitionByReference(string $reference, ?string $programId): ?array
     {
         try {
-            $data = EHealth::deviceDefinition()->getById($reference)->getData();
-            if (is_array($data) && (isset($data['id']) || isset($data['uuid']))) {
-                return $data;
-            }
-            if (isset($data[0]) && is_array($data[0])) {
-                return $data[0];
-            }
+            return EHealth::deviceDefinition()->getById($reference)->validate();
+        } catch (ValidationException $exception) {
+            // A successful but malformed detail cannot become a packaging rule
+            // or be hidden by switching to a different catalogue response.
+            Log::warning('CarePlanShow: invalid device definition detail: '.$exception->getMessage(), ['uuid' => $reference]);
+
+            return null;
         } catch (Throwable $exception) {
             Log::debug('CarePlanShow: device definition getById failed: '.$exception->getMessage(), [
                 'uuid' => $reference,
@@ -1113,12 +1113,19 @@ trait ManagesCarePlanReferrals
         }
 
         $page = 1;
-        $maxPages = 10;
+        $totalPages = null;
 
         do {
             $filters['page'] = $page;
             $response = EHealth::deviceDefinition()->getMany($filters);
-            $device = collect($response->getData())->first(
+            $definitions = $response->validate();
+            $paging = $response->getPaging();
+            if ($paging['page_number'] !== $page
+                || ($totalPages !== null && $paging['total_pages'] !== $totalPages)) {
+                throw ValidationException::withMessages(['paging' => __('device-requests.validation.configuration_incomplete')]);
+            }
+            $totalPages = $paging['total_pages'];
+            $device = collect($definitions)->first(
                 static fn (array $item): bool => (string) ($item['id'] ?? ($item['uuid'] ?? '')) === $reference
             );
 
@@ -1126,10 +1133,8 @@ trait ManagesCarePlanReferrals
                 return $device;
             }
 
-            $paging = $response->getPaging();
-            $totalPages = (int) ($paging['total_pages'] ?? 1);
             $page++;
-        } while ($page <= $totalPages && $page <= $maxPages);
+        } while ($page <= $totalPages);
 
         return null;
     }

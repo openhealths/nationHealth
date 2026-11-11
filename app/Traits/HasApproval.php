@@ -4,37 +4,37 @@ declare(strict_types=1);
 
 namespace App\Traits;
 
-use DB;
-use Exception;
-use Throwable;
+use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use Carbon\Carbon;
-use App\Enums\Status;
 use App\Enums\JobStatus;
-use Illuminate\Bus\Batch;
+use App\Enums\ResponseStatus;
+use App\Enums\Status;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\MedicalEvents\ApprovalVerificationException;
 use App\Models\EhealthJob;
 use App\Models\EhealthLink;
-use App\Enums\ResponseStatus;
-use App\Traits\LogsExceptions;
-use App\Classes\eHealth\EHealth;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Database\Eloquent\Model;
-use App\Traits\BatchLegalEntityQueries;
-use Illuminate\Support\Facades\Session;
 use App\Models\MedicalEvents\Sql\Approval;
-use App\Exceptions\EHealth\EHealthException;
-use App\Repositories\MedicalEvents\Repository;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\MedicalEvents\ApprovalVerificationException;
+use App\Models\Person\Person;
 use App\Notifications\RemoteEHealthLinksNotification;
+use App\Repositories\MedicalEvents\Repository;
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Bus\Batch;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 trait HasApproval
 {
-    use LogsExceptions;
     use BatchLegalEntityQueries;
+    use LogsExceptions;
 
     protected const string BATCH_NAME = 'RemoteEHealthLinksProcessing';
 
@@ -53,7 +53,7 @@ trait HasApproval
      *   completion or failure via {@see RemoteEHealthLinksNotification}.
      * - **Any other outcome**: flashes an error and throws an {@see Exception}.
      *
-     * @param  Model  $model  The approvable model (e.g. {@see \App\Models\Person\Person}).
+     * @param  Model  $model  The approvable model (e.g. {@see Person}).
      * @param  array  $payloadData  Approval payload. Must include an `authorize_with` key
      *                              containing the authentication method with `type` and `uuid`
      *                              sub-keys. The `OFFLINE` type is not allowed.
@@ -94,7 +94,8 @@ trait HasApproval
         try {
             $response = EHealth::approval()->createApproval($model->uuid, $requestData);
 
-            $responseData = $response->getData();
+            // Validate the complete native result before storing job links or synchronizing consent.
+            $responseData = $response->validate();
             $responseCode = $response->getStatusCode();
             $links = Arr::get($responseData, 'links', []);
 
@@ -105,6 +106,11 @@ trait HasApproval
                 ResponseStatus::NOT_FOUND->code() => ResponseStatus::NOT_FOUND,
                 default => null
             };
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+            Log::error('Approval creation returned an invalid response.', ['person_uuid' => $model->uuid, 'errors' => $exception->errors()]);
+
+            throw $exception;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle(__('Error throughout creating approval for getting a data for: ' . $model->uuid));
 
@@ -192,7 +198,7 @@ trait HasApproval
      * The OTP is re-sent via eHealth and the approval's `updated_at` timestamp is refreshed to restart the SMS validity window.
      *
      * @param  Model  $model  An {@see Approval} to resend the code for, or the approvable
-     *                        model (e.g. {@see \App\Models\Person\Person}) whose latest
+     *                        model (e.g. {@see Person}) whose latest
      *                        approval should be looked up.
      * @return void
      */
@@ -213,10 +219,15 @@ trait HasApproval
         }
 
         try {
-            EHealth::approval()->resendSms($approval->approvable?->uuid, $approval->uuid);
+            EHealth::approval()->resendSms($approval->approvable?->uuid, $approval->uuid)->validate();
 
             $approval->updated_at = now();
             $approval->save();
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+            Log::error('Approval SMS resend returned an invalid response.', ['approval_uuid' => $approval->uuid, 'errors' => $exception->errors()]);
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle(__('Error occurred while resending approval SMS code for the person data update'));
 
@@ -255,9 +266,15 @@ trait HasApproval
 
         try {
             $verifyResponse = EHealth::approval()->verify($approvable?->uuid, $approval->uuid, ['code' => (int)$code]);
+            $verifyResponse->validate();
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+            Log::error('Approval verification returned an invalid response.', ['approval_uuid' => $approval->uuid, 'errors' => $exception->errors()]);
+
+            return false;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle(__('Error occurred while trying to verify current Approval: ' . $approval->uuid));
-            \Log::error('Error occurred while trying to verify current Approval: ' . $approval->uuid, ['exception' => $exception, 'verify_response' => $verifyResponse ?? null]);
+            Log::error('Error occurred while trying to verify current Approval: ' . $approval->uuid, ['exception' => $exception, 'verify_response' => $verifyResponse ?? null]);
 
             return false;
         }
@@ -265,9 +282,23 @@ trait HasApproval
         if (\in_array($verifyResponse->getStatusCode(), [200, 204], true)) {
             try {
                 $response = EHealth::approval()->getApprovalDetails($approvable?->uuid, $approval->uuid);
-                $responseData = $response->getData();
+                $responseData = $response->validate();
+                if ($responseData['id'] !== $approval->uuid) {
+                    throw ValidationException::withMessages(['id' => __('errors.ehealth.messages.response_contract_invalid')]);
+                }
+                // A successful verification HTTP acknowledgement can precede confirmed consent.
+                if ($responseData['is_verified'] !== true) {
+                    Session::flash('info', __('patients.errors.approval_creation_pending'));
+
+                    return false;
+                }
 
                 Repository::approval()->sync(modelData: $responseData, approvableModel: $approvable, approvalModel: $approval);
+            } catch (ValidationException $exception) {
+                Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+                Log::error('Approval details returned an invalid response.', ['approval_uuid' => $approval->uuid, 'errors' => $exception->errors()]);
+
+                return false;
             } catch (EHealthException|EHealthConnectionException $exception) {
                 $exception->handle(__('Error occurred while trying to get Approval details: ' . $approval->uuid));
 
