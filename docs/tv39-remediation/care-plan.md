@@ -26,7 +26,7 @@ API rules were transcribed from the locally available official documentation arc
 
 The archive contains explicit spelling inconsistencies: plan cancellation `cencelled` in the response schema versus `cancelled` in the lifecycle, activity reason `oservation` versus `observation`, and plan author `care_team` in the response enum versus `employee` in its response example. The validator accepts those documented spellings only; UUID/types/required fields remain strict. Full plan supporting_info follows the response schema's procedure/diagnostic_report reference types. An undocumented alternative response shape must be reconciled against a verified official contract rather than silently imported.
 
-For C01 the API cancellation rule is less restrictive than approved TV39: it allows final activities, whereas TV39 explicitly also blocks completed activities. This implementation follows the user-selected approved TV39. The deliberate restriction and test must be retained unless the requirement owner approves a different normative interpretation.
+For C01 approved TV39 explicitly blocks cancellation when an activity is completed. The inspected API operation-0171 describes signed-content equality and links the status model; it does not establish that completed activities permit cancellation. The earlier claim of a less restrictive API rule was unverified and has been withdrawn. Retain the literal TV39 restriction and its test.
 
 ## Verification and integration limits
 

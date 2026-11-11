@@ -411,7 +411,7 @@
                 <li>
                     <a
                         href="{{ route('care-plans.index', [legalEntity()]) }}"
-                        class="menu-item-simple {{ (request()->routeIs('care-plan.*') || request()->routeIs('persons.care-plans')) ? 'menu-item-active' : '' }}"
+                        class="menu-item-simple {{ request()->routeIs('care-plans.*', 'persons.care-plans') ? 'menu-item-active' : '' }}"
                     >
                         @icon('hugeicons-contracts')
                         <span>{{ __('care-plan.care_plan') }}</span>
@@ -442,8 +442,10 @@
 
                 @can('viewAny', DeviceRequestRequest::class)
                     <li>
-                        <a href="{{ route('device-requests.index', [legalEntity()]) }}"
-                           class="menu-item-simple {{ request()->routeIs('device-requests.index') ? 'menu-item-active' : '' }}">
+                        <a
+                            href="{{ route('device-requests.index', [legalEntity()]) }}"
+                            class="menu-item-simple {{ request()->routeIs('device-requests.*', 'persons.device-requests*') ? 'menu-item-active' : '' }}"
+                        >
                             @icon('device-requests')
                             <span>{{ __('device-requests.labels.registry') }}</span>
                         </a>
