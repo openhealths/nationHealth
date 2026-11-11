@@ -162,7 +162,11 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
                 );
                 $verdicts = EHealth::serviceRequest()->prequalify($carePlan->person->uuid, $prequalifyPayload)->validate();
                 $this->assertSelectedProgramVerdict($verdicts, $dbData['program_id']);
-                $this->runPrequalify($verdicts);
+                // The native service-request contract permits an empty verdict list when no program was requested.
+                // Program-dependent writes still require the matching verdict above and the shared job validation.
+                if ($verdicts !== []) {
+                    $this->runPrequalify($verdicts);
+                }
             }
 
             DB::transaction(function () use ($existingDraft, $dbData, $carePlan, $uuids): void {
@@ -393,7 +397,11 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         if ($kind === 'service_request') {
             $this->assertSelectedProgramVerdict($verdicts, $dbData['program_id'] ?? null);
         }
-        $this->runPrequalify($verdicts);
+        // A validated empty service-request verdict with no program has no asynchronous outcome to resolve.
+        // Device requests and nonempty program verdicts retain the shared job checks.
+        if ($kind !== 'service_request' || $verdicts !== []) {
+            $this->runPrequalify($verdicts);
+        }
     }
 
     private function assertSelectedProgramVerdict(array $verdicts, ?string $programId): void

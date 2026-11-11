@@ -32,6 +32,7 @@ use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use App\Traits\BatchLegalEntityQueries;
 use Illuminate\Bus\Batch;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
@@ -654,6 +655,21 @@ class PatientReferrals extends BasePatientComponent
                 Auth::user()->party->taxId
             );
 
+            // Eligibility and pending operations can change during KEP; reload before creating submission tracking.
+            try {
+                $record = app(MedicalRequestOwnership::class)->serviceForPerson($record->uuid, (int) $this->personId);
+            } catch (ModelNotFoundException) {
+                Session::flash('error', __('referrals.messages.action_unavailable'));
+
+                return;
+            }
+            if (Auth::user()->cannot('recall', $record)
+                || Auth::user()->cannot('registeredAction', [ServiceRequestRequest::class, $snapshot, 'recall'])) {
+                Session::flash('error', __('referrals.messages.action_unavailable'));
+
+                return;
+            }
+
             $finalResponse = $this->submitClinicalOperation($record, ['status' => 'recalled', 'statusReason' => $payload['status_reason'], 'explanatoryLetter' => $letter], fn () => SubmissionApi::serviceRequest()->recall($this->uuid, $record->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']), 'service_request:recall');
             if ($finalResponse === null) {
                 return;
@@ -719,6 +735,21 @@ class PatientReferrals extends BasePatientComponent
                 $validated['keyContainerUpload'],
                 Auth::user()->party->taxId
             );
+
+            // Eligibility and pending operations can change during KEP; reload before creating submission tracking.
+            try {
+                $record = app(MedicalRequestOwnership::class)->serviceForPerson($record->uuid, (int) $this->personId);
+            } catch (ModelNotFoundException) {
+                Session::flash('error', __('referrals.messages.action_unavailable'));
+
+                return;
+            }
+            if (Auth::user()->cannot('cancel', $record)
+                || Auth::user()->cannot('registeredAction', [ServiceRequestRequest::class, $snapshot, 'error'])) {
+                Session::flash('error', __('referrals.messages.action_unavailable'));
+
+                return;
+            }
 
             $finalResponse = $this->submitClinicalOperation($record, ['status' => 'entered-in-error', 'statusReason' => $payload['status_reason'], 'explanatoryLetter' => trim($this->referralExplanatoryLetter)], fn () => SubmissionApi::serviceRequest()->cancel($this->uuid, $record->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']), 'service_request:cancel');
             if ($finalResponse === null) {
