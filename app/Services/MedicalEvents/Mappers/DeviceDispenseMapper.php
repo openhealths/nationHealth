@@ -8,7 +8,7 @@ use App\Contracts\FhirMapperContract;
 use App\Enums\DeviceDispense\Status;
 use App\Services\MedicalEvents\FhirResource;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class DeviceDispenseMapper implements FhirMapperContract
 {
@@ -35,7 +35,7 @@ class DeviceDispenseMapper implements FhirMapperContract
         }
 
         $result = [
-            'id' => $data['uuid'] ?? Str::uuid()->toString(),
+            'id' => $data['uuid'] ?? Uuid::uuid1()->toString(),
             'status' => $data['status'] ?? Status::COMPLETED->value,
             'primarySource' => true,
             'performer' => FhirResource::make()

@@ -8,7 +8,7 @@ use App\Contracts\FhirMapperContract;
 use App\Enums\DeviceAssociation\Status;
 use App\Services\MedicalEvents\FhirResource;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class DeviceAssociationMapper implements FhirMapperContract
 {
@@ -72,7 +72,7 @@ class DeviceAssociationMapper implements FhirMapperContract
         [$uuids] = $context;
 
         $result = [
-            'id' => $data['uuid'] ?? Str::uuid()->toString(),
+            'id' => $data['uuid'] ?? Uuid::uuid1()->toString(),
             'device' => FhirResource::make()
                 ->coding('eHealth/resources', 'device')
                 ->toIdentifier($data['deviceId']),

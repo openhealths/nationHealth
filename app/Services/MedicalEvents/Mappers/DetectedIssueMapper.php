@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents\Mappers;
 
 use App\Contracts\FhirMapperContract;
-use App\Services\MedicalEvents\FhirResource;
 use App\Enums\DetectedIssue\Status;
+use App\Services\MedicalEvents\FhirResource;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class DetectedIssueMapper implements FhirMapperContract
 {
@@ -17,7 +17,7 @@ class DetectedIssueMapper implements FhirMapperContract
         [$uuids] = $context;
 
         $result = [
-            'id' => $data['uuid'] ?? Str::uuid()->toString(),
+            'id' => $data['uuid'] ?? Uuid::uuid1()->toString(),
 
             'status' => data_get($data, 'status', Status::PRELIMINARY->value),
 

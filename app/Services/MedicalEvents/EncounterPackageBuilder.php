@@ -8,7 +8,7 @@ use App\Enums\Episode\Status;
 use App\Enums\Person\ConditionClinicalStatus;
 use App\Enums\Person\DiagnosticReportStatus;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class EncounterPackageBuilder
 {
@@ -23,10 +23,10 @@ class EncounterPackageBuilder
     public function build(array $data, string $episodeType, Status $episodeStatus = Status::ACTIVE): array
     {
         $uuids = [
-            'encounter' => Str::uuid()->toString(),
-            'visit' => Str::uuid()->toString(),
+            'encounter' => Uuid::uuid1()->toString(),
+            'visit' => Uuid::uuid1()->toString(),
             'employee' => Auth::user()->getEncounterWriterEmployee($data['encounter']['classCode'])->uuid,
-            'episode' => $data['episode']['id'] ?: Str::uuid()->toString()
+            'episode' => $data['episode']['id'] ?: Uuid::uuid1()->toString()
         ];
 
         $package = $this->toFhir($data, $uuids);
@@ -95,7 +95,7 @@ class EncounterPackageBuilder
 
                     return Fhir::diagnosticReport()->toFhir(
                         $diagnosticReport,
-                        array_merge($uuids, ['diagnosticReport' => $diagnosticReport['uuid'] ?? Str::uuid()->toString(), ]),
+                        array_merge($uuids, ['diagnosticReport' => $diagnosticReport['uuid'] ?? Uuid::uuid1()->toString(), ]),
                         DiagnosticReportStatus::tryFrom($diagnosticReport['status'] ?? '')
                             ?? DiagnosticReportStatus::FINAL
                     );

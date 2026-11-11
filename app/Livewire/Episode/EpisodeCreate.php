@@ -14,7 +14,7 @@ use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 use Throwable;
 
 class EpisodeCreate extends BaseEpisodeComponent
@@ -28,7 +28,7 @@ class EpisodeCreate extends BaseEpisodeComponent
     {
         parent::initializeComponent();
 
-        $this->form->id = Str::uuid()->toString();
+        $this->form->id = Uuid::uuid1()->toString();
         $this->form->startDate = now()->format(config('app.date_format'));
         $this->form->startTime = now()->format('H:i');
     }

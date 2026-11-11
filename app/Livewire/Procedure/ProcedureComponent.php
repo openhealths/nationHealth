@@ -4,36 +4,36 @@ declare(strict_types=1);
 
 namespace App\Livewire\Procedure;
 
-use App\Classes\eHealth\EHealth;
 use App\Classes\Cipher\Api\CipherRequest;
+use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Person\ProcedureStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
-use App\Jobs\RemoteEHealthLinksProcessing;
-use App\Enums\Equipment\AvailabilityStatus;
-use App\Livewire\Procedure\Forms\ProcedureForm as Form;
-use App\Models\Employee\Employee;
-use App\Models\LegalEntity;
-use App\Models\Person\Person;
-use App\Models\Equipment;
-use App\Models\Preperson;
-use App\Models\MedicalEvents\Sql\Procedure;
-use App\Traits\SearchesElectronicReferrals;
-use App\Services\MedicalEvents\Fhir;
-use App\Traits\FormTrait;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
-use Illuminate\Support\Str;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
+use App\Jobs\RemoteEHealthLinksProcessing;
+use App\Livewire\Procedure\Forms\ProcedureForm as Form;
+use App\Models\Employee\Employee;
+use App\Models\Equipment;
+use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Procedure;
+use App\Models\Person\Person;
+use App\Models\Preperson;
+use App\Services\MedicalEvents\Fhir;
+use App\Traits\FormTrait;
+use App\Traits\SearchesElectronicReferrals;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Ramsey\Uuid\Uuid;
 use Throwable;
 
 class ProcedureComponent extends Component
@@ -239,7 +239,7 @@ class ProcedureComponent extends Component
     ): array {
         $uuids = [
             'employee' => Auth::user()->getProcedureWriterEmployee()->uuid,
-            'procedure' => $procedureUuid ?? Str::uuid()->toString(),
+            'procedure' => $procedureUuid ?? Uuid::uuid1()->toString(),
         ];
 
         return Fhir::procedure()->toFhir($validatedData['procedure'], $uuids);

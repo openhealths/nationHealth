@@ -8,7 +8,7 @@ use App\Contracts\FhirMapperContract;
 use App\Enums\Specimen\Status;
 use App\Services\MedicalEvents\FhirResource;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class SpecimenMapper implements FhirMapperContract
 {
@@ -26,7 +26,7 @@ class SpecimenMapper implements FhirMapperContract
         $isReferenced = $data['isReferenced'] ?? false;
 
         $result = [
-            'id' => $data['uuid'] ?? Str::uuid()->toString(),
+            'id' => $data['uuid'] ?? Uuid::uuid1()->toString(),
             'status' => $isReferenced ? Status::UNAVAILABLE->value : Status::AVAILABLE->value,
             'type' => FhirResource::make()
                 ->coding('specimen_types', $data['typeCode'])

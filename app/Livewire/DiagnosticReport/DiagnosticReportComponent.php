@@ -7,36 +7,36 @@ namespace App\Livewire\DiagnosticReport;
 use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use App\Enums\Status;
-use App\Enums\User\Role;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Person\DiagnosticReportStatus;
+use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\RemoteEHealthLinksProcessing;
-use App\Models\MedicalEvents\Sql\DiagnosticReport;
-use App\Services\MedicalEvents\Fhir;
 use App\Livewire\DiagnosticReport\Forms\DiagnosticReportForm as Form;
 use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\ObservationConfigRepository;
 use App\Repositories\Repository;
+use App\Services\MedicalEvents\Fhir;
 use App\Traits\FormTrait;
 use App\Traits\SearchesElectronicReferrals;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Ramsey\Uuid\Uuid;
 use RuntimeException;
 use Throwable;
 
@@ -393,7 +393,7 @@ abstract class DiagnosticReportComponent extends Component
     ): array {
         $uuids = [
             'employee' => Auth::user()->getDiagnosticReportWriterEmployee()->uuid,
-            'diagnosticReport' => $diagnosticReportUuid ?? Str::uuid()->toString(),
+            'diagnosticReport' => $diagnosticReportUuid ?? Uuid::uuid1()->toString(),
         ];
 
         $diagnosticReport = Fhir::diagnosticReport()->toFhir(

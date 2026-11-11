@@ -8,7 +8,7 @@ use App\Contracts\FhirMapperContract;
 use App\Enums\Person\ImmunizationStatus;
 use App\Services\MedicalEvents\FhirResource;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class ImmunizationMapper implements FhirMapperContract
 {
@@ -24,7 +24,7 @@ class ImmunizationMapper implements FhirMapperContract
         [$uuids] = $context;
 
         $result = [
-            'id' => $data['uuid'] ?? Str::uuid()->toString(),
+            'id' => $data['uuid'] ?? Uuid::uuid1()->toString(),
             'status' => $data['status'] ?? ImmunizationStatus::COMPLETED->value,
             'notGiven' => $data['notGiven'],
             'vaccineCode' => FhirResource::make()

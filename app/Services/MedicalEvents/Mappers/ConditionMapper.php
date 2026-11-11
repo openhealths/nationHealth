@@ -7,7 +7,7 @@ namespace App\Services\MedicalEvents\Mappers;
 use App\Contracts\FhirMapperContract;
 use App\Services\MedicalEvents\FhirResource;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class ConditionMapper implements FhirMapperContract
 {
@@ -23,7 +23,7 @@ class ConditionMapper implements FhirMapperContract
         [$uuids] = $context;
 
         $result = [
-            'id' => $data['uuid'] ?? Str::uuid()->toString(),
+            'id' => $data['uuid'] ?? Uuid::uuid1()->toString(),
             'primarySource' => $data['primarySource'],
             'context' => FhirResource::make()->coding('eHealth/resources', 'encounter')
                 ->toIdentifier($uuids['encounter']),

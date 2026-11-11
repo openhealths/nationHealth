@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents\Mappers;
 
 use App\Contracts\FhirMapperContract;
+use App\Core\Arr;
 use App\Enums\Person\ProcedureStatus;
 use App\Services\MedicalEvents\FhirResource;
-use App\Core\Arr;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class ProcedureMapper implements FhirMapperContract
 {
@@ -28,7 +28,7 @@ class ProcedureMapper implements FhirMapperContract
         $status = ProcedureStatus::from($data['status']);
 
         $result = [
-            'id' => $uuids['procedure'] ?? $data['uuid'] ?? Str::uuid()->toString(),
+            'id' => $uuids['procedure'] ?? ($data['uuid'] ?? Uuid::uuid1()->toString()),
             'status' => $status->value,
             'code' => FhirResource::make()
                 ->coding('eHealth/resources', 'service')

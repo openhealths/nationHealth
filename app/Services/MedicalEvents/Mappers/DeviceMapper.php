@@ -7,7 +7,7 @@ namespace App\Services\MedicalEvents\Mappers;
 use App\Contracts\FhirMapperContract;
 use App\Enums\Device\Status;
 use App\Services\MedicalEvents\FhirResource;
-use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class DeviceMapper implements FhirMapperContract
 {
@@ -23,7 +23,7 @@ class DeviceMapper implements FhirMapperContract
         [$uuids] = $context;
 
         $result = [
-            'id' => $data['uuid'] ?? Str::uuid()->toString(),
+            'id' => $data['uuid'] ?? Uuid::uuid1()->toString(),
             'status' => $data['status'] ?? Status::ACTIVE->value,
             'primarySource' => $data['primarySource'],
             'type' => FhirResource::make()
