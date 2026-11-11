@@ -21,6 +21,7 @@ use App\Services\MedicalEvents\CarePlanActivityValidationService;
 use App\Services\MedicalEvents\CarePlanApprovalService;
 use App\Services\MedicalEvents\CarePlanLifecycleGateService;
 use App\Services\MedicalEvents\DeviceProgramParticipationGuard;
+use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Traits\InteractsWithApprovals;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
@@ -649,14 +650,33 @@ abstract class CarePlanComponent extends Component
 
     public function openSignatureModal(string $actionType, ?int $activityId = null, ?string $requestUuid = null): void
     {
-        $this->authorizeCarePlanWrite();
-        if (in_array($actionType, ['sign_activity', 'cancel_activity', 'complete_activity'], true)) {
-            if (!$this->authorizeCarePlanActivityWrite()) {
+        if (in_array($actionType, ['cancel_referral', 'recall_referral'], true)) {
+            // A registered referral has its own status permissions, even after its
+            // care plan closes or the physician no longer has care-plan write access.
+            try {
+                $request = app(MedicalRequestOwnership::class)
+                    ->serviceForPerson((string) $requestUuid, $this->carePlan->personId);
+            } catch (ModelNotFoundException) {
+                Session::flash('error', __('care-plan.document_context_unavailable'));
+
                 return;
             }
-        }
-        if ($this->guardTerminalCarePlanMutation()) {
-            return;
+            $operation = $actionType === 'recall_referral' ? 'recall' : 'cancel';
+            if (Auth::user()->cannot($operation, $request)) {
+                Session::flash('error', __('referrals.messages.action_unavailable'));
+
+                return;
+            }
+        } else {
+            $this->authorizeCarePlanWrite();
+            if (in_array($actionType, ['sign_activity', 'cancel_activity', 'complete_activity'], true)) {
+                if (!$this->authorizeCarePlanActivityWrite()) {
+                    return;
+                }
+            }
+            if ($this->guardTerminalCarePlanMutation()) {
+                return;
+            }
         }
 
         if (in_array($actionType, ['cancel', 'complete'], true) && $this->guardPlanLifecycleAccess($actionType)) {
