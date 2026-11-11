@@ -1410,7 +1410,7 @@ class CarePlanLifecycleTest extends TestCase
         $this->mock(CarePlanActivityApi::class, function ($mock) use ($activity, $carePlan): void {
             $response = Mockery::mock(EHealthResponse::class);
             $response->shouldReceive('successful')->andReturnTrue();
-            $response->shouldReceive('validate')->andReturn(Arr::toSnakeCase(Repository::carePlanActivity()->getResource($activity->id)));
+            $response->shouldReceive('validate')->andReturn(Repository::carePlanActivity()->getResource($activity->id));
             $mock->shouldReceive('getDetails')->once()->with($this->person->uuid, $carePlan->uuid, $activity->uuid)
                 ->andReturn($response);
         });

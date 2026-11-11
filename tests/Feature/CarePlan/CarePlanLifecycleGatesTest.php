@@ -178,6 +178,7 @@ class CarePlanLifecycleGatesTest extends TestCase
         $this->grantCarePlanWriteApproval($carePlan, $this->employee);
 
         $activity = $this->createFhirCarePlanActivity([
+            'scheduled_period_start' => now(), 'scheduled_period_end' => now()->addWeek(),
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'status' => 'scheduled',
@@ -230,6 +231,7 @@ class CarePlanLifecycleGatesTest extends TestCase
         $this->grantCarePlanWriteApproval($carePlan, $this->employee);
 
         $this->createFhirCarePlanActivity([
+            'scheduled_period_start' => now(), 'scheduled_period_end' => now()->addWeek(),
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'status' => 'scheduled',
@@ -311,6 +313,7 @@ class CarePlanLifecycleGatesTest extends TestCase
         $this->grantCarePlanWriteApproval($carePlan, $this->employee);
 
         $this->createFhirCarePlanActivity([
+            'scheduled_period_start' => now(), 'scheduled_period_end' => now()->addWeek(),
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'status' => 'processed',
@@ -342,6 +345,7 @@ class CarePlanLifecycleGatesTest extends TestCase
         $this->grantCarePlanWriteApproval($carePlan, $this->employee);
 
         $this->createFhirCarePlanActivity([
+            'scheduled_period_start' => now(), 'scheduled_period_end' => now()->addWeek(),
             'uuid' => (string) Str::uuid(),
             'care_plan_id' => $carePlan->id,
             'status' => 'completed',

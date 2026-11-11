@@ -48,6 +48,9 @@ class ClinicalFhirCompatibilityTest extends TestCase
         $this->assertNull($medications->findActivity($activity->uuid, $person->id, $plan->id, $legalEntity->id + 1));
 
         $referralResource = $this->fixture('ServiceRequest/resource.json');
+        // Keep the full registered referral projection explicit in the round-trip fixture.
+        $referralResource += ['usedByEmployee' => ['displayValue' => ''],
+            'usedByLegalEntity' => ['displayValue' => ''], 'statusHistory' => []];
         $serviceActivity = $activityResource;
         $serviceActivity['id'] = (string) Str::uuid();
         $serviceActivity['detail']['kind'] = 'service_request';
@@ -56,7 +59,7 @@ class ClinicalFhirCompatibilityTest extends TestCase
         $referralResource['basedOn'] = [$activityResource['carePlan'], [
             'identifier' => ['value' => $serviceActivity['id'], 'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'activity']]]],
         ]];
-        $referrals = MedicalEventsRepository::serviceRequestRequest();
+        $referrals = MedicalEventsRepository::serviceRequest();
         $referral = $referrals->storeResource($referralResource, $person->id);
 
         // Reimporting any owner must not mutate another module's references or periods.
