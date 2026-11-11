@@ -337,12 +337,18 @@ trait DrivesCompositionWizard
             throw new CompositionGuardException(__('compositions.errors.author_speciality_not_allowed'));
         }
         $newborn = $this->conclusionType() === CompositionType::NEWBORN;
-        $specialityEnabled = CompositionConfiguration::NEWBORN_DOCTOR_SPECIALITIES_ENABLED;
-        if ($newborn && $specialityEnabled->enabled()
-            && $specialities->pluck('speciality')->intersect(CompositionConfiguration::NEWBORN_DOCTOR_SPECIALITIES->codes($category))->isEmpty()) {
-            throw new CompositionGuardException(__('compositions.errors.author_speciality_not_allowed'));
+        $specialityEnabled = $newborn ? CompositionConfiguration::NEWBORN_DOCTOR_SPECIALITIES_ENABLED : CompositionConfiguration::DISABILITY_DOCTOR_SPECIALITIES_ENABLED;
+        if ($specialityEnabled->enabled()) {
+            $allowedSpecialities = $newborn
+                ? CompositionConfiguration::NEWBORN_DOCTOR_SPECIALITIES->codes($category)
+                : CompositionConfiguration::DISABILITY_DOCTOR_SPECIALITIES->optionalCodes($category);
+            // The disability filter maps only the categories it restricts; no environment defaults are inferred.
+            if ($allowedSpecialities !== null && $specialities->pluck('speciality')->intersect($allowedSpecialities)->isEmpty()) {
+                throw new CompositionGuardException(__('compositions.errors.author_speciality_not_allowed'));
+            }
         }
 
+        $activeParticipants = [];
         foreach (['subject', 'section.focus'] as $path) {
             $isFocus = $path === 'section.focus';
             $reference = data_get($payload, $path);
@@ -376,8 +382,23 @@ trait DrivesCompositionWizard
                     throw new CompositionGuardException(__('compositions.errors.newborn_identity_mismatch'));
                 }
             } else {
-                // The public MPI API does not expose the internal person.status field. Keep the
-                // synchronized demographics and verification checks separate from that provider limitation.
+                $statuses = $isFocus ? CompositionConfiguration::FOCUS_STATUSES : CompositionConfiguration::SUBJECT_STATUSES;
+                if ($statuses->value($category) !== 'active') {
+                    throw new CompositionGuardException(__('compositions.errors.participant_status_not_allowed'));
+                }
+                if (!isset($activeParticipants[$participant->uuid])) {
+                    // API-010-051-0002 checks status=active and is_active=true before returning 200.
+                    // Validate that fresh response before relying on its documented eligibility rule;
+                    // an empty method list still meets that precondition and never creates an authentication method.
+                    try {
+                        $response = EHealth::person()->getAuthMethods($participant->uuid);
+                        SchemaResponseContract::validate($response, 'GET /api/persons/{id}/authentication_methods', 'composition');
+                        $response->validate();
+                    } catch (EHealthConnectionException | EHealthException) {
+                        throw new CompositionGuardException(__('compositions.errors.participant_status_unavailable'));
+                    }
+                    $activeParticipants[$participant->uuid] = true;
+                }
                 $verification = $isFocus ? CompositionConfiguration::FOCUS_VERIFICATION : CompositionConfiguration::SUBJECT_VERIFICATION;
                 if (!in_array($participant->verificationStatus, $verification->codes($category), true)) {
                     throw new CompositionGuardException(__('compositions.errors.participant_verification_not_allowed'));
