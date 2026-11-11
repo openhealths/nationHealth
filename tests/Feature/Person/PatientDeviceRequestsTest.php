@@ -153,8 +153,8 @@ class PatientDeviceRequestsTest extends TestCase
         $service->shouldReceive('dictionary')->andReturn(['orthosis' => 'Ортез']);
         $this->instance(DeviceRequestLifecycleService::class, $service);
         app(SignatureService::class)->shouldReceive('signData')->once()->andReturn('test-signature');
-        $resolver = Mockery::mock(EHealthJobResolver::class);
-        $resolver->shouldReceive('resolve')->once()->andReturn([]);
+        $resolver = Mockery::mock(EHealthJobResolver::class)->makePartial();
+        $resolver->shouldReceive('resolve')->once()->andReturn(['status' => 'processed']);
         $this->instance(EHealthJobResolver::class, $resolver);
 
         Livewire::test(DeviceRequestCreationHarness::class, [

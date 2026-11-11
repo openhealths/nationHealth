@@ -174,12 +174,12 @@ class DeviceRequestPatientUiTest extends TestCase
         $this->patientComponent()->assertDontSeeHtml('href="'.route('persons.device-requests', [$this->legalEntity, 'person' => $this->person->id]).'"');
     }
 
-    public function testLegacyPrescriptionPageOffersAnAuthorizedPatientRequestButton(): void
+    public function testLegacyPrescriptionPageOffersAuthorizedPatientRequestNavigation(): void
     {
         $parameters = ['legalEntity' => $this->legalEntity, 'personId' => $this->person->id];
         Livewire::test(PatientPrescriptionRequests::class, $parameters)
             ->assertSee(route('persons.device-requests', [$this->legalEntity, 'person' => $this->person->id]), false)
-            ->assertSeeHtml('class="button-primary px-5 py-2 text-sm whitespace-nowrap"');
+            ->assertSeeHtml('href="'.route('persons.device-requests', [$this->legalEntity, 'person' => $this->person->id]).'"');
 
         $this->canReadRequests = false;
         Livewire::test(PatientPrescriptionRequests::class, $parameters)
