@@ -6,17 +6,21 @@ namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\CompositionErrorTranslator;
+use App\Classes\eHealth\SchemaResponseContract;
 use App\Contracts\ApiErrorTranslator;
 use App\Enums\Composition\CompositionJobStatus;
-use App\Exceptions\EHealth\EHealthException;
-use Illuminate\Support\Arr;
 use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use JsonException;
+use RuntimeException;
 
 /**
  * Composition API — Medical Conclusions (МВН / МВТН).
@@ -130,6 +134,28 @@ class Composition extends PatientApiBase
         return $this->get(self::URL . '/searchComposition', $query);
     }
 
+    /** Read every validated offset page before making a duplicate or linked-case decision. */
+    public function searchAll(array $query): array
+    {
+        $items = [];
+        $seen = [];
+        $limit = 100;
+        for ($offset = 0; ; $offset += $limit) {
+            $page = $this->search(array_replace($query, compact('offset', 'limit')))->validate();
+            foreach ($page as $item) {
+                $uuid = data_get($item, 'identifier.value');
+                if (isset($seen[$uuid])) {
+                    throw ValidationException::withMessages(['data' => __('compositions.errors.invalid_response')]);
+                }
+                $seen[$uuid] = true;
+                $items[] = $item;
+            }
+            if (count($page) < $limit) {
+                return $items;
+            }
+        }
+    }
+
     /**
      * Sign a Composition with the author's qualified electronic signature (API-006-009-0004).
      *
@@ -175,6 +201,8 @@ class Composition extends PatientApiBase
         string $encounterId,
         ?string $templateId = null
     ): PromiseInterface|EHealthResponse {
+        $this->setValidator($this->validatePrintForm(...));
+
         return $this->get(
             $this->contextUrl($patientId, $compositionId, $episodeId, $encounterId) . '/printForm',
             $templateId === null ? [] : ['templateId' => $templateId]
@@ -237,6 +265,7 @@ class Composition extends PatientApiBase
     {
         $body = $response->json();
         $data = is_array($body) && array_key_exists('data', $body) ? $body['data'] : $body;
+        $this->validateContract($data, 'detail');
         $validator = Validator::make(is_array($data) ? $data : [], $this->compositionRules());
 
         if ($validator->fails()) {
@@ -252,6 +281,7 @@ class Composition extends PatientApiBase
 
     protected function validateMany(EHealthResponse $response): array
     {
+        $this->validateContract($response->getData(), 'search');
         $items = Validator::make(['items' => $response->getData()], [
             'items' => ['present', 'array', 'list'],
             'items.*' => ['array'],
@@ -276,6 +306,7 @@ class Composition extends PatientApiBase
 
     protected function validateJob(EHealthResponse $response): array
     {
+        $this->validateContract($response->getData(), 'job');
         $data = Validator::make($response->getData(), [
             'id' => ['nullable', 'string'],
             'uuid' => ['nullable', 'string'],
@@ -288,7 +319,7 @@ class Composition extends PatientApiBase
         ])->validate();
 
         return [
-            'id' => $data['id'] ?? $data['uuid'] ?? null,
+            'id' => $data['id'] ?? ($data['uuid'] ?? null),
             'status' => $data['status'],
             'eta' => $data['eta'] ?? null,
             'compositionUuid' => $this->compositionUuidFromLinks($data['links'] ?? []),
@@ -356,6 +387,7 @@ class Composition extends PatientApiBase
 
     protected function validateIntegration(EHealthResponse $response): array
     {
+        $this->validateContract($response->getData(), 'integration');
         Validator::make(['items' => $response->getData()], [
             'items' => ['present', 'array'],
             'items.*' => ['array'],
@@ -367,6 +399,29 @@ class Composition extends PatientApiBase
         ])->validate();
 
         return $response->getData();
+    }
+
+    /** The native print document is plain text, preserved byte for byte after validation. */
+    protected function validatePrintForm(EHealthResponse $response): array
+    {
+        $mediaType = strtolower(trim(explode(';', (string) $response->header('Content-Type'))[0]));
+        Validator::make(['mediaType' => $mediaType], [
+            'mediaType' => ['required', Rule::in(['text/plain'])],
+        ])->validate();
+        SchemaResponseContract::validateData($response->body(), ['type' => 'string']);
+
+        return ['content' => $response->body()];
+    }
+
+    /** Validate the complete native document before applying the existing projection. */
+    private function validateContract(mixed $data, string $operation): void
+    {
+        try {
+            $contract = json_decode(file_get_contents(resource_path('ehealth/contracts/composition-responses.json')), true, flags: JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new RuntimeException('The Composition response contract is invalid.', previous: $exception);
+        }
+        SchemaResponseContract::validateData($data, $contract['operations'][$operation], $contract['components']);
     }
 
     private function compositionUuidFromLinks(mixed $links): ?string
@@ -388,7 +443,7 @@ class Composition extends PatientApiBase
 
     private function errorsFrom(array $data): array
     {
-        $errors = $data['error'] ?? $data['errors'] ?? data_get($data, 'response_data.error', []);
+        $errors = $data['error'] ?? ($data['errors'] ?? data_get($data, 'response_data.error', []));
         if (is_array($errors) && !array_is_list($errors)) {
             $errors = [$errors];
         }
@@ -398,7 +453,7 @@ class Composition extends PatientApiBase
 
         return collect($errors)->map(static function (mixed $error) use ($translator): string {
             if (is_array($error)) {
-                $message = data_get($error, 'message') ?? data_get($error, 'rules.0.description') ?? '';
+                $message = data_get($error, 'message') ?? (data_get($error, 'rules.0.description') ?? '');
                 $code = data_get($error, 'code') ?? data_get($error, 'rules.0.code');
                 if ($code !== null && !preg_match('/^\d{3,5}:/u', (string) $message)) {
                     $message = $code . ': ' . $message;

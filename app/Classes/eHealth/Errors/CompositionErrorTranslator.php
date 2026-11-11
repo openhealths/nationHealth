@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Errors;
 
 /** Translate medical conclusion errors for both HTTP failures and async job results. */
-final class CompositionErrorTranslator extends BaseErrorTranslator
+class CompositionErrorTranslator extends BaseErrorTranslator
 {
     protected function messages(): array
     {

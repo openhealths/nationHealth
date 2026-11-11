@@ -1,0 +1,2491 @@
+{
+  "sources": [
+    {
+      "url": "https://api.swaggerhub.com/apis/ehealthua/compositions/2.39.2",
+      "version": "2.39.2",
+      "retrieved": "2026-11-11"
+    },
+    {
+      "archive": "openapi/preprod/general-mis.json",
+      "version": "9.15.9",
+      "sha256": "525dcc074119c37ca2747e42765b585254aa24d28cb8b767807150b9886ce243"
+    },
+    {
+      "archive": "openapi/preprod/medical-events.json",
+      "version": "9.15.6",
+      "sha256": "aeceaa0b7201c24bd443e15edc18fc64119b2941d12e805ff73c40114899c2ac"
+    }
+  ],
+  "documented_overlays": {
+    "https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17571807297": [
+      "appends relation and object relatesTo",
+      "INFORM_WITH and treatment violation date",
+      "NEWBORN open period end",
+      "PREGNANCY category: additional checks in Create Composition; also required by TV39 3.8.2.5.4 (page 99), omitted from Swagger 2.39.2 enum"
+    ],
+    "https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17571282991": [
+      "ENTERED_IN_ERROR cancellation status"
+    ]
+  },
+  "components": {
+    "composition": {
+      "description": "https://www.hl7.org/fhir/composition.html",
+      "type": "object",
+      "required": [
+        "author",
+        "identifier",
+        "status",
+        "category",
+        "type",
+        "date",
+        "title",
+        "subject",
+        "custodian",
+        "encounter",
+        "section",
+        "extension",
+        "relatesTo"
+      ],
+      "properties": {
+        "author": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "category": {
+          "$ref": "#/components/schemas/codeableConceptCompositionCategory"
+        },
+        "custodian": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "identifier": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "status": {
+          "$ref": "#/components/schemas/compositionStatusEnum"
+        },
+        "type": {
+          "$ref": "#/components/schemas/codeableConceptCompositionType"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "title": {
+          "type": "string"
+        },
+        "relatesTo": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/compositionRelatesTo"
+            },
+            {
+              "$ref": "#/components/schemas/compositionRelationOutput"
+            }
+          ]
+        },
+        "event": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/compositionEvent"
+          }
+        },
+        "subject": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "encounter": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "section": {
+          "$ref": "#/components/schemas/compositionSection"
+        },
+        "extension": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/disabilityAccidentExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabillityTicketExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityTreatmentViolationExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityIntoxicationExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityForeignTreatmentExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityForceNewExtension"
+              },
+              {
+                "$ref": "#/components/schemas/authorizeWithExtension"
+              },
+              {
+                "$ref": "#/components/schemas/newbornBirthDateExtension"
+              },
+              {
+                "$ref": "#/components/schemas/newbornSexExtension"
+              },
+              {
+                "$ref": "#/components/schemas/documentedINFORM_WITH"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityTreatmentViolationDateExtension"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "compositionRequest": {
+      "description": "Запит на створення висновку",
+      "type": "object",
+      "required": [
+        "category",
+        "type",
+        "subject",
+        "encounter",
+        "author",
+        "section",
+        "extension"
+      ],
+      "properties": {
+        "relatesTo": {
+          "$ref": "#/components/schemas/compositionRelationInput"
+        },
+        "category": {
+          "$ref": "#/components/schemas/codeableConceptCompositionCategory"
+        },
+        "type": {
+          "$ref": "#/components/schemas/codeableConceptCompositionType"
+        },
+        "event": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/compositionEvent"
+          }
+        },
+        "subject": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "encounter": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "author": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "section": {
+          "$ref": "#/components/schemas/compositionSectionRequest"
+        },
+        "extension": {
+          "type": "array",
+          "description": "Розширення обʼєкту для додаткових функцій обробки мед висновків",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/authorizeWithExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityAccidentExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityTreatmentViolationExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityTreatmentViolationDateExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityIntoxicationExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityForeignTreatmentExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityForceNewExtension"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "compositionEvent": {
+      "description": "https://www.hl7.org/fhir/composition-definitions.html#Composition.event",
+      "type": "object",
+      "required": [
+        "period"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/components/schemas/codeableConceptCompositionEvent"
+        },
+        "period": {
+          "$ref": "#/components/schemas/compositionEventPeriod"
+        }
+      }
+    },
+    "compositionEventPeriod": {
+      "description": "https://www.hl7.org/fhir/datatypes.html#Period",
+      "type": "object",
+      "required": [
+        "start"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2022-10-24T10:45:16Z"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2022-10-28T10:45:16Z",
+          "nullable": true
+        }
+      }
+    },
+    "codeableConceptCompositionEvent": {
+      "type": "object",
+      "required": [
+        "coding"
+      ],
+      "properties": {
+        "coding": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/codeableConceptCompositionEventCoding"
+          }
+        }
+      }
+    },
+    "codeableConceptCompositionEventCoding": {
+      "type": "object",
+      "required": [
+        "system",
+        "code"
+      ],
+      "properties": {
+        "system": {
+          "type": "string",
+          "example": "COMPOSITION_EVENTS"
+        },
+        "code": {
+          "$ref": "#/components/schemas/compositionEventEnum"
+        }
+      }
+    },
+    "compositionEventEnum": {
+      "type": "string",
+      "enum": [
+        "COMPOSITION_VALIDITY_PERIOD"
+      ]
+    },
+    "compositionSection": {
+      "type": "object",
+      "properties": {
+        "focus": {
+          "description": "Субʼєкт якому видається висновок",
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "text": {
+          "description": "Текст наративу медичного висновку",
+          "$ref": "#/components/schemas/compositionNarrative"
+        }
+      }
+    },
+    "compositionSectionRequest": {
+      "type": "object",
+      "required": [
+        "focus"
+      ],
+      "properties": {
+        "focus": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "text": {
+          "$ref": "#/components/schemas/compositionNarrativeRequest"
+        }
+      }
+    },
+    "compositionStatusEnum": {
+      "type": "string",
+      "description": "Стан медвисновку https://wldd.atlassian.net/wiki/spaces/emal/pages/220397569",
+      "enum": [
+        "PRELIMINARY",
+        "FINAL",
+        "AMENDED",
+        "ENTERED-IN-ERROR",
+        "ENTERED_IN_ERROR"
+      ]
+    },
+    "newbornGenderEnum": {
+      "type": "string",
+      "enum": [
+        "MALE",
+        "FEMALE"
+      ]
+    },
+    "compositionNarrative": {
+      "type": "object",
+      "description": "Текст медвисновку згідно шаблонів визначених в системі, завжди генерується сервером. Модель даних шаблонів https://dbdiagram.io/d/5e70a7624495b02c3b8858e0",
+      "required": [
+        "status",
+        "div"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "generated",
+            "empty",
+            "additional"
+          ]
+        },
+        "div": {
+          "type": "string",
+          "format": "bytes"
+        }
+      }
+    },
+    "compositionNarrativeRequest": {
+      "type": "object",
+      "description": "Текст медвисновку згідно шаблонів визначених в системі. Задається лікарем.",
+      "required": [
+        "div"
+      ],
+      "properties": {
+        "div": {
+          "type": "string",
+          "format": "bytes"
+        }
+      }
+    },
+    "compositionRelatesTo": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/compositionRelationOutput"
+      }
+    },
+    "compositionRelationInput": {
+      "type": "object",
+      "description": "Використовується у випадках продовження або дострокового лікарняного",
+      "required": [
+        "code",
+        "targetIdentifier"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "replaces"
+          ]
+        },
+        "targetIdentifier": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        }
+      }
+    },
+    "compositionRelationOutput": {
+      "type": "object",
+      "description": "Використовується у випадках продовження або дострокового лікарняного",
+      "required": [
+        "code",
+        "targetIdentifier"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "replaces",
+            "transforms",
+            "amends",
+            "appends"
+          ]
+        },
+        "targetIdentifier": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        }
+      }
+    },
+    "compositionSearchResponse": {
+      "description": "Результат пошуку активних медичних висновків",
+      "type": "object",
+      "properties": {
+        "identifier": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "status": {
+          "$ref": "#/components/schemas/compositionStatusEnum"
+        },
+        "title": {
+          "type": "string",
+          "description": "Composition.title"
+        },
+        "type": {
+          "$ref": "#/components/schemas/codeableConceptCompositionType"
+        },
+        "date": {
+          "description": "Дата створення мед висновку",
+          "type": "string",
+          "format": "date-time"
+        },
+        "encounter": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "episodeOfCare": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        }
+      }
+    },
+    "signature": {
+      "description": "Обʼєкт цифрового підпису. FHIR: https://www.hl7.org/fhir/datatypes.html#Signature",
+      "type": "object",
+      "required": [
+        "data"
+      ],
+      "properties": {
+        "data": {
+          "description": "Signed payload",
+          "type": "string",
+          "format": "base64"
+        }
+      }
+    },
+    "resourceIdentifier": {
+      "description": "http://hl7.org/fhir/STU3/datatypes.html#Identifier",
+      "type": "object",
+      "required": [
+        "type",
+        "value"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/components/schemas/codeableConcept"
+        },
+        "value": {
+          "type": "string",
+          "format": "uuid",
+          "example": "52b504c7-0177-4078-834b-52d89154081c"
+        }
+      }
+    },
+    "codeableConcept": {
+      "type": "object",
+      "required": [
+        "coding"
+      ],
+      "properties": {
+        "coding": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/codeableConceptCoding"
+          }
+        },
+        "text": {
+          "description": "Описова частина",
+          "type": "string",
+          "example": "string"
+        }
+      }
+    },
+    "codeableConceptCoding": {
+      "type": "object",
+      "required": [
+        "system",
+        "code"
+      ],
+      "properties": {
+        "system": {
+          "type": "string",
+          "example": "eHealth/resources"
+        },
+        "code": {
+          "type": "string",
+          "example": "person"
+        }
+      }
+    },
+    "codeableConceptCompositionType": {
+      "type": "object",
+      "required": [
+        "coding"
+      ],
+      "properties": {
+        "coding": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/codeableConceptCompositionTypeCoding"
+          }
+        }
+      }
+    },
+    "codeableConceptCompositionTypeCoding": {
+      "type": "object",
+      "required": [
+        "system",
+        "code"
+      ],
+      "properties": {
+        "system": {
+          "type": "string",
+          "example": "COMPOSITION_TYPES"
+        },
+        "code": {
+          "$ref": "#/components/schemas/compositionTypeEnum"
+        }
+      }
+    },
+    "codeableConceptCompositionCategory": {
+      "type": "object",
+      "required": [
+        "coding"
+      ],
+      "properties": {
+        "coding": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/codeableConceptCompositionCategoryCoding"
+          }
+        }
+      }
+    },
+    "codeableConceptCompositionCategoryCoding": {
+      "type": "object",
+      "required": [
+        "system",
+        "code"
+      ],
+      "properties": {
+        "system": {
+          "type": "string",
+          "example": "COMPOSITION_CATEGORIES"
+        },
+        "code": {
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/compositionTempDisabilityCategoryEnum"
+            },
+            {
+              "$ref": "#/components/schemas/compositionNewbornCategoryEnum"
+            }
+          ],
+          "example": "SICKNESS"
+        }
+      }
+    },
+    "compositionNewbornCategoryEnum": {
+      "description": "Категорія медичного висновку про народження",
+      "type": "string",
+      "enum": [
+        "LIVE_BIRTH"
+      ]
+    },
+    "compositionTempDisabilityCategoryEnum": {
+      "description": "Категорія медичного висновку тимчасової непрацездатності",
+      "type": "string",
+      "enum": [
+        "SICKNESS",
+        "CHILD_CARE",
+        "FAMILY_CARE",
+        "PARENTAL_CARE",
+        "QUARANTINE",
+        "COVID19",
+        "TEMP_TRANSFER",
+        "PROSTHETIC",
+        "RESTORATION",
+        "PREGNANCY"
+      ]
+    },
+    "compositionTypeEnum": {
+      "description": "Тип медичного висновку",
+      "type": "string",
+      "enum": [
+        "TEMP_DISABILITY",
+        "NEWBORN"
+      ]
+    },
+    "disabilityAccidentExtension": {
+      "description": "розширення, для вказання лікарем випадків, що непрацездатність викликана випадком на виробництві (тільки для висновків про тимчасову непрацездатність)",
+      "type": "object",
+      "required": [
+        "valueCode",
+        "valueBoolean"
+      ],
+      "properties": {
+        "valueCode": {
+          "type": "string",
+          "enum": [
+            "IS_ACCIDENT"
+          ]
+        },
+        "valueBoolean": {
+          "description": "Чи цей випадок пов'язаним із професійною діяльністю працівника",
+          "type": "boolean"
+        }
+      }
+    },
+    "disabilityIntoxicationExtension": {
+      "description": "розширення, для вказання лікарем випадків, що висновок створено при наявній інтоксикації пацієнта",
+      "type": "object",
+      "required": [
+        "valueCode",
+        "valueBoolean"
+      ],
+      "properties": {
+        "valueCode": {
+          "type": "string",
+          "enum": [
+            "IS_INTOXICATED"
+          ]
+        },
+        "valueBoolean": {
+          "description": "Чи виявлено алкогольну, наркотичну інтоксикацію",
+          "type": "boolean"
+        }
+      }
+    },
+    "disabilityForeignTreatmentExtension": {
+      "description": "розширення, для вказання лікарем випадків, які відносяться до лікування за кордоном",
+      "type": "object",
+      "required": [
+        "valueCode",
+        "valueBoolean"
+      ],
+      "properties": {
+        "valueCode": {
+          "type": "string",
+          "enum": [
+            "IS_FOREIGN_TREATMENT"
+          ]
+        },
+        "valueBoolean": {
+          "description": "Чи відбувалось лікування за кордоном",
+          "type": "boolean"
+        }
+      }
+    },
+    "disabilityTreatmentViolationExtension": {
+      "description": "розширення, для вказання лікарем випадків, що непрацездатність викликана порушенням режиму лікування. Значення відповідно до словника COMPOSITION_TREATMENT_VIOLATION",
+      "type": "object",
+      "required": [
+        "valueCode",
+        "valueString"
+      ],
+      "properties": {
+        "valueCode": {
+          "type": "string",
+          "enum": [
+            "TREATMENT_VIOLATION"
+          ]
+        },
+        "valueString": {
+          "type": "string",
+          "enum": [
+            "reject_recommendation",
+            "late_arrival",
+            "alcohol_intoxication",
+            "narcotic_intoxication",
+            "toxic_intoxication",
+            "hospital_leave",
+            "hospital_change_unauthorized",
+            "reject_examination"
+          ]
+        }
+      }
+    },
+    "disabilityTreatmentViolationDateExtension": {
+      "description": "дата порушення режиму лікування. Обовʼязкова, якщо надано disabilityTreatmentViolationExtension",
+      "type": "object",
+      "required": [
+        "valueCode",
+        "valueDate"
+      ],
+      "properties": {
+        "valueCode": {
+          "type": "string",
+          "enum": [
+            "TREATMENT_VIOLATION_DATE"
+          ]
+        },
+        "valueDate": {
+          "type": "string",
+          "format": "date",
+          "example": "2022-10-24"
+        }
+      }
+    },
+    "disabillityTicketExtension": {
+      "description": "Квитанція щодо статусу е-Лікарняного в ЕРЛН. Завжди генерується сервером",
+      "type": "object",
+      "required": [
+        "valueCode",
+        "valueString"
+      ],
+      "properties": {
+        "valueCode": {
+          "type": "string",
+          "enum": [
+            "ERLN_DISABILITY_TICKET"
+          ]
+        },
+        "valueString": {
+          "type": "string"
+        }
+      }
+    },
+    "disabilityForceNewExtension": {
+      "description": "розширення, для вказання лікарем випадків, які однозначно вказують на початок нового випадку лікування, і не дозволяють проовжувати будь-які існуючі",
+      "type": "object",
+      "required": [
+        "valueCode",
+        "valueBoolean"
+      ],
+      "properties": {
+        "valueCode": {
+          "type": "string",
+          "enum": [
+            "IS_FORCE_RENEW"
+          ]
+        },
+        "valueBoolean": {
+          "description": "Чи лікар підтверджуює, що даний МВ є початком нового лікування",
+          "type": "boolean"
+        }
+      }
+    },
+    "newbornBirthDateExtension": {
+      "type": "object",
+      "description": "Розширення, яке заповнюється сервером для вказання дати народження пацієнта",
+      "required": [
+        "valueCode",
+        "valueDate"
+      ],
+      "properties": {
+        "valueCode": {
+          "type": "string",
+          "enum": [
+            "NEWBORN_BIRTH_DATE"
+          ]
+        },
+        "valueDate": {
+          "format": "date"
+        }
+      }
+    },
+    "newbornSexExtension": {
+      "type": "object",
+      "description": "Розширення, яке заповнюється сервером для вказання статі пацієнта",
+      "required": [
+        "valueCode",
+        "valueString"
+      ],
+      "properties": {
+        "valueCode": {
+          "type": "string",
+          "enum": [
+            "NEWBORN_SEX"
+          ]
+        },
+        "valueString": {
+          "$ref": "#/components/schemas/newbornGenderEnum"
+        }
+      }
+    },
+    "authorizeWithExtension": {
+      "type": "object",
+      "description": "Розширення, яке використовується лікарем для вказання методу авторизація для надсилання СМС.",
+      "required": [
+        "valueCode",
+        "valueUuid"
+      ],
+      "properties": {
+        "valueCode": {
+          "type": "string",
+          "enum": [
+            "AUTHORIZE_WITH"
+          ]
+        },
+        "valueUuid": {
+          "type": "string",
+          "format": "uuid",
+          "enum": [
+            "e7ff2eef-712f-4676-960d-6aa16dce2103"
+          ]
+        }
+      }
+    },
+    "compositionAsyncJobStateResponse": {
+      "description": "Стан планування/виконання асинхронної задачі",
+      "type": "object",
+      "required": [
+        "data"
+      ],
+      "properties": {
+        "data": {
+          "$ref": "#/components/schemas/compositionAsyncJobStateData"
+        }
+      }
+    },
+    "compositionAsyncJobStateData": {
+      "type": "object",
+      "required": [
+        "eta",
+        "id",
+        "links",
+        "status"
+      ],
+      "properties": {
+        "eta": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2022-10-24T12:35:49.956Z"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "example": "89678f60-4cdc-4fe3-ae83-e8b3ebd35c59"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/compositionAsyncJobListItem"
+          }
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "FAILED",
+            "DONE"
+          ]
+        }
+      }
+    },
+    "compositionAsyncJobListItem": {
+      "type": "object",
+      "required": [
+        "entity"
+      ],
+      "properties": {
+        "entity": {
+          "type": "string",
+          "example": "eHealth/resources"
+        },
+        "href": {
+          "type": "string"
+        }
+      }
+    },
+    "dummyCancelationSchema": {
+      "type": "object",
+      "required": [
+        "identifier",
+        "reason"
+      ],
+      "properties": {
+        "identifier": {
+          "$ref": "#/components/schemas/resourceIdentifierCancelation"
+        },
+        "reason": {
+          "$ref": "#/components/schemas/codeableConceptCancellationReasonTempDisability"
+        }
+      },
+      "description": "Структура обʼєкту повідомлення про відміну медичного висновку про тимчасову непрацездатність"
+    },
+    "codeableConceptCancellationReasonTempDisability": {
+      "type": "object",
+      "required": [
+        "coding",
+        "text"
+      ],
+      "properties": {
+        "coding": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/codeableConceptCodingCancellationReasonTempDisability"
+          }
+        },
+        "text": {
+          "example": "Я, Шевченко Наталія Олександрівна, 14.06.2023 здійснила механічну помилку при внесенні медичного висновку до системи",
+          "type": "string"
+        }
+      }
+    },
+    "codeableConceptCodingCancellationReasonTempDisability": {
+      "type": "object",
+      "required": [
+        "system",
+        "code"
+      ],
+      "properties": {
+        "system": {
+          "type": "string",
+          "example": "eHealth/COMPOSITION_CANCELLATION_REASONS_TEMP_DISABILITY"
+        },
+        "code": {
+          "$ref": "#/components/schemas/cancellationReasonTempDisabilityEnum"
+        }
+      }
+    },
+    "cancellationReasonTempDisabilityEnum": {
+      "type": "string",
+      "enum": [
+        "INCORRECT_CATEGORY",
+        "INCORRECT_DISABILITY_PERIOD",
+        "INCORRECT_INOXICATION",
+        "INCORRECT_OTHER",
+        "INCORRECT_PATIENT",
+        "INCORRECT_TRITMENT_VIOLATION"
+      ]
+    },
+    "codeableConceptCodingCancellationReasonNewborn": {
+      "type": "object",
+      "required": [
+        "system",
+        "code"
+      ],
+      "properties": {
+        "system": {
+          "type": "string",
+          "example": "eHealth/COMPOSITION_CANCELLATION_REASONS_NEWBORN"
+        },
+        "code": {
+          "$ref": "#/components/schemas/cancellationReasonNewbornEnum"
+        }
+      }
+    },
+    "cancellationReasonNewbornEnum": {
+      "type": "string",
+      "enum": [
+        "INCORRECT_PATIENT",
+        "TYPO"
+      ]
+    },
+    "resourceIdentifierCancelation": {
+      "type": "object",
+      "required": [
+        "type",
+        "value"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/components/schemas/codeableConceptCancelation"
+        },
+        "value": {
+          "type": "string",
+          "format": "uuid",
+          "example": "52b504c7-0177-4078-834b-52d89154081c"
+        }
+      }
+    },
+    "codeableConceptCancelation": {
+      "type": "object",
+      "required": [
+        "coding"
+      ],
+      "properties": {
+        "coding": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/codeableConceptCodingCancelation"
+          }
+        },
+        "text": {
+          "description": "Описова частина",
+          "type": "string",
+          "example": "string"
+        }
+      }
+    },
+    "codeableConceptCodingCancelation": {
+      "type": "object",
+      "required": [
+        "system",
+        "code"
+      ],
+      "properties": {
+        "system": {
+          "type": "string",
+          "example": "eHealth/resources"
+        },
+        "code": {
+          "type": "string",
+          "example": "composition"
+        }
+      }
+    },
+    "documentedINFORM_WITH": {
+      "type": "object",
+      "required": [
+        "valueCode",
+        "valueUuid"
+      ],
+      "properties": {
+        "valueCode": {
+          "type": "string",
+          "enum": [
+            "INFORM_WITH"
+          ]
+        },
+        "valueUuid": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "validatedCompositionSearch": {
+      "type": "object",
+      "required": [
+        "identifier",
+        "status"
+      ],
+      "properties": {
+        "author": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "category": {
+          "$ref": "#/components/schemas/codeableConceptCompositionCategory"
+        },
+        "custodian": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "identifier": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "status": {
+          "$ref": "#/components/schemas/compositionStatusEnum"
+        },
+        "type": {
+          "$ref": "#/components/schemas/codeableConceptCompositionType"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "title": {
+          "type": "string"
+        },
+        "relatesTo": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/compositionRelatesTo"
+            },
+            {
+              "$ref": "#/components/schemas/compositionRelationOutput"
+            }
+          ]
+        },
+        "event": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/compositionEvent"
+          }
+        },
+        "subject": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "encounter": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        },
+        "section": {
+          "$ref": "#/components/schemas/compositionSection"
+        },
+        "extension": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/disabilityAccidentExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabillityTicketExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityTreatmentViolationExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityIntoxicationExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityForeignTreatmentExtension"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityForceNewExtension"
+              },
+              {
+                "$ref": "#/components/schemas/authorizeWithExtension"
+              },
+              {
+                "$ref": "#/components/schemas/newbornBirthDateExtension"
+              },
+              {
+                "$ref": "#/components/schemas/newbornSexExtension"
+              },
+              {
+                "$ref": "#/components/schemas/documentedINFORM_WITH"
+              },
+              {
+                "$ref": "#/components/schemas/disabilityTreatmentViolationDateExtension"
+              }
+            ]
+          }
+        },
+        "episodeOfCare": {
+          "$ref": "#/components/schemas/resourceIdentifier"
+        }
+      }
+    }
+  },
+  "operations": {
+    "detail": {
+      "$ref": "#/components/schemas/composition"
+    },
+    "search": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/validatedCompositionSearch"
+      }
+    },
+    "job": {
+      "$ref": "#/components/schemas/compositionAsyncJobStateData"
+    },
+    "integration": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "component",
+          "type",
+          "statusCode",
+          "statusMessage",
+          "integrationStatus",
+          "taskStatus",
+          "updatedAt",
+          "details"
+        ],
+        "properties": {
+          "component": {
+            "type": "string",
+            "enum": [
+              "ERLN",
+              "MJU_DRACZ",
+              "DIIA"
+            ],
+            "description": "Компонент, з яким відбувається взаємодія"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "NEWBORN_GET_COMPOSITION",
+              "NEWBORN_POST_COMPOSITION",
+              "CREATE_ERLN_RECORD",
+              "CANCEL_ERLN_RECORD"
+            ]
+          },
+          "statusCode": {
+            "type": "integer",
+            "description": "Результат виклику інтеграційного компоненту (визначається компонентом)"
+          },
+          "statusMessage": {
+            "type": "string",
+            "description": "Повідомлення про помилку (визначається компонентом)"
+          },
+          "integrationStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "IN_PROGRESS",
+              "DONE",
+              "ERROR"
+            ],
+            "description": "Статус інтеграційного процесу в інтерпретації сервісу медвисновків"
+          },
+          "taskStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "FAILED",
+              "DONE"
+            ],
+            "description": "Статус задачі"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Дата останнього оновлення стану інтеграційного процесу (UTC) (може бути null для старих задач)",
+            "nullable": true
+          },
+          "details": {
+            "type": "object",
+            "description": "Набір даних, визначений інтеграційним компонентом (у результаті взаємодії з сервісом медвисновків)"
+          }
+        }
+      },
+      "example": [
+        {
+          "component": "ERLN",
+          "details": {
+            "SL_NUM": "520-2000002848-1",
+            "SL_REG_DATETIME": "2022-09-22T12:36:08Z",
+            "SL_STOP": "2022-09-30T00:00:00Z",
+            "SL_START": "2022-09-20T00:00:00Z",
+            "IC_NUM": 520
+          }
+        },
+        {
+          "integrationStatus": "DONE",
+          "statusCode": 1101,
+          "statusMessage": "ЕЛН створено успішно",
+          "taskStatus": "DONE",
+          "type": "CREATE_ERLN_RECORD",
+          "updatedAt": "2022-09-22T09:37:07.290Z"
+        }
+      ]
+    },
+    "GET /api/persons/{id}/authentication_methods": {
+      "data": {
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "THIRD_PERSON"
+                  ]
+                },
+                "value": {
+                  "type": "string"
+                },
+                "alias": {
+                  "type": "string"
+                },
+                "ended_at": {
+                  "type": "string"
+                },
+                "started_at": {
+                  "type": "string"
+                },
+                "is_active": {
+                  "type": "boolean"
+                },
+                "person_id": {
+                  "type": "string"
+                },
+                "confidant_person": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "gender": {
+                      "type": "string",
+                      "enum": [
+                        "MALE",
+                        "FEMALE"
+                      ]
+                    },
+                    "tax_id": {
+                      "type": "string"
+                    },
+                    "no_tax_id": {
+                      "type": "boolean"
+                    },
+                    "unzr": {
+                      "type": "string"
+                    },
+                    "documents_person": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "type",
+                          "number"
+                        ],
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "phones": {
+                      "type": "object",
+                      "properties": {
+                        "number": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "number"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "no_tax_id",
+                    "phones"
+                  ]
+                },
+                "inserted_at": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "type": "string"
+                },
+                "inserted_by": {
+                  "type": "string"
+                },
+                "updated_by": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "inserted_at",
+                "inserted_by"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "OTP"
+                  ]
+                },
+                "phone_number": {
+                  "type": "string"
+                },
+                "ended_at": {
+                  "type": "string"
+                },
+                "started_at": {
+                  "type": "string"
+                },
+                "is_active": {
+                  "type": "boolean"
+                },
+                "inserted_by": {
+                  "type": "string"
+                },
+                "updated_by": {
+                  "type": "string"
+                },
+                "person_id": {
+                  "type": "string"
+                },
+                "inserted_at": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "inserted_by",
+                "inserted_at"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "GET /api/patients/{patient_id}/encounters/{encounter_id}": {
+      "data": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "origin_episode": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "object",
+                    "properties": {
+                      "coding": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "system": {
+                              "type": "string"
+                            },
+                            "code": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "system",
+                            "code"
+                          ]
+                        }
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "value"
+                ]
+              },
+              "display_value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "display_value"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "period": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "string"
+              },
+              "end": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ]
+          },
+          "incoming_referral": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "object",
+                    "properties": {
+                      "coding": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "system": {
+                              "type": "string"
+                            },
+                            "code": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "system",
+                            "code"
+                          ]
+                        }
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "value"
+                ]
+              },
+              "display_value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "identifier",
+              "display_value"
+            ],
+            "additionalProperties": false
+          },
+          "paper_referral": {
+            "type": "object",
+            "properties": {
+              "requisition": {
+                "type": "string"
+              },
+              "requester_legal_entity_name": {
+                "type": "string"
+              },
+              "requester_legal_entity_edrpou": {
+                "type": "string"
+              },
+              "requester_employee_name": {
+                "type": "string"
+              },
+              "service_request_date": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "requester_legal_entity_edrpou",
+              "requester_employee_name",
+              "service_request_date"
+            ],
+            "additionalProperties": false
+          },
+          "inserted_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "visit": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "object",
+                    "properties": {
+                      "coding": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "system": {
+                              "type": "string"
+                            },
+                            "code": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "system",
+                            "code"
+                          ]
+                        }
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "value"
+                ]
+              },
+              "display_value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "identifier",
+              "display_value"
+            ],
+            "additionalProperties": false
+          },
+          "episode": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "object",
+                    "properties": {
+                      "coding": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "system": {
+                              "type": "string"
+                            },
+                            "code": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "system",
+                            "code"
+                          ]
+                        }
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "value"
+                ]
+              },
+              "display_value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "identifier",
+              "display_value"
+            ],
+            "additionalProperties": false
+          },
+          "class": {
+            "type": "object",
+            "properties": {
+              "system": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "system",
+              "code"
+            ]
+          },
+          "type": {
+            "type": "object",
+            "properties": {
+              "coding": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "system": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "system",
+                    "code"
+                  ]
+                }
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          },
+          "performer": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "object",
+                    "properties": {
+                      "coding": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "system": {
+                              "type": "string"
+                            },
+                            "code": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "system",
+                            "code"
+                          ]
+                        }
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "value"
+                ]
+              },
+              "display_value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "display_value"
+            ]
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "coding": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "system": {
+                        "type": "string"
+                      },
+                      "code": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "text": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "diagnoses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "condition": {
+                  "type": "object",
+                  "properties": {
+                    "identifier": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "object",
+                          "properties": {
+                            "coding": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "system": {
+                                    "type": "string"
+                                  },
+                                  "code": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "system",
+                                  "code"
+                                ]
+                              }
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "value"
+                      ]
+                    },
+                    "display_value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "display_value"
+                  ]
+                },
+                "code": {
+                  "type": "object",
+                  "required": [
+                    "coding"
+                  ],
+                  "properties": {
+                    "coding": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "code"
+                        ]
+                      }
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "role": {
+                  "type": "object",
+                  "required": [
+                    "coding"
+                  ],
+                  "properties": {
+                    "coding": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "code"
+                        ]
+                      }
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "rank": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "condition",
+                "code",
+                "role"
+              ]
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "coding": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "system": {
+                        "type": "string"
+                      },
+                      "code": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "system",
+                      "code"
+                    ]
+                  }
+                },
+                "text": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "action_references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "identifier": {
+                  "type": "object",
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "object",
+                      "properties": {
+                        "coding": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "system"
+                            ],
+                            "properties": {
+                              "system": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "division": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "object",
+                    "properties": {
+                      "coding": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "system": {
+                              "type": "string"
+                            },
+                            "code": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "system",
+                            "code"
+                          ]
+                        }
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "value"
+                ]
+              },
+              "display_value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "identifier",
+              "display_value"
+            ],
+            "additionalProperties": false
+          },
+          "prescriptions": {
+            "type": "string"
+          },
+          "supporting_info": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "identifier": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "object",
+                      "properties": {
+                        "coding": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "system": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "system",
+                              "code"
+                            ]
+                          }
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "value"
+                  ]
+                },
+                "display_value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "display_value"
+              ]
+            }
+          },
+          "cancellation_reason": {
+            "type": "object",
+            "required": [
+              "coding"
+            ],
+            "properties": {
+              "coding": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "system": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "system",
+                    "code"
+                  ]
+                }
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          },
+          "explanatory_letter": {
+            "type": "string"
+          },
+          "hospitalization": {
+            "type": "object",
+            "properties": {
+              "admit_source": {
+                "type": "object",
+                "properties": {
+                  "coding": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "system": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "system",
+                        "code"
+                      ]
+                    }
+                  }
+                }
+              },
+              "re_admission": {
+                "type": "object",
+                "properties": {
+                  "coding": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "system": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "system",
+                        "code"
+                      ]
+                    }
+                  }
+                }
+              },
+              "destination": {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "object",
+                        "properties": {
+                          "coding": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "system": {
+                                  "type": "string"
+                                },
+                                "code": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "system",
+                                "code"
+                              ]
+                            }
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "value"
+                    ]
+                  },
+                  "display_value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "display_value"
+                ]
+              },
+              "discharge_disposition": {
+                "type": "object",
+                "properties": {
+                  "coding": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "system": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "system",
+                        "code"
+                      ]
+                    }
+                  }
+                }
+              },
+              "discharge_department": {
+                "type": "object",
+                "properties": {
+                  "coding": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "system": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "system",
+                        "code"
+                      ]
+                    }
+                  }
+                }
+              },
+              "pre_admission_identifier": {
+                "type": "string"
+              }
+            }
+          },
+          "participant": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "identifier": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "object",
+                      "properties": {
+                        "coding": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "system": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string",
+                                "enum": [
+                                  "care_team",
+                                  "employee"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "system",
+                              "code"
+                            ]
+                          }
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "value"
+                  ]
+                },
+                "display_value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "display_value"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "period",
+          "inserted_at",
+          "updated_at",
+          "visit",
+          "episode",
+          "class",
+          "type",
+          "performer",
+          "reasons",
+          "actions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "GET /api/composition_configurations": {
+      "data": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "example": "e477a845-972b-47a1-8ca3-1c71e4fd00c2",
+              "type": "string"
+            },
+            "type": {
+              "type": "object",
+              "properties": {
+                "coding": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "system": {
+                        "example": "COMPOSITION_TYPES",
+                        "type": "string"
+                      },
+                      "code": {
+                        "example": "DRIVERS",
+                        "type": "string",
+                        "description": "Symbol in syntax defined by the system"
+                      }
+                    },
+                    "required": [
+                      "system",
+                      "code"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "coding"
+              ],
+              "additionalProperties": false
+            },
+            "category": {
+              "type": "object",
+              "properties": {
+                "coding": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "system": {
+                        "example": "COMPOSITION_CATEGORIES",
+                        "type": "string"
+                      },
+                      "code": {
+                        "example": "DRIVERS_GROUP1",
+                        "type": "string",
+                        "description": "Symbol in syntax defined by the system"
+                      }
+                    },
+                    "required": [
+                      "system",
+                      "code"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "coding"
+              ],
+              "additionalProperties": false
+            },
+            "is_active": {
+              "example": true,
+              "type": "boolean"
+            },
+            "settings": {
+              "example": "{ \"COMPOSITION_PERSON_GENDER\": { \"check\": [ \"female\", \"male\" ] }, \"COMPOSITION_SECTION_EMPTY_REASON\": { \"check\": [\"NILKNOWN\", \"NOTASKED\", \"WITHHELD\", \"UNAVAILABLE\", \"CLOSED\"] }, \"COMPOSITION_SECTION_NESTING_LEVEL\": { \"check\": 5 }, \"COMPOSITION_SECTION_COUNT_LIMIT\": { \"check\": 100 }, \"COMPOSITION_SECTION_ORDERBY\": { \"check\": [ \"USER\", \"SYSTEM\", \"EVENT-DATE\", \"ALPHABETIC\", \"CATEGORY\" ] }, \"COMPOSITION_DRIVER_RELATED_CODES\": [ { \"condition\": { \"code\": \"01.\", \"system\": \"eHealth/composition_additional_condition_admission\" }, \"check\": [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\"] }, { \"condition\": { \"code\": \"01.01.\", \"system\": \"eHealth/composition_additional_condition_admission\" }, \"check\": [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\"] }, { \"condition\": { \"code\": \"01.02.\", \"system\": \"eHealth/composition_additional_condition_admission\" }, \"check\": [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\"] }]}",
+              "type": "string"
+            },
+            "inserted_at": {
+              "example": "2017-04-20T19:14:13Z",
+              "type": "string",
+              "description": "ISO 8601 date and time in UTC timezone."
+            },
+            "inserted_by": {
+              "example": "e1453f4c-1077-4e85-8c98-c13ffca0063e",
+              "type": "string"
+            },
+            "updated_at": {
+              "example": "2018-08-02T10:45:16.000Z",
+              "type": "string"
+            },
+            "updated_by": {
+              "example": "2922a240-63db-404e-b730-09222bfeb2dd",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "category",
+            "is_active",
+            "settings",
+            "inserted_at",
+            "inserted_by",
+            "updated_at",
+            "updated_by"
+          ]
+        }
+      },
+      "paging": {
+        "type": "object",
+        "properties": {
+          "page_number": {
+            "example": 2,
+            "type": "number",
+            "description": "Page number."
+          },
+          "page_size": {
+            "example": 50,
+            "type": "number",
+            "description": "A limit on the number of objects to be returned, between 1 and 300. Default: 50"
+          },
+          "total_entries": {
+            "example": 1000,
+            "type": "number",
+            "description": "Total number of objects in collection."
+          },
+          "total_pages": {
+            "example": 23,
+            "type": "number",
+            "description": "Total number of pages."
+          }
+        },
+        "required": [
+          "page_number",
+          "page_size",
+          "total_entries",
+          "total_pages"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

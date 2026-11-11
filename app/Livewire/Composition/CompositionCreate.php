@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Composition;
 
-use App\Enums\Composition\CompositionType;
-use App\Enums\Composition\CompositionStatus;
 use App\Classes\eHealth\EHealth;
+use App\Enums\Composition\CompositionStatus;
+use App\Enums\Composition\CompositionType;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
@@ -16,7 +16,10 @@ use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use App\Repositories\MedicalEvents\Repository;
+use DateTimeInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
@@ -68,7 +71,7 @@ class CompositionCreate extends BasePatientComponent
             $this->form->prepersonUuid = $this->uuid;
             $this->newbornFullName = $this->patientFullName;
             $this->form->newbornBirthDate = convertToAppDateFormat(
-                $this->patient()->birthDate instanceof \DateTimeInterface
+                $this->patient()->birthDate instanceof DateTimeInterface
                     ? $this->patient()->birthDate->format('Y-m-d')
                     : (string) $this->patient()->birthDate
             );
@@ -117,7 +120,7 @@ class CompositionCreate extends BasePatientComponent
     {
         $term = trim($this->counterpartSearchTerm);
 
-        if ($term === '') {
+        if ($term === '' || Auth::user()->cannot($this->createAbility(), Composition::class)) {
             return collect();
         }
 
@@ -150,6 +153,11 @@ class CompositionCreate extends BasePatientComponent
      */
     public function searchCounterpart(): void
     {
+        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
+            Session::flash('error', __('compositions.errors.create_newborn_not_allowed'));
+
+            return;
+        }
         $this->counterpartSearchTerm = trim($this->counterpartQuery);
         unset($this->counterpartMatches);
     }
@@ -185,6 +193,11 @@ class CompositionCreate extends BasePatientComponent
 
     public function selectMother(int $personId): void
     {
+        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
+            Session::flash('error', __('compositions.errors.create_newborn_not_allowed'));
+
+            return;
+        }
         $person = Person::with('names')->find($personId);
 
         if (!$person) {
@@ -221,6 +234,11 @@ class CompositionCreate extends BasePatientComponent
 
     public function selectNewborn(int $prepersonId): void
     {
+        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
+            Session::flash('error', __('compositions.errors.create_newborn_not_allowed'));
+
+            return;
+        }
         $preperson = Preperson::find($prepersonId);
 
         if (!$preperson) {
@@ -230,7 +248,7 @@ class CompositionCreate extends BasePatientComponent
         $this->form->prepersonUuid = $preperson->uuid;
         $this->newbornFullName = $preperson->fullName;
         $this->form->newbornBirthDate = convertToAppDateFormat(
-            $preperson->birthDate instanceof \DateTimeInterface
+            $preperson->birthDate instanceof DateTimeInterface
                 ? $preperson->birthDate->format('Y-m-d')
                 : (string) $preperson->birthDate
         );
@@ -353,10 +371,17 @@ class CompositionCreate extends BasePatientComponent
         }
 
         try {
-            $existsRemotely = collect(EHealth::composition()->search([
+            $results = EHealth::composition()->searchAll([
                 'subject' => $this->form->prepersonUuid,
                 'type' => CompositionType::NEWBORN->value,
-            ])->validate())->contains(
+            ]);
+            foreach ($results as $result) {
+                Repository::composition()->assertDocumentContext($result, [
+                    'subject.value' => $this->form->prepersonUuid,
+                    'type.coding.0.code' => CompositionType::NEWBORN->value,
+                ]);
+            }
+            $existsRemotely = collect($results)->contains(
                 static fn (array $item): bool =>
                 CompositionStatus::fromEHealth($item['status']) !== CompositionStatus::ENTERED_IN_ERROR
             );

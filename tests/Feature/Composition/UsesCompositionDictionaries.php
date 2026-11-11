@@ -13,6 +13,7 @@ use Mockery;
 
 trait UsesCompositionDictionaries
 {
+    use UsesTv39CompositionConfiguration;
     protected function setUpUsesCompositionDictionaries(): void
     {
         config(['ehealth.api.domain' => 'https://ehealth.test']);
@@ -21,7 +22,7 @@ trait UsesCompositionDictionaries
         $definitions = [
             'POSITION' => ['P8' => 'Лікар-педіатр', 'P6' => 'Лікар-акушер-гінеколог'],
             'eHealth/encounter_classes' => ['AMB' => 'Амбулаторний'],
-            'eHealth/encounter_types' => ['AMB' => 'Амбулаторний'],
+            'eHealth/encounter_types' => ['AMB' => 'Амбулаторний', 'service_delivery_location' => 'У місці надання послуг'],
             'GENDER' => ['MALE' => 'Чоловіча', 'FEMALE' => 'Жіноча', 'UNKNOWN' => 'Невідома'],
             CompositionCategory::DICTIONARY => array_column(CompositionCategory::cases(), 'value', 'value'),
             'COMPOSITION_TREATMENT_VIOLATION' => [

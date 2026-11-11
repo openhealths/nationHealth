@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Composition;
 
-use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\Api\Patient\Composition as CompositionApi;
+use App\Classes\eHealth\EHealth;
 use App\Models\MedicalEvents\Sql\Composition;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -19,12 +19,12 @@ class CompositionJobResponseTest extends TestCase
     public function test_create_returns_the_scheduled_job_and_writes_nothing_locally(): void
     {
         $this->fakeApi([
-            'data' => ['id' => 'job-1', 'eta' => '2026-08-13T12:35:49.956Z', 'status' => 'PENDING'],
+            'data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-08-13T12:35:49.956Z', 'links' => [], 'status' => 'PENDING'],
         ]);
 
         $job = EHealth::composition()->create(['type' => ['coding' => [['system' => 'COMPOSITION_TYPES', 'code' => 'NEWBORN']]]])->validate();
 
-        $this->assertSame('job-1', $job['id']);
+        $this->assertSame('719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', $job['id']);
         $this->assertSame('PENDING', $job['status']);
         $this->assertSame(
             0,
@@ -35,7 +35,7 @@ class CompositionJobResponseTest extends TestCase
 
     public function test_create_sends_the_composition_request_body_not_a_signature_wrapper(): void
     {
-        $this->fakeApi(['data' => ['id' => 'job-1', 'status' => 'PENDING']]);
+        $this->fakeApi(['data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']]);
 
         $payload = [
             'type' => ['coding' => [['system' => 'COMPOSITION_TYPES', 'code' => 'TEMP_DISABILITY']]],
@@ -52,20 +52,20 @@ class CompositionJobResponseTest extends TestCase
 
     public function test_cancel_and_erln_retry_return_the_job_they_scheduled(): void
     {
-        $this->fakeApi(['data' => ['id' => 'job-cancel', 'status' => 'PENDING']]);
-        $this->assertSame('job-cancel', EHealth::composition()->cancel(self::COMPOSITION_ID, ['data' => 'signed'])->validate()['id']);
+        $this->fakeApi(['data' => ['id' => '203f6d60-888d-561e-b6a8-4b56ea45ed7d', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']]);
+        $this->assertSame('203f6d60-888d-561e-b6a8-4b56ea45ed7d', EHealth::composition()->cancel(self::COMPOSITION_ID, ['data' => 'signed'])->validate()['id']);
 
-        $this->fakeApi(['data' => ['id' => 'job-erln', 'status' => 'PENDING']]);
-        $this->assertSame('job-erln', EHealth::composition()->resendErln(self::COMPOSITION_ID)->validate()['id']);
+        $this->fakeApi(['data' => ['id' => '010e9934-696d-5820-ae3b-0e2119044ef7', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']]);
+        $this->assertSame('010e9934-696d-5820-ae3b-0e2119044ef7', EHealth::composition()->resendErln(self::COMPOSITION_ID)->validate()['id']);
     }
 
     public function test_job_status_reports_pending_without_a_composition_id(): void
     {
         $this->fakeApi([
-            'data' => ['status' => 'PENDING', 'links' => [['entity' => 'eHealth/resources']]],
+            'data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING', 'links' => [['entity' => 'eHealth/resources']]],
         ]);
 
-        $status = EHealth::composition()->getAsyncJobStatus('job-1')->validate();
+        $status = EHealth::composition()->getAsyncJobStatus('719a23fe-c9b6-5b6f-8d9f-c36da885d0d6')->validate();
 
         $this->assertSame('PENDING', $status['status']);
         $this->assertNull($status['compositionUuid']);
@@ -75,7 +75,7 @@ class CompositionJobResponseTest extends TestCase
     public function test_job_status_extracts_the_composition_id_from_a_link_href(): void
     {
         $this->fakeApi([
-            'data' => [
+            'data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [],
                 'status' => 'DONE',
                 'links' => [[
                     'entity' => 'eHealth/resources',
@@ -84,7 +84,7 @@ class CompositionJobResponseTest extends TestCase
             ],
         ]);
 
-        $status = EHealth::composition()->getAsyncJobStatus('job-1')->validate();
+        $status = EHealth::composition()->getAsyncJobStatus('719a23fe-c9b6-5b6f-8d9f-c36da885d0d6')->validate();
 
         $this->assertSame('DONE', $status['status']);
         $this->assertSame(self::COMPOSITION_ID, $status['compositionUuid']);
@@ -93,13 +93,13 @@ class CompositionJobResponseTest extends TestCase
     public function test_job_status_surfaces_failure_messages(): void
     {
         $this->fakeApi([
-            'data' => [
+            'data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [],
                 'status' => 'FAILED',
                 'error' => [['message' => 'Invalid period']],
             ],
         ]);
 
-        $status = EHealth::composition()->getAsyncJobStatus('job-1')->validate();
+        $status = EHealth::composition()->getAsyncJobStatus('719a23fe-c9b6-5b6f-8d9f-c36da885d0d6')->validate();
 
         $this->assertSame('FAILED', $status['status']);
         $this->assertSame(['Invalid period'], $status['errors']);
@@ -108,7 +108,7 @@ class CompositionJobResponseTest extends TestCase
     public function test_job_status_translates_treatment_violation_date_rule_1172(): void
     {
         $this->fakeApi([
-            'data' => [
+            'data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [],
                 'status' => 'FAILED',
                 'error' => [[
                     'message' => '1172: Treatment violation date should be >= composition start && <= now',
@@ -116,7 +116,7 @@ class CompositionJobResponseTest extends TestCase
             ],
         ]);
 
-        $status = EHealth::composition()->getAsyncJobStatus('job-1')->validate();
+        $status = EHealth::composition()->getAsyncJobStatus('719a23fe-c9b6-5b6f-8d9f-c36da885d0d6')->validate();
 
         $this->assertSame('FAILED', $status['status']);
         $this->assertSame([

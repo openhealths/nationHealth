@@ -4,51 +4,53 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use BackedEnum;
-use Exception;
+use App\Enums\Composition\CompositionCategory;
+use App\Enums\Composition\CompositionConfiguration;
+use App\Enums\Composition\CompositionType;
+use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
-use InvalidArgumentException;
-use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
-use App\Enums\Composition\CompositionCategory;
-use App\Enums\Composition\CompositionType;
+use App\Exceptions\MedicalEvents\CompositionGuardException;
+use App\Models\Employee\Employee;
+use App\Models\Employee\EmployeeRequest;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
-use App\Models\Employee\Employee;
 use App\Models\Role as ModelsRole;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
-use Spatie\Permission\Traits\HasRoles;
+use BackedEnum;
 use Database\Factories\UserFactory;
 use Eloquence\Behaviours\HasCamelCasing;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Models\Employee\EmployeeRequest;
-use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Builder;
-use Spatie\Permission\PermissionRegistrar;
+use Exception;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Spatie\Permission\Models\Role as SpatieRole;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Spatie\Permission\Models\Role as SpatieRole;
+use Spatie\Permission\PermissionRegistrar;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory;
-    use Notifiable,
-        HasCamelCasing,
-        HasRoles {
+    use HasCamelCasing,
+        HasRoles,
+        Notifiable {
             HasRoles::assignRole as assignRoleParent;                // Aliasing original assignRole
             HasRoles::syncPermissions as syncPermissionsParent;      // Aliasing original syncPermissions
             HasRoles::givePermissionTo as givePermissionToParent;    // Aliasing original givePermissionTo
             HasRoles::getAllPermissions as getAllPermissionsParent;  // Alias original getAllPermissions
         }
+    /** @use HasFactory<UserFactory> */
+    use HasFactory;
 
     /**
      * Track if email verification was already sent
@@ -278,7 +280,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function scopeAllRelated(Builder $query, ?int $partyId = null, ?int $legalEntityId = null): Builder
     {
         $partyId ??= $this->partyId;
-        $legalEntityId ??= legalEntity()->id ?? $this->legalEntityId;
+        $legalEntityId ??= (legalEntity()->id ?? $this->legalEntityId);
 
         return $query
             ->where('party_id', $partyId)
@@ -526,9 +528,8 @@ class User extends Authenticatable implements MustVerifyEmail
      * are considered.
      *
      * A birth conclusion is further restricted by position
-     * (EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_POSITION: P5, P6, P8, P34, P103). Among
-     * those, an employee linked to this user is preferred so a pediatrician login is
-     * not overwritten by an earlier endocrinologist record on the same party.
+     * (EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_POSITION). Only started employee contracts
+     * linked to this user with an available current role may author a conclusion.
      */
     public function getCompositionAuthorEmployee(?CompositionType $type = null): ?Employee
     {
@@ -548,10 +549,23 @@ class User extends Authenticatable implements MustVerifyEmail
 
         $candidates = $this->getWriterEmployeeCandidates(...$roles);
         $linked = $this->linkedEmployeesAmong($candidates);
-        $pool = $linked->concat($candidates)->unique('id')->values();
+        // A shared party does not authorize an unlinked or future employee contract.
+        $startedIds = Employee::query()->whereIn('id', $linked->pluck('id'))
+            ->whereDate('start_date', '<=', today())->pluck('id')->all();
+        $pool = $linked->filter(fn (Employee $employee): bool => in_array($employee->id, $startedIds, true)
+            && $this->hasAllowedRole($employee->employeeType))->values();
 
         if ($type === CompositionType::NEWBORN) {
-            $allowedPositions = CompositionCategory::LIVE_BIRTH->allowedAuthorPositions();
+            try {
+                $positions = CompositionConfiguration::AUTHOR_POSITIONS->value();
+                if (!is_array($positions) || array_is_list($positions)) {
+                    return collect();
+                }
+                $allowedPositions = array_keys(array_filter($positions, static fn (mixed $categories): bool => is_array($categories)
+                    && array_is_list($categories) && in_array(CompositionCategory::LIVE_BIRTH->value, $categories, true)));
+            } catch (CompositionGuardException) {
+                return collect();
+            }
             $pool = $this->employeesWithAuthorPositions($pool, $allowedPositions);
         }
 
@@ -568,7 +582,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function getCompositionEmployeeUuids(): array
     {
-        return $this->getWriterEmployeeCandidates(Role::DOCTOR, Role::SPECIALIST)
+        return $this->getCompositionAuthorEmployees()
             ->pluck('uuid')
             ->filter()
             ->all();

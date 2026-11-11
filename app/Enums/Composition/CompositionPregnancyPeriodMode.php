@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums\Composition;
 
-use Carbon\CarbonImmutable;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
+use Carbon\CarbonImmutable;
 
 /**
  * Which set of pregnancy validity periods applies to a conclusion (TV 3.8.2.5.4).
@@ -62,7 +62,7 @@ enum CompositionPregnancyPeriodMode: string
             ->filter(static fn (mixed $row): bool => is_array($row) && data_get($row, 'name') === $name)
             ->pluck('value')
             ->flatten()
-            ->filter(static fn (mixed $value): bool => is_numeric($value) && (int) $value > 0)
+            ->filter(static fn (mixed $value): bool => is_int($value) && $value > 0)
             ->map(static fn (mixed $value): int => (int) $value)
             ->unique()
             ->sort()

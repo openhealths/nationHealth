@@ -5,29 +5,39 @@ declare(strict_types=1);
 namespace App\Livewire\Composition\Concerns;
 
 use App\Classes\eHealth\EHealth;
-use App\Enums\Composition\CompositionType;
+use App\Classes\eHealth\SchemaResponseContract;
 use App\Enums\Composition\CompositionAsyncOperation;
+use App\Enums\Composition\CompositionCategory;
+use App\Enums\Composition\CompositionConfiguration;
+use App\Enums\Composition\CompositionJobStatus;
+use App\Enums\Composition\CompositionStatus;
+use App\Enums\Composition\CompositionType;
 use App\Enums\Person\EncounterStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\MedicalEvents\ClinicalStorageException;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\MedicalEvents\Sql\CompositionOperation;
-use App\Repositories\MedicalEvents\CompositionOperationRepository;
-use App\Repositories\MedicalEvents\CompositionRepository;
+use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
 use App\Models\Preperson;
-use App\Enums\Composition\CompositionJobStatus;
-use App\Repositories\MedicalEvents\Repository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
 use App\Services\SignatureService;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Throwable;
 
 /**
@@ -70,7 +80,7 @@ trait DrivesCompositionWizard
     public bool $acknowledgedMissingAuthMethod = false;
 
     #[Locked]
-    #[\Livewire\Attributes\Url(as: 'job')]
+    #[Url(as: 'job')]
     public ?string $asyncJobId = null;
 
     #[Locked]
@@ -139,6 +149,9 @@ trait DrivesCompositionWizard
     #[Computed]
     public function availableEncounters(): Collection
     {
+        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
+            return collect();
+        }
         $authors = Auth::user()->getCompositionAuthorEmployees($this->conclusionType())->keyBy('uuid');
         $subjectUuid = $this->encounterSubjectUuid();
 
@@ -148,9 +161,26 @@ trait DrivesCompositionWizard
 
         try {
             $params = array_filter(['managing_organization_id' => legalEntity()?->uuid]);
-            $encounters = EHealth::encounter()
-                ->getBySearchParams($subjectUuid, $params)
-                ->validate();
+            $params['page'] = 1;
+            $encounters = [];
+            do {
+                $response = EHealth::encounter()->getBySearchParams($subjectUuid, $params);
+                $page = $response->validate();
+                $paging = $response->getPaging();
+                if (isset($paging['page_number']) && (int) $paging['page_number'] !== $params['page']) {
+                    throw ValidationException::withMessages(['encounters' => __('compositions.errors.invalid_response')]);
+                }
+                if ($page === [] && $response->isNotLast()) {
+                    throw ValidationException::withMessages(['encounters' => __('compositions.errors.invalid_response')]);
+                }
+                // Read every remote page before filtering: the author's encounter may be on the last one.
+                $encounters = array_merge($encounters, $page);
+                $params['page']++;
+            } while ($response->isNotLast());
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('compositions.errors.invalid_response'));
+
+            return collect();
         } catch (EHealthConnectionException | EHealthException $exception) {
             $exception->handle('Error loading encounters for a medical conclusion');
 
@@ -170,6 +200,303 @@ trait DrivesCompositionWizard
             })
             ->sortByDesc(static fn (array $encounter) => data_get($encounter, 'period.start'))
             ->values();
+    }
+
+    #[Computed]
+    public function authenticationManagementUrl(): ?string
+    {
+        $uuid = $this->authenticationSubjectUuid();
+        $person = $uuid === null ? null : Repository::person()->findByUuid($uuid);
+
+        return $person === null ? null : route('persons.patient-data', [legalEntity(), 'person' => $person->id]);
+    }
+
+    public function refreshAuthenticationMethods(): void
+    {
+        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
+            Session::flash('error', __('compositions.errors.create_not_allowed'));
+
+            return;
+        }
+        $this->loadAuthMethods();
+        if (filled($this->form->informWithUuid) && !$this->isKnownAuthMethod($this->form->informWithUuid)) {
+            $this->form->informWithUuid = null;
+        }
+    }
+
+    protected function assertConfiguredCreationAllowed(): void
+    {
+        $category = $this->form->category;
+        $type = $this->conclusionType();
+        $categories = $type === CompositionType::NEWBORN
+            ? CompositionConfiguration::NEWBORN_CATEGORIES->codes()
+            : CompositionConfiguration::DISABILITY_CATEGORIES->codes();
+        $position = data_get($this->selectedEncounter, 'authorPosition');
+        if (!in_array($category, $categories, true) || !is_string($position)
+            || !in_array($category, CompositionConfiguration::AUTHOR_POSITIONS->codes($position), true)) {
+            throw new CompositionGuardException(__('compositions.errors.category_not_allowed'));
+        }
+
+        $start = CarbonImmutable::parse($type === CompositionType::NEWBORN
+            ? $this->form->newbornBirthDate : $this->form->eventPeriodStart)->startOfDay();
+        $today = CarbonImmutable::today();
+        $encounterDate = data_get($this->selectedEncounter, 'period.start');
+        if (!is_string($encounterDate)) {
+            throw new CompositionGuardException(__('compositions.errors.encounter_not_selectable'));
+        }
+        $encounterStart = CarbonImmutable::parse($encounterDate)->startOfDay();
+        if ($encounterStart->isFuture()
+            || $encounterStart->lt($today->subDays(CompositionConfiguration::ENCOUNTER_AGE->days($category)))) {
+            throw new CompositionGuardException(__('compositions.errors.encounter_too_old'));
+        }
+
+        $startEnabled = $type === CompositionType::NEWBORN
+            ? CompositionConfiguration::NEWBORN_START_ENABLED : CompositionConfiguration::DISABILITY_START_ENABLED;
+        $replacement = $type === CompositionType::TEMP_DISABILITY && $this->form->relatesToCode === 'replaces' && filled($this->form->relatesToTargetUuid);
+        $startLimit = $replacement
+            ? ($type === CompositionType::NEWBORN ? CompositionConfiguration::NEWBORN_REPLACEMENT_START : CompositionConfiguration::DISABILITY_REPLACEMENT_START)
+            : ($type === CompositionType::NEWBORN ? CompositionConfiguration::NEWBORN_START : CompositionConfiguration::DISABILITY_START);
+        $foreign = $type === CompositionType::TEMP_DISABILITY && $this->form->isForeignTreatment;
+        $forceRenew = $type === CompositionType::TEMP_DISABILITY && $this->form->isForceRenew;
+        if (!$foreign && !$forceRenew && $startEnabled->enabled()
+            && $start->lt($today->subDays($startLimit->days($category)))) {
+            throw new CompositionGuardException(__('compositions.errors.period_start_too_old'));
+        }
+        if ($start->isFuture() && $category !== CompositionCategory::PREGNANCY->value) {
+            throw new CompositionGuardException(__('compositions.errors.period_starts_in_future'));
+        }
+
+        $authorUuid = $this->authorEmployeeUuid();
+        $payload = $this->form->toPayload((string) $authorUuid);
+        // Public form fields must still refer to the patient and encounter selected in the locked context.
+        if (data_get($payload, 'subject.value') !== data_get($this->selectedEncounter, 'subjectUuid')
+            || data_get($payload, 'subject.value') !== $this->encounterSubjectUuid()) {
+            throw new CompositionGuardException(__('compositions.errors.participant_not_found'));
+        }
+        if (data_get($payload, 'encounter.value') !== data_get($this->selectedEncounter, 'uuid')) {
+            throw new CompositionGuardException(__('compositions.errors.encounter_not_selectable'));
+        }
+        $this->assertConfiguredParticipantsAllowed($payload);
+        $this->assertConfiguredEncounterAllowed($category, $type);
+        $duplicateEnabled = $type === CompositionType::NEWBORN
+            ? CompositionConfiguration::NEWBORN_DUPLICATE_ENABLED : CompositionConfiguration::DISABILITY_DUPLICATE_ENABLED;
+        if ($duplicateEnabled->enabled() && data_get($payload, 'subject.type.coding.0.code') === 'preperson') {
+            $this->assertPrepersonConclusionUnique(data_get($payload, 'subject.value'));
+        }
+        $equal = data_get($payload, 'subject.value') === data_get($payload, 'section.focus.value');
+        if ($equal !== CompositionConfiguration::EQUALITY->enabled($category)) {
+            throw new CompositionGuardException(__('compositions.errors.care_focus_required'));
+        }
+        $extensions = CompositionConfiguration::EXTENSIONS->codes($category, allowEmpty: true);
+        foreach ($payload['extension'] as $extension) {
+            if (!in_array($extension['valueCode'], ['INFORM_WITH', 'SIGNED_BY', 'SIGNED_AT'], true)
+                && !in_array($extension['valueCode'], $extensions, true)) {
+                throw new CompositionGuardException(__('compositions.errors.extension_not_allowed'));
+            }
+        }
+        if ($type === CompositionType::TEMP_DISABILITY && !$foreign && !$forceRenew
+            && CompositionConfiguration::SINGLE_SPAN_ENABLED->enabled()) {
+            $end = CarbonImmutable::parse($this->form->eventPeriodEnd)->startOfDay();
+            $duration = (int) $start->diffInDays($end) + 1;
+            if ($duration > CompositionConfiguration::SINGLE_SPAN->days($category)) {
+                throw new CompositionGuardException(__('compositions.errors.period_too_long'));
+            }
+        }
+        if ($type === CompositionType::TEMP_DISABILITY && !$forceRenew
+            && CompositionConfiguration::TOTAL_SPAN_ENABLED->enabled()
+            && (int) $start->diffInDays(CarbonImmutable::parse($this->form->eventPeriodEnd)->startOfDay()) + 1
+                > CompositionConfiguration::TOTAL_SPAN->days($category)) {
+            throw new CompositionGuardException(__('compositions.errors.period_too_long'));
+        }
+    }
+
+    private function assertConfiguredParticipantsAllowed(array $payload): void
+    {
+        // Signing rechecks the category in the fresh native document, not the editable form.
+        $category = data_get($payload, 'category.coding.0.code');
+        $extensions = collect($payload['extension'])->keyBy('valueCode');
+        $foreign = data_get($extensions->get('IS_FOREIGN_TREATMENT'), 'valueBoolean') === true;
+        $author = Auth::user()->getCompositionAuthorEmployees($this->conclusionType())
+            ->firstWhere('uuid', data_get($payload, 'author.value'))?->refresh();
+        $entity = legalEntity();
+        $statuses = $this->conclusionType() === CompositionType::NEWBORN
+            ? CompositionConfiguration::CUSTODIAN_NEWBORN_STATUSES : CompositionConfiguration::CUSTODIAN_DISABILITY_STATUSES;
+        if ($author === null || $author->status->value !== CompositionConfiguration::AUTHOR_STATUS->value()
+            || !in_array($category, CompositionConfiguration::AUTHOR_TYPES->codes($author->employeeType), true)
+            || !in_array($entity->status, $statuses->codes(), true)
+            || !in_array($category, CompositionConfiguration::CUSTODIAN_TYPES->codes($entity->type->name), true)) {
+            throw new CompositionGuardException(__('compositions.errors.author_not_found'));
+        }
+
+        $specialities = $author->specialities;
+        $officio = $specialities->where('specialityOfficio', true);
+        if (!$officio->contains(fn ($speciality): bool => in_array($category, CompositionConfiguration::AUTHOR_OFFICIO->optionalCodes($speciality->speciality) ?? [], true))
+            || (CompositionConfiguration::AUTHOR_SPECIALITIES_ENABLED->enabled()
+                && !$specialities->reject(fn ($speciality): bool => $speciality->specialityOfficio === true)
+                    ->contains(fn ($speciality): bool => in_array($category, CompositionConfiguration::AUTHOR_SPECIALITIES->optionalCodes($speciality->speciality) ?? [], true)))) {
+            throw new CompositionGuardException(__('compositions.errors.author_speciality_not_allowed'));
+        }
+        $newborn = $this->conclusionType() === CompositionType::NEWBORN;
+        $specialityEnabled = CompositionConfiguration::NEWBORN_DOCTOR_SPECIALITIES_ENABLED;
+        if ($newborn && $specialityEnabled->enabled()
+            && $specialities->pluck('speciality')->intersect(CompositionConfiguration::NEWBORN_DOCTOR_SPECIALITIES->codes($category))->isEmpty()) {
+            throw new CompositionGuardException(__('compositions.errors.author_speciality_not_allowed'));
+        }
+
+        foreach (['subject', 'section.focus'] as $path) {
+            $isFocus = $path === 'section.focus';
+            $reference = data_get($payload, $path);
+            $resource = data_get($reference, 'type.coding.0.code');
+            $types = $isFocus ? CompositionConfiguration::FOCUS_TYPES : CompositionConfiguration::SUBJECT_TYPES;
+            if (!in_array($category, $types->codes($resource), true)) {
+                throw new CompositionGuardException(__('compositions.errors.participant_type_not_allowed'));
+            }
+            $participant = $resource === 'preperson'
+                ? Preperson::whereUuid($reference['value'])->first()
+                : Repository::person()->findByUuid($reference['value']);
+            if ($participant === null) {
+                throw new CompositionGuardException(__('compositions.errors.participant_not_found'));
+            }
+            if ($participant instanceof Preperson) {
+                $statuses = $isFocus ? CompositionConfiguration::FOCUS_STATUSES : CompositionConfiguration::SUBJECT_STATUSES;
+                if ($participant->status?->value !== $statuses->value($category)) {
+                    throw new CompositionGuardException(__('compositions.errors.participant_status_not_allowed'));
+                }
+                if ($this->conclusionType() === CompositionType::TEMP_DISABILITY && $foreign) {
+                    throw new CompositionGuardException(__('compositions.errors.foreign_preperson_not_allowed'));
+                }
+                // Identified-person age, verification and documents do not apply to a preperson.
+                if ($this->conclusionType() !== CompositionType::NEWBORN) {
+                    continue;
+                }
+                if (blank($participant->birthDate) || blank($participant->gender)
+                    || blank(data_get($extensions->get('NEWBORN_BIRTH_DATE'), 'valueDate'))
+                    || !CarbonImmutable::parse($participant->birthDate)->isSameDay(CarbonImmutable::parse(data_get($extensions->get('NEWBORN_BIRTH_DATE'), 'valueDate')))
+                    || $participant->gender->value !== data_get($extensions->get('NEWBORN_SEX'), 'valueString')) {
+                    throw new CompositionGuardException(__('compositions.errors.newborn_identity_mismatch'));
+                }
+            } else {
+                // The public MPI API does not expose the internal person.status field. Keep the
+                // synchronized demographics and verification checks separate from that provider limitation.
+                $verification = $isFocus ? CompositionConfiguration::FOCUS_VERIFICATION : CompositionConfiguration::SUBJECT_VERIFICATION;
+                if (!in_array($participant->verificationStatus, $verification->codes($category), true)) {
+                    throw new CompositionGuardException(__('compositions.errors.participant_verification_not_allowed'));
+                }
+                if (!$participant->noTaxId && blank($participant->taxId)) {
+                    throw new CompositionGuardException(__('compositions.errors.participant_tax_id_required'));
+                }
+                $documents = $participant->documents()->pluck('type')->all();
+                $allowed = ($isFocus ? CompositionConfiguration::FOCUS_DOCUMENTS : CompositionConfiguration::SUBJECT_DOCUMENTS)->optionalCodes($category);
+                if (array_intersect($documents, CompositionConfiguration::FOREIGN_DOCUMENTS->codes(allowEmpty: true)) !== []
+                    || ($allowed !== null && array_intersect($documents, $allowed) === [])
+                    || ($isFocus && array_intersect($documents, CompositionConfiguration::ERLN_DOCUMENTS->codes()) === [])) {
+                    throw new CompositionGuardException(__('compositions.errors.participant_documents_not_allowed'));
+                }
+            }
+            $gender = $participant instanceof Preperson ? $participant->gender?->value : $participant->gender;
+            $genders = ($isFocus ? CompositionConfiguration::FOCUS_GENDERS : CompositionConfiguration::SUBJECT_GENDERS)->optionalCodes($category);
+            if ($genders !== null && !in_array($gender, $genders, true)) {
+                throw new CompositionGuardException(__('compositions.errors.participant_gender_not_allowed'));
+            }
+            if (blank($participant->birthDate)) {
+                throw new CompositionGuardException(__('compositions.errors.participant_age_not_allowed'));
+            }
+            $birthDate = CarbonImmutable::parse($participant->birthDate)->startOfDay();
+            if ($birthDate->isFuture()) {
+                throw new CompositionGuardException(__('compositions.errors.participant_age_not_allowed'));
+            }
+            $age = $birthDate->age;
+            ($isFocus ? CompositionConfiguration::FOCUS_AGES : CompositionConfiguration::SUBJECT_AGES)->assertAgeAllowed($category, $age);
+            $newborn = $this->conclusionType() === CompositionType::NEWBORN;
+            $ageEnabled = $newborn ? CompositionConfiguration::NEWBORN_AGE_ENABLED : CompositionConfiguration::DISABILITY_AGE_ENABLED;
+            if (!$isFocus && $ageEnabled->enabled()) {
+                ($newborn ? CompositionConfiguration::NEWBORN_AGE : CompositionConfiguration::DISABILITY_AGE)->assertAgeAllowed($category, $age);
+            }
+            $genderEnabled = $newborn ? CompositionConfiguration::NEWBORN_GENDER_ENABLED : CompositionConfiguration::DISABILITY_GENDER_ENABLED;
+            if ($isFocus && $genderEnabled->enabled()) {
+                $allowed = ($newborn ? CompositionConfiguration::NEWBORN_GENDER : CompositionConfiguration::DISABILITY_GENDER)->optionalCodes($category);
+                if ($allowed !== null && !in_array($gender, $allowed, true)) {
+                    throw new CompositionGuardException(__('compositions.errors.participant_gender_not_allowed'));
+                }
+            }
+        }
+    }
+
+    private function assertConfiguredEncounterAllowed(string $category, CompositionType $type): void
+    {
+        $newborn = $type === CompositionType::NEWBORN;
+        $typesEnabled = $newborn ? CompositionConfiguration::NEWBORN_ENCOUNTER_TYPES_ENABLED : CompositionConfiguration::DISABILITY_ENCOUNTER_TYPES_ENABLED;
+        if ($typesEnabled->enabled() && !in_array(
+            data_get($this->selectedEncounter, 'type.coding.0.code'),
+            ($newborn ? CompositionConfiguration::NEWBORN_ENCOUNTER_TYPES : CompositionConfiguration::DISABILITY_ENCOUNTER_TYPES)->codes(),
+            true
+        )) {
+            throw new CompositionGuardException(__('compositions.errors.encounter_type_not_allowed'));
+        }
+        $divisionEnabled = $newborn ? CompositionConfiguration::NEWBORN_DIVISION_ENABLED : CompositionConfiguration::DISABILITY_DIVISION_ENABLED;
+        if ($divisionEnabled->enabled()
+            && ($newborn ? CompositionConfiguration::NEWBORN_DIVISION : CompositionConfiguration::DISABILITY_DIVISION)->enabled($category)
+            && blank(data_get($this->selectedEncounter, 'division.identifier.value'))) {
+            throw new CompositionGuardException(__('compositions.errors.encounter_division_required'));
+        }
+        $diagnosesEnabled = $newborn ? CompositionConfiguration::NEWBORN_DIAGNOSES_ENABLED : CompositionConfiguration::DISABILITY_DIAGNOSES_ENABLED;
+        if (!$diagnosesEnabled->enabled()) {
+            return;
+        }
+        $codes = ($newborn ? CompositionConfiguration::NEWBORN_DIAGNOSES : CompositionConfiguration::DISABILITY_DIAGNOSES)->optionalCodes($category);
+        if ($codes === null) {
+            return;
+        }
+        // Summary rows omit diagnoses; read the full native encounter only when the enabled rule requires it.
+        $response = EHealth::encounter()->getById($this->encounterSubjectUuid(), $this->form->encounterUuid);
+        $native = SchemaResponseContract::validate($response, 'GET /api/patients/{patient_id}/encounters/{encounter_id}', 'composition');
+        if ($native['id'] !== $this->form->encounterUuid
+            || data_get($native, 'performer.identifier.value') !== $this->authorEmployeeUuid()) {
+            throw new CompositionGuardException(__('compositions.errors.encounter_not_selectable'));
+        }
+        $primary = collect($native['diagnoses'] ?? [])->filter(static fn (array $diagnosis): bool => data_get($diagnosis, 'role.coding.0.code') === 'primary');
+        if ($primary->count() !== 1 || !in_array(data_get($primary->first(), 'code.coding.0.code'), $codes, true)) {
+            throw new CompositionGuardException(__('compositions.errors.encounter_diagnosis_not_allowed'));
+        }
+    }
+
+    private function assertPrepersonConclusionUnique(string $uuid, ?string $except = null): void
+    {
+        $query = ['subject' => $uuid];
+        if ($this->conclusionType() === CompositionType::NEWBORN) {
+            $query['type'] = CompositionType::NEWBORN->value;
+        }
+        foreach (EHealth::composition()->searchAll($query) as $item) {
+            if (data_get($item, 'subject.value') !== $uuid) {
+                throw ValidationException::withMessages(['data' => __('compositions.errors.invalid_response')]);
+            }
+            if (data_get($item, 'identifier.value') !== $except
+                && CompositionStatus::fromEHealth($item['status']) !== CompositionStatus::ENTERED_IN_ERROR) {
+                throw new CompositionGuardException(__('compositions.errors.preperson_duplicate'));
+            }
+        }
+    }
+
+    private function assertConfiguredSigningAllowed(): void
+    {
+        $newborn = $this->conclusionType() === CompositionType::NEWBORN;
+        $delayEnabled = $newborn ? CompositionConfiguration::NEWBORN_SIGN_DELAY_ENABLED : CompositionConfiguration::DISABILITY_SIGN_DELAY_ENABLED;
+        $createdAt = CarbonImmutable::parse($this->compositionDetail['date']);
+        if ($delayEnabled->enabled() && ($createdAt->isFuture()
+            || $createdAt->addHours(($newborn ? CompositionConfiguration::NEWBORN_SIGN_DELAY : CompositionConfiguration::DISABILITY_SIGN_DELAY)->days('max-hours'))->isPast())) {
+            throw new CompositionGuardException(__('compositions.errors.signing_deadline_expired'));
+        }
+        $duplicateEnabled = $newborn ? CompositionConfiguration::NEWBORN_SIGN_DUPLICATE_ENABLED : CompositionConfiguration::DISABILITY_SIGN_DUPLICATE_ENABLED;
+        if ($duplicateEnabled->enabled() && data_get($this->compositionDetail, 'subject.type.coding.0.code') === 'preperson') {
+            $this->assertPrepersonConclusionUnique(data_get($this->compositionDetail, 'subject.value'), $this->compositionUuid);
+        }
+        $this->assertConfiguredParticipantsAllowed($this->compositionDetail);
+        $this->assertTypeSpecificSigningAllowed($this->compositionDetail);
+    }
+
+    protected function assertTypeSpecificSigningAllowed(array $document): void
+    {
+        // Conclusion types may recheck their own relationships before invoking KEP.
     }
 
     public function selectEncounter(string $encounterRef): void
@@ -201,6 +528,8 @@ trait DrivesCompositionWizard
             'uuid' => $encounterUuid,
             'period' => $encounter['period'] ?? null,
             'class' => $encounter['class'] ?? null,
+            'type' => $encounter['type'],
+            'division' => $encounter['division'] ?? null,
             'subjectUuid' => $this->encounterSubjectUuid(),
             'authorUuid' => data_get($encounter, 'performer.identifier.value'),
             'authorName' => $encounter['authorName'],
@@ -224,12 +553,12 @@ trait DrivesCompositionWizard
 
         $encounterRef = trim($encounterRef);
 
-        if (\Illuminate\Support\Str::isUuid($encounterRef)) {
+        if (Str::isUuid($encounterRef)) {
             return $encounterRef;
         }
 
         if (ctype_digit($encounterRef)) {
-            return \App\Models\MedicalEvents\Sql\Encounter::query()
+            return Encounter::query()
                 ->whereKey((int) $encounterRef)
                 ->value('uuid');
         }
@@ -247,6 +576,11 @@ trait DrivesCompositionWizard
 
     public function loadAuthMethods(): void
     {
+        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
+            Session::flash('error', __('compositions.errors.create_not_allowed'));
+
+            return;
+        }
         $this->authMethods = [];
         $subjectUuid = $this->authenticationSubjectUuid();
 
@@ -255,9 +589,18 @@ trait DrivesCompositionWizard
         }
 
         try {
-            $this->authMethods = EHealth::person()
-                ->getAuthMethods($subjectUuid)
-                ->getData();
+            $response = EHealth::person()->getAuthMethods($subjectUuid);
+            // The shared patient client must keep its native union, including required audit metadata.
+            $native = SchemaResponseContract::validate($response, 'GET /api/persons/{id}/authentication_methods', 'composition');
+            $response->validate();
+            $this->authMethods = collect($native)->filter(static function (array $method): bool {
+                $endedAt = $method['ehealth_ended_at'] ?? ($method['ended_at'] ?? null);
+
+                return ($method['is_active'] ?? true) !== false
+                    && ($endedAt === null || CarbonImmutable::parse($endedAt)->isFuture());
+            })->values()->all();
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('compositions.errors.invalid_response'));
         } catch (EHealthConnectionException | EHealthException $exception) {
             Log::error('Failed to load authentication methods for a medical conclusion', [
                 'focus' => $subjectUuid,
@@ -277,9 +620,12 @@ trait DrivesCompositionWizard
      */
     public function selectAuthMethod(string $methodUuid): void
     {
-        if ($this->authMethods === []) {
-            $this->loadAuthMethods();
+        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
+            Session::flash('error', __('compositions.errors.create_not_allowed'));
+
+            return;
         }
+        $this->loadAuthMethods();
 
         if (!$this->isKnownAuthMethod($methodUuid)) {
             $this->addError('form.informWithUuid', __('compositions.errors.auth_method_not_offered'));
@@ -354,14 +700,22 @@ trait DrivesCompositionWizard
             return;
         }
 
-        $this->authorize($this->createAbility(), Composition::class);
+        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
+            Session::flash('error', __('compositions.errors.create_not_allowed'));
+
+            return;
+        }
 
         try {
             $this->form->validate($this->detailsRules());
-            app(CompositionRepository::class)->assertFhirStorageReady();
+            MedicalEventsRepository::composition()->assertFhirStorageReady();
             $this->assertSubmissionAllowed();
+            $this->assertConfiguredCreationAllowed();
         } catch (ValidationException $exception) {
             $this->setErrorBag($exception->validator->getMessageBag());
+            if (collect(array_keys($exception->errors()))->contains(static fn (string $key): bool => !str_starts_with($key, 'form.'))) {
+                Session::flash('error', __('compositions.errors.invalid_response'));
+            }
 
             return;
         } catch (CompositionGuardException $exception) {
@@ -382,13 +736,13 @@ trait DrivesCompositionWizard
             // Do not log the payload: it is the patient's medical record.
             $job = EHealth::composition()->create($this->form->toPayload($authorUuid))->validate();
 
-            app(CompositionOperationRepository::class)->store($job, CompositionAsyncOperation::CREATE, $this->storagePatient(), [
+            MedicalEventsRepository::compositionOperation()->store($job, CompositionAsyncOperation::CREATE, $this->storagePatient(), [
                 'composition_type' => $this->conclusionType(),
                 'encounter_uuid' => $this->form->encounterUuid,
                 'episode_uuid' => $this->episodeUuid,
                 'author_uuid' => $authorUuid,
                 'requestData' => [
-                    'form' => \Illuminate\Support\Arr::except($this->form->toArray(), ['password', 'knedp', 'keyContainerUpload']),
+                    'form' => Arr::except($this->form->toArray(), ['password', 'knedp', 'keyContainerUpload']),
                     'selectedEncounter' => $this->selectedEncounter,
                 ],
             ]);
@@ -400,9 +754,9 @@ trait DrivesCompositionWizard
         } catch (EHealthResponseException $exception) {
             $details = $exception->getDetails();
             $errText = data_get($details, 'error.message')
-                ?? data_get($details, 'details.errorMessage')
-                ?? data_get($details, 'description')
-                ?? $exception->getMessage();
+                ?? (data_get($details, 'details.errorMessage')
+                    ?? (data_get($details, 'description')
+                        ?? $exception->getMessage()));
 
             $exception->handle(
                 'Failed to submit a medical conclusion',
@@ -410,7 +764,7 @@ trait DrivesCompositionWizard
             );
         } catch (EHealthConnectionException | EHealthException $exception) {
             $exception->handle('Failed to submit a medical conclusion');
-        } catch (\App\Exceptions\MedicalEvents\ClinicalStorageException $exception) {
+        } catch (ClinicalStorageException $exception) {
             Session::flash('error', __('clinical-storage.remote_import_pending'));
         } catch (Throwable $exception) {
             Session::flash('error', __('clinical-storage.write_failed'));
@@ -449,7 +803,7 @@ trait DrivesCompositionWizard
      * also returns a job. After a sign, the conclusion already exists locally so the
      * details are refreshed rather than resolved from scratch.
      */
-    #[\Livewire\Attributes\On('composition-submission-updated')]
+    #[On('composition-submission-updated')]
     public function pollAsyncJob(bool $notify = true): void
     {
         $operation = $this->currentOperation();
@@ -457,7 +811,9 @@ trait DrivesCompositionWizard
             return;
         }
         $previousStep = $this->step;
-        $this->asyncJobStatus = $operation->status;
+        $this->asyncJobStatus = $operation->status === CompositionJobStatus::PENDING->value
+            ? ($operation->job->response_data['status'] ?? $operation->status)
+            : $operation->status;
         $this->asyncJobErrors = $operation->job->response_data['errors'] ?? [];
         if ($this->asyncJobStatus === CompositionJobStatus::FAILED->value) {
             $this->asyncJobErrors = $this->asyncJobErrors ?: [__('compositions.errors.async_job_failed')];
@@ -467,7 +823,7 @@ trait DrivesCompositionWizard
         if ($this->asyncJobStatus !== CompositionJobStatus::DONE->value || !$operation->composition) {
             return;
         }
-        $composition = Repository::composition()->findForPatient($this->storagePatient(), $operation->composition->uuid);
+        $composition = MedicalEventsRepository::composition()->findForPatient($this->storagePatient(), $operation->composition->uuid);
         if ($composition === null) {
             return;
         }
@@ -489,15 +845,31 @@ trait DrivesCompositionWizard
         }
     }
 
+    public function retryAsyncJob(): void
+    {
+        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
+            Session::flash('error', __('compositions.errors.create_not_allowed'));
+
+            return;
+        }
+        $operation = $this->currentOperation();
+        if ($operation === null || $operation->status !== CompositionJobStatus::PENDING->value) {
+            return;
+        }
+        MedicalEventsRepository::compositionOperation()->queue($operation);
+        $this->asyncJobErrors = [];
+        $this->asyncJobStatus = CompositionJobStatus::PENDING->value;
+    }
+
     protected function resumeAsyncSubmission(): bool
     {
         if ($this->asyncJobId === null) {
             return false;
         }
-        $operation = app(CompositionOperationRepository::class)->findForWizard($this->patient(), $this->asyncJobId, $this->conclusionType(), Auth::user());
+        $operation = MedicalEventsRepository::compositionOperation()->findForWizard($this->patient(), $this->asyncJobId, $this->conclusionType(), Auth::user());
         abort_unless($operation !== null, 404);
         $formData = $operation->job->request_data['form'] ?? [];
-        $this->form->fill(\Illuminate\Support\Arr::except($formData, ['password', 'knedp', 'keyContainerUpload']));
+        $this->form->fill(Arr::except($formData, ['password', 'knedp', 'keyContainerUpload']));
         $this->form->encounterUuid = $operation->encounterUuid;
         $this->selectedEncounter = $operation->job->request_data['selectedEncounter'] ?? null;
         $this->episodeUuid = $operation->episodeUuid;
@@ -524,14 +896,23 @@ trait DrivesCompositionWizard
         }
 
         try {
-            $this->compositionDetail = EHealth::composition()->getById(
+            $details = EHealth::composition()->getById(
                 $this->encounterSubjectUuid(),
                 $this->compositionUuid,
                 $this->episodeUuid,
                 $this->form->encounterUuid
             )->validate();
 
-            $composition = Repository::composition()->store(
+            MedicalEventsRepository::composition()->assertDocumentContext($details, [
+                'identifier.value' => $this->compositionUuid,
+                'subject.value' => $this->encounterSubjectUuid(),
+                'encounter.value' => $this->form->encounterUuid,
+                'author.value' => $this->authorEmployeeUuid(),
+                'type.coding.0.code' => $this->conclusionType()->value,
+            ]);
+            $this->compositionDetail = $details;
+
+            $composition = MedicalEventsRepository::composition()->store(
                 $this->compositionDetail,
                 $this->storagePatient(),
                 $this->episodeUuid
@@ -576,8 +957,10 @@ trait DrivesCompositionWizard
                 $templateId
             );
 
-            $this->printFormHtml = $response->body();
+            $this->printFormHtml = $response->validate()['content'];
             $this->showPrintModal = true;
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('compositions.errors.invalid_response'));
         } catch (EHealthConnectionException | EHealthException $exception) {
             Session::flash('error', __('compositions.errors.print_form_failed'));
 
@@ -610,9 +993,13 @@ trait DrivesCompositionWizard
             return;
         }
 
-        $this->authorize('sign', $composition);
+        if (Auth::user()->cannot('sign', $composition)) {
+            Session::flash('error', __('compositions.errors.sign_not_allowed'));
 
-        if (app(CompositionOperationRepository::class)->hasPendingForComposition($composition)) {
+            return;
+        }
+
+        if (MedicalEventsRepository::compositionOperation()->hasPendingForComposition($composition)) {
             $this->showSignatureModal = false;
             Session::flash('info', __('compositions.messages.signature_submitted'));
 
@@ -631,9 +1018,14 @@ trait DrivesCompositionWizard
             return;
         }
         $composition->refresh();
-        $this->authorize('sign', $composition);
+        if (Auth::user()->cannot('sign', $composition)) {
+            Session::flash('error', __('compositions.errors.sign_not_allowed'));
+
+            return;
+        }
 
         try {
+            $this->assertConfiguredSigningAllowed();
             $signedContent = app(SignatureService::class)->signData(
                 $this->compositionDetail,
                 $this->form->password,
@@ -644,14 +1036,14 @@ trait DrivesCompositionWizard
 
             $job = EHealth::composition()->sign($composition->uuid, ['data' => $signedContent])->validate();
 
-            app(CompositionOperationRepository::class)->store($job, CompositionAsyncOperation::SIGN, $this->storagePatient(), [
+            MedicalEventsRepository::compositionOperation()->store($job, CompositionAsyncOperation::SIGN, $this->storagePatient(), [
                 'composition_id' => $composition->id,
                 'composition_type' => $composition->type,
                 'encounter_uuid' => $composition->encounterUuid,
                 'episode_uuid' => $composition->episodeOfCareUuid,
                 'author_uuid' => $composition->authorUuid,
                 'requestData' => [
-                    'form' => \Illuminate\Support\Arr::except($this->form->toArray(), ['password', 'knedp', 'keyContainerUpload']),
+                    'form' => Arr::except($this->form->toArray(), ['password', 'knedp', 'keyContainerUpload']),
                     'selectedEncounter' => $this->selectedEncounter,
                 ],
             ]);
@@ -664,6 +1056,10 @@ trait DrivesCompositionWizard
             $this->step = self::STEP_AWAITING_JOB;
 
             Session::flash('info', __('compositions.messages.signature_submitted'));
+        } catch (CompositionGuardException $exception) {
+            $this->reportGuardFailure($exception);
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('compositions.errors.invalid_response'));
         } catch (Throwable $exception) {
             Session::flash('error', $exception->getMessage());
 
@@ -719,7 +1115,7 @@ trait DrivesCompositionWizard
 
     private function currentOperation(): ?CompositionOperation
     {
-        return app(CompositionOperationRepository::class)->findForWizard($this->patient(), $this->asyncJobId ?? '', $this->conclusionType(), Auth::user());
+        return MedicalEventsRepository::compositionOperation()->findForWizard($this->patient(), $this->asyncJobId ?? '', $this->conclusionType(), Auth::user());
     }
 
     protected function resolveCreatedComposition(
@@ -734,7 +1130,7 @@ trait DrivesCompositionWizard
                 'type' => $type->value,
                 'limit' => 2,
             ])->validate();
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::warning('Could not locate the created composition by encounter', [
                 'encounter' => $encounterUuid,
                 'error' => $exception->getMessage(),

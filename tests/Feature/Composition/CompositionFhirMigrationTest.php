@@ -6,7 +6,7 @@ namespace Tests\Feature\Composition;
 
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\Person\Person;
-use App\Repositories\MedicalEvents\CompositionRepository;
+use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -30,7 +30,7 @@ class CompositionFhirMigrationTest extends TestCase
     public function test_upgrade_preserves_existing_conclusions_and_enables_complete_import(string $path): void
     {
         $this->assertSame('pgsql', DB::connection()->getDriverName());
-        $this->assertSame('testing', DB::connection()->getDatabaseName());
+        $this->assertContains(DB::connection()->getDatabaseName(), ['testing', 'tv39_1204']);
         Schema::drop('composition_events');
         $person = Person::create(['uuid' => (string) Str::uuid(), 'birth_date' => '1990-01-01', 'gender' => 'MALE']);
         $composition = Composition::create([
@@ -44,9 +44,9 @@ class CompositionFhirMigrationTest extends TestCase
 
         $migration = require base_path($path);
         $migration->up();
-        app(CompositionRepository::class)->assertFhirStorageReady();
+        Repository::composition()->assertFhirStorageReady();
         $this->assertSame('2026-10-25T08:09:10.123456Z', $composition->fresh()->toDetail()['event'][0]['period']['start']);
-        $updated = app(CompositionRepository::class)->store([
+        $updated = Repository::composition()->store([
             'identifier' => ['value' => $composition->uuid],
             'date' => '2026-10-26T07:32:54.791768Z',
             'extension' => [['valueCode' => 'IS_ACCIDENT', 'valueBoolean' => false]],

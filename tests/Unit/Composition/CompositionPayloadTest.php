@@ -129,7 +129,7 @@ class CompositionPayloadTest extends TestCase
     #[Test]
     public function an_unidentified_patient_is_referenced_as_a_preperson(): void
     {
-        $payload = $this->tempDisability(['isUnidentified' => true]);
+        $payload = $this->tempDisability(['isUnidentified' => true, 'isFocusUnidentified' => true]);
 
         $this->assertSame('preperson', $payload['subject']['type']['coding'][0]['code']);
         $this->assertSame('preperson', $payload['section']['focus']['type']['coding'][0]['code']);

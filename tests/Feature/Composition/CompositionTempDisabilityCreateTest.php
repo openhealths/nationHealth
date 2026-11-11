@@ -7,11 +7,13 @@ namespace Tests\Feature\Composition;
 use App\Classes\eHealth\Api\Patient\Encounter as EncounterApi;
 use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionStatus;
+use App\Enums\Composition\TreatmentViolation;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Livewire\Composition\CompositionTempDisabilityCreate;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\Permission;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Models\Relations\Party;
@@ -21,7 +23,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
-use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role as PermissionRole;
 use Tests\TestCase;
 
 /**
@@ -87,7 +89,7 @@ class CompositionTempDisabilityCreateTest extends TestCase
             ->assertSee(CompositionStatus::PRELIMINARY->label())
             ->assertDontSee(__('compositions.create_temp_disability.created'))
             ->assertSee(__('forms.sign_with_KEP'))
-            ->assertSee(\App\Enums\Composition\TreatmentViolation::label('reject_hospitalization'))
+            ->assertSee(TreatmentViolation::label('reject_hospitalization'))
             ->assertDontSee('reject_hospitalization (');
     }
 
@@ -425,6 +427,11 @@ class CompositionTempDisabilityCreateTest extends TestCase
             'gender' => 'MALE',
         ]);
 
+        foreach (['composition:create', 'composition:read'] as $scope) {
+            $permission = Permission::findOrCreate($scope, 'web');
+            $permission->legalEntityTypes()->syncWithoutDetaching([$typeId]);
+        }
+
         $this->instance('legalEntity', $legalEntity);
 
         if (config('permission.teams')) {
@@ -436,6 +443,9 @@ class CompositionTempDisabilityCreateTest extends TestCase
             Permission::findOrCreate('composition:read', 'web'),
         );
 
+        $permissionRole = PermissionRole::findOrCreate(Role::SPECIALIST->value, 'web');
+        $permissionRole->syncPermissions(['composition:create', 'composition:read']);
+        $user->assignRole($permissionRole);
         $this->actingAs($user);
 
         return compact('legalEntity', 'person', 'user', 'employee');

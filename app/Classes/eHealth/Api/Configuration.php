@@ -6,10 +6,14 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\SchemaResponseContract;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
+use JsonException;
 
 class Configuration extends Request
 {
@@ -56,8 +60,55 @@ class Configuration extends Request
     public function getCompositions(array $query = []): PromiseInterface|EHealthResponse
     {
         $this->setDefaultPageSize();
+        $this->setValidator($this->validateCompositions(...));
 
-        return $this->get(self::URL_COMPOSITIONS, $query);
+        return $this->get(self::URL_COMPOSITIONS, $this->normalizeActiveFilter($query));
+    }
+
+    protected function validateCompositions(EHealthResponse $response): array
+    {
+        SchemaResponseContract::validate($response, 'GET /api/composition_configurations', 'composition');
+        $body = $response->json();
+        Validator::make(is_array($body) ? $body : [], [
+            'data' => ['present', 'array', 'list'],
+            'data.*' => ['required', 'array'],
+            'data.*.id' => ['required', 'uuid'],
+            'data.*.type' => ['required', 'array'],
+            'data.*.type.coding' => ['required', 'array', 'min:1'],
+            'data.*.type.coding.*.system' => ['required', 'string'],
+            'data.*.type.coding.*.code' => ['required', 'string'],
+            'data.*.category' => ['required', 'array'],
+            'data.*.category.coding' => ['required', 'array', 'min:1'],
+            'data.*.category.coding.*.system' => ['required', 'string'],
+            'data.*.category.coding.*.code' => ['required', 'string'],
+            'data.*.is_active' => ['required', 'boolean'],
+            'data.*.settings' => ['required', 'string', 'json'],
+            'data.*.inserted_at' => ['required', 'date'],
+            'data.*.updated_at' => ['required', 'date'],
+            'data.*.inserted_by' => ['required', 'uuid'],
+            'data.*.updated_by' => ['required', 'uuid'],
+            'paging' => ['required', 'array'],
+            'paging.page_number' => ['required', 'integer', 'min:1'],
+            'paging.page_size' => ['required', 'integer', 'min:1'],
+            'paging.total_pages' => ['required', 'integer', 'min:0'],
+            'paging.total_entries' => ['required', 'integer', 'min:0'],
+        ])->validate();
+
+        return array_map(static function (array $row): array {
+            // Decode only after the complete native catalog envelope has passed validation.
+            try {
+                $settings = json_decode($row['settings'], true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                throw ValidationException::withMessages(['settings' => __('compositions.errors.invalid_response')]);
+            }
+            if (!is_array($settings) || ($settings !== [] && array_is_list($settings))
+                || !is_object(json_decode($row['settings']))) {
+                throw ValidationException::withMessages(['settings' => __('compositions.errors.invalid_response')]);
+            }
+            $row['decoded_settings'] = $settings;
+
+            return $row;
+        }, $body['data']);
     }
 
     /**
