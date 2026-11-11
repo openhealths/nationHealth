@@ -26,6 +26,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Ramsey\Uuid\Uuid;
 use Throwable;
 
 class DeviceRequestForm extends Component
@@ -95,7 +96,7 @@ class DeviceRequestForm extends Component
     {
         $this->legalEntityId = $legalEntity->id;
         $this->personId = $person->id;
-        $this->requestUuid = (string) Str::uuid();
+        $this->requestUuid = (string) Uuid::uuid1();
         $service = app(DeviceRequestLifecycleService::class);
         $employee = $service->authorizeAction($legalEntity, 'device_request:write');
         $activity = null;
@@ -183,7 +184,7 @@ class DeviceRequestForm extends Component
                     $this->request['ended_at'] = CarbonImmutable::parse($detail['scheduled_period']['end'])->format('d.m.Y');
                 }
 
-                $this->request['reason_reference'] = collect($detail['reason_reference'] ?? $detail['reason_references'] ?? [])
+                $this->request['reason_reference'] = collect($detail['reason_reference'] ?? ($detail['reason_references'] ?? []))
                     ->map(fn (array $reference): array => ['uuid' => data_get($reference, 'identifier.value'), 'type' => data_get($reference, 'identifier.type.coding.0.code')])->all();
             }
 
@@ -454,10 +455,10 @@ class DeviceRequestForm extends Component
 
     public function sign(): void
     {
-        $this->validate(['form.knedp' => 'required|string', 'form.keyContainerUpload' => 'required|file|max:1024|extensions:dat,pfx,zs2,jks', 'form.password' => 'required|string']);
         $lock = Cache::lock('device-request-sign:'.$this->person->uuid.':'.($this->activityUuid ?? $this->requestUuid), 600);
 
         try {
+            $this->validate(['form.knedp' => 'required|string', 'form.keyContainerUpload' => 'required|file|max:1024|extensions:dat,pfx,zs2,jks', 'form.password' => 'required|string']);
             if (!$lock->get()) {
                 throw ValidationException::withMessages(['sign' => __('device-requests.validation.concurrent_prescribing')]);
             }
@@ -480,16 +481,23 @@ class DeviceRequestForm extends Component
 
             $service->sync($this->person, $remote);
             Session::flash('success', $service->createdMessage($remote['requisition'], !empty($saved['data']['program_id']), $prepared['authType']));
-            $this->redirectRoute('persons.device-requests.view', ['legalEntity' => $this->legalEntity, 'person' => $this->person, 'deviceRequest' => $record->uuid]);
-        } catch (Throwable $exception) {
-            $this->refreshOptions();
-            $this->reportError($exception);
-        } finally {
-            $lock->release();
             $this->showSignatureModal = false;
             $this->form['password'] = '';
             $this->form['keyContainerUpload'] = null;
             $this->form['keyContainerFileName'] = '';
+            $this->redirectRoute('persons.device-requests.view', ['legalEntity' => $this->legalEntity, 'person' => $this->person, 'deviceRequest' => $record->uuid]);
+        } catch (Throwable $exception) {
+            // Field and local validation errors must not trigger another external request.
+            if (!$exception instanceof ValidationException) {
+                try {
+                    $this->refreshOptions();
+                } catch (Throwable $refreshException) {
+                    report($refreshException);
+                }
+            }
+            $this->reportError($exception);
+        } finally {
+            $lock->release();
         }
     }
 

@@ -1,0 +1,229 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\DeviceRequest;
+
+use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
+use App\Classes\eHealth\Api\CarePlanActivity;
+use App\Classes\eHealth\Api\Patient\DeviceRequest as DeviceRequestApi;
+use App\Classes\eHealth\EHealthResponse;
+use App\Livewire\DeviceRequest\DeviceRequestForm;
+use App\Models\CarePlan;
+use App\Models\Employee\Employee;
+use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
+use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\Person\Person;
+use App\Models\User;
+use App\Repositories\CarePlanRepository;
+use App\Repositories\MedicalEvents\PeriodRepository;
+use App\Services\MedicalEvents\DeviceRequestLifecycleService;
+use App\Services\MedicalEvents\Mappers\DeviceRequestMapper;
+use App\Services\SignatureService;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
+use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Ramsey\Uuid\Uuid;
+use Tests\TestCase;
+
+class DeviceRequestTv39RemediationTest extends TestCase
+{
+    use DatabaseTransactions;
+
+    public function test_new_clinical_identifier_uses_version_one_and_existing_identifier_is_preserved(): void
+    {
+        $context = ['person_uuid' => (string) Str::uuid(), 'employee_uuid' => (string) Str::uuid(),
+            'legal_entity_uuid' => (string) Str::uuid()];
+        $mapper = new DeviceRequestMapper();
+        $new = $mapper->toFhir(['device_id' => 'walker'], $context);
+        $this->assertSame(1, Uuid::fromString($new['id'])->getVersion());
+        $existing = (string) Str::uuid();
+        $this->assertSame($existing, $mapper->toFhir(['uuid' => $existing, 'device_id' => 'walker'], $context)['id']);
+    }
+
+    public static function activityPeriods(): array
+    {
+        return [
+            'non-program activity without period' => [null, false, true],
+            'program activity without period' => [null, true, false],
+            'empty period' => [[], false, false],
+            'end without start' => [['end' => '2026-11-30'], false, false],
+            'valid open period' => [['start' => '2026-11-01'], false, true],
+            'valid program period' => [['start' => '2026-11-01', 'end' => '2026-11-30'], true, true],
+            'future period' => [['start' => '2026-11-20'], false, false],
+            'expired period' => [['start' => '2026-11-01', 'end' => '2026-11-05'], false, false],
+        ];
+    }
+
+    #[DataProvider('activityPeriods')]
+    public function test_optional_activity_period_preserves_plan_and_program_limits(?array $period, bool $program, bool $allowed): void
+    {
+        $this->travelTo(now()->setDate(2026, 11, 11)->startOfDay());
+        $person = Person::create(['uuid' => (string) Str::uuid(), 'gender' => 'MALE']);
+        $planUuid = (string) Str::uuid();
+        $activityUuid = (string) Str::uuid();
+        $plan = new CarePlan(['uuid' => $planUuid]);
+        $this->mock(CarePlanRepository::class)->shouldReceive('findByUuid')->once()
+            ->with($planUuid, legalEntity()?->id, $person->id)->andReturn($plan);
+        Gate::shouldReceive('authorize')->once()->with('manageActivities', $plan)->andReturnTrue();
+        $this->mock(CarePlanApi::class)->shouldReceive('getDetails')->once()
+            ->with($person->uuid, $planUuid)->andReturn($this->validatedResponse([
+                'status' => 'active', 'period' => ['start' => '2026-11-01', 'end' => '2026-11-30'],
+            ]));
+        $detail = ['kind' => 'device_request', 'status' => 'scheduled'];
+        if ($period !== null) {
+            $detail['scheduled_period'] = $period;
+        }
+        if ($program) {
+            $detail['program'] = ['identifier' => ['value' => (string) Str::uuid()]];
+        }
+        $this->mock(CarePlanActivity::class)->shouldReceive('getDetails')->once()
+            ->with($person->uuid, $planUuid, $activityUuid)
+            ->andReturn($this->validatedResponse(['detail' => $detail]));
+        if (!$allowed) {
+            $this->expectException(ValidationException::class);
+        }
+        $context = app(DeviceRequestLifecycleService::class)->carePlanContext($person, $planUuid, $activityUuid);
+        $this->assertSame($detail, $context['detail']);
+    }
+
+    public function test_signing_fields_remain_visible_and_validation_has_no_external_or_database_effects(): void
+    {
+        [$person, $entity] = $this->signingContext();
+        $this->mock(DeviceRequestApi::class)->shouldNotReceive('createSigned');
+        $this->mock(DeviceRequestLifecycleService::class)->shouldNotReceive('prescribingOptions');
+        Http::preventStrayRequests();
+        Queue::fake();
+        $component = Livewire::test(DeviceRequestSigningHarness::class, ['legalEntity' => $entity, 'person' => $person]);
+        $component->call('sign')->assertSet('showSignatureModal', true)
+            ->assertHasErrors(['form.knedp', 'form.keyContainerUpload', 'form.password'])
+            ->assertSee(__('forms.sign_with_KEP'))
+            ->assertSee('wire:submit="sign"', false);
+        $this->assertDatabaseCount('device_request_requests', 0);
+        Http::assertNothingSent();
+        Queue::assertNothingPushed();
+    }
+
+    public function test_concurrent_submission_keeps_the_modal_and_original_field_values(): void
+    {
+        [$person, $entity] = $this->signingContext();
+        $this->mock(DeviceRequestApi::class)->shouldNotReceive('createSigned');
+        $this->mock(DeviceRequestLifecycleService::class)->shouldNotReceive('prescribingOptions');
+        $component = Livewire::test(DeviceRequestSigningHarness::class, ['legalEntity' => $entity, 'person' => $person]);
+        $id = $component->get('requestUuid');
+        $lock = Cache::lock('device-request-sign:'.$person->uuid.':'.$id, 600);
+        $this->assertTrue($lock->get());
+        try {
+            $component->set('form.knedp', 'test-provider')
+                ->set('form.keyContainerUpload', UploadedFile::fake()->create('test.dat', 1))
+                ->set('form.keyContainerFileName', 'test.dat')->set('form.password', 'test-password')
+                ->call('sign')->assertSet('showSignatureModal', true)
+                ->assertSet('form.password', 'test-password')->assertSet('form.keyContainerFileName', 'test.dat')
+                ->assertHasErrors(['request.sign'])
+                ->assertSee(__('device-requests.validation.concurrent_prescribing'));
+            $this->assertDatabaseCount('device_request_requests', 0);
+            $this->assertFalse(Cache::lock('device-request-sign:'.$person->uuid.':'.$id, 600)->get());
+        } finally {
+            $lock->release();
+        }
+    }
+
+    public static function requestPeriodLimits(): array
+    {
+        return [
+            'no activity period' => [null, '2026-11-01', '2026-11-30', true],
+            'open activity period' => [['start' => '2026-11-01'], '2026-11-01', '2026-11-30', true],
+            'starts before activity' => [['start' => '2026-11-12'], '2026-11-01', '2026-11-30', false],
+            'ends after activity' => [['start' => '2026-11-01', 'end' => '2026-11-12'], '2026-11-01', '2026-11-30', false],
+            'starts before plan' => [null, '2026-11-12', '2026-11-30', false],
+            'ends after plan' => [null, '2026-11-01', '2026-11-12', false],
+        ];
+    }
+
+    #[DataProvider('requestPeriodLimits')]
+    public function test_preparation_without_activity_period_still_checks_the_plan(?array $activityPeriod, string $planStart, string $planEnd, bool $allowed): void
+    {
+        $this->travelTo(now()->setDate(2026, 11, 11)->startOfDay());
+        $person = Person::create(['uuid' => (string) Str::uuid(), 'gender' => 'MALE']);
+        $entity = new LegalEntity(['uuid' => (string) Str::uuid()]);
+        $employee = new Employee(['uuid' => (string) Str::uuid()]);
+        $encounter = Encounter::create([
+            'uuid' => (string) Str::uuid(), 'person_id' => $person->id, 'status' => 'finished',
+            'episode_id' => Identifier::create(['value' => (string) Str::uuid()])->id,
+            'performer_id' => Identifier::create(['value' => $employee->uuid])->id,
+            'class_id' => Coding::create(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id,
+            'type_id' => CodeableConcept::create()->id, 'ehealth_inserted_at' => now(),
+        ]);
+        app(PeriodRepository::class)->sync($encounter, ['start' => now()->toIso8601String(), 'end' => now()->toIso8601String()]);
+        $planUuid = (string) Str::uuid();
+        $activityUuid = (string) Str::uuid();
+        $detail = ['product_codeable_concept' => ['coding' => [['code' => 'walker']]]];
+        if ($activityPeriod !== null) {
+            $detail['scheduled_period'] = $activityPeriod;
+        }
+        $service = Mockery::mock(DeviceRequestLifecycleService::class)->makePartial();
+        $service->shouldReceive('authorizeAction')->andReturn($employee);
+        $service->shouldReceive('encounter')->andReturn($encounter);
+        $service->shouldReceive('prescribingOptions')->andReturn(['program' => [], 'packages' => [], 'parameters' => [], 'model' => []]);
+        $service->shouldReceive('authMethods')->andReturn([]);
+        $service->shouldReceive('carePlanContext')->with($person, $planUuid, $activityUuid)
+            ->andReturn(['plan' => ['period' => ['start' => $planStart, 'end' => $planEnd]], 'detail' => $detail]);
+        $data = ['uuid' => (string) Str::uuid(), 'encounter_uuid' => $encounter->uuid, 'device_id' => 'walker',
+            'device_code_type' => 'CLASSIFICATION_TYPE', 'device_code_system' => 'assistive_devices', 'program_id' => '',
+            'quantity' => null, 'quantity_code' => 'piece', 'started_at' => now()->addHour()->toIso8601String(),
+            'ended_at' => now()->addDays(2)->toIso8601String(), 'phone_confirmed' => false,
+            'parameter_values' => [], 'inform_with' => ''];
+        if (!$allowed) {
+            $this->expectException(ValidationException::class);
+            $this->expectExceptionMessage(__('device-requests.validation.activity_period_limit'));
+        }
+        $prepared = $service->prepare($person, $entity, $data, $planUuid, $activityUuid);
+        $this->assertSame($data['uuid'], $prepared['payload']['id']);
+        $this->assertSame($activityUuid, data_get($prepared, 'payload.based_on.1.identifier.value'));
+    }
+
+    private function validatedResponse(array $data): EHealthResponse
+    {
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->once()->andReturn($data);
+
+        return $response;
+    }
+
+    private function signingContext(): array
+    {
+        $this->withoutVite();
+        $entity = LegalEntity::create(['uuid' => (string) Str::uuid(), 'status' => 'ACTIVE']);
+        $this->instance('legalEntity', $entity);
+        $person = Person::create(['uuid' => (string) Str::uuid(), 'gender' => 'MALE']);
+        $this->actingAs(User::create(['email' => Str::random(12).'@example.com', 'password' => 'unused']));
+        $this->mock(SignatureService::class)->shouldReceive('getCertificateAuthorities')->andReturn([]);
+
+        return [$person, $entity];
+    }
+}
+
+class DeviceRequestSigningHarness extends DeviceRequestForm
+{
+    public function mount(LegalEntity $legalEntity, Person $person): void
+    {
+        $this->legalEntityId = $legalEntity->id;
+        $this->personId = $person->id;
+        $this->requestUuid = (string) Str::uuid();
+        $this->showSignatureModal = true;
+        $this->request = ['device_code_type' => 'CLASSIFICATION_TYPE', 'device_id' => '', 'device_code_system' => '',
+            'quantity' => null, 'quantity_code' => 'piece', 'program_id' => '', 'inform_with' => '',
+            'phone_confirmed' => false, 'reason_reference' => [], 'parameter_values' => []];
+    }
+}

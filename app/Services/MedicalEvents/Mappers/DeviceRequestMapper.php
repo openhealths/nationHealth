@@ -9,7 +9,7 @@ use App\Core\Arr;
 use App\Services\MedicalEvents\FhirResource;
 use App\Services\MedicalEvents\InformWith;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class DeviceRequestMapper implements FhirMapperContract
 {
@@ -25,7 +25,7 @@ class DeviceRequestMapper implements FhirMapperContract
         [$uuids] = $context;
 
         $result = [
-            'id' => $data['uuid'] ?? Str::uuid()->toString(),
+            'id' => $data['uuid'] ?? Uuid::uuid1()->toString(),
             'status' => $data['status'] ?? 'draft',
             'intent' => $data['intent'] ?? 'order',
             'codeCodeableConcept' => FhirResource::make()
@@ -183,7 +183,7 @@ class DeviceRequestMapper implements FhirMapperContract
         $deviceRequest = array_merge($deviceRequest, $this->mapDeviceCode($data));
         $deviceRequest = array_merge($deviceRequest, $occurrence);
 
-        $reasons = $data['reason_reference'] ?? $data['supporting_info'] ?? [];
+        $reasons = $data['reason_reference'] ?? ($data['supporting_info'] ?? []);
         if (!empty($reasons)) {
             $deviceRequest['reason'] = [];
             foreach ($reasons as $ref) {
