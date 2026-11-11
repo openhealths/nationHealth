@@ -6,6 +6,7 @@ namespace Tests\Browser;
 
 use App\Classes\eHealth\Api\Patient\ServiceRequest as PatientServiceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
@@ -25,6 +26,7 @@ class ReferralIndexBrowserFixture extends ReferralTest
     public function testExportBrowserFixture(): void
     {
         $this->actingAs($this->user);
+        $this->grantMedicalEventAbilities($this->user, ['service_request:recall', 'service_request:cancel']);
         Cache::forever(MedicalProgramDictionary::KEY, []);
         Cache::forever(MedicalProgramDictionary::KEY.':fresh', true);
         $this->partialMock(ServiceRequestRequestRepository::class)->shouldReceive('completionStates')->andReturn([]);
@@ -64,6 +66,10 @@ class ReferralIndexBrowserFixture extends ReferralTest
                 && in_array($query['status'], ['active', 'completed', 'entered_in_error', 'recalled'], true)
                 && $query['page'] === 1 && $query['page_size'] === 100))->andReturn($nativeResponse);
         $this->instance(PatientServiceRequestApi::class, $api);
+
+        foreach (['recall', 'error'] as $action) {
+            $this->assertTrue($this->user->can('registeredAction', [ServiceRequestRequest::class, $rows[9], $action]));
+        }
 
         $component = Livewire::test(ReferralIndexFixture::class, ['legalEntity' => $this->legalEntity]);
         $fixtures = ['ids' => $ids, 'patientUuid' => $patientUuid, 'executorId' => $this->employee->id, 'initial' => $this->capture($component)];
