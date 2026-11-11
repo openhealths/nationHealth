@@ -99,7 +99,8 @@ return [
         'speciality_condition_code_forbidden' => 'Встановлювач діагнозу не має необхідної спеціальності для встановлення коду :code.',
         'asserter_employee_not_found' => 'Працівника, вказаного як встановлювача діагнозу, не знайдено.',
         'asserter_employee_invalid_type' => 'Тип працівника не дозволений як встановлювач діагнозу.',
-        'asserter_employee_not_participant' => 'Працівник, вказаний як встановлювач діагнозу, має бути учасником взаємодії.'
+        'asserter_employee_not_participant' => 'Працівник, вказаний як встановлювач діагнозу, має бути учасником взаємодії.',
+        'report_origin_required' => "Поле :attribute є обов'язковим для заповнення, якщо первинним джерелом обрано «Інше джерело»."
     ],
 
     // Number of the record every :attribute of a validation message carries
@@ -110,8 +111,8 @@ return [
         'primarySource' => 'первинне джерело діагнозу',
         'asserterEmployeeId' => 'медичний працівник, який встановив діагноз',
         'reportOriginCode' => 'джерело інформації діагнозу',
-        'codeCode' => 'джерело інформації діагнозу',
-        'codeSystem' => 'код стану діагнозу',
+        'codeCode' => 'код діагнозу',
+        'codeSystem' => 'система кодувань діагнозу',
         'clinicalStatus' => 'клінічний статус діагнозу',
         'verificationStatus' => 'статус верифікації діагнозу',
         'severityCode' => 'ступінь тяжкості стану діагнозу',

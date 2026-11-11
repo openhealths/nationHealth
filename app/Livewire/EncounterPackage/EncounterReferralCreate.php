@@ -172,7 +172,7 @@ class EncounterReferralCreate extends EncounterDocumentCreate
 
     private function redirectToDraft(): void
     {
-        $this->redirectRoute('encounter.referral.edit', [
+        $this->redirectRoute('persons.encounters.referrals.edit', [
             'legalEntity' => $this->legalEntityId,
             'person' => $this->personId,
             'encounter' => $this->encounterId,

@@ -169,9 +169,11 @@
                                     :value="parent.uuid"
                                     :selected="parent.uuid === modalSpecimen.parentIds[parentIndex]"
                                     x-text="
+                                        parent.name ||
                                         [parent.accessionIdentifier, specimenTypesDictionary[parent.typeCode]]
                                             .filter(Boolean)
-                                            .join(' - ') || parent.uuid
+                                            .join(' - ') ||
+                                        parent.uuid
                                     "
                                 ></option>
                             </template>

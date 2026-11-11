@@ -238,8 +238,8 @@ class Episode extends Model
     }
 
     /**
-     * Order by most recently updated in eHealth first. Records without that timestamp are the drafts and the episodes
-     * created here and not synced yet, so they are newer than any synced one and go on top, the latest first.
+     * Order by the latest update first: the one in eHealth, or the local one for a record eHealth has not updated yet,
+     * such as a draft, so that an old draft does not stay above the episodes updated after it.
      *
      * @param  Builder  $query
      * @return Builder
@@ -247,8 +247,7 @@ class Episode extends Model
     #[Scope]
     protected function recentlyUpdatedFirst(Builder $query): Builder
     {
-        return $query->orderByRaw('CASE WHEN ehealth_updated_at IS NULL THEN 0 ELSE 1 END')
-            ->orderByDesc('ehealth_updated_at')
+        return $query->orderByRaw('COALESCE(ehealth_updated_at, updated_at) DESC')
             ->orderByDesc('id');
     }
 }
