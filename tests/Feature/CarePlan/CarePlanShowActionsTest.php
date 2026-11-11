@@ -580,19 +580,17 @@ class CarePlanShowActionsTest extends TestCase
         ]);
         $verified = Mockery::mock(EHealthResponse::class);
         $verified->shouldReceive('successful')->andReturnTrue();
-        $verified->shouldReceive('validate')->andReturn([]);
+        $verified->shouldReceive('validate')->andReturn([
+            'id' => $approvalId, 'is_verified' => true, 'status' => ApprovalStatus::ACTIVE->value,
+            'expires_at' => now()->addYear()->toIso8601String(),
+        ]);
         $api = $this->mock(ApprovalApi::class);
         $api->shouldReceive('withToken')->andReturnSelf();
         $api->shouldReceive('createApproval')->once()->with($this->person->uuid, Mockery::on(
             fn (array $payload): bool => $payload['authorize_with'] === $authId
         ))->andReturn($created);
         $api->shouldReceive('verify')->once()->with($this->person->uuid, $approvalId, $requiresOtp ? ['code' => 1234] : [])->andReturn($verified);
-        $details = Mockery::mock(EHealthResponse::class);
-        $details->shouldReceive('successful')->once()->andReturnTrue();
-        $details->shouldReceive('validate')->once()->andReturn([
-            'id' => $approvalId, 'is_verified' => true, 'expires_at' => now()->addYear()->toIso8601String(),
-        ]);
-        $api->shouldReceive('getApprovalDetails')->once()->with($this->person->uuid, $approvalId)->andReturn($details);
+        $api->shouldNotReceive('getApprovalDetails');
         $api->shouldNotReceive('resendSms');
 
         $component = Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
@@ -854,7 +852,8 @@ class CarePlanShowActionsTest extends TestCase
     {
         $this->actingAs($this->user);
         $plan = $this->makeSignedNewPlan();
-        $activity = $this->createFhirCarePlanActivity(['care_plan_id' => $plan->id, 'author_id' => $this->employee->id]);
+        $activity = $this->createFhirCarePlanActivity(['care_plan_id' => $plan->id, 'author_id' => $this->employee->id,
+            'scheduled_period_start' => now(), 'scheduled_period_end' => now()->addWeek()]);
         $basedOn = Identifier::create(['value' => $activity->uuid]);
         $referral = ServiceRequestRequest::create([
             'uuid' => (string) Str::uuid(), 'person_id' => $this->person->id, 'employee_id' => $this->employee->id,
@@ -880,6 +879,7 @@ class CarePlanShowActionsTest extends TestCase
         $serviceUuid = (string) Str::uuid();
         $activity = $this->createFhirCarePlanActivity([
             'care_plan_id' => $plan->id, 'author_id' => $this->employee->id, 'product_reference' => $serviceUuid,
+            'scheduled_period_start' => now(), 'scheduled_period_end' => now()->addWeek(),
         ]);
         Cache::put('dictionaries.service', [[
             'id' => (string) Str::uuid(), 'groups' => [[
@@ -1026,6 +1026,7 @@ class CarePlanShowActionsTest extends TestCase
         $plan->update(['status' => 'active']);
         $this->grantCarePlanWriteApproval($plan, $this->employee);
         $this->createFhirCarePlanActivity([
+            'scheduled_period_start' => now(), 'scheduled_period_end' => now()->addWeek(),
             'care_plan_id' => $plan->id, 'author_id' => $this->employee->id,
             'kind' => 'service_request', 'status' => 'completed',
         ]);
@@ -1071,6 +1072,7 @@ class CarePlanShowActionsTest extends TestCase
         $plan = $this->makeSignedNewPlan();
         $this->grantCarePlanWriteApproval($plan, $this->employee);
         $activity = $this->createFhirCarePlanActivity([
+            'scheduled_period_start' => now(), 'scheduled_period_end' => now()->addWeek(),
             'care_plan_id' => $plan->id, 'author_id' => $this->employee->id,
             'kind' => 'service_request', 'status' => 'scheduled',
             'product_reference' => $groupId, 'product_reference_type' => 'service_group',
@@ -1097,6 +1099,7 @@ class CarePlanShowActionsTest extends TestCase
         $plan = $this->makeSignedNewPlan();
         $this->grantCarePlanWriteApproval($plan, $this->employee);
         $activity = $this->createFhirCarePlanActivity([
+            'scheduled_period_start' => now(), 'scheduled_period_end' => now()->addWeek(),
             'care_plan_id' => $plan->id, 'author_id' => $this->employee->id,
             'kind' => 'service_request', 'status' => 'scheduled', 'program' => (string) Str::uuid(),
             'product_reference' => $groupId, 'product_type' => 'service_group',

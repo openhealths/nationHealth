@@ -6,6 +6,7 @@ namespace Tests\Feature\CarePlan;
 
 use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Enums\Person\ApprovalStatus;
 use App\Exceptions\EHealth\EHealthJobTimeoutException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\CarePlan\CarePlanApprovals;
@@ -294,7 +295,7 @@ class CarePlanRegistryQualityTest extends TestCase
         $approval = Approval::create([
             'uuid' => (string) Str::uuid(), 'approvable_type' => $plan->getMorphClass(), 'approvable_id' => $plan->id,
             'granted_to_id' => $recipient->id, 'created_by_id' => $otherCreator->id,
-            'granted_to_type' => 'employee',
+            'granted_to_type' => 'employee', 'status' => ApprovalStatus::ACTIVE->value,
             'is_verified' => true, 'access_level' => 'write', 'expires_at' => now()->addDay(),
         ]);
         $service = Mockery::mock(CarePlanApprovalService::class)->makePartial();

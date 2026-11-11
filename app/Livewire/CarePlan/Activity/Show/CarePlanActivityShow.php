@@ -133,7 +133,7 @@ class CarePlanActivityShow extends CarePlanComponent
             try {
                 $reference = (string) $activity->productReference;
                 $device = dictionary()->deviceDefinitions()->first(
-                    fn (array $item): bool => (string) ($item['id'] ?? $item['uuid'] ?? '') === $reference
+                    fn (array $item): bool => (string) ($item['id'] ?? ($item['uuid'] ?? '')) === $reference
                 );
 
                 if (is_array($device)) {
