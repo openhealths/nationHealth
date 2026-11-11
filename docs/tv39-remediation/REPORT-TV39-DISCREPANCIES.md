@@ -6,7 +6,7 @@
 
 Джерела: [локальний корпус ТВ39](/Users/mefizz/Documents/Codex/ohealth/docs/technical-requirements/edition-39.json:1), [його походження](/Users/mefizz/Documents/Codex/ohealth/docs/technical-requirements/README.md:1). Публічні першоджерела: `https://ehealth.gov.ua/technichni_vymogy/` і `https://ehealth.gov.ua/wp-content/uploads/2026/08/39-MIS-Tehnichni-vymogy-v-redaktsii-nakazu-NSZU-464-vid-25.08.2026.pdf`.
 
-Вихідний код аудиту — `3ae4e34e3631ed4bba711c3b4ab6d96d701e0cc5`; інтеграційний checkpoint — `e07fc925`. Знайдений дефект у вихідній версії не означає, що він лишається в остаточному PR. Поточний результат перевіряється в umbrella #1217.
+Вихідний код аудиту — `3ae4e34e3631ed4bba711c3b4ab6d96d701e0cc5`; поточний інтеграційний checkpoint — `7714f184`, який включає RX `a203bf04` та Device `e25aee03`. Знайдений дефект у вихідній версії не означає, що він лишається в остаточному PR. Поточний результат перевіряється в umbrella #1217; зведена регресія ще триває.
 
 ## Підтверджені зайві обмеження реалізації
 
