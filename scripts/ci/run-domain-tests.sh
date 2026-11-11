@@ -24,6 +24,7 @@ DOMAIN_PATHS=(
   tests/Unit/Livewire/Party
   tests/Unit/Livewire/CarePlan
   tests/Unit/Livewire/CarePlanLockedStateTest.php
+  tests/Unit/Livewire/EncounterReferralFlowTest.php
   tests/Unit/CarePlan
   tests/Unit/Exceptions/EHealthValidationExceptionCarePlanMessageTest.php
   tests/Unit/Exceptions/ClinicalErrorTranslationsTest.php
@@ -76,6 +77,8 @@ DOMAIN_PATHS=(
   tests/Feature/MedicationRequestTest.php
   tests/Feature/Referral
   tests/Feature/ReferralTest.php
+  tests/Feature/Diagnostic/ElectronicReferralAndPrescriptionDiagnosticTest.php
+  tests/Feature/Diagnostic/EncounterStandaloneReferralCreateDiagnosticTest.php
   tests/Feature/Api/ReferralControllerTest.php
   tests/Feature/Api/ReferralControllerProcessCancelUsageTest.php
   tests/Feature/EHealth/EHealthResponseExceptionPartyNotVerifiedTest.php
