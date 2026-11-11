@@ -1,19 +1,28 @@
 @use('App\Enums\Person\MedicationRequestStatus')
 @use('App\Models\MedicalEvents\Sql\Encounter')
 
-<x-layouts.patient :showLegacyMessages="false" :personId="$personId" :patientFullName="$patientFullName">
+<x-layouts.patient :showLegacyMessages="false" :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
     <x-slot name="headerActions">
         <div class="flex w-full flex-wrap items-center gap-2">
             @can('create', Encounter::class)
-                <a href="{{ route('encounter.create', [legalEntity(), 'person' => $personId]) }}" class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm">
+                <a
+                    href="{{
+                        $prepersonId
+                        ? route('prepersons.encounters.create', [legalEntity(), 'preperson' => $prepersonId])
+                        : route('persons.encounters.create', [legalEntity(), 'person' => $personId])
+                    }}"
+                    class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
+                >
                     @icon('plus', 'w-4 h-4')
                     {{ __('encounters.new') }}
                 </a>
             @endcan
 
-            <livewire:person.records.patient-approval :person-id="$personId" :key="'prescriptions-patient-approval-'.$personId" />
+            @if ($personId)
+                <livewire:person.records.patient-approval :person-id="$personId" :key="'prescriptions-patient-approval-'.$personId" />
+            @endif
 
             <button
                 type="button"
