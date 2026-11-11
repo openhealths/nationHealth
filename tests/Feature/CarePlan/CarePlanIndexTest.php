@@ -4,23 +4,47 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
-use App\Models\Person\Person;
+use App\Classes\eHealth\Api\CarePlan;
+use App\Classes\eHealth\Api\CarePlanActivity;
+use App\Classes\eHealth\Api\Declaration as DeclarationApi;
+use App\Classes\eHealth\EHealth;
+use App\Classes\eHealth\EHealthResponse;
+use App\Enums\Declaration\RequestStatus;
+use App\Enums\Declaration\Status;
+use App\Enums\JobStatus;
+use App\Enums\Status as EnumsStatus;
+use App\Enums\User\Role;
+use App\Livewire\CarePlan\CarePlanCreate;
+use App\Livewire\CarePlan\CarePlanIndex;
 use App\Models\Declaration;
-use App\Models\LegalEntity;
+use App\Models\DeclarationRequest;
+use App\Models\Division;
 use App\Models\Employee\Employee;
+use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
+use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Episode;
+
+use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Livewire\Livewire;
-use Tests\TestCase;
-use Tests\Concerns\MocksBasicDictionaries;
-use Mockery;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
-use App\Classes\eHealth\EHealth;
-use App\Classes\eHealth\EHealthResponse;
+use Livewire\Livewire;
+use Mockery;
+use Tests\Concerns\CreatesFhirCarePlans;
+use Tests\Concerns\MocksBasicDictionaries;
+use Tests\TestCase;
 
 class CarePlanIndexTest extends TestCase
 {
+    use CreatesFhirCarePlans;
     use DatabaseTransactions;
     use MocksBasicDictionaries;
 
@@ -30,7 +54,7 @@ class CarePlanIndexTest extends TestCase
         $this->mockBasicDictionaries();
 
         config(['cipher.api.domain' => 'https://cipher.invalid']);
-        \Illuminate\Support\Facades\Cache::put('knedp_certificate_authority', [], 60);
+        Cache::put('knedp_certificate_authority', [], 60);
     }
 
     protected function migrateDatabases()
@@ -48,8 +72,8 @@ class CarePlanIndexTest extends TestCase
     public function test_care_plan_index_sync_flow(): void
     {
         // 1. Setup initial data
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -72,15 +96,15 @@ class CarePlanIndexTest extends TestCase
         $user = User::create([
             'uuid' => (string) Str::uuid(),
             'email' => 'doctor@example.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'password' => Hash::make('password'),
             'party_id' => $party->id,
         ]);
 
         $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr. Who',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => EnumsStatus::APPROVED->value,
             'legal_entity_id' => $legalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',
@@ -100,7 +124,7 @@ class CarePlanIndexTest extends TestCase
             'process_disclosure_data_consent' => true,
         ]);
 
-        $division = \App\Models\Division::create([
+        $division = Division::create([
             'uuid' => (string) Str::uuid(),
             'name' => 'Main Division',
             'type' => 'CLINIC',
@@ -110,9 +134,9 @@ class CarePlanIndexTest extends TestCase
             'legal_entity_id' => $legalEntity->id,
         ]);
 
-        $declarationRequest = \App\Models\DeclarationRequest::create([
+        $declarationRequest = DeclarationRequest::create([
             'uuid' => (string) Str::uuid(),
-            'status' => \App\Enums\Declaration\RequestStatus::SIGNED,
+            'status' => RequestStatus::SIGNED,
             'declaration_number' => '123',
             'employee_id' => $employee->id,
             'person_id' => $person->id,
@@ -130,8 +154,8 @@ class CarePlanIndexTest extends TestCase
             'legal_entity_id' => $legalEntity->id,
             'division_id' => $division->id,
             'is_active' => true,
-            'status' => \App\Enums\Declaration\Status::ACTIVE,
-            'sync_status' => \App\Enums\JobStatus::COMPLETED,
+            'status' => Status::ACTIVE,
+            'sync_status' => JobStatus::COMPLETED,
             'end_date' => now()->addYears(1)->format('Y-m-d'),
             'inserted_at' => now(),
             'signed_at' => now(),
@@ -147,15 +171,15 @@ class CarePlanIndexTest extends TestCase
         // 2. Mock EHealth APIs
         $this->grantMedicalEventAbilities($user);
         session()->put(config('ehealth.api.oauth.bearer_token'), 'synthetic-token');
-        \Illuminate\Support\Facades\Queue::fake();
-        $mockCarePlanApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class)->makePartial();
-        $mockDeclarationApi = Mockery::mock(\App\Classes\eHealth\Api\Declaration::class);
-        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
+        Queue::fake();
+        $mockCarePlanApi = Mockery::mock(CarePlan::class)->makePartial();
+        $mockDeclarationApi = Mockery::mock(DeclarationApi::class);
+        $mockActivityApi = Mockery::mock(CarePlanActivity::class)->makePartial();
 
-        $this->instance(\App\Classes\eHealth\Api\CarePlan::class, $mockCarePlanApi);
+        $this->instance(CarePlan::class, $mockCarePlanApi);
         $mockCarePlanApi->shouldReceive('withToken')->andReturnSelf();
-        $this->instance(\App\Classes\eHealth\Api\Declaration::class, $mockDeclarationApi);
-        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
+        $this->instance(DeclarationApi::class, $mockDeclarationApi);
+        $this->instance(CarePlanActivity::class, $mockActivityApi);
 
         // Mock declarations sync for patient
         $decSyncResponse = Mockery::mock(EHealthResponse::class);
@@ -187,7 +211,7 @@ class CarePlanIndexTest extends TestCase
         $mockActivityApi->shouldReceive('getSummary')->andReturn($activitySummaryResponse);
 
         // 3. Test CarePlanIndex Livewire component
-        Livewire::test(\App\Livewire\CarePlan\CarePlanIndex::class)
+        Livewire::test(CarePlanIndex::class)
             ->call('sync')
             ->assertHasNoErrors();
 
@@ -205,7 +229,7 @@ class CarePlanIndexTest extends TestCase
 
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\CarePlan\CarePlanIndex::class)
+        Livewire::test(CarePlanIndex::class)
             ->assertSeeHtml(route('care-plans.create', $legalEntity));
     }
 
@@ -215,7 +239,7 @@ class CarePlanIndexTest extends TestCase
 
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\CarePlan\CarePlanCreate::class, [
+        Livewire::test(CarePlanCreate::class, [
             'legalEntity' => $legalEntity,
         ])
             ->assertSet('personId', 0)
@@ -227,6 +251,8 @@ class CarePlanIndexTest extends TestCase
     public function test_care_plan_create_patient_search_loads_encounters(): void
     {
         ['legalEntity' => $legalEntity, 'user' => $user] = $this->createCarePlanIndexAuthContext();
+        $employee = $user->employees()->firstOrFail();
+        $this->grantCarePlanEmployeeRole($employee, 'OUTPATIENT');
 
         $person = Person::create([
             'uuid' => (string) Str::uuid(),
@@ -243,25 +269,26 @@ class CarePlanIndexTest extends TestCase
         ]);
 
         $episodeUuid = (string) Str::uuid();
-        $owner = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $legalEntity->uuid]);
-        \App\Models\MedicalEvents\Sql\Episode::create([
+        $owner = Identifier::create(['value' => $legalEntity->uuid]);
+        Episode::create([
             'uuid' => $episodeUuid,
             'person_id' => $person->id,
             'status' => 'active',
             'name' => 'Synthetic patient search episode',
             'managing_organization_id' => $owner->id,
         ]);
-        $identifierId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $episodeUuid])->id;
-        $codingId = \App\Models\MedicalEvents\Sql\Coding::create(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id;
-        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
+        $identifierId = Identifier::create(['value' => $episodeUuid])->id;
+        $codingId = Coding::create(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id;
+        $ccId = CodeableConcept::create()->id;
 
-        $encounter = \App\Models\MedicalEvents\Sql\Encounter::create([
+        $encounter = Encounter::create([
             'uuid' => (string) Str::uuid(),
             'person_id' => $person->id,
             'status' => 'finished',
             'episode_id' => $identifierId,
             'class_id' => $codingId,
             'type_id' => $ccId,
+            'performer_id' => Identifier::create(['value' => $employee->uuid])->id,
             'ehealth_inserted_at' => null,
         ]);
 
@@ -277,7 +304,7 @@ class CarePlanIndexTest extends TestCase
 
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\CarePlan\CarePlanCreate::class, [
+        Livewire::test(CarePlanCreate::class, [
             'legalEntity' => $legalEntity,
         ])
             ->set('patientSearch.firstName', 'Пацієнт')
@@ -302,8 +329,8 @@ class CarePlanIndexTest extends TestCase
      */
     private function createCarePlanIndexAuthContext(): array
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -326,15 +353,15 @@ class CarePlanIndexTest extends TestCase
         $user = User::create([
             'uuid' => (string) Str::uuid(),
             'email' => 'doctor-index@example.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'password' => Hash::make('password'),
             'party_id' => $party->id,
         ]);
 
         $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr. Who',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => EnumsStatus::APPROVED->value,
             'legal_entity_id' => $legalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',

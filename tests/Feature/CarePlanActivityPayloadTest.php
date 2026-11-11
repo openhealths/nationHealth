@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
@@ -17,7 +19,13 @@ class CarePlanActivityPayloadTest extends TestCase
         $resource = json_decode(file_get_contents(base_path('tests/Fixtures/CarePlan/activity.json')), true, flags: JSON_THROW_ON_ERROR);
         $resource['detail']['kind'] = 'medication_request';
         $resource['detail']['dailyAmount'] = ['value' => 5, 'system' => 'MEDICATION_UNIT', 'code' => 'MG'];
-        $payload = \App\Livewire\CarePlan\Forms\CarePlanActivityForm::buildCreateContent($resource);
+        $resource['detail']['program'] = [
+            'identifier' => [
+                'value' => 'a3901c70-a1d5-4c96-8556-58a84d4d0a3c',
+                'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'medical_program']]],
+            ],
+        ];
+        $payload = CarePlanActivityForm::buildCreateContent($resource);
 
         $this->assertEquals(5, $payload['detail']['daily_amount']['value']);
         $this->assertEquals('MEDICATION_UNIT', $payload['detail']['daily_amount']['system']);
@@ -56,7 +64,7 @@ class CarePlanActivityPayloadTest extends TestCase
             ],
         ];
 
-        $result = \App\Core\Arr::toSnakeCase($input);
+        $result = Arr::toSnakeCase($input);
         $json = json_encode($result['outcome_codeable_concept']);
 
         // Must serialize as JSON array [...], not object {...}

@@ -4,71 +4,70 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
-use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
-use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Api\Approval as ApprovalApi;
+use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
+use App\Classes\eHealth\Api\Patient\ServiceRequest;
 use App\Classes\eHealth\Api\Person as PersonApi;
-use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
-use GuzzleHttp\Psr7\Response;
-use Mockery;
+use App\Classes\eHealth\EHealthResponse;
+use App\Enums\CarePlanStatus;
 
+use App\Enums\JobStatus;
 use App\Enums\Person\ApprovalStatus;
-use App\Livewire\CarePlan\CarePlanShow;
+use App\Enums\Status;
+use App\Enums\User\Role;
+use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
 use App\Livewire\CarePlan\CarePlanApprovals;
+use App\Livewire\CarePlan\CarePlanShow;
+use App\Livewire\Dictionary\ServiceCatalog;
+use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
+use App\Livewire\EncounterPackage\Forms\EncounterForm;
+use App\Livewire\Person\Records\PatientApproval;
 use App\Models\CarePlan;
+use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Approval;
+use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
+use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Models\Permission;
 use App\Models\Person\Person;
+use App\Models\Relations\Party;
+use App\Models\Role as RoleModel;
 use App\Models\User;
-use App\Services\MedicalEvents\PatientApprovalService;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
+use App\Repositories\Repository;
+use App\Services\MedicalEvents\CarePlanActivityEHealthGuard;
 use App\Services\MedicalEvents\CarePlanApprovalService;
+use App\Services\MedicalEvents\EHealthJobResolver;
+use App\Services\MedicalEvents\MedicationRequestLifecycleService;
+use App\Services\MedicalEvents\PatientApprovalService;
+use App\Services\MedicalEvents\ReferralRequestLifecycleService;
+use App\Services\SignatureService;
+use GuzzleHttp\Psr7\Response;
+use Illuminate\Bus\PendingBatch;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
-use Livewire\Livewire;
-use Tests\TestCase;
-use Tests\Concerns\MocksBasicDictionaries;
-use PHPUnit\Framework\Attributes\DataProvider;
-use Tests\Concerns\CreatesFhirCarePlans;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use App\Models\Relations\Party;
-use App\Enums\User\Role;
-use App\Enums\Status;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Bus\PendingBatch;
-use App\Models\MedicalEvents\Sql\DiagnosticReport;
-use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
-use Illuminate\Database\Eloquent\Model;
-use App\Services\MedicalEvents\MedicationRequestLifecycleService;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
-use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
-use App\Services\MedicalEvents\ReferralRequestLifecycleService;
-use App\Repositories\Repository;
-use App\Models\Role as RoleModel;
-use App\Models\Permission;
-use App\Livewire\Person\Records\PatientApproval;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
-use App\Models\MedicalEvents\Sql\Encounter;
-use App\Livewire\EncounterPackage\Forms\EncounterForm;
-use Illuminate\Http\UploadedFile;
-use App\Services\SignatureService;
-use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
-use App\Enums\JobStatus;
-use App\Models\MedicalEvents\Sql\Episode;
-use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
-use App\Livewire\Dictionary\ServiceCatalog;
-use App\Models\CarePlanActivity;
-use App\Services\MedicalEvents\CarePlanActivityEHealthGuard;
-use App\Services\MedicalEvents\EHealthJobResolver;
-use App\Classes\eHealth\Api\Patient\ServiceRequest;
-use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
-use App\Enums\CarePlanStatus;
+use Illuminate\Support\Str;
 use Livewire\Component;
-use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
+use Livewire\Livewire;
+use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
+use Tests\Concerns\CreatesFhirCarePlans;
+use Tests\Concerns\MocksBasicDictionaries;
+use Tests\TestCase;
 
 class CarePlanShowActionsTest extends TestCase
 {
@@ -283,6 +282,7 @@ class CarePlanShowActionsTest extends TestCase
     public function test_prescription_sync_keeps_signed_requests_and_prescription_states_separate(): void
     {
         $this->actingAs($this->user);
+        $this->grantMedicalEventAbilities($this->user, ['medication_request_request:read']);
         $plan = $this->makeSignedNewPlan();
         $activity = $this->createFhirCarePlanActivity([
             'care_plan_id' => $plan->id, 'author_id' => $this->employee->id,
@@ -297,17 +297,32 @@ class CarePlanShowActionsTest extends TestCase
         $records[1]->fill(['resource_type' => MedicationRequestRequest::TYPE_PRESCRIPTION,
             'source' => MedicationRequestRequest::SOURCE_EHEALTH, 'status' => 'active'])->save();
         $activeId = (string) Str::uuid();
-        $api = Mockery::mock(MedicationRequestApi::class);
-        $response = static fn (array $data) => new EHealthResponse(new Response(200, [], json_encode(['data' => $data])));
-        $api->shouldReceive('getBySearchParams')->once()->with($this->person->uuid, [])->andReturn($response([
-            ['id' => $activeId, 'request_number' => 'SYNC-1', 'status' => 'ACTIVE'],
-            ['id' => $records[1]->uuid, 'status' => 'COMPLETED'],
-        ]));
-        $api->shouldReceive('getRequestsBySearchParams')->once()->with($this->person->uuid, [])->andReturn($response([
-            ['id' => $records[0]->uuid, 'status' => 'REJECTED'],
-            ['id' => $records[2]->uuid, 'status' => 'REJECTED'],
-        ]));
-        $this->instance(MedicationRequestApi::class, $api);
+        $fixtures = json_decode(file_get_contents(base_path('tests/Fixtures/medication-official-responses.json')), true, flags: JSON_THROW_ON_ERROR);
+        $native = function (bool $request, string $uuid, string $status) use ($fixtures, $activity, $records): array {
+            $data = $fixtures[$request ? 'request_detail' : 'detail'];
+            $data['id'] = $uuid;
+            $data['status'] = $status;
+            if ($request) {
+                $data['request_number'] = $records->firstWhere('uuid', $uuid)->requestNumber;
+            }
+            $data['person']['id'] = $this->person->uuid;
+            $data['employee']['id'] = $this->employee->uuid;
+            $data['legal_entity']['id'] = $this->legalEntity->uuid;
+            $data['based_on'] = [['identifier' => ['value' => $activity->uuid,
+                'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'care_plan_activity']]]]]];
+
+            return $data;
+        };
+        $active = $native(false, $activeId, 'ACTIVE');
+        $active['request_number'] = 'SYNC-1';
+        $lifecycle = Mockery::mock(MedicationRequestLifecycleService::class, [app(EHealthJobResolver::class)])->makePartial();
+        $lifecycle->shouldReceive('getByCarePlan')->once()->with($plan->uuid, [])->andReturn([
+            $active, $native(false, $records[1]->uuid, 'COMPLETED'),
+        ]);
+        $lifecycle->shouldReceive('getRequestsByCarePlan')->once()->with($plan->uuid, [])->andReturn([
+            $native(true, $records[0]->uuid, 'REJECTED'), $native(true, $records[2]->uuid, 'REJECTED'),
+        ]);
+        $this->instance(MedicationRequestLifecycleService::class, $lifecycle);
 
         Livewire::test(CarePlanShow::class, ['carePlan' => $plan])->call('syncEPrescriptions');
 
@@ -1004,7 +1019,7 @@ class CarePlanShowActionsTest extends TestCase
             ->assertSee(__('care-plan.lifecycle_access_required'));
     }
 
-    public function test_final_activities_enable_finalization_but_cancel_requires_the_author(): void
+    public function test_completed_activities_enable_completion_and_block_plan_cancellation(): void
     {
         $this->actingAs($this->user);
         $plan = $this->makeSignedNewPlan();
@@ -1021,7 +1036,7 @@ class CarePlanShowActionsTest extends TestCase
         $this->instance(CarePlanApi::class, $api);
 
         $component = Livewire::test(CarePlanShow::class, ['carePlan' => $plan]);
-        $this->assertTrue($component->instance()->canCancelPlan);
+        $this->assertFalse($component->instance()->canCancelPlan);
         $this->assertTrue($component->instance()->canCompletePlan);
         $plan->authorReference->update(['value' => (string) Str::uuid()]);
         $component->call('openSignatureModal', 'cancel')->assertSet('showSignatureModal', false)
@@ -1116,7 +1131,7 @@ class CarePlanShowActionsTest extends TestCase
 
         $lifecycle->shouldReceive('trySyncDraftFromEHealth')->twice()->andReturnFalse();
         $response = Mockery::mock(EHealthResponse::class);
-        $response->shouldReceive('getData')->andReturn(['status' => 'VALID']);
+        $response->shouldReceive('validate')->andReturn([['program_id' => $activity->program, 'program_name' => 'Тестова програма', 'status' => 'VALID']]);
         $api->shouldReceive('prequalify')->once()->andReturn($response);
         $component->call('validateReferral')->assertHasNoErrors()->assertSet('showSignatureModal', true)
             ->assertSet('referralRequestIdToSign', $uuid);

@@ -14,14 +14,15 @@ use App\Models\CarePlan;
 use App\Models\Person\Person;
 use App\Repositories\CarePlanRepository;
 use GuzzleHttp\Psr7\Response as PsrResponse;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
@@ -31,7 +32,6 @@ use RuntimeException;
 use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\Feature\Composition\UsesCompositionDictionaries;
 use Tests\TestCase;
-use Illuminate\Database\Eloquent\Collection;
 
 class CarePlanAsyncSyncTest extends TestCase
 {
@@ -57,10 +57,12 @@ class CarePlanAsyncSyncTest extends TestCase
 
         $component = Livewire::test(PatientCarePlans::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])
             ->call('sync')->assertSee(__('care-plan.sync_first_page'))->assertDontSee(__('care-plan.sync_success'))
-            ->assertDontSee('First page summary')->assertNotDispatched('flashMessage')
-            ->set('filterCompleteness', 'all')->assertSee('First page summary');
+            ->assertSet('carePlans', [])->assertNotDispatched('flashMessage');
 
         $plan = CarePlan::whereUuid($summary['id'])->firstOrFail();
+        // A summary may be offered in related-plan filters without being a registry row.
+        $component->assertDontSeeHtml('wire:key="care-plan-'.$plan->id.'"')
+            ->set('filterCompleteness', 'all')->assertSeeHtml('wire:key="care-plan-'.$plan->id.'"');
         $this->assertNull($plan->detailsSyncedAt);
         $batch = Bus::findBatch($component->get('syncBatchId'));
         $this->assertSame($person->uuid, $batch->options['patient_uuid']);

@@ -66,15 +66,15 @@ class CarePlanRegistryQualityTest extends TestCase
 
         foreach ([CarePlanIndex::class, PatientCarePlans::class] as $component) {
             Livewire::test($component, ['legalEntity' => $legalEntity, 'personId' => $person->id])
-                ->assertSeeInOrder(['Full active', 'Full new', 'Full draft', 'Full on-hold'])
-                ->assertDontSee('Full terminated')
-                ->set('filterStatus', '')->call('search')
-                ->assertSeeInOrder(['Full active', 'Full new', 'Full draft', 'Full on-hold', 'Full terminated'])
-                ->assertDontSee('Summary only')->assertDontSee('Incomplete activity')
-                ->set('filterCompleteness', 'incomplete')->assertSee('Summary only')->assertSee('Incomplete activity')->assertDontSee('Full active')
-                ->set('filterCompleteness', 'all')->assertSee('Full active')->assertSee('Summary only')
+                ->assertSet('carePlans', static fn ($plans): bool => collect($plans)->pluck('id')->all() === array_slice($ids, 0, 4))
+                ->assertDontSeeHtml('wire:key="care-plan-'.$ids[4].'"')
+                ->set('filterStatus', '')->call($component === PatientCarePlans::class ? 'loadCarePlans' : 'search')
+                ->assertSet('carePlans', static fn ($plans): bool => collect($plans)->pluck('id')->all() === $ids)
+                ->assertDontSeeHtml('wire:key="care-plan-'.$legacy->id.'"')->assertDontSeeHtml('wire:key="care-plan-'.$partial->id.'"')
+                ->set('filterCompleteness', 'incomplete')->assertSeeHtml('wire:key="care-plan-'.$legacy->id.'"')->assertSeeHtml('wire:key="care-plan-'.$partial->id.'"')->assertDontSeeHtml('wire:key="care-plan-'.$ids[0].'"')
+                ->set('filterCompleteness', 'all')->assertSeeHtml('wire:key="care-plan-'.$ids[0].'"')->assertSeeHtml('wire:key="care-plan-'.$legacy->id.'"')
                 ->call('resetFilters')->assertSet('filterCompleteness', 'complete')->assertSet('filterStatus', 'current')
-                ->assertDontSee('Summary only')->assertDontSee('Full terminated');
+                ->assertDontSeeHtml('wire:key="care-plan-'.$legacy->id.'"')->assertDontSeeHtml('wire:key="care-plan-'.$ids[4].'"');
         }
         Http::assertNothingSent();
     }
@@ -104,9 +104,9 @@ class CarePlanRegistryQualityTest extends TestCase
         $this->assertSame([$incomplete->id], $repository->listing($legalEntity->id, ['completeness' => 'incomplete'])->modelKeys());
         foreach ([CarePlanIndex::class, PatientCarePlans::class] as $component) {
             Livewire::test($component, ['legalEntity' => $legalEntity, 'personId' => $person->id])
-                ->assertSee('Local draft draft')->assertSee('Local draft DRAFT')->assertDontSee('Needs remote details')
-                ->set('filterCompleteness', 'incomplete')->assertSee('Needs remote details')
-                ->assertDontSee('Local draft draft')->assertDontSee('Local draft DRAFT');
+                ->assertSeeHtml('wire:key="care-plan-'.$drafts[0]->id.'"')->assertSeeHtml('wire:key="care-plan-'.$drafts[1]->id.'"')->assertDontSeeHtml('wire:key="care-plan-'.$incomplete->id.'"')
+                ->set('filterCompleteness', 'incomplete')->assertSeeHtml('wire:key="care-plan-'.$incomplete->id.'"')
+                ->assertDontSeeHtml('wire:key="care-plan-'.$drafts[0]->id.'"')->assertDontSeeHtml('wire:key="care-plan-'.$drafts[1]->id.'"');
         }
         Http::assertNothingSent();
     }

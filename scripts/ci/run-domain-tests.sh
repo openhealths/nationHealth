@@ -36,7 +36,9 @@ DOMAIN_PATHS=(
   tests/Unit/Services/MedicalEvents/CarePlanActivityLifecycleServiceTest.php
   tests/Unit/Services/MedicalEvents/CarePlanLifecycleServiceTest.php
   tests/Unit/Services/MedicalEvents/EHealthJobResolverTest.php
+  tests/Unit/Services/MedicalEvents/EHealthRequestLifecycleServiceTest.php
   tests/Unit/Services/MedicalEvents/MedicationRequestSignPayloadTest.php
+  tests/Unit/Services/MedicalEvents/PrescriptionRulesTest.php
   tests/Unit/Services/MedicalEvents/Mappers/CarePlanMapperTest.php
   tests/Unit/Services/MedicalEvents/Mappers/CarePlanActivityMapperTest.php
   tests/Unit/Services/MedicalEvents/Mappers/MedicationRequestMapperTest.php
@@ -49,6 +51,10 @@ DOMAIN_PATHS=(
   tests/Unit/Services/MedicalEvents/DeviceRequestMapperTest.php
   tests/Unit/Services/MedicalEvents/DeviceRequestPrescribingTest.php
   tests/Unit/Services/MedicalEvents/DeviceProgramParticipationGuardTest.php
+  tests/Unit/Services/MedicalEvents/ClinicalIdentifiersTv39Test.php
+  tests/Unit/Services/MedicalEvents/EncounterCancellationPaginationTest.php
+  tests/Unit/Classes/EHealth/Api/DeviceDefinitionContractTest.php
+  tests/Unit/Classes/EHealth/Api/EncounterCancellationContractTest.php
   tests/Unit/Services/MedicalEvents/EncounterReferralDisplayTest.php
   tests/Unit/eHealth/Api/Patient/MedicationRequestRejectPayloadTest.php
   tests/Unit/eHealth
@@ -57,8 +63,8 @@ DOMAIN_PATHS=(
   tests/Feature/Party
   tests/Feature/CarePlan
   tests/Feature/CarePlanActivityPayloadTest.php
-  tests/Feature/Encounter/EncounterDocumentPagesTest.php
-  tests/Feature/Encounter/EncounterTransferDivisionLookupTest.php
+  tests/Feature/Encounter
+  tests/Feature/MedicalEvents/PatientSummaryTv39AuthorizationTest.php
   tests/Feature/MedicationRequest
   tests/Feature/DeviceRequest
   tests/Feature/MedicationRequestTest.php

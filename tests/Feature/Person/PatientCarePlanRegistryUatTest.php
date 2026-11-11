@@ -4,32 +4,31 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Person;
 
+use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
+use App\Classes\eHealth\EHealthResponse;
 use App\Enums\User\Role;
+use App\Jobs\CarePlanFullSync;
 use App\Livewire\CarePlan\CarePlanIndex;
 use App\Livewire\Person\Records\PatientCarePlans;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\LegalEntity;
-use App\Repositories\CarePlanRepository;
+use App\Models\Person\Person;
+use App\Repositories\Repository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Livewire;
+use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\Feature\Composition\UsesCompositionDictionaries;
 use Tests\TestCase;
-use App\Repositories\CarePlanActivityRepository;
-use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Crypt;
-use App\Jobs\CarePlanFullSync;
-use App\Models\Person\Person;
-use Mockery;
-use App\Classes\eHealth\EHealthResponse;
-use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
 
 class PatientCarePlanRegistryUatTest extends TestCase
 {
@@ -67,7 +66,7 @@ class PatientCarePlanRegistryUatTest extends TestCase
         ]);
         $resource = json_decode(file_get_contents(base_path('tests/Fixtures/CarePlan/plan.json')), true, flags: JSON_THROW_ON_ERROR);
         $resource['title'] = 'Canonical plan';
-        $repository = app(CarePlanRepository::class);
+        $repository = Repository::carePlan();
         $canonical = $repository->storeResource($resource, $person->id, $legalEntity->id);
         $ids = [$legacy->id, $draft->id, $canonical->id];
 
@@ -77,15 +76,15 @@ class PatientCarePlanRegistryUatTest extends TestCase
 
         foreach ([PatientCarePlans::class, CarePlanIndex::class] as $componentClass) {
             $component = Livewire::test($componentClass, ['legalEntity' => $legalEntity, 'personId' => $person->id])
-                ->assertOk()->assertDontSee('Legacy registered plan')->assertSee('Legacy local draft')->assertSee('Canonical plan')
-                ->set('filterCompleteness', 'all')->assertSee('Legacy registered plan')
+                ->assertOk()->assertDontSeeHtml('wire:key="care-plan-'.$legacy->id.'"')->assertSee('Legacy local draft')->assertSee('Canonical plan')
+                ->set('filterCompleteness', 'all')->assertSeeHtml('wire:key="care-plan-'.$legacy->id.'"')->assertSee('Legacy registered plan')
                 ->assertSee(__('care-plan.registry_incomplete'))->assertSee(__('care-plan.draft_backfill_required'))
                 ->assertSee(route('care-plans.show', [$legalEntity, $legacy->id]), false)
                 ->assertDontSee(route('care-plans.edit', [$legalEntity, $draft->id]))
                 ->assertSee(route('care-plans.show', [$legalEntity, $canonical->id]), false);
             if ($componentClass === PatientCarePlans::class) {
-                $component->set('filterName', 'Canonical')->call('search')->assertDontSee('Legacy registered plan')
-                    ->call('resetFilters')->assertDontSee('Legacy registered plan')->assertSee('Legacy local draft');
+                $component->set('filterName', 'Canonical')->call('loadCarePlans')->assertDontSeeHtml('wire:key="care-plan-'.$legacy->id.'"')
+                    ->call('resetFilters')->assertDontSeeHtml('wire:key="care-plan-'.$legacy->id.'"')->assertSee('Legacy local draft');
             }
         }
 
@@ -98,7 +97,7 @@ class PatientCarePlanRegistryUatTest extends TestCase
     public function test_canonical_plan_with_legacy_activity_offers_read_only_details(): void
     {
         ['person' => $person, 'legalEntity' => $legalEntity] = $this->compositionFixture(scopes: ['care_plan:read']);
-        $repository = app(CarePlanRepository::class);
+        $repository = Repository::carePlan();
         $resource = json_decode(file_get_contents(base_path('tests/Fixtures/CarePlan/plan.json')), true, flags: JSON_THROW_ON_ERROR);
         $resource['title'] = 'Partially imported plan';
         $plan = $repository->storeResource($resource, $person->id, $legalEntity->id);
@@ -115,7 +114,7 @@ class PatientCarePlanRegistryUatTest extends TestCase
         $this->assertTrue($repository->findById($plan->id)->requiresFhirImport());
         $activity = CarePlanActivity::whereCarePlanId($plan->id)->firstOrFail();
         $this->expectException(InvalidArgumentException::class);
-        app(CarePlanActivityRepository::class)->getResource($activity->id);
+        Repository::carePlanActivity()->getResource($activity->id);
     }
 
     public function test_full_import_unlocks_the_existing_legacy_plan_without_creating_a_duplicate(): void
@@ -126,7 +125,7 @@ class PatientCarePlanRegistryUatTest extends TestCase
             'personId' => $person->id, 'legalEntityId' => $legalEntity->id,
             'uuid' => $resource['id'], 'title' => 'Legacy before import', 'status' => 'active',
         ]);
-        $repository = app(CarePlanRepository::class);
+        $repository = Repository::carePlan();
         $imported = $repository->storeAggregate($resource, [], $person->id, $legalEntity->id);
 
         $this->assertSame($legacy->id, $imported->id);
