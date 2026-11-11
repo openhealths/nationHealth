@@ -1427,7 +1427,7 @@ class CarePlanLifecycleTest extends TestCase
     {
         [$plan, $activity, $service] = $this->deviceRequestFormContext();
         $service->shouldReceive('carePlanContext')->once()
-            ->with($this->person, $plan->uuid, $activity->uuid)
+            ->with($this->person, $plan->uuid, $activity->uuid, $this->employee->uuid)
             ->andReturn(['detail' => ['quantity' => ['code' => 'piece']]]);
 
         Livewire::withQueryParams(['carePlan' => $plan->id, 'activity' => $activity->id])
@@ -1435,6 +1435,7 @@ class CarePlanLifecycleTest extends TestCase
             ->assertOk()->assertHasNoErrors()
             ->assertSet('carePlanUuid', $plan->uuid)
             ->assertSet('activityUuid', $activity->uuid);
+        $this->assertNull(session('error'));
     }
 
     public function test_device_request_form_rejects_activity_from_another_plan(): void

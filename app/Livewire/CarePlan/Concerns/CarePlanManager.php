@@ -31,6 +31,7 @@ use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Services\MedicalEvents\PatientApprovalService;
 use App\Traits\SynchronizesCarePlans;
 use Exception;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
@@ -108,7 +109,25 @@ trait CarePlanManager
     {
         $repository = Repository::carePlan();
         $activityRepository = Repository::carePlanActivity();
-        $this->authorizeCarePlanWrite();
+        if (in_array($this->actionType, ['recall_referral', 'cancel_referral'], true)) {
+            // Recheck the registered referral's own permission when signing, including after its care plan closes.
+            try {
+                $request = app(MedicalRequestOwnership::class)
+                    ->serviceForPerson((string) $this->referralRequestIdToSign, $this->carePlan->personId);
+            } catch (ModelNotFoundException) {
+                Session::flash('error', __('care-plan.document_context_unavailable'));
+
+                return;
+            }
+            $operation = $this->actionType === 'recall_referral' ? 'recall' : 'cancel';
+            if (Auth::user()->cannot($operation, $request)) {
+                Session::flash('error', __('referrals.messages.action_unavailable'));
+
+                return;
+            }
+        } else {
+            $this->authorizeCarePlanWrite();
+        }
         if (in_array($this->actionType, ['cancel', 'complete'], true) && $this->guardPlanLifecycleAccess($this->actionType)) {
             return;
         }
