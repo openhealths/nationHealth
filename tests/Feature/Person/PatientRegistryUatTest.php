@@ -64,11 +64,11 @@ class PatientRegistryUatTest extends TestCase
         $first = $this->compositionRow($person->uuid, $employee->uuid, $legalEntity->uuid);
         $second = $this->compositionRow($person->uuid, $employee->uuid, $legalEntity->uuid);
         config(['ehealth.api.page_size' => 1]);
-        // Subject may be absent from a search row; the patient-wide query supplies it,
-        // then each result's encounter/episode context permits a validated full detail read.
+        // Published native summaries have no author or subject. The patient query and
+        // each result's encounter/episode supply scope; validated detail supplies the author.
         $summaries = [];
         foreach ([$first, $second] as $document) {
-            $summaries[] = array_replace(Arr::only($document, ['identifier', 'status', 'title', 'type', 'date', 'encounter', 'author']), [
+            $summaries[] = array_replace(Arr::only($document, ['identifier', 'status', 'title', 'type', 'date', 'encounter']), [
                 'title' => 'Search summary',
                 'episodeOfCare' => $this->compositionReference('episode', (string) Str::uuid())['identifier'],
             ]);
@@ -98,6 +98,8 @@ class PatientRegistryUatTest extends TestCase
         $this->assertSame(2, Composition::wherePersonId($person->id)->count());
         $this->assertSame($first['title'], Composition::whereUuid($first['identifier']['value'])->firstOrFail()->title);
         $this->assertSame($second['title'], Composition::whereUuid($second['identifier']['value'])->firstOrFail()->title);
+        $this->assertSame($employee->uuid, Repository::composition()->findForPatient($person, $first['identifier']['value'])->authorUuid);
+        $this->assertSame($employee->uuid, Repository::composition()->findForPatient($person, $second['identifier']['value'])->authorUuid);
         Http::assertSentCount(10);
         $this->assertSame([0, 1, 2, 0, 1, 2], Http::recorded(
             static fn ($request): bool => str_contains($request->url(), '/searchComposition')
