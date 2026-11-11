@@ -79,7 +79,8 @@ class CarePlanReadAccessTest extends TestCase
         $this->plan($context, ['status' => 'draft']);
         $this->plan($context, ['detailsSyncedAt' => now()]);
         $this->plan($context, ['uuid' => null]);
-        $otherContext = $this->compositionFixture(scopes: ['care_plan:read']);
+        // This unrelated patient/facility needs no login role and must not replace the acting specialist's permissions.
+        $otherContext = $this->compositionFixture(scopes: []);
         $this->plan($otherContext);
         $this->plan($context, ['legalEntityId' => $otherContext['legalEntity']->id]);
         $this->instance('legalEntity', $context['legalEntity']);
@@ -98,7 +99,8 @@ class CarePlanReadAccessTest extends TestCase
     {
         $context = $this->context();
         $plan = $this->plan($context);
-        $otherContext = $this->compositionFixture(scopes: ['care_plan:read']);
+        // This unrelated patient/facility needs no login role and must not replace the acting specialist's permissions.
+        $otherContext = $this->compositionFixture(scopes: []);
         $this->plan($context, ['uuid' => $plan->uuid, 'legalEntityId' => $otherContext['legalEntity']->id]);
         $this->instance('legalEntity', $context['legalEntity']);
         setPermissionsTeamId($context['legalEntity']->id);

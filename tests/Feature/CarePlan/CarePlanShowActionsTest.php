@@ -724,12 +724,21 @@ class CarePlanShowActionsTest extends TestCase
 
     public function test_encounter_referral_signing_persists_for_the_encounter_patient_before_submission(): void
     {
+        $permission = Permission::findOrCreate('service_request:write', 'web');
+        $permission->legalEntityTypes()->syncWithoutDetaching([$this->legalEntity->legalEntityTypeId]);
+        $role = RoleModel::findOrCreate($this->employee->employeeType, 'web');
+        $role->syncPermissions([$permission]);
+        $this->user->assignRoleParent($role);
+        Cache::memo()->forget('allowed_permissions:'.$this->legalEntity->id.':web');
+        $this->user = $this->user->fresh();
         $this->actingAs($this->user);
         Http::preventStrayRequests();
         $encounter = new Encounter();
         $encounter->setRawAttributes(['id' => 99, 'person_id' => $this->person->id, 'uuid' => (string) Str::uuid()]);
         $encounter->exists = true;
         $encounter->setRelation('episode', null);
+        $encounter->setRelation('person', $this->person);
+        $encounter->setRelation('class', null);
         $context = Identifier::create(['value' => $encounter->uuid]);
         $request = ServiceRequestRequest::create([
             'uuid' => (string) Str::uuid(), 'person_id' => $this->person->id,
@@ -748,6 +757,7 @@ class CarePlanShowActionsTest extends TestCase
         ]);
         $lifecycle = $this->mock(ReferralRequestLifecycleService::class);
         $lifecycle->shouldReceive('resolveEncounterEmployeeContext')->andReturn([
+            'employee_id' => $this->employee->id,
             'employee_uuid' => $this->employee->uuid, 'legal_entity_uuid' => $this->legalEntity->uuid,
         ]);
         $lifecycle->shouldReceive('buildSignDbData')->andReturn([
@@ -756,7 +766,8 @@ class CarePlanShowActionsTest extends TestCase
             'ended_at' => now()->addDay()->toIso8601String(),
         ]);
         $this->mock(SignatureService::class)->shouldReceive('signData')->once()->andReturn('synthetic-signature');
-        $repository = $this->mock(ServiceRequestRequestRepository::class);
+        // Keep patient, author and activity resolution real, including the checks before and after KEP.
+        $repository = $this->partialMock(ServiceRequestRequestRepository::class);
         $repository->shouldReceive('hasPendingSubmission')->once()->with(Mockery::on(static fn ($record): bool => $record->id === $request->id && $record->personId === $request->personId))->andReturn(false);
         $repository->shouldReceive('submissionState')->once()->with(Mockery::on(static fn ($record): bool => $record->id === $request->id && $record->personId === $request->personId))->andReturn([
             'id' => 1, 'status' => JobStatus::PENDING->value, 'error' => null,
@@ -765,7 +776,7 @@ class CarePlanShowActionsTest extends TestCase
             ->with(Mockery::on(static fn ($record): bool => $record->id === $request->id && $record->personId === $request->personId))
             ->andReturn(['id' => $request->uuid]);
         $repository->shouldReceive('storeResource')->once()
-            ->with(Mockery::type('array'), $this->person->id, $this->employee->id, null)->andReturn($request);
+            ->with(Mockery::type('array'), Mockery::on(fn (Person $person): bool => $person->is($this->person)), $this->employee->id, null)->andReturn($request);
         $previous = Model::preventsAccessingMissingAttributes();
         Model::preventAccessingMissingAttributes();
 

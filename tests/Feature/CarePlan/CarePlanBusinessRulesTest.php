@@ -126,7 +126,12 @@ class CarePlanBusinessRulesTest extends TestCase
         $api->stub(static function (Request $request) use (&$requestedUrls, $methodUuid) {
             $requestedUrls[] = $request->url();
 
-            return Http::response(['data' => [['id' => $methodUuid, 'type' => 'OTP', 'phone_number' => '+38093*****85']]]);
+            // GENERAL MIS 9.15.9 requires provenance on each authentication method.
+            return Http::response(['data' => [[
+                'id' => $methodUuid, 'type' => 'OTP', 'phone_number' => '+38093*****85',
+                'inserted_by' => 'af0264f5-438c-4773-9960-1c3e49a9a0ed',
+                'inserted_at' => '2026-01-01T00:00:00Z',
+            ]]]);
         });
         $this->instance(ApiPerson::class, $api);
         Queue::fake();
