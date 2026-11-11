@@ -1,13 +1,10 @@
-@php
-    use App\Livewire\Division\HealthcareService\{HealthcareServiceCreate, HealthcareServiceEdit};
-    use App\Models\{HealthcareService, LegalEntity};
-
-    $healthcareServiceModel = HealthcareService::find($healthcareServiceId);
-@endphp
+@use('App\Models\LegalEntity')
 
 <section class="section-form">
     <x-header-navigation class="breadcrumb-form" title="{{ __('forms.medical_service') }}">
         <x-slot name="title">{{ __('forms.medical_service') }}</x-slot>
+
+        @yield('healthcare-service-header-actions')
     </x-header-navigation>
 
     <div class="form shift-content" wire:key="{{ time() }}">
@@ -203,27 +200,7 @@
         <div class="mt-10 flex justify-start gap-4">
             <a href="{{ url()->previous() }}" type="button" class="button-minor"> {{ __('forms.back') }} </a>
 
-            @if (get_class($this) === HealthcareServiceCreate::class)
-                @can('create', HealthcareService::class)
-                    <button wire:click.prevent="createLocally" type="submit" class="button-primary-outline">
-                        {{ __('forms.save') }}
-                    </button>
-                @endcan
-
-                @can('create', HealthcareService::class)
-                    <button wire:click="create" type="submit" class="button-primary">
-                        {{ __('forms.save_and_send') }}
-                    </button>
-                @endcan
-            @endif
-
-            @if (get_class($this) === HealthcareServiceEdit::class)
-                @can('edit', $healthcareServiceModel)
-                    <button wire:click="create" type="submit" class="button-primary">
-                        {{ __('forms.save_and_send') }}
-                    </button>
-                @endcan
-            @endif
+            @yield('healthcare-service-actions')
         </div>
     </div>
 

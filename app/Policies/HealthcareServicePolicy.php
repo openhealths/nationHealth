@@ -25,11 +25,25 @@ class HealthcareServicePolicy
     }
 
     /**
-     * User allowed to synchronize healthcare services.
+     * User allowed to synchronize healthcare services, or exactly that one when it is given.
      */
-    public function sync(User $user): Response
+    public function sync(User $user, ?HealthcareService $healthcareService = null): Response
     {
         if ($user->cannot('healthcare_service:write') && $user->cannot('healthcare_service:read')) {
+            return Response::denyWithStatus(404);
+        }
+
+        if ($healthcareService === null) {
+            return Response::allow();
+        }
+
+        // Should belong to the same legal entity
+        if ($healthcareService->legalEntityId !== legalEntity()->id) {
+            return Response::denyWithStatus(404);
+        }
+
+        // A draft exists only locally, so there is nothing to get by its ID
+        if ($healthcareService->status === Status::DRAFT) {
             return Response::denyWithStatus(404);
         }
 

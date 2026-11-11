@@ -88,6 +88,7 @@ class HealthcareServiceForm extends Form
                     ->where('status', Status::ACTIVE)
             ],
             'category' => ['array', 'required'],
+            'category.coding' => ['required', 'array'],
             'category.coding.*.system' => ['required', 'string', Rule::in('HEALTHCARE_SERVICE_CATEGORIES')],
             'category.coding.*.code' => [
                 'required',
@@ -110,7 +111,7 @@ class HealthcareServiceForm extends Form
             ],
             'type' => ['array', 'nullable'],
             'type.coding.*.system' => $isTypeRequiredForCategory
-                ? ['nullable', 'string', Rule::in($typeDictionary)]
+                ? ['required', 'string', Rule::in($typeDictionary)]
                 : ['nullable', 'string'],
             'type.coding.*.code' => [
                 'nullable',

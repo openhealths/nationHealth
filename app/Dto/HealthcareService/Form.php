@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Dto\HealthcareService;
 
 use App\Core\Arr;
+use App\Dto\CodeableConcept\Form as CodeableConceptForm;
 use App\Models\HealthcareService;
-use App\Dto\Transform\CodeableConcept;
 use Symfony\Component\ObjectMapper\Attribute\Map;
 
 /**
@@ -16,21 +16,21 @@ use Symfony\Component\ObjectMapper\Attribute\Map;
 #[Map(source: HealthcareService::class)]
 class Form
 {
-    #[Map(source: '[category]', transform: [CodeableConcept::class, 'toArray'])]
-    public array $category = [];
+    #[Map(source: '[category]', transform: [CodeableConceptForm::class, 'map'])]
+    public CodeableConceptForm $category;
 
     public ?string $specialityType = null;
 
     public ?string $providingCondition = null;
 
-    #[Map(source: '[type]', transform: [CodeableConcept::class, 'toArray'])]
-    public ?array $type = null;
+    #[Map(source: '[type]', transform: [CodeableConceptForm::class, 'map'])]
+    public ?CodeableConceptForm $type = null;
 
     public ?string $licenseId = null;
 
     public ?string $comment = null;
 
-    #[Map(source: 'availableTime', transform: [self::class, 'camelCaseAvailableTime'])]
+    #[Map(source: '[availableTime]', transform: [self::class, 'camelCaseAvailableTime'])]
     public ?array $availableTime = null;
 
     public ?array $notAvailable = null;
@@ -54,8 +54,16 @@ class Form
      */
     public function toArray(): array
     {
-        $values = get_object_vars($this);
+        $values = [
+            'category' => $this->category->toArray(),
+            'specialityType' => $this->specialityType,
+            'providingCondition' => $this->providingCondition,
+            'licenseId' => $this->licenseId,
+            'comment' => $this->comment,
+            'availableTime' => $this->availableTime,
+            'notAvailable' => $this->notAvailable
+        ];
 
-        return $this->type === null ? Arr::except($values, ['type']) : $values;
+        return $this->type === null ? $values : [...$values, 'type' => $this->type->toArray()];
     }
 }

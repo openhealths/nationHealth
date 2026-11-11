@@ -19,7 +19,7 @@ class EHealthDatabaseBatchRepository extends DatabaseBatchRepository
 
         unset($batch->options['legal_entity_id']);
 
-        $this->connection->table($this->table)->insert([
+        $attributes = [
             'id' => $id,
             'name' => $batch->name,
             'total_jobs' => 0,
@@ -31,8 +31,11 @@ class EHealthDatabaseBatchRepository extends DatabaseBatchRepository
             'created_at' => time(),
             'cancelled_at' => null,
             'finished_at' => null,
-        ]);
+        ];
 
-        return $this->find($id);
+        $this->connection->table($this->table)->insert($attributes);
+
+        // All initial values are known here. Laravel refreshes the counters after adding the jobs.
+        return $this->toBatch((object) $attributes);
     }
 }

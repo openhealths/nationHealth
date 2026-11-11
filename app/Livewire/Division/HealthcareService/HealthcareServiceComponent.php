@@ -11,6 +11,7 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Division\Forms\HealthcareServiceForm as Form;
 use App\Models\Division;
+use App\Models\HealthcareService;
 use App\Models\LegalEntity;
 use App\Traits\FormTrait;
 use App\Traits\WorkTimeUtilities;
@@ -117,6 +118,17 @@ class HealthcareServiceComponent extends Component
             ->map(static fn (string $name, string $code): array => ['code' => $code, 'name' => $name])
             ->values()
             ->all();
+    }
+
+    /**
+     * Healthcare service of the edit and view pages.
+     *
+     * @return HealthcareService
+     */
+    #[Computed]
+    public function healthcareService(): HealthcareService
+    {
+        return HealthcareService::findOrFail($this->healthcareServiceId);
     }
 
     /**

@@ -28,9 +28,9 @@
     <div class="mt-10 flex justify-start gap-4">
         <a href="{{ url()->previous() }}" type="button" class="button-minor"> {{ __('forms.back') }} </a>
 
-        @if ($canUpdate)
+        @can('update', $this->healthcareService)
             <button wire:click.prevent="update" type="submit" class="button-primary">{{ __('forms.update') }}</button>
-        @endif
+        @endcan
     </div>
 
     <x-forms.loading />

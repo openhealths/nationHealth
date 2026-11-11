@@ -4,22 +4,23 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
+use App\Classes\eHealth\Api\Responses\Collections\HealthcareServiceDetails;
+use App\Classes\eHealth\Api\Responses\Collections\HealthcareServiceGetMany;
+use App\Classes\eHealth\EHealthRequest as Request;
+use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\HealthcareServiceErrorTranslator;
+use App\Contracts\ApiErrorTranslator;
+use App\Contracts\EHealthApi;
+use App\Enums\HealthcareService\Status;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use App\Models\LegalEntity as LegalEntityModel;
-use App\Models\Division as DivisionModel;
 use App\Rules\InDictionary;
-use Illuminate\Support\Facades\Log;
-use App\Classes\eHealth\EHealthResponse;
-use App\Classes\eHealth\Api\Responses\HealthcareServiceResponse;
 use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use App\Classes\eHealth\EHealthRequest as Request;
-use App\Classes\eHealth\Errors\HealthcareServiceErrorTranslator;
-use App\Contracts\ApiErrorTranslator;
 
-class HealthcareService extends Request
+class HealthcareService extends Request implements EHealthApi
 {
     protected const string URL = '/api/healthcare_services';
 
@@ -36,7 +37,7 @@ class HealthcareService extends Request
      *     providing_condition?: string, // Dictionary PROVIDING_CONDITION
      *     category?: string, // Dictionary HEALTHCARE_SERVICE_CATEGORIES
      *     type?: string, // Dictionary of types for category
-     *     status?: string, // Entity status
+     *     status?: value-of<Status>,
      *     page?: int,
      *     page_size?: int
      * } $query
@@ -47,11 +48,24 @@ class HealthcareService extends Request
     {
         $this->setDefaultPageSize();
         $this->setValidator($this->validateMany(...));
-        $this->setMapper($this->mapMany(...));
 
         $mergedQuery = array_merge($this->options['query'], $query);
 
         return $this->get(self::URL, $mergedQuery);
+    }
+
+    /**
+     * Get healthcare service details by ID.
+     *
+     * @param  string  $id  unique eHealth identifier
+     * @return PromiseInterface|EHealthResponse
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     */
+    public function getById(string $id): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator($this->validateResponse(...));
+
+        return $this->get(self::URL . '/' . $id);
     }
 
     /**
@@ -78,7 +92,7 @@ class HealthcareService extends Request
      * @return EHealthResponse|PromiseInterface
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
-    public function create(array $data = []): PromiseInterface|EHealthResponse
+    public function create(array $data): PromiseInterface|EHealthResponse
     {
         $this->setValidator($this->validateResponse(...));
 
@@ -124,78 +138,39 @@ class HealthcareService extends Request
     }
 
     /**
-     * Validate healthcare service response (create, update, activate, deactivate),
-     * see: https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/healthcare-services/create-healthcare-service
+     * Validate healthcare service response (get by id, create, update, activate, deactivate).
      */
-    protected function validateResponse(EHealthResponse $response): HealthcareServiceResponse
+    protected function validateResponse(EHealthResponse $response): HealthcareServiceDetails
     {
-        $data = $response->getData();
-
-        $replaced = self::replaceEHealthPropNames($data);
-
-        $validator = Validator::make($replaced, $this->validationRules());
+        $validator = Validator::make($response->getData(), $this->validationRules());
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
         }
 
-        return new HealthcareServiceResponse($validator->validate());
+        return new HealthcareServiceDetails($validator->validate());
     }
 
     /**
-     * Validate list of healthcare services.
+     * Validate list of healthcare services; each item has the same shape as a single healthcare service response.
      *
      * @param  EHealthResponse  $response
-     * @return array
+     * @return HealthcareServiceGetMany
      */
-    protected function validateMany(EHealthResponse $response): array
+    protected function validateMany(EHealthResponse $response): HealthcareServiceGetMany
     {
-        $replaced = [];
-        foreach ($response->getData() as $data) {
-            $replaced[] = self::replaceEHealthPropNames($data);
-        }
-
         // Add *. to every rule
         $rules = collect($this->validationRules())
             ->mapWithKeys(static fn (string|array $rule, string $key) => ["*.$key" => $rule])
             ->toArray();
 
-        $validator = Validator::make($replaced, $rules);
+        $validator = Validator::make($response->getData(), $rules);
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
         }
 
-        return $validator->validate();
-    }
-
-    /**
-     * Map UUID values to ID for multiple records.
-     *
-     * @param  array  $validated
-     * @return array
-     */
-    protected function mapMany(array $validated): array
-    {
-        // Get unique uuids.
-        $divisionUuids = collect($validated)->pluck('division_id')->unique()->filter()->values();
-        $legalEntityUuids = collect($validated)->pluck('legal_entity_id')->unique()->filter()->values();
-
-        $divisionMap = DivisionModel::whereIn('uuid', $divisionUuids)
-            ->pluck('id', 'uuid')
-            ->toArray();
-
-        $legalEntityMap = LegalEntityModel::whereIn('uuid', $legalEntityUuids)
-            ->pluck('id', 'uuid')
-            ->toArray();
-
-        // Map uuid to id
-        return collect($validated)->map(static function (array $item) use ($divisionMap, $legalEntityMap) {
-            $item['division_id'] = $divisionMap[$item['division_id']];
-            $item['legal_entity_id'] = $legalEntityMap[$item['legal_entity_id']];
-
-            return $item;
-        })->toArray();
+        return new HealthcareServiceGetMany($validator->validate());
     }
 
     /**
@@ -225,9 +200,9 @@ class HealthcareService extends Request
             'coverage_area' => 'nullable|array',
             'coverage_area.*' => 'required_with:coverage_area|string',
             'division_id' => 'required|string',
-            'uuid' => 'required|string',
-            'ehealth_inserted_at' => 'required|date',
-            'ehealth_inserted_by' => 'required|uuid',
+            'id' => 'required|string',
+            'inserted_at' => 'required|date',
+            'inserted_by' => 'required|uuid',
             'is_active' => 'required|boolean',
             'legal_entity_id' => 'required|string',
             'license_id' => 'nullable|string',
@@ -252,32 +227,8 @@ class HealthcareService extends Request
                 new InDictionary('HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES')
             ],
             'type.text' => 'nullable|string',
-            'ehealth_updated_at' => 'required|date',
-            'ehealth_updated_by' => 'required|uuid'
+            'updated_at' => 'required|date',
+            'updated_by' => 'required|uuid'
         ];
-    }
-
-    /**
-     * Replace eHealth property names with the ones used in the application.
-     * E.g., id => uuid.
-     */
-    protected static function replaceEHealthPropNames(array $properties): array
-    {
-        $replaced = [];
-
-        foreach ($properties as $name => $value) {
-            $newName = match ($name) {
-                'id' => 'uuid',
-                'inserted_at' => 'ehealth_inserted_at',
-                'inserted_by' => 'ehealth_inserted_by',
-                'updated_at' => 'ehealth_updated_at',
-                'updated_by' => 'ehealth_updated_by',
-                default => $name
-            };
-
-            $replaced[$newName] = $value;
-        }
-
-        return $replaced;
     }
 }
