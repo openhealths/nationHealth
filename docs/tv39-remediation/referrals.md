@@ -1,6 +1,6 @@
 # ТВ39: електронні направлення, #1202
 
-База: затверджена редакція 39 (наказ НСЗУ №464 від 25.08.2026), upstream/main `3ae4e34e3631ed4bba711c3b4ab6d96d701e0cc5`. Частина umbrella #1201. Проєкт редакції 40 не застосовувався.
+Вихідна база: затверджена редакція 39 (наказ НСЗУ №464 від 25.08.2026), upstream/main `3ae4e34e3631ed4bba711c3b4ab6d96d701e0cc5`. Оновлення main до `ea188869` інтегровано. Частина umbrella #1201. Проєкт редакції 40 не застосовувався.
 
 ## План і результат
 
@@ -20,6 +20,7 @@
 | R12 | 3.17.4.5: попередження про залишок | Реєстр/картка/взаємодія показують remaining quantity та checkbox; сервіс повторно читає validated актуальні дані і вимагає acknowledgement до completion RPC; pending не видається за completed. `ClinicalReferralCompletionTest`, `ReferralExecutorPhase4Test`. |
 | U05 | ПМД 3.2.2.15; СМД 3.3.1.19: перегляд ЕМЗ погашення видавцем | Read-only modal Encounter/Procedure/DiagnosticReport за completedWith; issuer LE, patient identity, type/read scope перед API; full response identity перевіряється до UI, чужі EMЗ не імпортуються в локальну БД. `ReferralTv39WorkflowTest`. |
 | U06 | 3.3.4.1.3; 3.17.1.15: refusal/стаціонар/переведення | Збережено AMB/service_delivery_location/new episode для refusal, actual server rule забороняє existing episode. SPECIALIST INPATIENT дозволено transfer/lab для Person/Preperson; counselling лише Person discharge. Preperson має окремий FK, маршрути/context/selection/import/complete перевіряють тип пацієнта, numeric ID collision не перетинає records. `ReferralTv39WorkflowTest`. |
+| U08 (R) | Видимий feedback, signing модалі, друк та pending | Session flash із явним consumer; signing field errors зберігають модаль; pending не підтверджує успіх; перегляд/друк застосовують read policy. `ReferralTv39WorkflowTest`, `ReferralRegisteredActionsTest`, `ReferralLifecycleTest`, `EncounterDocumentPagesTest` і 14 browser scenarios. Живі KEP/SMS/ЕСОЗ outcomes залишаються інтеграційним UAT. |
 | G01 (R) | API contracts та response-before-consumption | ServiceRequest resource/list/specimen/qualify/prequalify/receipt/SMS, nested service dictionary та Division search мають валідатори. Delegation зберігає validator; перед mapper/storage/UI/cache застосовується validate(). Final submission перевіряє всі native ресурси списку до вибору/merge; malformed result залишає pending без мутацій. Окремо підтримано документовані status-only acknowledgements. `ServiceRequestContractTv39Test`, `ServiceRequestSubmissionTest`, `DivisionSearchContractTest`. Спільні DeviceDefinition reads належать G01 umbrella. |
 | G02 (R) | 1.1.7: RFC4122 UUID першої версії | Нові клінічні referral ID утворюються `Uuid::uuid1()`; старі UUID під час редагування зберігаються, UI/cache keys не змінюються. `ReferralTv39WorkflowTest`. |
 
@@ -35,6 +36,8 @@ BA03/BA07 використовують спільний provider пов'язан
 
 Provider ПЛ з `12781f70` та selected-actor helper з `e07fc925` інтегровані без заміни encounter author історичним автором ПЛ. BA02 capacity враховує підтверджені направлення за distinct UUID і вже створені призначення; draft/pending не збільшують capacity. Відсутній або прострочений verified approval блокує створення й підписання.
 
+Після KEP обидві поверхні повторно перевіряють актуальну взаємодію, автора та збережену категорію перед storage/API. Зміна source status або inpatient rules під час підписання дає видиму відмову без збереження. BA04 використовує native clinical status: локальний display status `in_progress` після Use не замінює клінічний `active` для policy відкликання/помилки.
+
 ## Джерела контрактів
 
 Локальний офіційний архів ЕСОЗ `ehealth-documentation/openapi/preprod/medical-events.json` і `general-mis.json`, знімок 22.10.2026, та відповідні `references/preprod` сторінки Get Service Request Details, Get Service Requests in Specimen Context, Qualify/PreQualify/Use/Complete, Get Services Dictionary, Search Divisions. Деталі ресурсу, `used_by_legal_entity_history`, category/service group membership, identity/ref/envelope/paging правила звірені до реалізації. Medical Events paging використовує `page`, General MIS — `page_number`.
@@ -49,11 +52,15 @@ Runtime mapping: `ASSISTANT_SERVICE_REQUEST_ALLOWED_CATEGORIES` → `ehealth.ref
 
 ## Підсумок перевірок
 
-Фінальний broad run: **357 tests / 2057 assertions PASS**, одна наявна deprecation. Перевірено весь `tests/Feature/Referral`, реєстр, API controllers, standalone encounter pages, incoming state, Division lookup, patient referrals і referral mapper/lifecycle/signing/printout suites. У CI додано Division contract suite та EncounterReferralStateTest; нові feature suites входять через referral directory.
+Фінальний локальний broad run: **554 tests / 3562 assertions PASS**, одна наявна deprecation, без errors/failures/risky. Перевірено весь `tests/Feature/Referral`, реєстр, API controllers, standalone encounter pages, incoming state, Division lookup, patient referrals і referral mapper/lifecycle/signing/printout suites. Окремі негативні сценарії перевіряють stale approval/product/quantity, зміну source status/inpatient rules під час KEP, terminal меню, відмову доступу без SQL/API/queue та native identity/contracts.
 
-Pint: **61 touched PHP/Blade files PASS**. `git diff --check` PASS. Перевірено імпорти, repository factories, нові policy calls та переклади feedback.
+Pint: **86 PHP files PASS**. Повний import audit **101 PHP/Blade files PASS**, включно з існуючими рядками змінених файлів. `git diff --check` PASS. Перевірено repository factories, нові policy calls, allowed/denied paths та переклади видимого feedback.
 
 `PatientReferralDateFiltersTest` і `PatientReferralRegistryUatTest` мають власну вимогу literal database `testing`; їхні guards збережено. Повторний запуск цих двох suites виконує umbrella orchestration у підготовленій ізольованій конфігурації, не в `tv39_1202`.
+
+Chromium browser suite власника: **14/14 PASS** на 390/768/1440 px у світлій/темній темах. Real Blade/Alpine/Livewire fixtures перевіряють dropdown після scroll/morph, UUID аргументи recall/error, executor validation та local filters без HTTP. Fixture явно має потрібні scopes і проходить справжню registered-action policy. `npm run build` PASS.
+
+На об'єднаному `a22c42bf` локальний CP/Referral/Encounter прогін: **1170 tests / 6525 assertions**, 8 errors і 31 failures. 35 випадків направлень та чотири CP-випадки передано власникам для перевірки зі строгими Shared response-контрактами. Успішний owner broad run не є доказом проходження цієї інтеграції. Поточний CI не перевірявся: запити призупинено за дорученням користувача.
 
 ## Актуалізація main та дат роботи
 
