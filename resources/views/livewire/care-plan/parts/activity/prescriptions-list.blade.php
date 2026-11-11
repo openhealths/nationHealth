@@ -117,7 +117,7 @@
     @endif
 </div>
 
-@if ($prescriptionSmsConfirmationId !== null)
+@if (($prescriptionSmsConfirmationId ?? null) !== null)
     <div class="rounded-xl border p-4">
         <p>{{ __('medication-requests.sms_confirmation') }}</p>
         <button class="button-primary" wire:click="resendPrescriptionSms('{{ $prescriptionSmsConfirmationId }}')">
@@ -128,4 +128,4 @@
         </button>
     </div>
 @endif
-@include('livewire.medication-request.dispenses', ['items' => $ePrescriptionDispenses])
+@include('livewire.medication-request.dispenses', ['items' => ($ePrescriptionDispenses ?? [])])
