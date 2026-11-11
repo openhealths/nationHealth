@@ -7,10 +7,19 @@ namespace App\Policies;
 use App\Enums\CarePlanStatus;
 use App\Models\CarePlan;
 use App\Models\User;
+use App\Repositories\Repository;
+use App\Services\MedicalEvents\CarePlanApprovalService;
 use Illuminate\Auth\Access\Response;
 
 class CarePlanPolicy
 {
+    public function search(User $user): Response
+    {
+        return $user->can('care_plan:read') && $user->getCarePlanWriterEmployee() !== null
+            ? Response::allow()
+            : Response::deny(__('care-plan.sync_access_denied'));
+    }
+
     public function sync(User $user): Response
     {
         return $user->can('care_plan:read') && $user->activeEmployee() !== null
@@ -52,20 +61,20 @@ class CarePlanPolicy
     }
 
     /** A plan's registration does not itself grant patient access for prescribing. */
-    public function manageActivities(User $user, CarePlan $carePlan): Response
+    public function manageActivities(User $user, CarePlan $carePlan, ?string $actingEmployeeUuid = null): Response
     {
         $permission = $this->manage($user, $carePlan);
         if ($permission->denied()) {
             return $permission;
         }
         $legalEntity = legalEntity();
-        $employee = $user->getCarePlanWriterEmployee($carePlan->termsOfServiceCode());
+        $employee = $user->getCarePlanWriterEmployee($carePlan->termsOfServiceCode(), $actingEmployeeUuid);
         $status = CarePlanStatus::fromStored($carePlan->status);
         if ($employee === null || $legalEntity === null || $status === CarePlanStatus::DRAFT || $status->isTerminal()) {
             return Response::deny(__('care-plan.prescribing_patient_access_required'));
         }
-        $repository = app(\App\Repositories\CarePlanRepository::class);
-        if (app(\App\Services\MedicalEvents\CarePlanApprovalService::class)->skipsPatientOtp($carePlan, $legalEntity)
+        $repository = Repository::carePlan();
+        if (app(CarePlanApprovalService::class)->skipsPatientOtp($carePlan, $legalEntity)
             || $repository->hasGrantedApproval($carePlan, $employee->uuid)) {
             return Response::allow();
         }
@@ -98,7 +107,7 @@ class CarePlanPolicy
             return Response::denyWithStatus(404);
         }
 
-        if (\App\Repositories\Repository::carePlan()->hasPendingSubmission($carePlan)) {
+        if (Repository::carePlan()->hasPendingSubmission($carePlan)) {
             return Response::denyWithStatus(404);
         }
 

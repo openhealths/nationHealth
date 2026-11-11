@@ -9,7 +9,7 @@ use Throwable;
 /**
  * Search and flatten the eHealth services dictionary tree for referral pickers.
  */
-final class ServiceSearch
+class ServiceSearch
 {
     /**
      * Search requestable services by code or text name.

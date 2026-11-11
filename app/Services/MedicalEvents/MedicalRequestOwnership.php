@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
  * Livewire action arguments are client-controlled. Callers must not look up
  * requests globally by UUID.
  */
-final class MedicalRequestOwnership
+class MedicalRequestOwnership
 {
     public function medicationForPerson(string $uuid, int $personId): MedicationRequestRequest
     {

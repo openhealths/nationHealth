@@ -7,12 +7,67 @@ namespace App\Services\MedicalEvents;
 use App\Models\CarePlan;
 use App\Repositories\Repository;
 use Illuminate\Support\Arr;
+use Illuminate\Validation\ValidationException;
 
 /**
  * TV 3.10.2 activity create validations (providing conditions + rehab reason_reference).
  */
 class CarePlanActivityValidationService
 {
+    /** SPECIALITY_TYPE code, rather than a translated speciality label. */
+    private const string REHABILITATION_SPECIALITY = 'PHYSICAL_MEDICINE_AND_REHABILITATION';
+
+    public function allowsServiceMinutes(CarePlan $carePlan): bool
+    {
+        if (!$this->isRehabCategory($carePlan) || $carePlan->termsOfServiceCode() !== 'OUTPATIENT') {
+            return false;
+        }
+        $repository = Repository::carePlan();
+        $resource = $repository->getResource($carePlan);
+        $encounterUuid = data_get($resource, 'encounter.identifier.value');
+        if (!is_string($encounterUuid) || $encounterUuid === '') {
+            return false;
+        }
+        $encounter = $repository->findEncounter($encounterUuid, (int) $carePlan->personId);
+        $author = $carePlan->author;
+        // Unit eligibility follows the original plan/encounter author, even when another
+        // eligible physician now creates an activity under their own write approval.
+        if ($author === null || (int) $author->legalEntityId !== (int) $carePlan->legalEntityId
+            || data_get($resource, 'author.identifier.value') !== $author->uuid
+            || $encounter?->performer?->value !== $author->uuid) {
+            return false;
+        }
+
+        return $author->specialities()->whereSpeciality(self::REHABILITATION_SPECIALITY)
+            ->whereSpecialityOfficio(true)
+            ->where(static fn ($query) => $query->whereNull('valid_to_date')->orWhereDate('valid_to_date', '>=', today()))
+            ->exists();
+    }
+
+    public function assertServiceUnit(CarePlan $carePlan, string $code): void
+    {
+        if ($code === 'MINUTE' && !$this->allowsServiceMinutes($carePlan)) {
+            throw ValidationException::withMessages(['activityForm.quantity_code' => __('care-plan.service_minutes_unavailable')]);
+        }
+    }
+
+    /** BA01 requires a bounded service period in SMD, independently of program selection. */
+    public function assertServicePeriod(CarePlan $carePlan, array $detail): void
+    {
+        if ($carePlan->termsOfServiceCode() !== 'OUTPATIENT') {
+            return;
+        }
+        $errors = [];
+        foreach (['start', 'end'] as $boundary) {
+            if (!filled(data_get($detail, 'scheduledPeriod.'.$boundary))) {
+                $errors['activityForm.scheduled_period_'.$boundary] = __('care-plan.service_activity_period_required');
+            }
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
     /**
      * Rehab care plan categories that require activity.reason_reference (TV 3.10.2).
      *
@@ -44,8 +99,8 @@ class CarePlanActivityValidationService
 
         $allowed = $this->normalizeAllowedList(
             Arr::get($program, 'medical_program_settings.providing_conditions_allowed')
-                ?? Arr::get($program, 'medical_program_settings.PROVIDING_CONDITIONS_ALLOWED')
-                ?? Arr::get($program, 'providing_conditions_allowed')
+                ?? (Arr::get($program, 'medical_program_settings.PROVIDING_CONDITIONS_ALLOWED')
+                    ?? Arr::get($program, 'providing_conditions_allowed'))
         );
 
         if ($allowed === []) {

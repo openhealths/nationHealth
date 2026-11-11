@@ -6,16 +6,12 @@ namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\MedicalEventsErrorTranslator;
-use App\Classes\eHealth\ValidationRuleBuilder;
 use App\Contracts\ApiErrorTranslator;
-use App\Enums\Person\EncounterStatus;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class Encounter extends PatientApiBase
 {
@@ -48,7 +44,25 @@ class Encounter extends PatientApiBase
      */
     public function cancel(string $id, array $data): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateCancellationReceipt(...));
+
         return $this->patch(self::URL . "/$id/encounter_package", $data);
+    }
+
+    /** The official 202 receipt requires status; an optional link still requires both Link fields. */
+    protected function validateCancellationReceipt(EHealthResponse $response): array
+    {
+        $data = $response->getData();
+        Validator::make($data, [
+            'status' => ['required', 'string'],
+            'eta' => ['sometimes', 'string'],
+            'links' => ['sometimes', 'array'],
+            'links.*' => ['required', 'array'],
+            'links.*.entity' => ['required', 'string'],
+            'links.*.href' => ['required', 'string'],
+        ])->validate();
+
+        return $data;
     }
 
     /**
@@ -75,7 +89,8 @@ class Encounter extends PatientApiBase
      */
     public function getShortBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateShortEncounters(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/summary/encounters');
+
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
@@ -96,7 +111,7 @@ class Encounter extends PatientApiBase
      */
     public function getById(string $patientId, string $encounterId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateEncounter(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/encounters/{encounter_id}');
 
         return $this->get(self::URL . "/$patientId/encounters/$encounterId", $query);
     }
@@ -124,7 +139,8 @@ class Encounter extends PatientApiBase
      */
     public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateEncounters(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/encounters');
+
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
@@ -142,189 +158,4 @@ class Encounter extends PatientApiBase
         return new MedicalEventsErrorTranslator();
     }
 
-    /**
-     * Validate a list of short encounters from eHealth API response.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateShortEncounters(EHealthResponse $response): array
-    {
-        $replaced = [];
-        foreach ($response->getData() as $data) {
-            $replaced[] = $this->replaceEHealthPropNames($data);
-        }
-
-        $rules = collect($this->shortEncounterValidationRules())
-            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
-            ->toArray();
-
-        $validator = Validator::make($replaced, $rules);
-
-        if ($validator->fails()) {
-            Log::channel('e_health_errors')->error(
-                'Encounter validation failed: ' . implode(', ', $validator->errors()->all())
-            );
-        }
-
-        return $validator->validate();
-    }
-
-    /**
-     * Validate a single encounter from eHealth API response.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateEncounter(EHealthResponse $response): array
-    {
-        $replaced = [$this->replaceEHealthPropNames($response->getData())];
-
-        return $this->runEncounterValidation($replaced)[0];
-    }
-
-    /**
-     * Validate a list of encounters from eHealth API response.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateEncounters(EHealthResponse $response): array
-    {
-        $replaced = [];
-        foreach ($response->getData() as $data) {
-            $replaced[] = $this->replaceEHealthPropNames($data);
-        }
-
-        return $this->runEncounterValidation($replaced);
-    }
-
-    /**
-     * Apply encounter validation rules to a pre-processed list of encounter data.
-     *
-     * @param  array  $replacedItems
-     * @return array
-     */
-    private function runEncounterValidation(array $replacedItems): array
-    {
-        $rules = collect($this->encounterValidationRules())
-            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
-            ->toArray();
-
-        $validator = Validator::make($replacedItems, $rules);
-
-        if ($validator->fails()) {
-            Log::channel('e_health_errors')->error(
-                'Encounter validation failed: ' . implode(', ', $validator->errors()->all())
-            );
-        }
-
-        return $validator->validate();
-    }
-
-    /**
-     * List of validation rules for encounters from eHealth.
-     *
-     * @return array
-     */
-    protected function shortEncounterValidationRules(): array
-    {
-        return ValidationRuleBuilder::merge(
-            // Basic fields
-            [
-                'uuid' => ['required', 'uuid'],
-                'status' => ['required', Rule::in(EncounterStatus::values())],
-            ],
-
-            // Coding relationships
-            ValidationRuleBuilder::codingRules('class', true),
-            ValidationRuleBuilder::periodRules('period', true),
-
-            // Identifier relationships
-            ValidationRuleBuilder::identifierRules('episode', true),
-
-            // Codeable concept relationships
-            ValidationRuleBuilder::codeableConceptRules('type', true),
-            ValidationRuleBuilder::codeableConceptRules('performer_speciality', true)
-        );
-    }
-
-    /**
-     * List of validation rules for encounters from eHealth.
-     *
-     * @return array
-     */
-    protected function encounterValidationRules(): array
-    {
-        return ValidationRuleBuilder::merge(
-            // Basic fields
-            [
-                'explanatory_letter' => ['nullable', 'string', 'max:255'],
-                'uuid' => ['required', 'uuid'],
-                'ehealth_inserted_at' => ['required', 'date'],
-                'prescriptions' => ['nullable', 'string'],
-                'status' => ['required', Rule::in(EncounterStatus::values())],
-                'ehealth_updated_at' => ['required', 'date']
-            ],
-
-            // Collections of identifiers
-            ValidationRuleBuilder::identifierCollectionRules('action_references'),
-            ValidationRuleBuilder::identifierCollectionRules('participant'),
-            ValidationRuleBuilder::identifierCollectionRules('supporting_info'),
-
-            // Collections of сodeable concept. Presence of `actions` (ICPC-2) and `reasons` is
-            // class-dependent, mirroring the create form (EncounterForm): PHC requires `actions`
-            // and prohibits it otherwise, while `reasons` is only mandatory for PHC.
-            // @see https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/18167398401/AH+RC+CSI-1758+Submit+Encounter+Package
-            ValidationRuleBuilder::codeableConceptCollectionRules('actions'),
-            [
-                'actions' => [
-                    'nullable',
-                    'array',
-                    'required_if:*.class.code,PHC',
-                    'prohibited_unless:*.class.code,PHC'
-                ]
-            ],
-            ValidationRuleBuilder::codeableConceptCollectionRules('reasons'),
-            ['reasons' => ['nullable', 'array', 'required_if:*.class.code,PHC']],
-
-            // Coding relationships
-            ValidationRuleBuilder::codingRules('class', true),
-            ValidationRuleBuilder::codeableConceptRules('cancellation_reason'),
-
-            // Diagnoses
-            [
-                'diagnoses' => ['nullable', 'array'],
-                'diagnoses.*.rank' => ['nullable', 'integer']
-            ],
-            ValidationRuleBuilder::codeableConceptRules('diagnoses.*.code'),
-            ValidationRuleBuilder::identifierRules('diagnoses.*.condition'),
-            ValidationRuleBuilder::codeableConceptRules('diagnoses.*.role'),
-
-            // Identifier relationships
-            ValidationRuleBuilder::identifierRules('division'),
-            ValidationRuleBuilder::identifierRules('episode', true),
-            ValidationRuleBuilder::identifierRules('incoming_referral'),
-            ValidationRuleBuilder::identifierRules('origin_episode'),
-            ValidationRuleBuilder::identifierRules('performer', true),
-            ValidationRuleBuilder::identifierRules('visit', true),
-
-            // Hospitalization
-            [
-                'hospitalization' => ['nullable', 'array'],
-                'hospitalization.pre_admission_identifier' => ['nullable', 'string', 'max:255'],
-            ],
-            ValidationRuleBuilder::codingCollectionRules('hospitalization.admit_source'),
-            ValidationRuleBuilder::codingCollectionRules('hospitalization.re_admission'),
-            ValidationRuleBuilder::identifierRules('hospitalization.destination'),
-            ValidationRuleBuilder::codingCollectionRules('hospitalization.discharge_disposition'),
-            ValidationRuleBuilder::codingCollectionRules('hospitalization.discharge_department'),
-            ValidationRuleBuilder::paperReferralRules(),
-            ValidationRuleBuilder::periodRules('period', true),
-
-            // Codeable concept relationships
-            ValidationRuleBuilder::codeableConceptRules('priority'),
-            ValidationRuleBuilder::codeableConceptRules('type', true)
-        );
-    }
 }
