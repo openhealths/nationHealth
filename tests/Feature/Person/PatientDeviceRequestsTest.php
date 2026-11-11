@@ -7,14 +7,14 @@ namespace Tests\Feature\Person;
 use App\Classes\eHealth\Api\DeviceDefinition;
 use App\Classes\eHealth\Api\Patient\DeviceRequest;
 use App\Classes\eHealth\EHealthResponse;
-use App\Livewire\DeviceRequest\DeviceRequestIndex;
 use App\Livewire\DeviceRequest\DeviceRequestForm;
-use App\Livewire\Person\Records\PatientDeviceRequestView;
+use App\Livewire\DeviceRequest\DeviceRequestIndex;
 use App\Livewire\Person\Records\PatientDeviceRequests;
+use App\Livewire\Person\Records\PatientDeviceRequestView;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\Approval;
+use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
@@ -24,7 +24,6 @@ use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use App\Services\MedicalEvents\EHealthJobResolver;
 use App\Services\SignatureService;
-use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -32,8 +31,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
-use ReflectionMethod;
 use Tests\Concerns\MocksBasicDictionaries;
+use Tests\Support\NativeClinicalFixtures;
 use Tests\TestCase;
 
 class PatientDeviceRequestsTest extends TestCase
@@ -99,19 +98,30 @@ class PatientDeviceRequestsTest extends TestCase
 
     private function response(array $data, int $totalPages = 1): EHealthResponse
     {
-        return new EHealthResponse(new Response(200, [], json_encode(['data' => $data, 'paging' => ['total_pages' => $totalPages, 'total_entries' => count($data)]], JSON_THROW_ON_ERROR)));
+        if (isset($data['status']) && !isset($data['id'])) {
+            $fixture = json_decode(file_get_contents(base_path('tests/Fixtures/shared-official-responses.json')), true, flags: JSON_THROW_ON_ERROR);
+
+            return NativeClinicalFixtures::response('POST /api/patients/{patient_id}/device_requests', $fixture['POST /api/patients/{patient_id}/device_requests']['data']);
+        }
+
+        return NativeClinicalFixtures::response(
+            array_is_list($data) ? 'GET /api/patients/{patient_id}/device_requests' : 'GET /api/patients/{patient_id}/device_requests/{device_request_id}',
+            $data,
+            array_is_list($data) ? NativeClinicalFixtures::paging(pages: $totalPages, entries: count($data)) : null
+        );
     }
 
     private function record(): array
     {
-        return ['uuid' => $this->requestId, 'status' => 'active', 'intent' => 'order', 'requisition' => '0000-KQR5-ADR4-N5F1',
+        return NativeClinicalFixtures::deviceRequest($this->requestId, $this->person->uuid, [
+            'requisition' => '0000-KQR5-ADR4-N5F1',
             'code' => ['coding' => [['code' => 'orthosis', 'system' => 'eHealth/assistive_devices']]],
-            'authored_on' => '2026-10-28', 'dispense_valid_to' => '2026-11-28',
-            'quantity' => ['value' => 1], 'program' => ['identifier' => ['value' => $this->programId]],
-            'requester_legal_entity' => ['display_value' => 'Лікарня №4', 'identifier' => ['value' => $this->legalEntity->uuid]],
-            'encounter' => ['identifier' => ['value' => (string) Str::uuid()]],
-            'parameter' => [['code' => ['coding' => [['code' => 'brakes']]], 'value_boolean' => false]],
-            'reason' => [['display_value' => '<script>reason</script>']]];
+            'authored_on' => '2026-10-28T09:00:00Z', 'dispense_valid_to' => '2026-11-28',
+            'quantity' => ['value' => 1], 'program' => NativeClinicalFixtures::reference('medical_program', $this->programId),
+            'requester_legal_entity' => NativeClinicalFixtures::reference('legal_entity', $this->legalEntity->uuid, 'Лікарня №4'),
+            'parameter' => [['code' => ['coding' => [['system' => 'device_request_code_parameter', 'code' => 'brakes']]], 'value_boolean' => false]],
+            'reason' => [NativeClinicalFixtures::reference('condition', display: '<script>reason</script>')],
+        ]);
     }
 
     public function test_registry_uses_patient_scoped_search_and_links_to_the_new_detail_page(): void
@@ -165,9 +175,7 @@ class PatientDeviceRequestsTest extends TestCase
     public function test_search_validation_preserves_card_dates_and_references(): void
     {
         $record = $this->record();
-        $record['id'] = $record['uuid'];
-        unset($record['uuid']);
-        $records = (new ReflectionMethod(DeviceRequest::class, 'validateMany'))->invoke(app(DeviceRequest::class), $this->response([$record]));
+        $records = $this->response([$record])->validate();
         foreach (['authored_on', 'requester_legal_entity', 'encounter', 'dispense_valid_to'] as $field) {
             $this->assertSame($record[$field], $records[0][$field]);
         }
@@ -290,7 +298,7 @@ class PatientDeviceRequestsTest extends TestCase
         $catalog = Mockery::mock(DeviceDefinition::class);
         $catalog->shouldNotReceive('getById');
         $catalog->shouldReceive('getMany')->once()->with(Mockery::on(fn (array $filters): bool => $filters['medical_program_id'] === $this->programId && $filters['classification_type_code'] === 'orthosis' && $filters['page_size'] === 10))
-            ->andReturn($this->response([]));
+            ->andReturn(NativeClinicalFixtures::definitionResponse([], NativeClinicalFixtures::paging(entries: 0)));
         $this->instance(DeviceDefinition::class, $catalog);
         Livewire::test(PatientDeviceRequestView::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person, 'deviceRequest' => $this->requestId])
             ->assertSee('Загальна інформація')->assertSee('Інформація про виріб')->assertSee('Додаткова інформація')

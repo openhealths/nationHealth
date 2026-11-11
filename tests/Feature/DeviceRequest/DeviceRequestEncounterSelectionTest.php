@@ -10,8 +10,8 @@ use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Coding;
-use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
+use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
@@ -64,6 +64,9 @@ class DeviceRequestEncounterSelectionTest extends TestCase
         $this->encounter($this->employee(['status' => Status::STOPPED->value]));
         $this->encounter($this->employee(['is_active' => false]));
         $this->encounter($this->employee(['employee_type' => 'RECEPTIONIST']));
+        $unlinked = $this->employee(['user_id' => null]);
+        $this->encounter($unlinked);
+        $this->assertNull(app(DeviceRequestRequestPolicy::class)->employee($this->user, 'device_request:write', $unlinked->uuid));
 
         $choices = Repository::deviceRequest()->eligibleEncounters($this->person, $this->user, $this->legalEntity);
 
@@ -149,7 +152,7 @@ class DeviceRequestEncounterSelectionTest extends TestCase
     {
         return Employee::create(array_replace([
             'uuid' => (string) Str::uuid(), 'employee_type' => 'SPECIALIST', 'status' => Status::APPROVED->value,
-            'legal_entity_id' => $this->legalEntity->id, 'party_id' => $this->user->partyId,
+            'legal_entity_id' => $this->legalEntity->id, 'party_id' => $this->user->partyId, 'user_id' => $this->user->id,
             'is_active' => true, 'position' => 'P1', 'start_date' => today()->toDateString(),
         ], $attributes));
     }

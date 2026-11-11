@@ -6,6 +6,7 @@ namespace App\Livewire\DeviceRequest;
 
 use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthConnectionException;
+
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\DeviceRequest\Forms\DeviceRequestSearchForm;
 use App\Models\LegalEntity;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Dictionary;
 
 use App\Classes\eHealth\EHealth;
+
 use App\Enums\MedicalProgram\Type;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;

@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\MedicalEvents;
 
+use App\Classes\eHealth\Api\MedicalProgram;
 use App\Classes\eHealth\Api\Patient\DeviceRequest;
+
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -77,18 +80,21 @@ class DeviceRequestPrescribingTest extends TestCase
 
     public function test_fresh_medical_program_details_use_mis_credentials_without_changing_user_token(): void
     {
-        $programId = (string) \Illuminate\Support\Str::uuid();
+        $programId = (string) Str::uuid();
         config(['ehealth.api.domain' => 'https://ehealth.example', 'ehealth.api.mis_token' => 'mis-token',
             'ehealth.api.mis_api_key' => 'mis-api-key', 'ehealth.api.oauth.bearer_token' => 'userBearer']);
         session()->put('userBearer', 'doctor-token');
-        Http::fake(['*' => Http::response(['data' => ['id' => $programId, 'type' => 'DEVICE', 'is_active' => true]], 200)]);
+        $fixture = json_decode(file_get_contents(base_path('tests/Fixtures/shared-official-responses.json')), true, flags: JSON_THROW_ON_ERROR)['GET /api/medical_programs/id'];
+        $fixture['data']['id'] = $programId;
+        $fixture['data']['type'] = 'DEVICE';
+        Http::fake(['*' => Http::response($fixture, 200)]);
         $factory = Http::getFacadeRoot();
-        $api = new \App\Classes\eHealth\Api\MedicalProgram($factory);
+        $api = new MedicalProgram($factory);
         $api->stub((function () {
             return $this->stubCallbacks;
         })->call($factory));
         $api->preventStrayRequests();
-        $this->instance(\App\Classes\eHealth\Api\MedicalProgram::class, $api);
+        $this->instance(MedicalProgram::class, $api);
         $program = app(DeviceRequestLifecycleService::class)->program($programId);
         $this->assertSame($programId, $program['id']);
         Http::assertSent(fn (Request $request): bool => $request->url() === 'https://ehealth.example/api/medical_programs/'.$programId

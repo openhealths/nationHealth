@@ -1,3 +1,4 @@
+@use('App\Enums\Person\DeviceRequestStatus')
 <x-layouts.patient
     :personId="$personId"
     :patientFullName="$person->fullName"
@@ -21,7 +22,7 @@
                 <div class="form-row-2">
                     <x-device-request-field
                         :label="__('forms.status.label')"
-                        :value="\App\Enums\Person\DeviceRequestStatus::tryFrom($selected['status'])?->label() ?? $selected['status']"
+                        :value="DeviceRequestStatus::tryFrom($selected['status'])?->label() ?? $selected['status']"
                     />
                     <x-device-request-field :label="__('device-requests.patient.status_reason')">
                         <x-device-request-value :value="$selected['status_reason'] ?? '-'" />
@@ -39,7 +40,7 @@
                         <x-device-request-field
                             class="flex-1"
                             :label="__('device-requests.labels.device')"
-                            :value="data_get($selected, 'code_reference.display_value') ?? data_get($selected, 'code.text') ?? data_get($selected, 'code.coding.0.display') ?? data_get($selected, 'code.coding.0.code', '-')"
+                            :value="data_get($selected, 'code_reference.display_value') ?? (data_get($selected, 'code.text') ?? (data_get($selected, 'code.coding.0.display') ?? data_get($selected, 'code.coding.0.code', '-')))"
                         />
                         <button
                             type="button"
@@ -61,8 +62,8 @@
                 </h3>
                 <div class="form-row-2">
                     @forelse ($selected['parameter'] ?? [] as $parameter)
-                        <x-device-request-field :label="data_get($parameter, 'code.text') ?? data_get($parameter, 'code.coding.0.display') ?? $parameterNames[data_get($parameter, 'code.coding.0.code')] ?? data_get($parameter, 'code.coding.0.code', __('device-requests.labels.parameters'))">
-                            <x-device-request-value :value="$parameter['value_codeable_concept'] ?? $parameter['value_quantity'] ?? $parameter['value_range'] ?? $parameter['value_boolean'] ?? $parameter['value_integer'] ?? $parameter['value_decimal'] ?? $parameter['value_string'] ?? '-'" />
+                        <x-device-request-field :label="data_get($parameter, 'code.text') ?? (data_get($parameter, 'code.coding.0.display') ?? ($parameterNames[data_get($parameter, 'code.coding.0.code')] ?? data_get($parameter, 'code.coding.0.code', __('device-requests.labels.parameters'))))">
+                            <x-device-request-value :value="$parameter['value_codeable_concept'] ?? ($parameter['value_quantity'] ?? ($parameter['value_range'] ?? ($parameter['value_boolean'] ?? ($parameter['value_integer'] ?? ($parameter['value_decimal'] ?? ($parameter['value_string'] ?? '-'))))))" />
                         </x-device-request-field>
                     @empty
                         <span class="text-sm text-gray-500">-</span>

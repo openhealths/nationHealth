@@ -229,7 +229,7 @@ class DeviceRequestComplianceTest extends TestCase
         $repository = Mockery::mock(CarePlanRepository::class)->makePartial();
         $repository->shouldReceive('findByUuid')->once()->with($planUuid, legalEntity()?->id, $this->person->id)->andReturn($localPlan);
         $this->instance(CarePlanRepository::class, $repository);
-        Gate::shouldReceive('authorize')->once()->with('manageActivities', $localPlan)->andReturn(AccessResponse::allow());
+        Gate::shouldReceive('authorize')->once()->with('manageActivities', [$localPlan, null])->andReturn(AccessResponse::allow());
         $plan = Mockery::mock(CarePlan::class);
         $plan->shouldReceive('getDetails')->andReturn($this->response(['status' => $planStatus, 'period' => ['start' => now()->subDay()->toIso8601String(), 'end' => $end]], validated: true));
         $activity = Mockery::mock(CarePlanActivity::class);
@@ -681,7 +681,7 @@ class DeviceRequestComplianceTest extends TestCase
             [$service, $data] = $this->preparation();
             $period = ['start' => now()->toIso8601String(), 'end' => now()->addWeek()->toIso8601String()];
             $detail = ['quantity' => ['value' => 100, 'code' => $case === 'wrongUnit' ? 'different' : 'piece'], 'remaining_quantity' => ['value' => 100], 'product_reference' => ['identifier' => ['value' => $data['device_id']]], 'scheduled_period' => $period];
-            $service->shouldReceive('carePlanContext')->once()->with($this->person, $planUuid, $activityUuid)->andReturn(['plan' => ['period' => $period], 'detail' => $detail]);
+            $service->shouldReceive('carePlanContext')->once()->with($this->person, $planUuid, $activityUuid, null)->andReturn(['plan' => ['period' => $period], 'detail' => $detail]);
             $data['quantity'] = $case === 'missing' ? null : 50;
             try {
                 $prepared = $service->prepare($this->person, $this->legalEntity, $data, $planUuid, $activityUuid);

@@ -131,13 +131,13 @@ class DeviceRequestLifecycleService extends EHealthRequestLifecycleService imple
         return $encounter;
     }
 
-    public function carePlanContext(Person $person, string $carePlanUuid, string $activityUuid): array
+    public function carePlanContext(Person $person, string $carePlanUuid, string $activityUuid, ?string $actingEmployeeUuid = null): array
     {
         $localPlan = Repository::carePlan()->findByUuid($carePlanUuid, legalEntity()?->id, $person->id);
         if ($localPlan === null) {
             $this->invalid('activity', __('care-plan.full_sync_required'));
         }
-        Gate::authorize('manageActivities', $localPlan);
+        Gate::authorize('manageActivities', [$localPlan, $actingEmployeeUuid]);
         $plan = Arr::toSnakeCase(EHealth::carePlan()->getDetails($person->uuid, $carePlanUuid)->validate());
         $activity = Arr::toSnakeCase(EHealth::carePlanActivity()->getDetails($person->uuid, $carePlanUuid, $activityUuid)->validate());
         $detail = $activity['detail'] ?? $activity;
@@ -450,7 +450,7 @@ class DeviceRequestLifecycleService extends EHealthRequestLifecycleService imple
         }
         $remaining = null;
         if ($carePlanUuid !== null && $activityUuid !== null) {
-            $context = $this->carePlanContext($person, $carePlanUuid, $activityUuid);
+            $context = $this->carePlanContext($person, $carePlanUuid, $activityUuid, $employee->uuid);
             $detail = $context['detail'];
             $remaining = data_get($detail, 'remaining_quantity.value', $detail['remaining_quantity'] ?? null);
             $remaining = is_numeric($remaining) ? (float) $remaining : null;

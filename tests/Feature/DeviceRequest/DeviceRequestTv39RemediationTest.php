@@ -8,6 +8,7 @@ use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
 use App\Classes\eHealth\Api\CarePlanActivity;
 use App\Classes\eHealth\Api\Patient\DeviceRequest as DeviceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Core\Arr;
 use App\Livewire\DeviceRequest\DeviceRequestForm;
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
@@ -18,11 +19,14 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
 use App\Models\User;
+use App\Policies\EncounterPolicy;
 use App\Repositories\CarePlanRepository;
-use App\Repositories\MedicalEvents\PeriodRepository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use App\Services\MedicalEvents\Mappers\DeviceRequestMapper;
 use App\Services\SignatureService;
+use Illuminate\Auth\Access\Response as PolicyResponse;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -35,11 +39,130 @@ use Livewire\Livewire;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
+use Tests\Concerns\CreatesFhirCarePlans;
+use Tests\Feature\Composition\CompositionTestFixtures;
+use Tests\Support\NativeClinicalFixtures;
 use Tests\TestCase;
 
 class DeviceRequestTv39RemediationTest extends TestCase
 {
+    use CompositionTestFixtures;
+    use CreatesFhirCarePlans;
     use DatabaseTransactions;
+
+    private function documentContext(): array
+    {
+        $this->withoutVite();
+        $context = $this->compositionFixture(scopes: ['device_request:write', 'device_request:read', 'care_plan:read', 'care_plan:write', 'encounter:read']);
+        $employee = $context['employee'];
+        $person = $context['person'];
+        $this->grantCarePlanEmployeeRole($employee, 'OUTPATIENT');
+        $this->partialMock(EncounterPolicy::class)->shouldReceive('view')->andReturn(PolicyResponse::allow());
+        $this->fakeSignatureService();
+        $encounter = Encounter::create(['uuid' => (string) Str::uuid(), 'person_id' => $person->id, 'status' => 'finished',
+            'episode_id' => Identifier::create(['value' => (string) Str::uuid()])->id,
+            'performer_id' => Identifier::create(['value' => $employee->uuid])->id,
+            'type_id' => CodeableConcept::create()->id,
+            'class_id' => Coding::create(['system' => 'eHealth/encounter_classes', 'code' => 'AMB'])->id]);
+        $encounter->period()->create(['start' => now()->startOfDay()->utc(), 'end' => now()->utc()]);
+        $plan = $this->createFhirCarePlan(['person_id' => $person->id, 'legal_entity_id' => $context['legalEntity']->id,
+            'author_id' => $employee->id, 'encounter_id' => $encounter->id, 'status' => 'active',
+            'title' => 'BA08 device plan', 'period_end' => now()->addMonth()->toDateString()]);
+        $this->grantCarePlanWriteApproval($plan, $employee);
+        $activity = $this->createFhirCarePlanActivity(['care_plan_id' => $plan->id, 'author_id' => $employee->id,
+            'kind' => 'device_request', 'status' => 'scheduled', 'quantity' => 10,
+            'quantity_code' => 'piece', 'quantity_system' => 'device_unit',
+            'product_codeable_concept' => ['coding' => [['system' => 'assistive_devices', 'code' => 'walker']]]]);
+        $resource = Repository::carePlanActivity()->getResource($activity);
+        $resource['detail']['remainingQuantity'] = ['value' => 5, 'code' => 'piece', 'system' => 'device_unit', 'unit' => 'шт.'];
+        Repository::carePlanActivity()->storeResource($resource, $plan, $activity->id);
+        $service = Mockery::mock(DeviceRequestLifecycleService::class)->makePartial();
+        $service->shouldReceive('carePlanContext')->withArgs(static fn (Person $patient, string $planId, string $activityId, string $actor): bool => $patient->id === $person->id
+                && $planId === $plan->uuid && $activityId === $activity->uuid && $actor === $employee->uuid)
+            ->andReturn(['detail' => Arr::toSnakeCase($resource['detail'])]);
+        $service->shouldReceive('prescribingOptions')->andReturn(['model' => [], 'program' => [], 'parameters' => [], 'packages' => []]);
+        $service->shouldReceive('dictionary')->with('device_unit')->andReturn(['piece' => 'Штука']);
+        $service->shouldNotReceive('prepare');
+        $this->instance(DeviceRequestLifecycleService::class, $service);
+        Http::preventStrayRequests();
+
+        return [...$context, 'encounter' => $encounter, 'plan' => $plan, 'activity' => $activity];
+    }
+
+    private function planHarness(array $context)
+    {
+        return Livewire::test(DeviceRequestPlanHarness::class, [
+            'legalEntity' => $context['legalEntity'], 'person' => $context['person'], 'encounter' => $context['encounter'],
+        ]);
+    }
+
+    public function test_plan_selection_preserves_remaining_quantity_and_exact_actor_after_search(): void
+    {
+        $context = $this->documentContext();
+        $this->planHarness($context)->call('searchCarePlans')->assertHasNoErrors()->assertCount('carePlanChoices', 1)
+            ->call('selectCarePlan', $context['plan']->id)->assertCount('carePlanActivityChoices', 1)
+            ->call('selectCarePlanActivity', $context['activity']->id)->assertSet('activityUuid', $context['activity']->uuid)
+            ->assertSee('шт.')->set('carePlanSearch', 'another search')->call('searchCarePlans')
+            ->assertSet('carePlanApprovalRequired', false)->assertCount('carePlanActivityChoices', 1);
+        $this->assertDatabaseCount('device_request_requests', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_denied_plan_search_shows_feedback_without_calling_the_service(): void
+    {
+        $context = $this->documentContext();
+        $context['user']->syncRoles([]);
+        $context['user']->revokePermissionTo('device_request:write');
+        $this->planHarness($context)->call('searchCarePlans')->assertSet('carePlanChoices', [])
+            ->assertSee(__('device-requests.policy.create'));
+        $this->assertDatabaseCount('device_request_requests', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_revoked_plan_approval_stops_save_and_sign_with_visible_feedback(): void
+    {
+        $context = $this->documentContext();
+        $component = $this->planHarness($context)->call('selectCarePlan', $context['plan']->id)
+            ->call('selectCarePlanActivity', $context['activity']->id);
+        $context['plan']->approvals()->update(['is_verified' => false]);
+        $component->call('createDraft')->assertSet('draftId', null)->assertSee(__('device-requests.validation.inactive_plan'))
+            ->call('primeSigning')->set('form.knedp', 'test')->set('form.password', 'test')
+            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 1))
+            ->call('sign')->assertSet('showSignatureModal', true)->assertSee(__('device-requests.validation.inactive_plan'));
+        $this->assertDatabaseCount('device_request_requests', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_selected_model_displays_native_manufacturer_name_and_country(): void
+    {
+        [$person, $entity] = $this->signingContext();
+        $definition = NativeClinicalFixtures::definition(['manufacturer' => ['name' => 'Виробник виробу', 'country' => 'UA']]);
+        $model = NativeClinicalFixtures::definitionResponse($definition)->validate();
+
+        Livewire::test(DeviceRequestManufacturerHarness::class, ['legalEntity' => $entity, 'person' => $person, 'model' => $model])
+            ->assertSee(__('device-requests.form.manufacturer'))->assertSee('Виробник виробу')->assertSee('(UA)');
+    }
+
+    public function test_program_participant_is_not_displayed_as_a_missing_manufacturer(): void
+    {
+        [$person, $entity] = $this->signingContext();
+        $model = NativeClinicalFixtures::definitionResponse(NativeClinicalFixtures::definition())->validate();
+
+        Livewire::test(DeviceRequestManufacturerHarness::class, ['legalEntity' => $entity, 'person' => $person, 'model' => $model])
+            ->assertDontSee(__('device-requests.form.manufacturer'))->assertDontSee('Учасник програми');
+    }
+
+    #[DataProvider('malformedManufacturers')]
+    public function test_incomplete_or_malformed_manufacturer_is_rejected_before_display(array $manufacturer): void
+    {
+        $this->expectException(ValidationException::class);
+        NativeClinicalFixtures::definitionResponse(NativeClinicalFixtures::definition(['manufacturer' => $manufacturer]))->validate();
+    }
+
+    public static function malformedManufacturers(): array
+    {
+        return ['missing country' => [['name' => 'Manufacturer']], 'invalid name' => [['name' => ['Manufacturer'], 'country' => 'UA']]];
+    }
 
     public function test_new_clinical_identifier_uses_version_one_and_existing_identifier_is_preserved(): void
     {
@@ -76,7 +199,7 @@ class DeviceRequestTv39RemediationTest extends TestCase
         $plan = new CarePlan(['uuid' => $planUuid]);
         $this->mock(CarePlanRepository::class)->shouldReceive('findByUuid')->once()
             ->with($planUuid, legalEntity()?->id, $person->id)->andReturn($plan);
-        Gate::shouldReceive('authorize')->once()->with('manageActivities', $plan)->andReturnTrue();
+        Gate::shouldReceive('authorize')->once()->with('manageActivities', [$plan, null])->andReturnTrue();
         $this->mock(CarePlanApi::class)->shouldReceive('getDetails')->once()
             ->with($person->uuid, $planUuid)->andReturn($this->validatedResponse([
                 'status' => 'active', 'period' => ['start' => '2026-11-01', 'end' => '2026-11-30'],
@@ -165,7 +288,7 @@ class DeviceRequestTv39RemediationTest extends TestCase
             'class_id' => Coding::create(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id,
             'type_id' => CodeableConcept::create()->id, 'ehealth_inserted_at' => now(),
         ]);
-        app(PeriodRepository::class)->sync($encounter, ['start' => now()->toIso8601String(), 'end' => now()->toIso8601String()]);
+        MedicalEventsRepository::period()->sync($encounter, ['start' => now()->toIso8601String(), 'end' => now()->toIso8601String()]);
         $planUuid = (string) Str::uuid();
         $activityUuid = (string) Str::uuid();
         $detail = ['product_codeable_concept' => ['coding' => [['code' => 'walker']]]];
@@ -177,7 +300,7 @@ class DeviceRequestTv39RemediationTest extends TestCase
         $service->shouldReceive('encounter')->andReturn($encounter);
         $service->shouldReceive('prescribingOptions')->andReturn(['program' => [], 'packages' => [], 'parameters' => [], 'model' => []]);
         $service->shouldReceive('authMethods')->andReturn([]);
-        $service->shouldReceive('carePlanContext')->with($person, $planUuid, $activityUuid)
+        $service->shouldReceive('carePlanContext')->with($person, $planUuid, $activityUuid, $employee->uuid)
             ->andReturn(['plan' => ['period' => ['start' => $planStart, 'end' => $planEnd]], 'detail' => $detail]);
         $data = ['uuid' => (string) Str::uuid(), 'encounter_uuid' => $encounter->uuid, 'device_id' => 'walker',
             'device_code_type' => 'CLASSIFICATION_TYPE', 'device_code_system' => 'assistive_devices', 'program_id' => '',
@@ -225,5 +348,30 @@ class DeviceRequestSigningHarness extends DeviceRequestForm
         $this->request = ['device_code_type' => 'CLASSIFICATION_TYPE', 'device_id' => '', 'device_code_system' => '',
             'quantity' => null, 'quantity_code' => 'piece', 'program_id' => '', 'inform_with' => '',
             'phone_confirmed' => false, 'reason_reference' => [], 'parameter_values' => []];
+    }
+}
+
+class DeviceRequestManufacturerHarness extends DeviceRequestSigningHarness
+{
+    public function mount(LegalEntity $legalEntity, Person $person, array $model = []): void
+    {
+        parent::mount($legalEntity, $person);
+        $this->showSignatureModal = false;
+        $this->options = ['model' => $model, 'program' => ['participant' => ['name' => 'Учасник програми']]];
+    }
+}
+
+class DeviceRequestPlanHarness extends DeviceRequestSigningHarness
+{
+    public function mount(LegalEntity $legalEntity, Person $person, ?Encounter $encounter = null): void
+    {
+        parent::mount($legalEntity, $person);
+        $this->showSignatureModal = false;
+        $this->request['encounter_uuid'] = $encounter->uuid;
+    }
+
+    public function primeSigning(): void
+    {
+        $this->showSignatureModal = true;
     }
 }

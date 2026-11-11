@@ -1,3 +1,4 @@
+@use('App\Enums\Person\DeviceRequestStatus')
 <x-layouts.patient
     :personId="$personId"
     :patientFullName="$person->fullName"
@@ -18,9 +19,7 @@
                         <option value="">{{ __('device-requests.labels.all') }}</option>
                         <option value="draft">{{ __('forms.draft') }}</option>
                         @foreach (['active', 'completed', 'revoked', 'entered-in-error'] as $status)
-                            <option value="{{ $status }}">
-                                {{ \App\Enums\Person\DeviceRequestStatus::from($status)->label() }}
-                            </option>
+                            <option value="{{ $status }}">{{ DeviceRequestStatus::from($status)->label() }}</option>
                         @endforeach
                     </select>
                     <label for="deviceRequestStatus" class="label">{{ __('forms.status.label') }}</label>
@@ -124,9 +123,9 @@
             @forelse ($records as $record)
                 @php
                     $requestId = $record['uuid'] ?? $record['id'];
-                    $deviceName = data_get($record, 'code_reference.display_value') ?? data_get($record, 'code.text') ?? data_get($record, 'code.coding.0.display') ?? ($deviceTypes[data_get($record, 'code.coding.0.code')] ?? data_get($record, 'code.coding.0.code', '-'));
-                    $status = \App\Enums\Person\DeviceRequestStatus::tryFrom($record['status']);
-                    $programName = data_get($record, 'program.display_value') ?? collect($programs)->firstWhere('id', data_get($record, 'program.identifier.value'))['name'] ?? '-';
+                    $deviceName = data_get($record, 'code_reference.display_value') ?? (data_get($record, 'code.text') ?? (data_get($record, 'code.coding.0.display') ?? ($deviceTypes[data_get($record, 'code.coding.0.code')] ?? data_get($record, 'code.coding.0.code', '-'))));
+                    $status = DeviceRequestStatus::tryFrom($record['status']);
+                    $programName = data_get($record, 'program.display_value') ?? (collect($programs)->firstWhere('id', data_get($record, 'program.identifier.value'))['name'] ?? '-');
                 @endphp
                 <article class="record-inner-card" wire:key="device-request-{{ $requestId }}">
                     <div class="record-inner-header">
