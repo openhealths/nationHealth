@@ -37,6 +37,8 @@ class Tv39CompositionPreflightTest extends TestCase
             'preperson type' => ['type', 'participant_type_not_allowed'],
             'foreign preperson' => ['foreign', 'foreign_preperson_not_allowed'],
             'author speciality' => ['speciality', 'author_speciality_not_allowed'],
+            'disability speciality' => ['disability_speciality', 'author_speciality_not_allowed'],
+            'identified status' => ['identified_status', 'participant_status_not_allowed'],
             'additional speciality' => ['additional_speciality', 'author_speciality_not_allowed'],
             'custodian state' => ['custodian', 'author_not_found'],
             'encounter type' => ['encounter_type', 'encounter_type_not_allowed'],
@@ -72,6 +74,11 @@ class Tv39CompositionPreflightTest extends TestCase
                 break;
             case 'speciality': $fixture['employee']->specialities()->delete();
                 break;
+            case 'disability_speciality': $settings[CompositionConfiguration::DISABILITY_DOCTOR_SPECIALITIES_ENABLED->value] = true;
+                $settings[CompositionConfiguration::DISABILITY_DOCTOR_SPECIALITIES->value] = ['CHILD_CARE' => ['FAMILY_DOCTOR']];
+                break;
+            case 'identified_status': $settings[CompositionConfiguration::FOCUS_STATUSES->value]['CHILD_CARE'] = 'inactive';
+                break;
             case 'additional_speciality': $settings[CompositionConfiguration::AUTHOR_SPECIALITIES_ENABLED->value] = true;
                 break;
             case 'custodian': $fixture['legalEntity']->update(['status' => 'SUSPENDED']);
@@ -101,6 +108,45 @@ class Tv39CompositionPreflightTest extends TestCase
         $component->call('submitComposition')->assertHasNoErrors()->assertSet('asyncJobStatus', 'PENDING');
         Http::assertSent(static fn ($request): bool => $request->method() === 'POST');
         $this->assertSame(1, CompositionOperation::count());
+    }
+
+    public static function disabilitySpecialityCases(): array
+    {
+        return ['mapped allowed' => [true, ['CHILD_CARE' => ['OBSTETRICS_AND_GYNECOLOGY']]],
+            'disabled' => [false, ['CHILD_CARE' => ['FAMILY_DOCTOR']]],
+            'unmapped category' => [true, ['QUARANTINE' => ['FAMILY_DOCTOR']]]];
+    }
+
+    #[DataProvider('disabilitySpecialityCases')]
+    public function test_disability_speciality_filter_applies_only_enabled_category_restrictions(bool $enabled, array $map): void
+    {
+        [$component] = $this->readyChildCare();
+        $settings = config('compositions.emal');
+        $settings[CompositionConfiguration::DISABILITY_DOCTOR_SPECIALITIES_ENABLED->value] = $enabled;
+        $settings[CompositionConfiguration::DISABILITY_DOCTOR_SPECIALITIES->value] = $map;
+        config(['compositions.emal' => $settings]);
+        $component->call('submitComposition')->assertHasNoErrors()->assertSet('asyncJobStatus', 'PENDING');
+        $this->assertSame(1, CompositionOperation::count());
+    }
+
+    public static function statusReadFailures(): array
+    {
+        return ['not found' => [404, ['error' => ['type' => 'not_found', 'message' => 'Person not found']], 'participant_status_unavailable'],
+            'malformed' => [200, ['data' => [['type' => 'OTP']]], 'invalid_response']];
+    }
+
+    #[DataProvider('statusReadFailures')]
+    public function test_fresh_identified_person_eligibility_read_must_succeed_before_creation(int $status, array $body, string $error): void
+    {
+        [$component] = $this->readyChildCare();
+        $this->fakeEHealth(['*authentication_methods*' => Http::response($body, $status)]);
+        Bus::fake();
+        $component->call('submitComposition')->assertSee(__('compositions.errors.'.$error))->assertSet('asyncJobId', null);
+        Http::assertSent(static fn ($request): bool => $request->method() === 'GET' && str_contains($request->url(), '/authentication_methods'));
+        Http::assertNotSent(static fn ($request): bool => $request->method() === 'POST');
+        $this->assertSame(0, CompositionOperation::count());
+        $this->assertSame(0, Composition::count());
+        Bus::assertNothingDispatched();
     }
 
     public function test_retry_queues_only_the_existing_operation_and_denial_has_no_effects(): void
@@ -186,6 +232,7 @@ class Tv39CompositionPreflightTest extends TestCase
             'author' => $native['performer']['identifier']['value'] = (string) Str::uuid(),
         };
         $this->fakeEHealth([
+            '*authentication_methods*' => Http::response(['data' => []]),
             '*encounters/*' => Http::response(['data' => $native]),
             '*/composition' => Http::response(['data' => ['id' => (string) Str::uuid(), 'status' => 'PENDING', 'eta' => now()->toIso8601String(), 'links' => []]]),
         ]);

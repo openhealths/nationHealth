@@ -180,6 +180,7 @@ class Tv39CompositionLifecycleGuardsTest extends TestCase
         }
         $component->set('form.relatesToCode', 'replaces')->set('form.relatesToTargetUuid', $previous->uuid);
         $this->fakeEHealth([
+            '*authentication_methods*' => Http::response(['data' => []]),
             '*searchComposition*' => Http::response(['data' => [$summary]]),
             '*'.$later['identifier']['value'].'*' => Http::response($later),
             '*/composition' => Http::response(['data' => ['id' => (string) Str::uuid(), 'status' => 'PENDING', 'eta' => now()->toIso8601String(), 'links' => []]]),
@@ -212,6 +213,7 @@ class Tv39CompositionLifecycleGuardsTest extends TestCase
         $native['relatesTo'] = ['code' => 'replaces', 'targetIdentifier' => $this->compositionReference('composition', $previous->uuid)['identifier']];
         $this->fakeSignatureService('signed-composition');
         $this->fakeEHealth([
+            '*authentication_methods*' => Http::response(['data' => []]),
             '*searchComposition*' => Http::response(['data' => []]), '*integrationData*' => Http::response(['data' => []]),
             '*'.$previous->uuid.'*' => Http::response($previousNative),
             '*/composition' => Http::response(['data' => ['id' => (string) Str::uuid(), 'status' => 'PENDING', 'eta' => now()->toIso8601String(), 'links' => []]]),

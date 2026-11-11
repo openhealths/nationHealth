@@ -77,7 +77,9 @@
     "EMAL_FILTER_SIGN_CREATE_DELAY_DISABILITY_ENABLED",
     "EMAL_FILTER_SIGN_CREATE_DELAY_NEWBORN_ENABLED",
     "EMAL_FILTER_REPLACEMENT_PERIOD_START_DISABILITY",
-    "EMAL_FILTER_REPLACEMENT_PERIOD_START_NEWBORN"
+    "EMAL_FILTER_REPLACEMENT_PERIOD_START_NEWBORN",
+    "EMAL_FILTER_DOCTOR_SPECIALITY_DISABILITY",
+    "EMAL_FILTER_DOCTOR_SPECIALITY_DISABILITY_ENABLED"
   ],
   "properties": {
     "EMAL_VALIDATION_AUTHOR_CATEGORIES_BY_POSITION": {
@@ -727,6 +729,19 @@
         "type": "integer",
         "minimum": 0
       }
+    },
+    "EMAL_FILTER_DOCTOR_SPECIALITY_DISABILITY": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "EMAL_FILTER_DOCTOR_SPECIALITY_DISABILITY_ENABLED": {
+      "type": "boolean"
     }
   }
 }
