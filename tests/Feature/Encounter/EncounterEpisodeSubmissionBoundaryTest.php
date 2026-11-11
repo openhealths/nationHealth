@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\MedicalEvents\EncounterPackageBuilder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -28,6 +29,7 @@ class EncounterEpisodeSubmissionBoundaryTest extends TestCase
     {
         parent::setUp();
         Http::preventStrayRequests();
+        Queue::fake();
         config(['ehealth.jobs.max_attempts' => 1, 'ehealth.jobs.interval_seconds' => 0]);
         app()->setLocale('uk');
     }
@@ -46,6 +48,7 @@ class EncounterEpisodeSubmissionBoundaryTest extends TestCase
         $this->assertTrue($component->showSignatureModal);
         $this->assertSame(__('errors.ehealth.messages.validation_error'), session('error'));
         Http::assertNothingSent();
+        Queue::assertNothingPushed();
     }
 
     #[DataProvider('jobOutcomes')]
@@ -75,6 +78,7 @@ class EncounterEpisodeSubmissionBoundaryTest extends TestCase
         $this->assertSame($expectedWrites, $component->persistCalls);
         $this->assertSame($expectedWrites === 1, $component->stoppedBeforeSigning);
         Http::assertNothingSent();
+        Queue::assertNothingPushed();
     }
 
     public static function jobOutcomes(): array
@@ -106,6 +110,7 @@ class EncounterEpisodeSubmissionBoundaryTest extends TestCase
         $this->assertTrue($component->showSignatureModal);
         $this->assertSame(__('errors.ehealth.messages.validation_error'), session('error'));
         Http::assertNothingSent();
+        Queue::assertNothingPushed();
     }
 
     public static function invalidEpisodeIdentity(): array
@@ -123,6 +128,7 @@ class EncounterEpisodeSubmissionBoundaryTest extends TestCase
         $this->assertSame(0, $component->persistCalls);
         $this->assertSame(__('encounters.policy.create'), session('error'));
         Http::assertNothingSent();
+        Queue::assertNothingPushed();
     }
 
     private function submissionComponent(bool $allowed = true): EncounterEpisodeSubmissionHarness
@@ -179,8 +185,9 @@ class EncounterEpisodeSubmissionHarness extends EncounterPackageCreate
     {
     }
 
-    protected function syncRegisteredConditions(array $conditions): void
+    protected function syncReferencedRecords(): void
     {
+        // This fixture has no referenced records; keep the real episode receipt, job and detail boundaries in sign().
     }
 
     protected function syncSelectedEpisode(?string $episodeId): void
@@ -195,6 +202,11 @@ class EncounterEpisodeSubmissionHarness extends EncounterPackageCreate
 
     protected function handleDatabaseErrors(Throwable $exception, string $logMessage, ?string $flashMessage = null): void
     {
+        // Only the persistence sentinel ends this test; a broken fixture must fail instead of hiding an earlier error.
+        if (!$exception instanceof RuntimeException || $exception->getMessage() !== 'Stop before external signing.') {
+            throw $exception;
+        }
+
         $this->stoppedBeforeSigning = true;
     }
 }
