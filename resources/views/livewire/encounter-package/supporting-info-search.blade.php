@@ -8,7 +8,8 @@
                 $wire.icd10Descriptions[code] ||
                 dictionaries['eHealth/LOINC/observation_codes']?.[code] ||
                 dictionaries['eHealth/ICF/classifiers']?.[code] ||
-                dictionaries['eHealth/ICPC2/condition_codes']?.[code];
+                dictionaries['eHealth/ICPC2/condition_codes']?.[code] ||
+                dictionaries['eHealth/custom/observation_codes']?.[code];
 
             if (dictionaryName) {
                 return `${code} - ${dictionaryName}`;

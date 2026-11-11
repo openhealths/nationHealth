@@ -186,6 +186,35 @@ class EncounterIndex extends BasePatientComponent
     }
 
     /**
+     * Delete the draft encounter package of the patient together with its records.
+     *
+     * @param  string  $uuid  UUID of the encounter
+     * @return void
+     */
+    public function deleteDraft(string $uuid): void
+    {
+        $encounter = Encounter::forPatient($this->patient())->whereUuid($uuid)->firstOrFail();
+
+        if (Auth::user()->cannot('delete', $encounter)) {
+            Session::flash('error', __('encounters.policy.delete'));
+
+            return;
+        }
+
+        try {
+            Repository::encounter()->deleteDraft($encounter);
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to delete encounter draft');
+
+            return;
+        }
+
+        Session::flash('success', __('encounters.messages.draft_deleted'));
+
+        $this->loadFilterOptions();
+    }
+
+    /**
      * Validation rules for the encounter search filters.
      *
      * @return array
@@ -279,6 +308,7 @@ class EncounterIndex extends BasePatientComponent
                 $paginator->getCollection()->map(function (Encounter $encounter) {
                     $data = Arr::toCamelCase($encounter->toArray());
                     $data['id'] = $encounter->id;
+                    $data['canDelete'] = Auth::user()->can('delete', $encounter);
 
                     return $data;
                 })

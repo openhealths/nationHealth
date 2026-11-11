@@ -9,7 +9,7 @@
     <x-slot name="headerActions">
         @can('create', Encounter::class)
             <a
-                href="{{ route('encounter.create', [legalEntity(), 'person' => $personId]) }}"
+                href="{{ route('persons.encounters.create', [legalEntity(), 'person' => $personId]) }}"
                 class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
             >
                 @icon('plus', 'w-4 h-4')

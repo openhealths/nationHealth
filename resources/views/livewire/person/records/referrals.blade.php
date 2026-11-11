@@ -242,7 +242,7 @@
 
                                                 @if (!empty($referral['encounterId']) && $personId)
                                                     <a
-                                                        href="{{ route('encounter.edit', [legalEntity(), 'person' => $personId, 'encounter' => $referral['encounterId']]) }}"
+                                                        href="{{ route('persons.encounters.edit', [legalEntity(), 'person' => $personId, 'encounter' => $referral['encounterId']]) }}"
                                                         class="dropdown-item"
                                                     >
                                                         @icon('edit', 'w-5 h-5 text-gray-500')
@@ -384,7 +384,7 @@
 
                                             @elseif (!empty($referral['encounterId']) && $personId)
                                                 <a
-                                                    href="{{ route('encounter.edit', [legalEntity(), 'person' => $personId, 'encounter' => $referral['encounterId']]) }}"
+                                                    href="{{ route('persons.encounters.edit', [legalEntity(), 'person' => $personId, 'encounter' => $referral['encounterId']]) }}"
                                                     class="text-link"
                                                 >
                                                     {{ $referral['basisLabel'] }}

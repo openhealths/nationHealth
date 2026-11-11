@@ -151,7 +151,7 @@ class CarePlanUpdate extends CarePlanCreate
 
         $encounter = $this->carePlan->encounter;
         if ($encounter) {
-            $this->redirectRoute('encounter.view', [legalEntity(), $this->personId, $encounter->id], navigate: true);
+            $this->redirectRoute('persons.encounters.package.show', [legalEntity(), $this->personId, $encounter->id], navigate: true);
 
             return;
         }

@@ -101,7 +101,7 @@ class EncounterDocumentPagesTest extends TestCase
         $this->get(route($routeName, [$legalEntity, $person, $encounter]))
             ->assertOk()
             ->assertSeeLivewire($component)
-            ->assertSee(route('encounter.view', [$legalEntity, $person, $encounter]), false)
+            ->assertSee(route('persons.encounters.package.show', [$legalEntity, $person, $encounter]), false)
             ->assertDontSee("entangle('showEncounterReferralDrawer')", false)
             ->assertDontSee("entangle('showEncounterEPrescriptionDrawer')", false);
     }
@@ -133,7 +133,7 @@ class EncounterDocumentPagesTest extends TestCase
         $encounter = $this->encounter($person);
 
         $this->get('/dashboard/'.$legalEntity->id.'/encounters/'.$encounter->id.'/care-plan/create')
-            ->assertRedirect(route('care-plans.create-by-encounter', [$legalEntity, $person, $encounter]));
+            ->assertRedirect(route('persons.encounters.care-plans.create', [$legalEntity, $person, $encounter]));
         Http::assertNothingSent();
     }
 
@@ -183,7 +183,7 @@ class EncounterDocumentPagesTest extends TestCase
             ->call('validateEncounterReferral')->assertHasNoErrors()->assertSet('showSignatureModal', false);
         $this->assertSame(1, ServiceRequestRequest::wherePersonId($person->id)->count());
         $record = ServiceRequestRequest::wherePersonId($person->id)->sole();
-        $editUrl = route('encounter.referral.edit', [$legalEntity, $person, $encounter, $record->id]);
+        $editUrl = route('persons.encounters.referrals.edit', [$legalEntity, $person, $encounter, $record->id]);
         $component->assertRedirect($editUrl);
         $api->shouldNotHaveReceived('prequalify');
         $this->assertSame('draft', $record->status);
@@ -259,9 +259,9 @@ class EncounterDocumentPagesTest extends TestCase
             ->set('encounterReferralForm.note', 'Saved before redirect')
             ->call($action)->assertHasNoErrors();
         $record = ServiceRequestRequest::whereUuid($component->get('encounterReferralRequestIdToSign'))->sole();
-        $editUrl = route('encounter.referral.edit', [$legalEntity, $person, $encounter, $record->id]);
+        $editUrl = route('persons.encounters.referrals.edit', [$legalEntity, $person, $encounter, $record->id]);
         $component->assertRedirect($editUrl);
-        $this->assertStringEndsWith('/referral/'.$record->id.'/edit', $editUrl);
+        $this->assertStringEndsWith('/referrals/'.$record->id.'/edit', $editUrl);
 
         $edit = Livewire::test(EncounterReferralCreate::class, $parameters + ['referral' => $record->id])
             ->assertSet('referralId', $record->id)
@@ -358,7 +358,7 @@ class EncounterDocumentPagesTest extends TestCase
         $this->fakeEHealth(['*' => Http::response($this->eHealthBody([]))]);
         $otherPatient = Person::create(['uuid' => (string) Str::uuid(), 'birth_date' => '1990-01-01', 'gender' => 'MALE']);
         foreach ([$this->encounter($person), $this->encounter($otherPatient)] as $otherEncounter) {
-            $this->get(route('encounter.referral.edit', [$legalEntity, $person, $otherEncounter, $record->id]))
+            $this->get(route('persons.encounters.referrals.edit', [$legalEntity, $person, $otherEncounter, $record->id]))
                 ->assertNotFound();
         }
         Http::assertNotSent(static fn ($request): bool => $request->method() === 'POST');
@@ -650,8 +650,8 @@ class EncounterDocumentPagesTest extends TestCase
     public static function documentPages(): array
     {
         return [
-            'referral' => ['encounter.referral.create', EncounterReferralCreate::class],
-            'eprescription' => ['encounter.eprescription.create', EncounterEPrescriptionCreate::class],
+            'referral' => ['persons.encounters.referrals.create', EncounterReferralCreate::class],
+            'eprescription' => ['persons.encounters.eprescriptions.create', EncounterEPrescriptionCreate::class],
         ];
     }
 
@@ -756,7 +756,7 @@ class EncounterDocumentPagesTest extends TestCase
             ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 8))
             ->call('sign')->assertHasNoErrors()
             ->assertSet('encounterReferralSubmission.status', JobStatus::PENDING->value)
-            ->assertRedirect(route('encounter.referral.edit', [$legalEntity, $person, $encounter, $record->id]));
+            ->assertRedirect(route('persons.encounters.referrals.edit', [$legalEntity, $person, $encounter, $record->id]));
 
         app(SignatureService::class)->shouldHaveReceived('signData')
             ->withArgs(static fn (array $payload): bool => $payload['id'] === $uuid && $payload['occurrence_period'] === $editedPeriod)
@@ -794,11 +794,11 @@ class EncounterDocumentPagesTest extends TestCase
         $record->forceFill(['status' => 'active', 'requestNumber' => '1234-5678-9012-3456'])->save();
         $component->call('checkEncounterReferralSubmission')
             ->assertSet('encounterReferralRequestIdToSign', null)->assertSet('submissionId', null)
-            ->assertRedirect(route('encounter.view', [$legalEntity, $person, $encounter]));
+            ->assertRedirect(route('persons.encounters.package.show', [$legalEntity, $person, $encounter]));
         Livewire::test(XMessage::class)
             ->assertSee(__('referrals.submission_created', ['number' => '1234-5678-9012-3456']))
             ->call('$refresh')->assertDontSee('1234-5678-9012-3456');
-        $this->get(route('encounter.referral.edit', [$legalEntity, $person, $encounter, $record->id]))
+        $this->get(route('persons.encounters.referrals.edit', [$legalEntity, $person, $encounter, $record->id]))
             ->assertOk()->assertSee('1234-5678-9012-3456')
             ->assertDontSeeHtml('wire:click="saveEncounterReferralDraft"')
             ->assertDontSee(__('forms.save_and_sign'));
@@ -888,9 +888,9 @@ class EncounterDocumentPagesTest extends TestCase
     public static function allDocumentRoutes(): array
     {
         return [
-            'referral' => ['encounter.referral.create'],
-            'eprescription' => ['encounter.eprescription.create'],
-            'care-plan' => ['care-plans.create-by-encounter'],
+            'referral' => ['persons.encounters.referrals.create'],
+            'eprescription' => ['persons.encounters.eprescriptions.create'],
+            'care-plan' => ['persons.encounters.care-plans.create'],
         ];
     }
 
@@ -898,7 +898,7 @@ class EncounterDocumentPagesTest extends TestCase
     {
         $record = ServiceRequestRequest::whereUuid($component->get('encounterReferralRequestIdToSign'))->sole();
         $component->assertSet('showSignatureModal', false)
-            ->assertRedirect(route('encounter.referral.edit', [...array_values($parameters), $record->id]));
+            ->assertRedirect(route('persons.encounters.referrals.edit', [...array_values($parameters), $record->id]));
 
         return Livewire::test(EncounterReferralCreate::class, $parameters + ['preperson' => null, 'referral' => $record->id])
             ->assertSet('prepareReferralForSigning', true)

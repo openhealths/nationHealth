@@ -160,6 +160,21 @@
                                         {{ __('medical-events.mark_as_error') }}
                                     </button>
                                 @endif
+
+                                @if ($showStatusActions && data_get($episode, 'canDelete'))
+                                    <button
+                                        type="button"
+                                        data-uuid="{{ data_get($episode, 'uuid') }}"
+                                        @click="
+                                            close($refs.button);
+                                            deletingUuid = $el.dataset.uuid;
+                                        "
+                                        class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-500 dark:hover:bg-gray-600"
+                                    >
+                                        @icon('trash', 'w-5 h-5')
+                                        {{ __('episodes.delete_draft') }}
+                                    </button>
+                                @endif
                             </div>
                         </div>
                     </div>

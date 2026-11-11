@@ -96,6 +96,12 @@ class ObservationRepository extends BaseRepository
                     Repository::codeableConcept()->attach($device, $datum['device']);
                 }
 
+                $specimen = null;
+                if (isset($datum['specimen'])) {
+                    $specimen = Repository::identifier()->store($datum['specimen']['identifier']['value']);
+                    Repository::codeableConcept()->attach($specimen, $datum['specimen']);
+                }
+
                 $observation = $this->model->updateOrCreate(
                     ['uuid' => $datum['uuid'] ?? $datum['id']],
                     [
@@ -122,6 +128,7 @@ class ObservationRepository extends BaseRepository
                             : null,
                         'reaction_on_id' => $reactionOn?->id,
                         'device_id' => $device?->id,
+                        'specimen_id' => $specimen?->id,
                         'context_id' => $context?->id
                     ]
                 );
@@ -239,6 +246,7 @@ class ObservationRepository extends BaseRepository
                 $observation['uuid'] => [
                     'ehealthInsertedAt' => $observation['ehealthInsertedAt'] ?? null,
                     'codeCode' => data_get($observation, 'code.coding.0.code'),
+                    'codeSystem' => data_get($observation, 'code.coding.0.system'),
                     'type' => 'observation'
                 ]
             ])

@@ -42,7 +42,7 @@
         <x-slot name="headerActions">
             @can('create', Encounter::class)
                 <a
-                    href="{{ route('prepersons.encounter.create', [legalEntity(), 'preperson' => $preperson->id]) }}"
+                    href="{{ route('prepersons.encounters.create', [legalEntity(), 'preperson' => $preperson->id]) }}"
                     class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
                 >
                     @icon('plus', 'w-4 h-4')
@@ -73,14 +73,14 @@
                     >
                         <div class="custom-scrollbar overflow-y-auto">
                             <a
-                                href="{{ route('prepersons.encounter.create', [legalEntity(), 'preperson' => $preperson->id, 'type' => 'discharge']) }}"
+                                href="{{ route('prepersons.encounters.create', [legalEntity(), 'preperson' => $preperson->id, 'type' => 'discharge']) }}"
                                 class="dropdown-item"
                             >
                                 @icon('hospital-bed', 'w-4 h-4 shrink-0')
                                 {{ __('patients.discharge_patient') }}
                             </a>
                             <a
-                                href="{{ route('prepersons.encounter.create', [legalEntity(), 'preperson' => $preperson->id, 'type' => 'hospitalization_refusal']) }}"
+                                href="{{ route('prepersons.encounters.create', [legalEntity(), 'preperson' => $preperson->id, 'type' => 'hospitalization_refusal']) }}"
                                 class="dropdown-item"
                             >
                                 @icon('cancel', 'w-4 h-4 shrink-0')
