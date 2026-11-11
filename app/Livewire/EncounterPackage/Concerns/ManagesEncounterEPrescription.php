@@ -196,6 +196,21 @@ trait ManagesEncounterEPrescription
         return $this->encounterEPrescriptionPlanId === null ? null : Repository::carePlan()->findById($this->encounterEPrescriptionPlanId);
     }
 
+    #[Computed]
+    public function encounterEPrescriptionApprovalContext(): array
+    {
+        if (!$this->encounterEPrescriptionApprovalRequired || $this->encounterEPrescriptionPlanId === null) {
+            return [];
+        }
+        $encounter = $this->resolveEncounterModelForStandalone();
+        if ($encounter === null || !$this->guardEncounterPrescriptionCreate($encounter)) {
+            return [];
+        }
+
+        // Consent must target the selected encounter actor, never another available writer.
+        return ['actingEmployeeUuid' => $encounter->performer->value];
+    }
+
     private function guardEncounterPrescriptionCreate(Encounter $encounter): bool
     {
         if (Auth::user()->cannot('createMedicationRequest', [$encounter, Person::findOrFail($this->personId), legalEntity()])) {
