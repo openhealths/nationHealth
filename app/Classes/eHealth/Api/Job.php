@@ -50,7 +50,7 @@ class Job extends Request
     public function getDetailsByHref(string $href, array $query = []): PromiseInterface|EHealthResponse
     {
         $path = parse_url($href, PHP_URL_PATH);
-        if (!is_string($path) || preg_match('#^/?(?:api/)?jobs/([A-Za-z0-9_-]+)/?$#', $path, $matches) !== 1) {
+        if (!is_string($path) || preg_match('#^/?(?:api/)?jobs/([A-Za-z0-9_-]+)/?$#i', $path, $matches) !== 1) {
             throw new InvalidArgumentException('Invalid eHealth job link.');
         }
 

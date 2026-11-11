@@ -1,7 +1,8 @@
 @use(App\Enums\Person\ObservationStatus)
 @use(App\Models\MedicalEvents\Sql\Encounter)
 
-<x-layouts.patient :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
+<x-layouts.patient :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName" :showLegacyMessages="false">
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <x-slot name="headerActions">
         @can('create', Encounter::class)
             <a

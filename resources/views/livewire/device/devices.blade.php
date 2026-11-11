@@ -1,15 +1,15 @@
-@php
-    use App\Enums\Device\Status;
-    use App\Models\MedicalEvents\Sql\Device;
-    use App\Models\MedicalEvents\Sql\DeviceProperty;
-@endphp
+@use(App\Enums\Device\Status)
+@use(App\Models\MedicalEvents\Sql\Device)
+@use(App\Models\MedicalEvents\Sql\DeviceProperty)
 
 <x-layouts.patient
     :personId="$personId"
     :prepersonId="$prepersonId"
     :patientFullName="$patientFullName"
     :activeTab="'devices'"
+    :showLegacyMessages="false"
 >
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <x-slot name="headerActions">
         <div class="flex flex-wrap items-center gap-2">
             <button

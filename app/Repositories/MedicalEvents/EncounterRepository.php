@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
+use App\Classes\eHealth\EHealth;
+use App\Enums\ClinicalImpression\Status as ClinicalImpressionStatus;
 use App\Enums\DetectedIssue\Status as DetectedIssueStatus;
 use App\Enums\Device\Status as DeviceStatus;
 use App\Enums\DeviceAssociation\Status as DeviceAssociationStatus;
-use App\Enums\ClinicalImpression\Status as ClinicalImpressionStatus;
+use App\Enums\DeviceDispense\Status as DeviceDispenseStatus;
+use App\Enums\JobStatus;
 use App\Enums\Person\ConditionVerificationStatus;
 use App\Enums\Person\DiagnosticReportStatus;
 use App\Enums\Person\EncounterStatus;
@@ -15,11 +18,14 @@ use App\Enums\Person\ImmunizationStatus;
 use App\Enums\Person\ObservationStatus;
 use App\Enums\Person\ProcedureStatus;
 use App\Enums\Specimen\Status as SpecimenStatus;
+use App\Jobs\RemoteEHealthLinksProcessing;
+use App\Models\EhealthLink;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\DetectedIssue;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\DeviceAssociation;
+use App\Models\MedicalEvents\Sql\DeviceDispense;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Encounter as EncounterSql;
@@ -30,8 +36,11 @@ use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -46,8 +55,8 @@ class EncounterRepository extends BaseRepository
             ->findOrFail($id);
     }
 
-    /** @return \Illuminate\Support\Collection<int, Condition> */
-    public function primaryDiagnosisConditions(Encounter $encounter): \Illuminate\Support\Collection
+    /** @return Collection<int, Condition> */
+    public function primaryDiagnosisConditions(Encounter $encounter): Collection
     {
         $encounter->loadMissing(['diagnoses.role.coding']);
         $primaryDiagnoses = $encounter->diagnoses->filter(
@@ -120,7 +129,7 @@ class EncounterRepository extends BaseRepository
             if (isset($data['incomingReferral'])) {
                 $incomingReferral = Repository::identifier()->store(
                     $data['incomingReferral']['identifier']['value'],
-                    $data['incomingReferral']['display_value'] ?? $data['incomingReferral']['displayValue'] ?? null
+                    $data['incomingReferral']['display_value'] ?? ($data['incomingReferral']['displayValue'] ?? null)
                 );
                 Repository::codeableConcept()->attach($incomingReferral, $data['incomingReferral']);
             }
@@ -247,6 +256,7 @@ class EncounterRepository extends BaseRepository
      * @var array
      */
     private const array CANCELLED_STATUSES = [
+        DeviceDispense::class => ['status', DeviceDispenseStatus::ENTERED_IN_ERROR],
         Condition::class => ['verification_status', ConditionVerificationStatus::ENTERED_IN_ERROR],
         Observation::class => ['status', ObservationStatus::ENTERED_IN_ERROR],
         Immunization::class => ['status', ImmunizationStatus::ENTERED_IN_ERROR],
@@ -266,6 +276,7 @@ class EncounterRepository extends BaseRepository
      * @var array
      */
     private const array SEPARATELY_CANCELLED_STATUSES = [
+        'deviceDispenses' => [DeviceDispense::class, 'status', DeviceDispenseStatus::ENTERED_IN_ERROR],
         'observations' => [Observation::class, 'status', ObservationStatus::ENTERED_IN_ERROR],
         'immunizations' => [Immunization::class, 'status', ImmunizationStatus::ENTERED_IN_ERROR],
         'diagnosticReports' => [DiagnosticReport::class, 'status', DiagnosticReportStatus::ENTERED_IN_ERROR],
@@ -288,6 +299,7 @@ class EncounterRepository extends BaseRepository
      * The relation each kind of record of the package holds the identifier of its encounter in.
      */
     private const array ENCOUNTER_RELATIONS = [
+        'deviceDispenses' => 'encounter',
         'observations' => 'context',
         'immunizations' => 'context',
         'diagnosticReports' => 'encounter',
@@ -442,6 +454,244 @@ class EncounterRepository extends BaseRepository
                         'explanatory_letter' => $explanatoryLetter
                     ]);
             }
+        });
+    }
+
+    /**
+     * Fetch the complete remote package before rebuilding signed cancellation content.
+     * Every page is validated before it can be synchronized; a later failure leaves the package uncancelled.
+     */
+    public function synchronizeCancellationPackage(Encounter $encounter, Person|Preperson $patient): array
+    {
+        $remoteEncounter = EHealth::encounter()->getById($patient->uuid, $encounter->uuid)->validate();
+        if (($remoteEncounter['uuid'] ?? null) !== $encounter->uuid) {
+            throw new RuntimeException('Encounter detail returned a different resource.');
+        }
+
+        $sections = [
+            'condition' => 'encounter_id',
+            'observation' => 'encounter_id',
+            'immunization' => 'encounter_id',
+            'diagnosticReport' => 'encounter_id',
+            'procedure' => 'encounter_id',
+            'clinicalImpression' => 'encounter_id',
+            'device' => 'encounter_id',
+            'deviceAssociation' => 'encounter_id',
+            'detectedIssue' => 'encounter_id',
+            'specimen' => 'encounter',
+            'deviceDispense' => 'encounter',
+        ];
+        $resources = [];
+        foreach ($sections as $name => $filter) {
+            $resources[$name] = $this->cancellationRecords($name, $filter, $patient->uuid, $encounter->uuid);
+        }
+
+        // A diagnosis can point to a condition recorded before this encounter.
+        $knownConditions = array_column($resources['condition'], 'uuid');
+        foreach ($remoteEncounter['diagnoses'] ?? [] as $diagnosis) {
+            $uuid = data_get($diagnosis, 'condition.identifier.value');
+            if (is_string($uuid) && !in_array($uuid, $knownConditions, true)) {
+                $condition = EHealth::condition()->getById($patient->uuid, $uuid)->validate();
+                if (($condition['uuid'] ?? null) !== $uuid) {
+                    throw new RuntimeException('Diagnosis condition detail returned a different resource.');
+                }
+                $resources['condition'][] = $condition;
+                $knownConditions[] = $uuid;
+            }
+        }
+
+        DB::transaction(static function () use ($patient, $remoteEncounter, $resources): void {
+            Repository::encounter()->sync($patient, [$remoteEncounter]);
+            foreach ($resources as $name => $records) {
+                Repository::$name()->sync($patient, $records);
+            }
+        });
+
+        return ['encounter' => $remoteEncounter, 'resources' => $resources];
+    }
+
+    /** Recover an accepted cancellation whose HTTP receipt was lost, using validated remote resources. */
+    public function reconcileCancellation(EhealthLink $submission, Person|Preperson $patient): bool
+    {
+        $encounter = $submission->linkable;
+        if (!$encounter instanceof Encounter || !Encounter::forPatient($patient)->whereKey($encounter->id)->exists()) {
+            throw new RuntimeException('Cancellation does not belong to the current patient.');
+        }
+        $snapshot = $this->synchronizeCancellationPackage($encounter, $patient);
+        $selected = $submission->job->request_data['selectedRecords'];
+        if ($selected === [] && $snapshot['encounter']['status'] !== EncounterStatus::ENTERED_IN_ERROR->value) {
+            return false;
+        }
+        $sections = [
+            'condition' => 'conditions', 'observation' => 'observations', 'immunization' => 'immunizations',
+            'diagnosticReport' => 'diagnosticReports', 'procedure' => 'procedures', 'clinicalImpression' => 'clinicalImpressions',
+            'device' => 'devices', 'deviceAssociation' => 'deviceAssociations', 'detectedIssue' => 'detectedIssues',
+            'specimen' => 'specimens', 'deviceDispense' => 'deviceDispenses',
+        ];
+        foreach ($sections as $name => $section) {
+            $records = collect($snapshot['resources'][$name])->keyBy('uuid');
+            $uuids = $selected === [] ? $records->keys()->all() : ($selected[$section] ?? []);
+            foreach ($uuids as $uuid) {
+                $record = $records->get($uuid);
+                // A diagnosis from an earlier encounter must retain its original verification status.
+                if ($name === 'condition' && data_get($record, 'context.identifier.value') !== $encounter->uuid) {
+                    continue;
+                }
+                $status = $name === 'condition' ? 'verification_status' : 'status';
+                if ($record === null || ($record[$status] ?? null) !== 'entered_in_error') {
+                    return false;
+                }
+            }
+        }
+
+        // This is a local recovery result backed by the resource reads above, not an invented remote job response.
+        return $this->finishCancellation($submission, ['status' => 'processed', 'verified_by' => 'remote_resources']);
+    }
+
+    /** @return Collection<int, EhealthLink> */
+    public function patientCancellationsByIds(Person|Preperson $patient, array $ids): Collection
+    {
+        return EhealthLink::with(['job', 'linkable'])
+            ->whereIn('id', $ids)
+            ->whereHasMorph('linkable', [Encounter::class], static fn ($query) => $query->forPatient($patient))
+            ->whereHas('job', static fn ($query) => $query->where('request_data->operation', 'cancelEncounter'))
+            ->get();
+    }
+
+    /** Read all pages using the endpoint's actual encounter filter. */
+    private function cancellationRecords(string $name, string $filter, string $patientUuid, string $encounterUuid): array
+    {
+        $records = [];
+        $page = 1;
+        $pageSize = (int) config('ehealth.api.page_size', 300);
+        $expectedPaging = null;
+        do {
+            $response = EHealth::$name()->getBySearchParams($patientUuid, [
+                $filter => $encounterUuid, 'page' => $page, 'page_size' => $pageSize,
+            ]);
+            $items = $response->validate();
+            if (!is_array($items) || !array_is_list($items)) {
+                throw new RuntimeException('Encounter package search did not return a collection.');
+            }
+            $paging = $response->getPaging();
+            Validator::make($paging, [
+                    'page_number' => ['required', 'integer', 'min:1', 'in:'.$page],
+                    'page_size' => ['required', 'integer', 'min:1'],
+                    'total_pages' => ['required', 'integer', 'min:0'],
+                    'total_entries' => ['required', 'integer', 'min:0'],
+            ])->validate();
+            $totals = [(int) $paging['total_entries'], (int) $paging['total_pages']];
+            if ($expectedPaging !== null && $totals !== $expectedPaging) {
+                throw new RuntimeException('Encounter package changed while reading its pages.');
+            }
+            $expectedPaging = $totals;
+            foreach ($items as $item) {
+                $context = in_array($name, ['condition', 'observation', 'immunization', 'device', 'deviceAssociation', 'specimen'], true)
+                    ? 'context' : 'encounter';
+                if (data_get($item, $context.'.identifier.value') !== $encounterUuid) {
+                    throw new RuntimeException('Encounter package search returned a record from another encounter.');
+                }
+                $uuid = $item['uuid'];
+                if (isset($records[$uuid])) {
+                    throw new RuntimeException('Encounter package search repeated a record across pages.');
+                }
+                $records[$uuid] = $item;
+            }
+            $hasNext = $page < (int) $paging['total_pages'];
+            if ($hasNext && $items === []) {
+                throw new RuntimeException('Encounter package search returned an incomplete page.');
+            }
+            $page++;
+        } while ($hasNext);
+
+        if (count($records) !== $expectedPaging[0]) {
+            throw new RuntimeException('Encounter package search returned an incomplete collection.');
+        }
+
+        return array_values($records);
+    }
+
+    /** A durable duplicate guard survives refreshes and an uncertain HTTP outcome. */
+    public function pendingCancellation(Encounter $encounter): ?EhealthLink
+    {
+        return $encounter->ehealthLinks()
+            ->whereIn('status', [JobStatus::PENDING->value, JobStatus::PROCESSING->value])
+            ->whereHas('job', static fn ($query) => $query->where('request_data->operation', 'cancelEncounter'))
+            ->latest('id')->first();
+    }
+
+    /** Lock the encounter so simultaneous tabs cannot submit the same cancellation twice. */
+    public function startCancellation(Encounter $encounter, array $request): ?EhealthLink
+    {
+        return DB::transaction(static function () use ($encounter, $request): ?EhealthLink {
+            $locked = Encounter::whereKey($encounter->id)->lockForUpdate()->firstOrFail();
+            if (Repository::encounter()->pendingCancellation($locked) !== null) {
+                return null;
+            }
+
+            return RemoteEHealthLinksProcessing::startSubmission($locked, $request);
+        });
+    }
+
+    /** @return Collection<int, EhealthLink> */
+    public function pendingPatientCancellations(Person|Preperson $patient): Collection
+    {
+        return EhealthLink::with(['job', 'linkable'])
+            ->whereIn('status', [JobStatus::PENDING->value, JobStatus::PROCESSING->value])
+            ->whereHasMorph('linkable', [Encounter::class], static fn ($query) => $query->forPatient($patient))
+            ->whereHas('job', static fn ($query) => $query->where('request_data->operation', 'cancelEncounter'))
+            ->get();
+    }
+
+    /** Apply cancellation exactly once, after a final validated eHealth job result. */
+    public function finishCancellation(EhealthLink $submission, array $result): bool
+    {
+        Validator::make($result, [
+            'status' => ['required', 'string', 'in:pending,processing,accepted,queued,processed,failed'],
+            'status_code' => ['nullable', 'integer'],
+            'error' => ['nullable'],
+        ])->validate();
+        if (in_array(strtolower($result['status']), ['pending', 'processing', 'accepted', 'queued'], true)) {
+            return false;
+        }
+
+        return DB::transaction(static function () use ($submission, $result): bool {
+            $link = EhealthLink::whereKey($submission->id)->lockForUpdate()->firstOrFail();
+            if (!in_array($link->status, [JobStatus::PENDING->value, JobStatus::PROCESSING->value], true)) {
+                return false;
+            }
+            $request = $link->job->request_data;
+            $encounter = $link->linkable;
+            if (!$encounter instanceof Encounter || ($request['operation'] ?? null) !== 'cancelEncounter') {
+                throw new RuntimeException('Invalid encounter cancellation submission.');
+            }
+            $succeeded = strtolower($result['status']) === 'processed'
+                && !isset($result['error'])
+                && (!isset($result['status_code']) || in_array($result['status_code'], [200, 201, 204], true));
+            if ($succeeded) {
+                if ($request['selectedRecords'] === []) {
+                    Repository::encounter()->markAsEnteredInError(
+                        $encounter,
+                        $request['cancellationReasonConcept'],
+                        $request['explanatoryLetter']
+                    );
+                } else {
+                    Repository::encounter()->markRecordsAsEnteredInError(
+                        $encounter->uuid,
+                        $request['selectedRecords'],
+                        $request['explanatoryLetter']
+                    );
+                }
+            }
+            $status = $succeeded ? JobStatus::PROCESSED->value : JobStatus::FAILED->value;
+            $link->job()->update(['status' => $status, 'response_data' => $result]);
+            $link->update([
+                'status' => $status,
+                'error' => $succeeded ? null : ($result['error'] ?? ['message' => __('encounters.messages.cancel_package_request_error')]),
+                'error_code' => $result['status_code'] ?? null,
+            ]);
+
+            return true;
         });
     }
 

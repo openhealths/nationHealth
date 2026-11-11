@@ -1,15 +1,15 @@
-@php
-    use App\Enums\DeviceAssociation\Status;
-    use App\Models\MedicalEvents\Sql\Device;
-    use App\Models\MedicalEvents\Sql\DeviceAssociation;
-@endphp
+@use(App\Enums\DeviceAssociation\Status)
+@use(App\Models\MedicalEvents\Sql\Device)
+@use(App\Models\MedicalEvents\Sql\DeviceAssociation)
 
 <x-layouts.patient
     :personId="$personId"
     :prepersonId="$prepersonId"
     :patientFullName="$patientFullName"
     :activeTab="'device-associations'"
+    :showLegacyMessages="false"
 >
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <x-slot name="headerActions">
         <div class="flex flex-wrap items-center gap-2">
             @can('viewAny', DeviceAssociation::class)

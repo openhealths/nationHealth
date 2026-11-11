@@ -6,7 +6,9 @@
     :prepersonId="$prepersonId"
     :patientFullName="$patientFullName"
     activeTab="specimens"
+    :showLegacyMessages="false"
 >
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <x-slot name="headerActions">
         @can('create', Specimen::class)
             <a
