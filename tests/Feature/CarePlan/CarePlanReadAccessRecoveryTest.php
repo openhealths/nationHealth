@@ -97,7 +97,6 @@ class CarePlanReadAccessRecoveryTest extends TestCase
         return array_replace([
             'id' => $approval->uuid,
             'is_verified' => true,
-            'status' => 'active',
             'access_level' => 'read',
             'expires_at' => now()->addHour()->toIso8601String(),
             'created_by' => $payload['created_by'],
@@ -178,8 +177,8 @@ class CarePlanReadAccessRecoveryTest extends TestCase
     public static function unavailableGrants(): array
     {
         return [
-            'revoked' => [['status' => 'terminated']],
-            'expired' => [['expires_at' => '2000-01-01T00:00:00Z']],
+            'unverified' => [['is_verified' => false]],
+            'revoked or expired' => [['expires_at' => '2000-01-01T00:00:00Z']],
             'resources removed' => [['granted_resources' => []]],
         ];
     }
@@ -191,6 +190,7 @@ class CarePlanReadAccessRecoveryTest extends TestCase
         $plan = $this->plan($context);
         ['approval' => $approval, 'payload' => $payload] = $this->request($context, [$plan]);
         Repository::approval()->sync($this->remote($approval, $payload), $context['person'], $approval);
+        $before = $approval->fresh()->getAttributes();
         $service = $this->mock(PatientApprovalService::class)->makePartial();
         $service->shouldReceive('details')->once()->andThrow(new EHealthResponseException(new HttpResponse(new Response($status, [], '{"error":{"message":"Synthetic failure"}}'))));
         $service->shouldNotReceive('create');
@@ -199,11 +199,14 @@ class CarePlanReadAccessRecoveryTest extends TestCase
             ->assertNotDispatched('care-plan-read-access-granted');
         if ($status === 404) {
             $component->assertSet('open', true)->assertSet('approvalId', null);
-            $this->assertSame('inactive', $approval->fresh()->status);
+            $this->assertFalse($approval->fresh()->expiresAt->isFuture());
+            $this->assertCount(0, Repository::approval()->verifiedCarePlanReadRequests($context['person'], $context['employee']->uuid, [$plan->uuid]));
         } else {
             $component->assertSee(__('approval.create.confirmation_failed'));
-            $this->assertSame('active', $approval->fresh()->status);
+            $this->assertSame($before, $approval->fresh()->getAttributes());
         }
+        $this->assertTrue($approval->fresh()->getAttribute('is_verified'));
+        $this->assertNull($approval->fresh()->status);
     }
 
     public static function readFailures(): array
