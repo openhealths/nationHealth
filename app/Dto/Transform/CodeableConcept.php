@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Dto\Transform;
 
 use App\Models\MedicalEvents\Sql\CodeableConcept as CodeableConceptModel;
+use App\Repositories\MedicalEvents\Repository;
 
 /**
  * Codeable concept transforms for #[Map], referenced as [CodeableConcept::class, 'method'].
@@ -20,6 +21,6 @@ class CodeableConcept
      */
     public static function toArray(?CodeableConceptModel $codeableConcept): ?array
     {
-        return $codeableConcept?->toArray();
+        return Repository::codeableConcept()->toResource($codeableConcept);
     }
 }

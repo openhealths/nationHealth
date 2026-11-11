@@ -4,20 +4,19 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
+use App\Classes\eHealth\Api\Responses\Collections\HealthcareServiceDetails;
+use App\Classes\eHealth\EHealthRequest as Request;
+use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\Errors\HealthcareServiceErrorTranslator;
+use App\Contracts\ApiErrorTranslator;
+use App\Enums\HealthcareService\Status;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use App\Models\LegalEntity as LegalEntityModel;
-use App\Models\Division as DivisionModel;
 use App\Rules\InDictionary;
-use Illuminate\Support\Facades\Log;
-use App\Classes\eHealth\EHealthResponse;
-use App\Classes\eHealth\Api\Responses\HealthcareServiceResponse;
 use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use App\Classes\eHealth\EHealthRequest as Request;
-use App\Classes\eHealth\Errors\HealthcareServiceErrorTranslator;
-use App\Contracts\ApiErrorTranslator;
 
 class HealthcareService extends Request
 {
@@ -36,7 +35,7 @@ class HealthcareService extends Request
      *     providing_condition?: string, // Dictionary PROVIDING_CONDITION
      *     category?: string, // Dictionary HEALTHCARE_SERVICE_CATEGORIES
      *     type?: string, // Dictionary of types for category
-     *     status?: string, // Entity status
+     *     status?: value-of<Status>,
      *     page?: int,
      *     page_size?: int
      * } $query
@@ -47,11 +46,24 @@ class HealthcareService extends Request
     {
         $this->setDefaultPageSize();
         $this->setValidator($this->validateMany(...));
-        $this->setMapper($this->mapMany(...));
 
         $mergedQuery = array_merge($this->options['query'], $query);
 
         return $this->get(self::URL, $mergedQuery);
+    }
+
+    /**
+     * Get healthcare service details by ID.
+     *
+     * @param  string  $uuid  unique eHealth identifier
+     * @return PromiseInterface|EHealthResponse
+     * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
+     */
+    public function getById(string $uuid): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator($this->validateResponse(...));
+
+        return $this->get(self::URL . '/' . $uuid);
     }
 
     /**
@@ -124,10 +136,9 @@ class HealthcareService extends Request
     }
 
     /**
-     * Validate healthcare service response (create, update, activate, deactivate),
-     * see: https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/healthcare-services/create-healthcare-service
+     * Validate healthcare service response (get by id, create, update, activate, deactivate).
      */
-    protected function validateResponse(EHealthResponse $response): HealthcareServiceResponse
+    protected function validateResponse(EHealthResponse $response): HealthcareServiceDetails
     {
         $data = $response->getData();
 
@@ -139,14 +150,14 @@ class HealthcareService extends Request
             Log::channel('e_health_errors')->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
         }
 
-        return new HealthcareServiceResponse($validator->validate());
+        return new HealthcareServiceDetails($validator->validate());
     }
 
     /**
-     * Validate list of healthcare services.
+     * Validate list of healthcare services; each item has the same shape as a single healthcare service response.
      *
      * @param  EHealthResponse  $response
-     * @return array
+     * @return array List of HealthcareServiceDetails
      */
     protected function validateMany(EHealthResponse $response): array
     {
@@ -166,36 +177,10 @@ class HealthcareService extends Request
             Log::channel('e_health_errors')->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
         }
 
-        return $validator->validate();
-    }
-
-    /**
-     * Map UUID values to ID for multiple records.
-     *
-     * @param  array  $validated
-     * @return array
-     */
-    protected function mapMany(array $validated): array
-    {
-        // Get unique uuids.
-        $divisionUuids = collect($validated)->pluck('division_id')->unique()->filter()->values();
-        $legalEntityUuids = collect($validated)->pluck('legal_entity_id')->unique()->filter()->values();
-
-        $divisionMap = DivisionModel::whereIn('uuid', $divisionUuids)
-            ->pluck('id', 'uuid')
-            ->toArray();
-
-        $legalEntityMap = LegalEntityModel::whereIn('uuid', $legalEntityUuids)
-            ->pluck('id', 'uuid')
-            ->toArray();
-
-        // Map uuid to id
-        return collect($validated)->map(static function (array $item) use ($divisionMap, $legalEntityMap) {
-            $item['division_id'] = $divisionMap[$item['division_id']];
-            $item['legal_entity_id'] = $legalEntityMap[$item['legal_entity_id']];
-
-            return $item;
-        })->toArray();
+        return array_map(
+            static fn (array $item): HealthcareServiceDetails => new HealthcareServiceDetails($item),
+            $validator->validate()
+        );
     }
 
     /**

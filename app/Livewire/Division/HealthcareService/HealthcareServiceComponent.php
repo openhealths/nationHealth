@@ -7,14 +7,15 @@ namespace App\Livewire\Division\HealthcareService;
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Dto\HealthcareService\Ehealth as EhealthData;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Division\Forms\HealthcareServiceForm as Form;
 use App\Models\Division;
+use App\Models\HealthcareService;
 use App\Models\LegalEntity;
 use App\Traits\FormTrait;
 use App\Traits\WorkTimeUtilities;
 use GuzzleHttp\Promise\PromiseInterface;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
@@ -117,6 +118,17 @@ class HealthcareServiceComponent extends Component
             ->map(static fn (string $name, string $code): array => ['code' => $code, 'name' => $name])
             ->values()
             ->all();
+    }
+
+    /**
+     * Healthcare service of the edit and view pages.
+     *
+     * @return HealthcareService
+     */
+    #[Computed]
+    public function healthcareService(): HealthcareService
+    {
+        return HealthcareService::findOrFail($this->healthcareServiceId);
     }
 
     /**

@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Division\HealthcareService;
 
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
-use Exception;
-use Throwable;
+use App\Classes\eHealth\Api\Responses\Collections\HealthcareServiceDetails;
 use App\Classes\eHealth\EHealth;
 use App\Dto\HealthcareService\Model as HealthcareServiceData;
 use App\Enums\JobStatus;
 use App\Enums\Status;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\HealthcareServiceSync;
 use App\Models\Division;
 use App\Models\HealthcareService;
@@ -34,12 +33,13 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Throwable;
 
 class HealthcareServiceIndex extends Component
 {
     use BatchLegalEntityQueries;
-    use WithPagination;
     use FormTrait;
+    use WithPagination;
 
     protected const string BATCH_NAME = 'HealthcareServiceSync';
 
@@ -168,7 +168,7 @@ class HealthcareServiceIndex extends Component
         try {
             $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
 
-            Repository::healthcareService()->saveMapped($healthcareServiceData, $healthcareService, legalEntity());
+            Repository::healthcareService()->save($healthcareServiceData, $healthcareService);
 
             Session::flash('success', __('healthcare-services.success.activated'));
         } catch (Throwable $exception) {
@@ -197,7 +197,7 @@ class HealthcareServiceIndex extends Component
         try {
             $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
 
-            Repository::healthcareService()->saveMapped($healthcareServiceData, $healthcareService, legalEntity());
+            Repository::healthcareService()->save($healthcareServiceData, $healthcareService);
 
             Session::flash('success', __('healthcare-services.success.deactivated'));
         } catch (Throwable $exception) {
@@ -216,10 +216,10 @@ class HealthcareServiceIndex extends Component
         }
 
         try {
-            HealthcareService::destroy($healthcareService->id);
+            Repository::healthcareService()->deleteDraft($healthcareService);
 
             Session::flash('success', __('healthcare-services.success.draft_deleted'));
-        } catch (Exception $exception) {
+        } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while deleting healthcare service: ');
 
             return;
@@ -272,8 +272,12 @@ class HealthcareServiceIndex extends Component
         }
 
         try {
-            $validated = $response->validate();
-            Repository::healthcareService()->sync($response->map($validated));
+            $healthcareServices = array_map(
+                static fn (HealthcareServiceDetails $item): HealthcareServiceData => objectMapper()->map($item, HealthcareServiceData::class),
+                $response->validate()
+            );
+
+            Repository::healthcareService()->sync(legalEntity(), ...$healthcareServices);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors(
                 $exception,

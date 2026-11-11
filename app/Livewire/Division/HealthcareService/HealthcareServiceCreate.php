@@ -42,10 +42,9 @@ class HealthcareServiceCreate extends HealthcareServiceComponent
         try {
             $healthcareServiceData = objectMapper()->map($this->form, HealthcareServiceData::class);
 
-            Repository::healthcareService()->saveMapped(
+            Repository::healthcareService()->save(
                 $healthcareServiceData,
-                new HealthcareService(['division_id' => $this->divisionId]),
-                legalEntity()
+                new HealthcareService(['division_id' => $this->divisionId, 'legal_entity_id' => legalEntity()->id])
             );
 
             Session::flash('success', __('healthcare-services.success.draft_created'));
@@ -77,10 +76,9 @@ class HealthcareServiceCreate extends HealthcareServiceComponent
         try {
             $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
 
-            Repository::healthcareService()->saveMapped(
+            Repository::healthcareService()->save(
                 $healthcareServiceData,
-                new HealthcareService(['division_id' => $this->divisionId]),
-                legalEntity()
+                new HealthcareService(['division_id' => $this->divisionId, 'legal_entity_id' => legalEntity()->id])
             );
 
             Session::flash('success', __('healthcare-services.success.created'));
