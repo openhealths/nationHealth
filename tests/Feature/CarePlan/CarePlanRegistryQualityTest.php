@@ -6,7 +6,6 @@ namespace Tests\Feature\CarePlan;
 
 use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Classes\eHealth\EHealthResponse;
-use App\Enums\Person\ApprovalStatus;
 use App\Exceptions\EHealth\EHealthJobTimeoutException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\CarePlan\CarePlanApprovals;
@@ -67,15 +66,15 @@ class CarePlanRegistryQualityTest extends TestCase
 
         foreach ([CarePlanIndex::class, PatientCarePlans::class] as $component) {
             Livewire::test($component, ['legalEntity' => $legalEntity, 'personId' => $person->id])
-                ->assertSeeInOrder(['Full active', 'Full new', 'Full draft', 'Full on-hold'])
-                ->assertDontSee('Full terminated')
-                ->set('filterStatus', '')->call('search')
-                ->assertSeeInOrder(['Full active', 'Full new', 'Full draft', 'Full on-hold', 'Full terminated'])
-                ->assertDontSee('Summary only')->assertDontSee('Incomplete activity')
-                ->set('filterCompleteness', 'incomplete')->assertSee('Summary only')->assertSee('Incomplete activity')->assertDontSee('Full active')
-                ->set('filterCompleteness', 'all')->assertSee('Full active')->assertSee('Summary only')
+                ->assertSet('carePlans', static fn ($plans): bool => collect($plans)->pluck('id')->all() === array_slice($ids, 0, 4))
+                ->assertDontSeeHtml('wire:key="care-plan-'.$ids[4].'"')
+                ->set('filterStatus', '')->call($component === PatientCarePlans::class ? 'loadCarePlans' : 'search')
+                ->assertSet('carePlans', static fn ($plans): bool => collect($plans)->pluck('id')->all() === $ids)
+                ->assertDontSeeHtml('wire:key="care-plan-'.$legacy->id.'"')->assertDontSeeHtml('wire:key="care-plan-'.$partial->id.'"')
+                ->set('filterCompleteness', 'incomplete')->assertSeeHtml('wire:key="care-plan-'.$legacy->id.'"')->assertSeeHtml('wire:key="care-plan-'.$partial->id.'"')->assertDontSeeHtml('wire:key="care-plan-'.$ids[0].'"')
+                ->set('filterCompleteness', 'all')->assertSeeHtml('wire:key="care-plan-'.$ids[0].'"')->assertSeeHtml('wire:key="care-plan-'.$legacy->id.'"')
                 ->call('resetFilters')->assertSet('filterCompleteness', 'complete')->assertSet('filterStatus', 'current')
-                ->assertDontSee('Summary only')->assertDontSee('Full terminated');
+                ->assertDontSeeHtml('wire:key="care-plan-'.$legacy->id.'"')->assertDontSeeHtml('wire:key="care-plan-'.$ids[4].'"');
         }
         Http::assertNothingSent();
     }
@@ -105,9 +104,9 @@ class CarePlanRegistryQualityTest extends TestCase
         $this->assertSame([$incomplete->id], $repository->listing($legalEntity->id, ['completeness' => 'incomplete'])->modelKeys());
         foreach ([CarePlanIndex::class, PatientCarePlans::class] as $component) {
             Livewire::test($component, ['legalEntity' => $legalEntity, 'personId' => $person->id])
-                ->assertSee('Local draft draft')->assertSee('Local draft DRAFT')->assertDontSee('Needs remote details')
-                ->set('filterCompleteness', 'incomplete')->assertSee('Needs remote details')
-                ->assertDontSee('Local draft draft')->assertDontSee('Local draft DRAFT');
+                ->assertSeeHtml('wire:key="care-plan-'.$drafts[0]->id.'"')->assertSeeHtml('wire:key="care-plan-'.$drafts[1]->id.'"')->assertDontSeeHtml('wire:key="care-plan-'.$incomplete->id.'"')
+                ->set('filterCompleteness', 'incomplete')->assertSeeHtml('wire:key="care-plan-'.$incomplete->id.'"')
+                ->assertDontSeeHtml('wire:key="care-plan-'.$drafts[0]->id.'"')->assertDontSeeHtml('wire:key="care-plan-'.$drafts[1]->id.'"');
         }
         Http::assertNothingSent();
     }
@@ -156,9 +155,10 @@ class CarePlanRegistryQualityTest extends TestCase
     }
 
     #[DataProvider('cancellationResponses')]
-    public function test_recipient_can_revoke_without_care_plan_write_permission_and_sees_confirmed_result(int $statusCode): void
+    public function test_recipient_can_revoke_without_care_plan_write_permission_and_sees_confirmed_result(int $statusCode, ?string $legacyStatus): void
     {
         [$plan, $approval, $legalEntity] = $this->approvalContext(['care_plan:read', 'approval:cancel']);
+        $approval->update(['status' => $legacyStatus]);
         $api = Mockery::mock(ApprovalApi::class);
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn($statusCode === 201
@@ -177,14 +177,19 @@ class CarePlanRegistryQualityTest extends TestCase
             ->assertSee(__('care-plan.revoke_approval'))
             ->call('cancelApproval', $approval->uuid)->assertSee(__('care-plan.approval_cancelled'))
             ->assertDontSeeHtml('wire:click="cancelApproval')->assertDispatched('care-plan-approvals-changed');
-        $this->assertSame(ApprovalStatus::TERMINATED->value, $approval->fresh()->status);
+        $this->assertSame($legacyStatus, $approval->fresh()->status);
         $this->assertTrue($approval->fresh()->getAttribute('is_verified'));
         $this->assertFalse($approval->fresh()->expiresAt->isFuture());
     }
 
     public static function cancellationResponses(): array
     {
-        return ['synchronous' => [201], 'asynchronous' => [202]];
+        return [
+            'synchronous' => [201, null],
+            'asynchronous' => [202, null],
+            'synchronous legacy status' => [201, 'active'],
+            'asynchronous legacy status' => [202, 'active'],
+        ];
     }
 
     public function test_previously_expired_approval_is_not_displayed_as_active(): void
@@ -194,6 +199,27 @@ class CarePlanRegistryQualityTest extends TestCase
         Livewire::test(CarePlanApprovals::class, ['legalEntity' => $legalEntity, 'carePlan' => $plan])
             ->assertSee(__('care-plan.no_approvals_found'))->assertDontSeeHtml('wire:click="cancelApproval');
         Http::assertNothingSent();
+    }
+
+    #[DataProvider('approvalVerificationFlags')]
+    public function test_approval_expiring_after_mount_is_hidden_on_the_next_render(bool $verified): void
+    {
+        [$plan, $approval, $legalEntity] = $this->approvalContext(['care_plan:read', 'approval:cancel']);
+        $approval->update(['is_verified' => $verified]);
+        $component = Livewire::test(CarePlanApprovals::class, ['legalEntity' => $legalEntity, 'carePlan' => $plan])
+            ->assertDontSee(__('care-plan.no_approvals_found'));
+
+        $this->travelTo(now()->addDays(2), function () use ($component): void {
+            $component->call('$refresh')->assertSee(__('care-plan.no_approvals_found'))
+                ->assertDontSeeHtml('wire:click="cancelApproval')
+                ->assertDontSeeHtml('wire:click="verifyExistingApproval');
+        });
+        Http::assertNothingSent();
+    }
+
+    public static function approvalVerificationFlags(): array
+    {
+        return ['verified' => [true], 'awaiting confirmation' => [false]];
     }
 
     public function test_revocation_denial_has_visible_feedback_and_no_api_or_database_effects(): void
@@ -269,7 +295,7 @@ class CarePlanRegistryQualityTest extends TestCase
             'uuid' => (string) Str::uuid(), 'approvable_type' => $plan->getMorphClass(), 'approvable_id' => $plan->id,
             'granted_to_id' => $recipient->id, 'created_by_id' => $otherCreator->id,
             'granted_to_type' => 'employee',
-            'status' => 'active', 'is_verified' => true, 'access_level' => 'write', 'expires_at' => now()->addDay(),
+            'is_verified' => true, 'access_level' => 'write', 'expires_at' => now()->addDay(),
         ]);
         $service = Mockery::mock(CarePlanApprovalService::class)->makePartial();
         $service->shouldReceive('skipsPatientOtp')->andReturn(true);

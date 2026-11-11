@@ -7,7 +7,10 @@ namespace Tests\Feature\CarePlan;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\Person\Person;
-use App\Repositories\MedicalEvents\MedicationRequestRepository;
+
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -38,18 +41,18 @@ class CarePlanMedicationDocumentSyncTest extends TestCase
         $concept->coding()->create(['system' => 'eHealth/resources', 'code' => 'activity']);
         $second = $request->replicate();
         $second->fill(['uuid' => (string) Str::uuid(), 'based_on_id' => $basis->id])->save();
-        $previous = \Illuminate\Database\Eloquent\Model::preventsLazyLoading();
-        \Illuminate\Database\Eloquent\Model::preventLazyLoading();
+        $previous = Model::preventsLazyLoading();
+        Model::preventLazyLoading();
 
         try {
-            $rows = app(\App\Repositories\CarePlanActivityRepository::class)
+            $rows = Repository::carePlanActivity()
                 ->linkedDocuments([$activityUuid], 'medication_request')->keyBy('uuid')->toArray();
 
             $this->assertCount(2, $rows);
             $this->assertSame($activityUuid, $rows[$request->uuid]['basedOn']['identifier']['value']);
             $this->assertSame('activity', $rows[$second->uuid]['basedOn']['identifier']['type']['coding'][0]['code']);
         } finally {
-            \Illuminate\Database\Eloquent\Model::preventLazyLoading($previous);
+            Model::preventLazyLoading($previous);
         }
     }
 
@@ -57,7 +60,7 @@ class CarePlanMedicationDocumentSyncTest extends TestCase
     {
         $request = $this->request();
         $prescriptionUuid = (string) Str::uuid();
-        $repository = app(MedicationRequestRepository::class);
+        $repository = MedicalEventsRepository::medicationRequest();
         $repository->synchronizeCarePlanDocuments(collect([$request]), [
             ['id' => $prescriptionUuid, 'request_number' => $request->requestNumber, 'status' => 'ACTIVE'],
         ], [['id' => $request->uuid, 'status' => 'NEW']]);
@@ -82,7 +85,7 @@ class CarePlanMedicationDocumentSyncTest extends TestCase
     public function test_linked_prescription_counts_once_and_its_expiry_releases_quantity(): void
     {
         $request = $this->request();
-        $repository = app(MedicationRequestRepository::class);
+        $repository = MedicalEventsRepository::medicationRequest();
         $active = ['id' => (string) Str::uuid(), 'request_number' => $request->requestNumber, 'status' => 'ACTIVE'];
         $repository->synchronizeCarePlanDocuments(collect([$request]), [$active], []);
         $external = $request->replicate();
@@ -102,7 +105,7 @@ class CarePlanMedicationDocumentSyncTest extends TestCase
         $other = $request->replicate();
         $other->uuid = (string) Str::uuid();
         $other->save();
-        app(MedicationRequestRepository::class)->synchronizeCarePlanDocuments(collect([$request, $other]), [
+        MedicalEventsRepository::medicationRequest()->synchronizeCarePlanDocuments(collect([$request, $other]), [
             ['id' => (string) Str::uuid(), 'request_number' => $request->requestNumber, 'status' => 'ACTIVE'],
         ], []);
 
@@ -114,7 +117,7 @@ class CarePlanMedicationDocumentSyncTest extends TestCase
     {
         $request = $this->request();
         try {
-            app(MedicationRequestRepository::class)->synchronizeCarePlanDocuments(collect([$request]), [
+            MedicalEventsRepository::medicationRequest()->synchronizeCarePlanDocuments(collect([$request]), [
                 ['id' => (string) Str::uuid(), 'request_number' => $request->requestNumber, 'status' => 'ACTIVE',
                     'person' => ['id' => (string) Str::uuid()]],
             ], []);
@@ -128,7 +131,7 @@ class CarePlanMedicationDocumentSyncTest extends TestCase
     public function test_entered_in_error_api_spelling_releases_quantity_without_retagging_the_request(): void
     {
         $request = $this->request();
-        $repository = app(MedicationRequestRepository::class);
+        $repository = MedicalEventsRepository::medicationRequest();
         $active = ['id' => (string) Str::uuid(), 'request_number' => $request->requestNumber, 'status' => 'ACTIVE'];
         $repository->synchronizeCarePlanDocuments(collect([$request]), [$active], []);
         $active['status'] = 'ENTERED_IN_ERROR';

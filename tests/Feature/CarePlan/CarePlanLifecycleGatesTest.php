@@ -4,22 +4,33 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
+use App\Enums\Status;
+use App\Enums\User\Role;
+use App\Livewire\CarePlan\CarePlanShow;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
+use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+
 use App\Models\Person\Person;
+use App\Models\Relations\Party;
 use App\Models\User;
 use App\Services\MedicalEvents\CarePlanLifecycleGateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\TestCase;
 
 class CarePlanLifecycleGatesTest extends TestCase
 {
-    use \Tests\Concerns\CreatesFhirCarePlans;
+    use CreatesFhirCarePlans;
 
     use DatabaseTransactions;
 
@@ -36,7 +47,7 @@ class CarePlanLifecycleGatesTest extends TestCase
         parent::setUp();
 
         config(['cipher.api.domain' => 'https://cipher.invalid']);
-        \Illuminate\Support\Facades\Cache::put('knedp_certificate_authority', [], 60);
+        Cache::put('knedp_certificate_authority', [], 60);
 
         $this->person = Person::create([
             'uuid' => (string) Str::uuid(),
@@ -48,8 +59,8 @@ class CarePlanLifecycleGatesTest extends TestCase
             'process_disclosure_data_consent' => true,
         ]);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $this->legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -60,7 +71,7 @@ class CarePlanLifecycleGatesTest extends TestCase
         ]);
         $this->instance('legalEntity', $this->legalEntity);
 
-        $party = \App\Models\Relations\Party::create([
+        $party = Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Gate',
             'last_name' => 'Doctor',
@@ -79,8 +90,8 @@ class CarePlanLifecycleGatesTest extends TestCase
         $this->employee = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr Gate',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $this->legalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',
@@ -121,8 +132,8 @@ class CarePlanLifecycleGatesTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
-        $basedOnId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $activity->uuid])->id;
-        $intentId = \App\Models\MedicalEvents\Sql\Coding::firstOrCreate([
+        $basedOnId = Identifier::create(['value' => $activity->uuid])->id;
+        $intentId = Coding::firstOrCreate([
             'code' => 'order',
             'system' => 'http://hl7.org/fhir/request-intent',
         ])->id;
@@ -139,7 +150,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             'source' => MedicationRequestRequest::SOURCE_LOCAL,
         ]);
 
-        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan])
             ->call('openSignatureModal', 'cancel_activity', $activity->id)
             ->assertSet('showSignatureModal', false);
 
@@ -174,12 +185,12 @@ class CarePlanLifecycleGatesTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
-        $basedOnId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $activity->uuid])->id;
-        $intentId = \App\Models\MedicalEvents\Sql\Coding::firstOrCreate([
+        $basedOnId = Identifier::create(['value' => $activity->uuid])->id;
+        $intentId = Coding::firstOrCreate([
             'code' => 'order',
             'system' => 'http://hl7.org/fhir/request-intent',
         ])->id;
-        $priorityId = \App\Models\MedicalEvents\Sql\CodeableConcept::firstOrCreate(['text' => 'routine'])->id;
+        $priorityId = CodeableConcept::firstOrCreate(['text' => 'routine'])->id;
 
         ServiceRequestRequest::create([
             'uuid' => (string) Str::uuid(),
@@ -193,7 +204,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             'priority_id' => $priorityId,
         ]);
 
-        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan])
             ->call('openSignatureModal', 'complete_activity', $activity->id)
             ->assertSet('showSignatureModal', false);
 
@@ -226,7 +237,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
-        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan->fresh('activities')])
+        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan->fresh('activities')])
             ->call('openSignatureModal', 'cancel')
             ->assertSet('showSignatureModal', false)
             ->assertSeeHtml('role="alert"')
@@ -260,8 +271,8 @@ class CarePlanLifecycleGatesTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
-        $basedOnId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $activity->uuid])->id;
-        $intentId = \App\Models\MedicalEvents\Sql\Coding::firstOrCreate([
+        $basedOnId = Identifier::create(['value' => $activity->uuid])->id;
+        $intentId = Coding::firstOrCreate([
             'code' => 'order',
             'system' => 'http://hl7.org/fhir/request-intent',
         ])->id;
@@ -278,7 +289,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             'source' => MedicationRequestRequest::SOURCE_LOCAL,
         ]);
 
-        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
+        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan])
             ->call('openSignatureModal', 'cancel_activity', $activity->id)
             ->assertSet('showSignatureModal', true)
             ->assertSet('actionType', 'cancel_activity');
@@ -307,7 +318,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
-        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan->fresh('activities')])
+        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan->fresh('activities')])
             ->assertSee(__('forms.synchronise_with_eHealth'))
             ->call('openSignatureModal', 'complete')
             ->assertSet('showSignatureModal', false)
@@ -338,7 +349,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             'author_id' => $this->employee->id,
         ]);
 
-        Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan->fresh('activities')])
+        Livewire::test(CarePlanShow::class, ['carePlan' => $carePlan->fresh('activities')])
             ->call('openSignatureModal', 'complete')
             ->assertSet('showSignatureModal', true)
             ->assertSet('actionType', 'complete');

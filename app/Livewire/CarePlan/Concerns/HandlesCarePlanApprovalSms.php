@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan\Concerns;
 
-use App\Exceptions\EHealth\EHealthValidationException;
 use App\Enums\Person\AuthenticationMethod;
+use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlan;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
@@ -72,7 +72,11 @@ trait HandlesCarePlanApprovalSms
             return;
         }
         $plan = $this->carePlanForSms();
-        $this->authorize('view', $plan);
+        if (Auth::user()->cannot('view', $plan)) {
+            Session::flash('error', __('care-plan.approval_access_denied'));
+
+            return;
+        }
         $state = Repository::approval()->carePlanSmsResendState($plan, $this->approvalId, $this->smsResendLinkId);
         if (in_array($state['status'], ['PENDING', 'PROCESSING'], true)) {
             return;

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Livewire\CarePlan;
 
 use App\Livewire\CarePlan\Forms\CarePlanForm;
+
+use App\Services\MedicalEvents\Fhir;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -55,7 +57,7 @@ class CarePlanPeriodValidationTest extends TestCase
         $rules = array_intersect_key($form->rulesForSigning(), array_flip(['periodStart', 'periodEnd']));
         $this->assertTrue(Validator::make($form->toArray(), $rules)->passes());
 
-        $payload = \App\Services\MedicalEvents\Fhir::carePlan()->toFhir(array_replace($form->toArray(), [
+        $payload = Fhir::carePlan()->toFhir(array_replace($form->toArray(), [
             'uuid' => '11111111-1111-4111-8111-111111111111',
             'periodStart' => $form->periodStartIsoDate(), 'periodEnd' => $form->periodEndIsoDate(),
         ]), ['timezone' => config('app.timezone')]);

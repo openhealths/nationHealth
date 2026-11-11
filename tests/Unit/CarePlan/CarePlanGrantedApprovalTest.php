@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace Tests\Unit\CarePlan;
 
 use App\Enums\Person\ApprovalStatus;
+use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Models\CarePlan;
+
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
+use App\Models\Relations\Party;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -41,8 +46,8 @@ class CarePlanGrantedApprovalTest extends TestCase
         $other = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Other Doctor',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $employee->legal_entity_id,
             'is_active' => true,
             'position' => 'Doctor',
@@ -67,8 +72,8 @@ class CarePlanGrantedApprovalTest extends TestCase
      */
     private function makePlanWithEmployee(): array
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -78,7 +83,7 @@ class CarePlanGrantedApprovalTest extends TestCase
             'is_active' => true,
         ]);
 
-        $party = \App\Models\Relations\Party::create([
+        $party = Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Grant',
             'last_name' => 'Doctor',
@@ -90,8 +95,8 @@ class CarePlanGrantedApprovalTest extends TestCase
         $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr Grant',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $legalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',

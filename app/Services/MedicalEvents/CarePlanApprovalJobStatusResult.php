@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\MedicalEvents;
 
-final class CarePlanApprovalJobStatusResult
+class CarePlanApprovalJobStatusResult
 {
     public function __construct(
         public readonly CarePlanApprovalJobOutcome $outcome,

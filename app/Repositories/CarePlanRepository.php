@@ -918,6 +918,78 @@ class CarePlanRepository extends MedicalEventsBaseRepository
             ->values()->all();
     }
 
+    /** BA08: local, policy-filtered search shared by encounter document forms. No remote access is requested here. */
+    public function documentPlanChoices(int $personId, string $encounterUuid, User $user, string $search = '', ?string $actingEmployeeUuid = null): array
+    {
+        $person = Person::find($personId);
+        $encounter = $person === null ? null : $this->findEncounter($encounterUuid, $personId);
+        if ($encounter === null || $user->cannot('view', [$encounter, $person])) {
+            return [];
+        }
+        $termsOfService = $this->encounterTermsOfService($encounterUuid, $personId);
+        // Existing plans may be used by another eligible employee with write approval.
+        // A form's explicitly selected actor takes precedence over the encounter author.
+        $employee = $user->getCarePlanWriterEmployee($termsOfService, $actingEmployeeUuid);
+        if ($employee === null) {
+            return [];
+        }
+        $search = trim($search);
+
+        return CarePlan::wherePersonId($personId)->whereLegalEntityId(legalEntity()?->id)
+            ->whereIn('status', [CarePlanStatus::PENDING->value, CarePlanStatus::ACTIVE->value])
+            ->whereNotNull('uuid')->whereNotNull('details_synced_at')
+            ->when($search !== '', static fn (Builder $query) => $query->where(static fn (Builder $matches) => $matches
+                ->whereLike('title', '%'.$search.'%')->orWhereLike('requisition', '%'.$search.'%')->orWhereLike('uuid', '%'.$search.'%')))
+            ->with($this->uiRelations())->orderByDesc('id')->get()
+            ->filter(fn (CarePlan $plan): bool => !$user->cannot('manage', $plan) && !$user->cannot('view', $plan)
+                && $plan->termsOfServiceCode() === $termsOfService && !$this->hasPendingSubmission($plan))
+            ->map(fn (CarePlan $plan): array => [
+                'id' => $plan->id, 'uuid' => $plan->uuid,
+                'label' => trim(($plan->requisition ?: $plan->uuid).' — '.$plan->title),
+                // The form must complete the existing approval flow before selecting/signing an activity.
+                'approvalRequired' => $user->cannot('manageActivities', [$plan, $employee->uuid]),
+            ])->values()->all();
+    }
+
+    public function documentActivityChoices(int $planId, int $personId, string $encounterUuid, User $user, string $kind, ?string $actingEmployeeUuid = null): array
+    {
+        $kind = CarePlanActivityKind::fromInput($kind)->value;
+        if (!collect($this->documentPlanChoices($personId, $encounterUuid, $user, actingEmployeeUuid: $actingEmployeeUuid))->contains('id', $planId)) {
+            return [];
+        }
+        $plan = $this->findById($planId);
+        if ($user->cannot('manageActivities', [$plan, $actingEmployeeUuid])) {
+            return [];
+        }
+        $repository = Repository::carePlanActivity();
+
+        return CarePlanActivity::whereCarePlanId($planId)->whereKind($kind)
+            ->whereIn('status', ['scheduled', 'in-progress'])->whereNotNull('details_synced_at')
+            ->with(CarePlanActivityRepository::FHIR_RELATIONS)->get()
+            ->filter(fn (CarePlanActivity $activity): bool => !$this->hasPendingSubmission($activity))
+            ->map(function (CarePlanActivity $activity) use ($repository, $plan, $kind): array {
+                $resource = $repository->getResource($activity);
+                $detail = $resource['detail'];
+
+                return [
+                    'id' => $activity->id, 'uuid' => $activity->uuid, 'kind' => $kind,
+                    'description' => $detail['description'] ?? null,
+                    'productReference' => $detail['productReference'] ?? null,
+                    'quantity' => $detail['quantity'] ?? null,
+                    // Native remaining quantity and units are kept together; unknown is never treated as unlimited.
+                    'remainingQuantity' => $detail['remainingQuantity'] ?? null,
+                    'remainingQuantityType' => $detail['remainingQuantityType'] ?? null,
+                    'scheduledPeriod' => $detail['scheduledPeriod'] ?? null,
+                    'serviceCreationCapacity' => $kind === CarePlanActivityKind::SERVICE_REQUEST->value
+                        ? $repository->serviceCreationCapacity(
+                            $plan,
+                            (string) data_get($detail, 'productReference.identifier.value', ''),
+                            (string) data_get($detail, 'productReference.identifier.type.coding.0.code', 'service')
+                        ) : null,
+                ];
+            })->values()->all();
+    }
+
     public function assertRelatedPlans(array $form, int $personId, ?int $exceptId = null): void
     {
         $allowed = array_column($this->relatedPlanChoices($personId, $exceptId), 'uuid');

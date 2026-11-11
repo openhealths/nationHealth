@@ -61,14 +61,14 @@ class CarePlanPolicy
     }
 
     /** A plan's registration does not itself grant patient access for prescribing. */
-    public function manageActivities(User $user, CarePlan $carePlan): Response
+    public function manageActivities(User $user, CarePlan $carePlan, ?string $actingEmployeeUuid = null): Response
     {
         $permission = $this->manage($user, $carePlan);
         if ($permission->denied()) {
             return $permission;
         }
         $legalEntity = legalEntity();
-        $employee = $user->getCarePlanWriterEmployee($carePlan->termsOfServiceCode());
+        $employee = $user->getCarePlanWriterEmployee($carePlan->termsOfServiceCode(), $actingEmployeeUuid);
         $status = CarePlanStatus::fromStored($carePlan->status);
         if ($employee === null || $legalEntity === null || $status === CarePlanStatus::DRAFT || $status->isTerminal()) {
             return Response::deny(__('care-plan.prescribing_patient_access_required'));

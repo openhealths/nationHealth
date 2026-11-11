@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Classes\eHealth\EHealthResponse;
+
 use App\Core\EHealthJob;
+use App\Enums\JobStatus;
 use App\Models\EhealthLink;
+
 use App\Models\LegalEntity;
 use App\Notifications\RemoteEHealthLinksNotification;
-use App\Repositories\CarePlanRepository;
+use App\Repositories\Repository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
 use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 /** Grant the author access after a confirmed creation, without blocking the document page. */
@@ -28,7 +33,7 @@ class CarePlanInpatientApprovalProcessing extends EHealthJob
 
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse|null
     {
-        $repository = app(CarePlanRepository::class);
+        $repository = Repository::carePlan();
         $plan = $repository->findById($this->submission->linkable_id);
         $service = app(CarePlanApprovalService::class);
         if (!$plan || !$service->skipsPatientOtp($plan, $this->legalEntity)
@@ -47,7 +52,7 @@ class CarePlanInpatientApprovalProcessing extends EHealthJob
             bearerToken: $token,
         );
         if (!$result->isGranted() && !$result->isAsync()) {
-            throw new \RuntimeException(__('care-plan.approval_verify_error'));
+            throw new RuntimeException(__('care-plan.approval_verify_error'));
         }
         $repository->setInpatientApprovalProgress(
             $this->submission,
@@ -72,14 +77,14 @@ class CarePlanInpatientApprovalProcessing extends EHealthJob
         return null;
     }
 
-    protected function setEntityStatus(\App\Enums\JobStatus $status): void
+    protected function setEntityStatus(JobStatus $status): void
     {
     }
 
     public function failed(?Throwable $exception): void
     {
-        app(CarePlanRepository::class)->setInpatientApprovalProgress($this->submission, 'failed');
-        \Illuminate\Support\Facades\Log::warning('Automatic inpatient care plan approval failed', [
+        Repository::carePlan()->setInpatientApprovalProgress($this->submission, 'failed');
+        Log::warning('Automatic inpatient care plan approval failed', [
             'submissionId' => $this->submission->id,
             'exceptionType' => $exception ? $exception::class : null,
         ]);

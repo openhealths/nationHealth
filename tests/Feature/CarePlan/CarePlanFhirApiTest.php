@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\CarePlan;
 
 use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
+
 use App\Classes\eHealth\Api\CarePlanActivity as ActivityApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
@@ -13,6 +14,7 @@ use App\Exceptions\EHealth\EHealthResponseException;
 use App\Jobs\CarePlanFullSync;
 use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
 use App\Livewire\CarePlan\Forms\CarePlanForm;
+use App\Livewire\Concerns\ReadsClinicalSnapshots;
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
 use App\Repositories\CarePlanActivityRepository;
@@ -343,7 +345,7 @@ class CarePlanFhirApiTest extends TestCase
 
 class CarePlanFhirSynchronizationHarness
 {
-    use \App\Livewire\Concerns\ReadsClinicalSnapshots {
+    use ReadsClinicalSnapshots {
         fetchActivityCancelSnapshot as public;
     }
 

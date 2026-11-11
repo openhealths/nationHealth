@@ -6,22 +6,28 @@ namespace Tests\Unit\CarePlan;
 
 use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Models\CarePlan;
+
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Identifier;
-use GuzzleHttp\Psr7\Response;
-use PHPUnit\Framework\Attributes\DataProvider;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\User;
-use App\Repositories\MedicalEvents\Repository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -84,7 +90,7 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
             ->andReturn($response);
         $this->instance(ApprovalApi::class, $api);
 
-        Repository::approval()->syncApprovals($carePlan->fresh(['person']), 'care_plan');
+        MedicalEventsRepository::approval()->syncApprovals($carePlan->fresh(['person']), 'care_plan');
     }
 
     public static function revokedStatuses(): array
@@ -105,11 +111,11 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
         $response = $this->approvalPage([$this->remoteGrant($plan, $employeeUuid, $approval->uuid, $remoteStatus)]);
         $this->mock(ApprovalApi::class)->shouldReceive('getPatientApprovals')->once()->andReturn($response);
 
-        Repository::approval()->syncApprovals($plan, 'care_plan');
+        MedicalEventsRepository::approval()->syncApprovals($plan, 'care_plan');
 
         $this->assertSame($storedStatus, $approval->fresh()->status);
         $this->assertTrue($approval->fresh()->getAttribute('is_verified'));
-        $this->assertFalse(\App\Repositories\Repository::carePlan()->hasGrantedApproval($plan->fresh(), $employeeUuid));
+        $this->assertFalse(Repository::carePlan()->hasGrantedApproval($plan->fresh(), $employeeUuid));
     }
 
     public function test_empty_snapshot_revokes_only_the_requested_scope_and_preserves_pending_jobs(): void
@@ -121,17 +127,17 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
         $otherPlan = $this->localGrant($this->makeCarePlan(), $employeeUuid);
         $pending = $this->localGrant($plan, $employeeUuid);
         $pending->update(['status' => 'pending', 'is_verified' => false]);
-        Repository::approval()->attachEhealthLink($pending, ['href' => '/jobs/pending']);
+        MedicalEventsRepository::approval()->attachEhealthLink($pending, ['href' => '/jobs/pending']);
         $this->mock(ApprovalApi::class)->shouldReceive('getPatientApprovals')->once()->andReturn($this->approvalPage([]));
 
         $plan->load('approvals.grantedTo');
-        Repository::approval()->syncApprovals($plan, 'care_plan', ['granted_to.identifier.value' => $employeeUuid]);
+        MedicalEventsRepository::approval()->syncApprovals($plan, 'care_plan', ['granted_to.identifier.value' => $employeeUuid]);
 
         $this->assertSame('inactive', $stale->fresh()->status);
         $this->assertSame('active', $otherEmployee->fresh()->status);
         $this->assertSame('active', $otherPlan->fresh()->status);
         $this->assertSame('pending', $pending->fresh()->status);
-        $this->assertFalse(\App\Repositories\Repository::carePlan()->hasGrantedApproval($plan, $employeeUuid));
+        $this->assertFalse(Repository::carePlan()->hasGrantedApproval($plan, $employeeUuid));
     }
 
     public function test_all_pages_are_imported_before_reconciling_missing_grants(): void
@@ -148,7 +154,7 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
         $api->shouldReceive('getPatientApprovals')->once()->with($plan->person->uuid, $query + ['page' => 2])
             ->andReturn($this->approvalPage([$this->remoteGrant($plan, $second->grantedTo->value, $second->uuid)], 2, 2));
 
-        Repository::approval()->syncApprovals($plan, 'care_plan');
+        MedicalEventsRepository::approval()->syncApprovals($plan, 'care_plan');
 
         $this->assertSame('active', $first->fresh()->status);
         $this->assertSame('active', $second->fresh()->status);
@@ -165,16 +171,16 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
         $api->shouldReceive('getPatientApprovals')->once()->with($plan->person->uuid, $query)
             ->andReturn($this->approvalPage([$this->remoteGrant($plan, $employeeUuid, $approval->uuid, 'terminated')], 1, 2));
         $api->shouldReceive('getPatientApprovals')->once()->with($plan->person->uuid, $query + ['page' => 2])
-            ->andThrow(new \RuntimeException('Second page unavailable'));
+            ->andThrow(new RuntimeException('Second page unavailable'));
 
         try {
-            Repository::approval()->syncApprovals($plan, 'care_plan');
+            MedicalEventsRepository::approval()->syncApprovals($plan, 'care_plan');
             $this->fail('An incomplete snapshot must not be accepted.');
-        } catch (\RuntimeException $exception) {
+        } catch (RuntimeException $exception) {
             $this->assertSame('Second page unavailable', $exception->getMessage());
         }
         $this->assertSame('active', $approval->fresh()->status);
-        $this->assertTrue(\App\Repositories\Repository::carePlan()->hasGrantedApproval($plan->fresh(), $employeeUuid));
+        $this->assertTrue(Repository::carePlan()->hasGrantedApproval($plan->fresh(), $employeeUuid));
     }
 
     public function test_direct_sync_and_completed_jobs_cannot_restore_terminated_access(): void
@@ -183,15 +189,15 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
         $employeeUuid = (string) Str::uuid();
         $approval = $this->localGrant($plan, $employeeUuid);
         $data = $this->remoteGrant($plan, $employeeUuid, $approval->uuid, 'terminated');
-        Repository::approval()->sync($data, $plan, $approval);
+        MedicalEventsRepository::approval()->sync($data, $plan, $approval);
         $this->assertSame('terminated', $approval->fresh()->status);
         $approval->update(['status' => 'active']);
-        $link = Repository::approval()->attachEhealthLink($approval, ['href' => '/jobs/completed']);
+        $link = MedicalEventsRepository::approval()->attachEhealthLink($approval, ['href' => '/jobs/completed']);
 
-        Repository::approval()->completeCarePlanRequest($link, $data);
+        MedicalEventsRepository::approval()->completeCarePlanRequest($link, $data);
 
         $this->assertSame('terminated', $approval->fresh()->status);
-        $this->assertFalse(\App\Repositories\Repository::carePlan()->hasGrantedApproval($plan->fresh(), $employeeUuid));
+        $this->assertFalse(Repository::carePlan()->hasGrantedApproval($plan->fresh(), $employeeUuid));
     }
 
     private function localGrant(CarePlan $plan, string $employeeUuid): Approval
@@ -224,8 +230,8 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
 
     private function makeCarePlan(): CarePlan
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -254,8 +260,8 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
         $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr. Test',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $legalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',

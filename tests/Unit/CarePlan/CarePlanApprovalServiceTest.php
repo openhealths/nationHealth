@@ -6,24 +6,35 @@ namespace Tests\Unit\CarePlan;
 
 use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Models\CarePlan;
 use App\Models\EhealthJob;
 use App\Models\EhealthLink;
+use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Approval;
+
 use App\Models\Person\Person;
+use App\Models\Relations\Party;
 use App\Models\User;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\CarePlanApprovalCreateOutcome;
 use App\Services\MedicalEvents\CarePlanApprovalJobOutcome;
 use App\Services\MedicalEvents\CarePlanApprovalService;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
+use ReflectionMethod;
+use RuntimeException;
 use Tests\TestCase;
 
 class CarePlanApprovalServiceTest extends TestCase
@@ -48,7 +59,7 @@ class CarePlanApprovalServiceTest extends TestCase
         $carePlan->update(['status' => 'draft']);
         $this->mock(ApprovalApi::class)->shouldNotReceive('createApproval');
 
-        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->expectException(ValidationException::class);
         $this->expectExceptionMessage(__('care-plan.cannot_grant_unregistered'));
         app(CarePlanApprovalService::class)->create($carePlan, 'patient-uuid', 'employee-uuid', 'write', null, $legalEntity, $user);
     }
@@ -244,7 +255,7 @@ class CarePlanApprovalServiceTest extends TestCase
         ];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('confirmationMethods')]
+    #[DataProvider('confirmationMethods')]
     public function test_sync_creation_preserves_the_required_confirmation(array $method, bool $requiresOtp): void
     {
         [$carePlan, $legalEntity, $user] = $this->makeCarePlanContext();
@@ -345,7 +356,7 @@ class CarePlanApprovalServiceTest extends TestCase
 
         $this->instance(ApprovalApi::class, $this->mockAsyncCreateApi());
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(__('care-plan.approval_create_error'));
 
         try {
@@ -372,7 +383,7 @@ class CarePlanApprovalServiceTest extends TestCase
 
         $this->instance(ApprovalApi::class, $this->mockAsyncCreateApi());
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(__('care-plan.approval_create_error'));
 
         try {
@@ -388,7 +399,7 @@ class CarePlanApprovalServiceTest extends TestCase
         }
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('confirmationMethods')]
+    #[DataProvider('confirmationMethods')]
     public function test_async_creation_preserves_the_required_confirmation(array $method, bool $requiresOtp): void
     {
         [$carePlan] = $this->makeCarePlanContext();
@@ -422,7 +433,7 @@ class CarePlanApprovalServiceTest extends TestCase
         $this->assertTrue($before->requiresConfirmation());
         $this->assertSame($requiresOtp, $before->requiresOtp());
         $this->assertSame('33333333-3333-3333-3333-333333333333', $approval->fresh()->uuid);
-        \App\Repositories\MedicalEvents\Repository::approval()->completeCarePlanRequest($link, $job->response_data);
+        Repository::approval()->completeCarePlanRequest($link, $job->response_data);
         $status = app(CarePlanApprovalService::class)->resolveAsyncJob($link->id);
 
         $this->assertTrue($status->requiresConfirmation());
@@ -502,7 +513,7 @@ class CarePlanApprovalServiceTest extends TestCase
             'href' => '/jobs/job-inpatient',
         ]);
 
-        \App\Repositories\MedicalEvents\Repository::approval()->completeCarePlanRequest($link, $job->response_data);
+        Repository::approval()->completeCarePlanRequest($link, $job->response_data);
         $status = app(CarePlanApprovalService::class)->resolveAsyncJob($link->id);
 
         $this->assertTrue($status->isGranted());
@@ -516,9 +527,9 @@ class CarePlanApprovalServiceTest extends TestCase
             'uuid' => (string) Str::uuid(), 'status' => 'pending',
             'access_level' => 'write', 'is_verified' => false,
         ]);
-        $validator = new \ReflectionMethod(ApprovalApi::class, 'validateVerification');
+        $validator = new ReflectionMethod(ApprovalApi::class, 'validateVerification');
         $response = new EHealthResponse(
-            new \GuzzleHttp\Psr7\Response(200, [], '{"data":{},"meta":{"code":200,"type":"object"}}'),
+            new Response(200, [], '{"data":{},"meta":{"code":200,"type":"object"}}'),
             fn (EHealthResponse $response): array => $validator->invoke(new ApprovalApi(), $response),
         );
         $api = Mockery::mock(ApprovalApi::class);
@@ -542,7 +553,7 @@ class CarePlanApprovalServiceTest extends TestCase
         ]);
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('successful')->once()->andReturnTrue();
-        $response->shouldReceive('validate')->once()->andThrow(\Illuminate\Validation\ValidationException::withMessages(['body' => 'Unknown acknowledgement']));
+        $response->shouldReceive('validate')->once()->andThrow(ValidationException::withMessages(['body' => 'Unknown acknowledgement']));
         $details = Mockery::mock(EHealthResponse::class);
         $details->shouldReceive('successful')->once()->andReturnTrue();
         $details->shouldReceive('validate')->once()->andReturn([
@@ -669,8 +680,8 @@ class CarePlanApprovalServiceTest extends TestCase
      */
     private function makeCarePlanContext(): array
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -680,7 +691,7 @@ class CarePlanApprovalServiceTest extends TestCase
             'is_active' => true,
         ]);
 
-        $party = \App\Models\Relations\Party::create([
+        $party = Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Doctor',
             'last_name' => 'Who',
@@ -692,15 +703,15 @@ class CarePlanApprovalServiceTest extends TestCase
         $user = User::create([
             'uuid' => (string) Str::uuid(),
             'email' => 'doctor-'.Str::random(8).'@example.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'password' => Hash::make('password'),
             'party_id' => $party->id,
         ]);
 
-        $employee = \App\Models\Employee\Employee::create([
+        $employee = Employee::create([
             'uuid' => (string) Str::uuid(),
             'full_name' => 'Dr. Test',
-            'employee_type' => \App\Enums\User\Role::DOCTOR->value,
-            'status' => \App\Enums\Status::APPROVED->value,
+            'employee_type' => Role::DOCTOR->value,
+            'status' => Status::APPROVED->value,
             'legal_entity_id' => $legalEntity->id,
             'is_active' => true,
             'position' => 'Doctor',

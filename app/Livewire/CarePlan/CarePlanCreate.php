@@ -26,7 +26,6 @@ use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
-use App\Repositories\CarePlanRepository;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
@@ -691,8 +690,9 @@ class CarePlanCreate extends BasePatientComponent
     /**
      * Save as a local draft (without sending to eHealth).
      */
-    public function save(CarePlanRepository $repository): void
+    public function save(): void
     {
+        $repository = Repository::carePlan();
         if (Auth::user()?->cannot('create', CarePlan::class)) {
             $msg = __('care-plan.no_permission_create');
             Session::flash('error', $msg);
@@ -942,8 +942,9 @@ class CarePlanCreate extends BasePatientComponent
     /**
      * Sign with KEP and send to eHealth.
      */
-    public function sign(CarePlanRepository $repository): void
+    public function sign(): void
     {
+        $repository = Repository::carePlan();
         if (Auth::user()?->cannot('create', CarePlan::class)) {
             $msg = __('care-plan.no_permission_create');
             Session::flash('error', $msg);

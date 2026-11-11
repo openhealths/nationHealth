@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\CarePlan;
 
+use App\Repositories\ApprovalRepository as ApprovalRepositoryRef;
+
 use App\Repositories\MedicalEvents\ApprovalRepository;
 use App\Repositories\MedicalEvents\Repository;
 use Tests\TestCase;
@@ -19,7 +21,7 @@ class CarePlanApprovalRepositoryResolutionTest extends TestCase
     public function test_wrong_approval_repository_fqcn_does_not_exist(): void
     {
         $this->assertFalse(
-            class_exists(\App\Repositories\ApprovalRepository::class, false),
+            class_exists(ApprovalRepositoryRef::class, false),
             'App\\Repositories\\ApprovalRepository must not exist; use MedicalEvents\\ApprovalRepository'
         );
         $this->assertFileDoesNotExist(app_path('Repositories/ApprovalRepository.php'));

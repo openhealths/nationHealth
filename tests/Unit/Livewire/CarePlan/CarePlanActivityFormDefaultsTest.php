@@ -44,6 +44,6 @@ class CarePlanActivityFormDefaultsTest extends TestCase
         $this->assertNotFalse($blade);
         $this->assertStringNotContainsString('dark:bg-gray-750', $blade);
         $this->assertStringContainsString('dark:bg-gray-700', $blade);
-        $this->assertStringContainsString('dark:text-gray-200', $blade);
+        $this->assertStringContainsString('dark:text-gray-300', $blade);
     }
 }

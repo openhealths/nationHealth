@@ -30,6 +30,28 @@ use UnitEnum;
 
 trait ManagesCarePlanActivities
 {
+    #[Computed]
+    public function serviceMinutesAllowed(): bool
+    {
+        return app(CarePlanActivityValidationService::class)->allowsServiceMinutes($this->carePlan);
+    }
+
+    #[Computed]
+    public function serviceCreationCapacity(): ?array
+    {
+        $product = $this->activityForm['product_reference'] ?? null;
+        if (!is_string($product) || $product === '') {
+            return null;
+        }
+
+        return Repository::carePlanActivity()->serviceCreationCapacity(
+            $this->carePlan,
+            $product,
+            $this->activityForm['product_reference_type'] ?? 'service',
+            filled($this->activityForm['id'] ?? null) ? (int) $this->activityForm['id'] : null
+        );
+    }
+
     public bool $confirmingActivityDeletion = false;
 
     #[Locked]
@@ -115,8 +137,9 @@ trait ManagesCarePlanActivities
         ];
     }
 
-    public function editActivity(int $activityId, CarePlanActivityRepository $repository): void
+    public function editActivity(int $activityId): void
     {
+        $repository = Repository::carePlanActivity();
         if (!$this->authorizeCarePlanActivityWrite()) {
             return;
         }
@@ -296,8 +319,9 @@ trait ManagesCarePlanActivities
         $this->activityToDelete = null;
     }
 
-    public function deleteActivity(int $activityId, CarePlanActivityRepository $repository): void
+    public function deleteActivity(int $activityId): void
     {
+        $repository = Repository::carePlanActivity();
         if (!$this->authorizeCarePlanActivityWrite()) {
             return;
         }
@@ -335,16 +359,18 @@ trait ManagesCarePlanActivities
         $this->refreshCarePlan();
     }
 
-    public function saveActivity(CarePlanActivityRepository $repository): void
+    public function saveActivity(): void
     {
+        $repository = Repository::carePlanActivity();
         $this->persistActivityDraft($repository, andSign: false);
     }
 
     /**
      * Persist the local activity draft, then open the KEP modal for sign_activity.
      */
-    public function saveActivityAndSign(CarePlanActivityRepository $repository): void
+    public function saveActivityAndSign(): void
     {
+        $repository = Repository::carePlanActivity();
         $this->persistActivityDraft($repository, andSign: true);
     }
 
@@ -426,6 +452,10 @@ trait ManagesCarePlanActivities
             $this->activityForm['quantity_system'] = 'SERVICE_UNIT';
             $rules['activityForm.quantity'] = 'required|integer|gt:0';
             $rules['activityForm.quantity_code'] = 'required_with:activityForm.quantity|in:PIECE,MINUTE';
+            if ($this->carePlan->termsOfServiceCode() === 'OUTPATIENT') {
+                $rules['activityForm.scheduled_period_start'] = 'required|date_format:' . config('app.date_format');
+                $rules['activityForm.scheduled_period_end'] = 'required|date_format:' . config('app.date_format');
+            }
         }
 
         $activityValidation = app(CarePlanActivityValidationService::class);
@@ -650,18 +680,25 @@ trait ManagesCarePlanActivities
             unset($activityData['scheduled_period_start'], $activityData['scheduled_period_end']);
         }
 
-        if (!empty($this->activityForm['id'])) {
-            $activityId = (int) $this->activityForm['id'];
-            $repository->updateById($activityId, $activityData);
-            Session::flash('success', __('care-plan.activity_updated'));
-        } else {
-            $activityData['care_plan_id'] = $this->carePlan->id;
-            $activityData['author_id'] = Auth::user()?->getCarePlanWriterEmployee($this->carePlan->termsOfServiceCode())?->id;
-            $activityData['status'] = CarePlanStatus::DRAFT->value;
+        try {
+            if (!empty($this->activityForm['id'])) {
+                $activityId = (int) $this->activityForm['id'];
+                $repository->updateById($activityId, $activityData);
+                Session::flash('success', __('care-plan.activity_updated'));
+            } else {
+                $activityData['care_plan_id'] = $this->carePlan->id;
+                $activityData['author_id'] = Auth::user()?->getCarePlanWriterEmployee($this->carePlan->termsOfServiceCode())?->id;
+                $activityData['status'] = CarePlanStatus::DRAFT->value;
 
-            $created = $repository->create($activityData);
-            $activityId = (int) $created->id;
-            Session::flash('success', __('care-plan.activity_draft_saved'));
+                $created = $repository->create($activityData);
+                $activityId = (int) $created->id;
+                Session::flash('success', __('care-plan.activity_draft_saved'));
+            }
+        } catch (ValidationException $exception) {
+            $this->setErrorBag($exception->validator->errors());
+            Session::flash('error', $exception->validator->errors()->first());
+
+            return;
         }
 
         $this->activityForm['id'] = $activityId;
@@ -1431,7 +1468,7 @@ trait ManagesCarePlanActivities
 
     protected function ensureCarePlanEffectivePeriodSynced(CarePlanRepository $repository): void
     {
-        $this->carePlan = app(CarePlanRepository::class)->findById($this->carePlan->id);
+        $this->carePlan = Repository::carePlan()->findById($this->carePlan->id);
 
         if ($this->carePlan->effectivePeriod && $repository->resolveEHealthPeriodBounds($this->carePlan)['start']) {
             return;

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Tests\Unit\CarePlan;
 
 use App\Classes\eHealth\Api\Approval;
+use App\Classes\eHealth\Api\Person;
+
 use App\Classes\eHealth\EHealthResponse;
+use App\Enums\Person\AuthenticationMethod;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Models\CarePlan;
 use App\Models\MedicalEvents\Sql\Approval as ApprovalModel;
@@ -13,12 +16,12 @@ use App\Models\Person\Person as Patient;
 use App\Services\MedicalEvents\CarePlanApprovalService;
 use App\Services\MedicalEvents\PatientApprovalService;
 use GuzzleHttp\Psr7\Response;
+use Illuminate\Validation\ValidationException;
 use Mockery;
-use Tests\TestCase;
-use App\Classes\eHealth\Api\Person;
-use App\Enums\Person\AuthenticationMethod;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionMethod;
+use RuntimeException;
+use Tests\TestCase;
 
 class ApprovalResponseContractTest extends TestCase
 {
@@ -90,11 +93,11 @@ class ApprovalResponseContractTest extends TestCase
         ];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('malformedApprovalLists')]
+    #[DataProvider('malformedApprovalLists')]
     public function test_incomplete_approval_snapshots_are_rejected(string $body): void
     {
-        $this->expectException(\Illuminate\Validation\ValidationException::class);
-        (new \ReflectionMethod(Approval::class, 'validateApprovalList'))->invoke(
+        $this->expectException(ValidationException::class);
+        (new ReflectionMethod(Approval::class, 'validateApprovalList'))->invoke(
             new Approval(),
             new EHealthResponse(new Response(200, [], $body)),
         );
@@ -109,29 +112,29 @@ class ApprovalResponseContractTest extends TestCase
         ];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('completeApprovalPages')]
+    #[DataProvider('completeApprovalPages')]
     public function test_complete_empty_approval_snapshots_are_accepted(array $paging): void
     {
-        $this->assertSame([], (new \ReflectionMethod(Approval::class, 'validateApprovalList'))->invoke(
+        $this->assertSame([], (new ReflectionMethod(Approval::class, 'validateApprovalList'))->invoke(
             new Approval(),
             new EHealthResponse(new Response(200, [], json_encode(['data' => [], 'paging' => $paging], JSON_THROW_ON_ERROR))),
         ));
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('verificationAcknowledgements')]
+    #[DataProvider('verificationAcknowledgements')]
     public function test_verification_accepts_a_success_acknowledgement_without_a_full_resource(int $status, string $body): void
     {
         $api = new Approval();
         $response = new EHealthResponse(new Response($status, [], $body));
-        $method = new \ReflectionMethod(Approval::class, 'validateVerification');
+        $method = new ReflectionMethod(Approval::class, 'validateVerification');
 
         $this->assertSame([], $method->invoke($api, $response));
     }
 
     public function test_verification_rejects_a_malformed_acknowledgement(): void
     {
-        $this->expectException(\Illuminate\Validation\ValidationException::class);
-        (new \ReflectionMethod(Approval::class, 'validateVerification'))->invoke(
+        $this->expectException(ValidationException::class);
+        (new ReflectionMethod(Approval::class, 'validateVerification'))->invoke(
             new Approval(),
             new EHealthResponse(new Response(200, [], '{"data":"untrusted"}')),
         );
@@ -146,7 +149,7 @@ class ApprovalResponseContractTest extends TestCase
         $api->shouldReceive('verify')->once()->with('patient', 'approval', ['code' => 1234])->andReturn($response);
         $this->instance(Approval::class, $api);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(__('care-plan.approval_verify_error'));
         app(CarePlanApprovalService::class)->verify('patient', 'approval', 1234);
     }
@@ -289,7 +292,7 @@ class ApprovalResponseContractTest extends TestCase
         ]);
         $this->mock(Approval::class)->shouldReceive('getApprovalDetails')->once()->andReturn($response);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         app(CarePlanApprovalService::class)->pendingConfirmation('patient', '11111111-1111-4111-8111-111111111111');
     }
 

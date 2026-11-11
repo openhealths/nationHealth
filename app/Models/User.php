@@ -476,6 +476,8 @@ class User extends Authenticatable implements MustVerifyEmail
     public function getCarePlanWriterEmployee(?string $termsOfService = null, ?string $employeeUuid = null): ?Employee
     {
         $candidates = $this->linkedEmployeesAmong($this->getWriterEmployeeCandidates(Role::DOCTOR, Role::SPECIALIST, Role::MED_COORDINATOR));
+        // A linked earlier position cannot supply an author role unavailable in this login.
+        $candidates = $candidates->filter(fn (Employee $employee): bool => $this->hasAllowedRole($employee->employeeType))->values();
         $startedIds = Employee::whereIn('id', $candidates->pluck('id'))->where(fn (Builder $query) => $query->whereNull('start_date')->orWhereDate('start_date', '<=', today()))->pluck('id');
         $candidates = $candidates->whereIn('id', $startedIds)->values();
         if ($employeeUuid !== null) {

@@ -4,10 +4,18 @@ declare(strict_types=1);
 
 namespace Tests\Concerns;
 
+use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
-use App\Repositories\CarePlanActivityRepository;
-use App\Repositories\CarePlanRepository;
+use App\Models\Division;
+use App\Models\Employee\Employee;
+use App\Models\EmployeeRole;
+use App\Models\HealthcareService;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\Permission;
+use App\Models\Role as RoleModel;
+use App\Repositories\Repository;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Str;
 
@@ -23,7 +31,7 @@ trait CreatesFhirCarePlans
             }
         }
         $plan = $query->firstOrFail();
-        $resource = app(CarePlanRepository::class)->getResource($plan->id);
+        $resource = Repository::carePlan()->getResource($plan->id);
         foreach ($expected as $key => $value) {
             $actual = match ($key) {
                 'terms_of_service' => data_get($resource, 'termsOfService.coding.0.code'),
@@ -44,7 +52,7 @@ trait CreatesFhirCarePlans
             }
         }
         $activity = $query->firstOrFail();
-        $resource = app(CarePlanActivityRepository::class)->getResource($activity->id);
+        $resource = Repository::carePlanActivity()->getResource($activity->id);
         foreach ($expected as $key => $value) {
             $actual = match ($key) {
                 'quantity' => data_get($resource, 'detail.quantity.value'),
@@ -64,7 +72,7 @@ trait CreatesFhirCarePlans
             }
         }
 
-        $plan = app(CarePlanRepository::class)->create(array_replace([
+        $plan = Repository::carePlan()->create(array_replace([
             'uuid' => (string) Str::uuid(), 'status' => 'draft', 'category' => 'TEST',
             'title' => 'Synthetic fixture', 'terms_of_service' => 'OUTPATIENT',
             'period_start' => now()->toDateString(),
@@ -74,9 +82,10 @@ trait CreatesFhirCarePlans
         return $plan;
     }
 
-    protected function grantCarePlanWriteApproval(CarePlan $plan, \App\Models\Employee\Employee $employee): void
+    protected function grantCarePlanWriteApproval(CarePlan $plan, Employee $employee): void
     {
-        $identifier = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $employee->uuid]);
+        $this->grantCarePlanEmployeeRole($employee, $plan->termsOfServiceCode());
+        $identifier = Identifier::create(['value' => $employee->uuid]);
         $plan->approvals()->create([
             'uuid' => (string) Str::uuid(),
             'granted_to_id' => $identifier->id,
@@ -87,6 +96,44 @@ trait CreatesFhirCarePlans
             'expires_at' => now()->addYear(),
         ]);
         $plan->unsetRelation('approvals');
+    }
+
+    protected function grantCarePlanEmployeeRole(Employee $employee, string $providingCondition): void
+    {
+        // An employee position and token scopes alone do not grant that role in the current login.
+        setPermissionsTeamId($employee->legalEntityId);
+        $role = RoleModel::findOrCreate($employee->employeeType, 'web');
+        $role->givePermissionTo(Permission::findOrCreate('care_plan:write', 'web'));
+        $users = $employee->users()->get();
+        foreach ($users as $user) {
+            $user->givePermissionToParent(...$role->permissions);
+            $user->assignRoleParent($role);
+            $user->unsetRelation('roles');
+        }
+
+        if (EmployeeRole::whereEmployeeId($employee->id)->whereStatus(EmployeeRoleStatus::ACTIVE)
+            ->whereIsActive(true)->whereHas('healthcareService', static fn ($query) => $query->whereProvidingCondition($providingCondition)->whereIsActive(true))->exists()) {
+            return;
+        }
+
+        $division = Division::create([
+            'uuid' => (string) Str::uuid(), 'name' => 'Synthetic care plan division',
+            'email' => 'care-plan-fixture@example.com', 'mountain_group' => false,
+            'legal_entity_id' => $employee->legalEntityId, 'status' => 'ACTIVE', 'is_active' => true,
+        ]);
+        $service = HealthcareService::create([
+            'uuid' => (string) Str::uuid(), 'division_id' => $division->id,
+            'legal_entity_id' => $employee->legalEntityId, 'category_id' => CodeableConcept::create()->id,
+            'providing_condition' => $providingCondition, 'speciality_type' => 'THERAPY',
+            'status' => 'ACTIVE', 'is_active' => true,
+        ]);
+        EmployeeRole::create([
+            'uuid' => (string) Str::uuid(), 'employee_id' => $employee->id,
+            'healthcare_service_id' => $service->id, 'start_date' => now(),
+            'status' => EmployeeRoleStatus::ACTIVE, 'is_active' => true,
+            'ehealth_inserted_at' => now(), 'ehealth_updated_at' => now(),
+            'ehealth_inserted_by' => (string) Str::uuid(), 'ehealth_updated_by' => (string) Str::uuid(),
+        ]);
     }
 
     protected function createFhirCarePlanActivity(array $attributes): CarePlanActivity
@@ -100,7 +147,7 @@ trait CreatesFhirCarePlans
             }
         }
 
-        return app(CarePlanActivityRepository::class)->create(array_replace([
+        return Repository::carePlanActivity()->create(array_replace([
             'uuid' => (string) Str::uuid(), 'status' => 'draft', 'kind' => 'service_request',
         ], $attributes));
     }

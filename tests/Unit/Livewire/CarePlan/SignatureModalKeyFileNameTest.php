@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Unit\Livewire\CarePlan;
 
 use App\Livewire\CarePlan\Forms\CarePlanForm;
+
 use PHPUnit\Framework\Attributes\Test;
+use ReflectionClass;
 use Tests\TestCase;
 
 class SignatureModalKeyFileNameTest extends TestCase
@@ -27,7 +29,7 @@ class SignatureModalKeyFileNameTest extends TestCase
     public function care_plan_form_tracks_key_container_file_name(): void
     {
         $this->assertTrue(
-            (new \ReflectionClass(CarePlanForm::class))->hasProperty('keyContainerFileName')
+            (new ReflectionClass(CarePlanForm::class))->hasProperty('keyContainerFileName')
         );
     }
 }

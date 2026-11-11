@@ -33,6 +33,7 @@ DOMAIN_PATHS=(
   tests/Unit/Repositories/RepositoryCarePlanTest.php
   tests/Unit/Repositories/MedicalEvents/MedicationRequestRepositoryFhirRefsTest.php
   tests/Unit/Services/Party
+  tests/Unit/Services/MedicalEvents/CarePlanActivityRegistrationBoundaryTest.php
   tests/Unit/Services/MedicalEvents/CarePlanActivityLifecycleServiceTest.php
   tests/Unit/Services/MedicalEvents/CarePlanLifecycleServiceTest.php
   tests/Unit/Services/MedicalEvents/EHealthJobResolverTest.php
