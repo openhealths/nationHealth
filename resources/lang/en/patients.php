@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 return [
+    'policy' => [
+        'view_summary' => 'You do not have permission to view the patient medical summary.',
+    ],
     'search' => 'Search',
     'authentication_methods' => 'Authentication methods',
     'change' => 'Change',

@@ -15,14 +15,14 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use App\Jobs\EpisodeSync;
-use App\Jobs\EncounterShortSync;
 use App\Jobs\ClinicalImpressionSync;
+use App\Jobs\ConditionSync;
+use App\Jobs\DeviceSync;
+use App\Jobs\DiagnosticReportSync;
+use App\Jobs\EncounterShortSync;
+use App\Jobs\EpisodeSync;
 use App\Jobs\ImmunizationSync;
 use App\Jobs\ObservationSync;
-use App\Jobs\ConditionSync;
-use App\Jobs\DiagnosticReportSync;
-use App\Jobs\DeviceSync;
 use App\Models\Declaration;
 use App\Models\Icd10;
 use App\Models\LegalEntity;
@@ -32,9 +32,9 @@ use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
-use App\Models\MedicalEvents\Sql\PersonCurrentDiagnosis;
 use App\Models\MedicalEvents\Sql\Immunization;
 use App\Models\MedicalEvents\Sql\Observation;
+use App\Models\MedicalEvents\Sql\PersonCurrentDiagnosis;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\MergedPerson;
 use App\Models\Person\Person;
@@ -180,6 +180,10 @@ class PatientSummary extends BasePatientComponent
 
     public function loadMore(string $section): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         if (!array_key_exists($section, $this->summaryLimits)) {
             return;
         }
@@ -231,6 +235,22 @@ class PatientSummary extends BasePatientComponent
         }
     }
 
+    /** A summary scope permits nursing reads without requiring each full-record scope. */
+    protected function canReadSummary(): bool
+    {
+        $denied = $this->prepersonId === null
+            ? Auth::user()->cannot('view', Person::class)
+            : Auth::user()->cannot('viewSummary', $this->patient());
+
+        if ($denied) {
+            Session::flash('error', __('patients.policy.view_summary'));
+
+            return false;
+        }
+
+        return true;
+    }
+
     protected function initializeComponent(): void
     {
         $this->getDictionary();
@@ -263,6 +283,10 @@ class PatientSummary extends BasePatientComponent
      */
     public function syncEpisodes(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         if ($this->cannotStartSync(self::ENTITY_TYPE_EPISODE)) {
             return;
         }
@@ -301,6 +325,10 @@ class PatientSummary extends BasePatientComponent
 
     public function getEpisodes(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         $this->setPaginatedRecords(
             'episodes',
             Episode::with(['period', 'managingOrganization.type.coding', 'careManager.type.coding'])
@@ -316,6 +344,10 @@ class PatientSummary extends BasePatientComponent
 
     public function syncEncounters(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         if ($this->cannotStartSync(self::ENTITY_TYPE_ENCOUNTER)) {
             return;
         }
@@ -354,6 +386,10 @@ class PatientSummary extends BasePatientComponent
 
     public function getEncounters(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         // Short encounters are open by a declaration (rule 1) or by the managing organization (rule 2) only
         $encounters = Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
             ? Encounter::readableFor($this->patient(), true)
@@ -370,6 +406,10 @@ class PatientSummary extends BasePatientComponent
 
     public function syncClinicalImpressions(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         if ($this->cannotStartSync(self::ENTITY_TYPE_CLINICAL_IMPRESSION)) {
             return;
         }
@@ -408,6 +448,10 @@ class PatientSummary extends BasePatientComponent
 
     public function getClinicalImpressions(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         // Short clinical impressions are open by a declaration (rule 1) only
         $clinicalImpressions = Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
             ? ClinicalImpression::readableFor($this->patient(), true)
@@ -423,6 +467,10 @@ class PatientSummary extends BasePatientComponent
 
     public function syncImmunizations(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         if ($this->cannotStartSync(self::ENTITY_TYPE_IMMUNIZATION)) {
             return;
         }
@@ -460,6 +508,10 @@ class PatientSummary extends BasePatientComponent
 
     public function getImmunizations(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         $this->setPaginatedRecords(
             'immunizations',
             Immunization::forPatient($this->patient())->notInDraftEncounter($this->patient())->withAllRelations(),
@@ -470,6 +522,10 @@ class PatientSummary extends BasePatientComponent
 
     public function syncObservations(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         if ($this->cannotStartSync(self::ENTITY_TYPE_OBSERVATION)) {
             return;
         }
@@ -508,6 +564,10 @@ class PatientSummary extends BasePatientComponent
 
     public function getObservations(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         // Short observations are open by a declaration (rule 1) or by the managing organization (rule 2) only
         $observations = Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
             ? Observation::readableFor($this->patient(), true, Auth::user())
@@ -523,6 +583,10 @@ class PatientSummary extends BasePatientComponent
 
     public function syncDiagnoses(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         try {
             $response = EHealth::patient()->getActiveDiagnoses($this->uuid);
         } catch (EHealthException|EHealthConnectionException $exception) {
@@ -546,6 +610,10 @@ class PatientSummary extends BasePatientComponent
 
     public function getDiagnoses(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         $this->setPaginatedRecords(
             'diagnoses',
             PersonCurrentDiagnosis::forPatient($this->patient())
@@ -557,6 +625,10 @@ class PatientSummary extends BasePatientComponent
 
     public function syncConditions(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         if ($this->cannotStartSync(self::ENTITY_TYPE_CONDITION)) {
             return;
         }
@@ -595,6 +667,10 @@ class PatientSummary extends BasePatientComponent
 
     public function getConditions(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         // Short conditions are open by a declaration (rule 1) or by the managing organization (rule 2) only
         $conditions = Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
             ? Condition::readableFor($this->patient(), true)
@@ -611,6 +687,10 @@ class PatientSummary extends BasePatientComponent
 
     public function syncDiagnosticReports(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         if ($this->cannotStartSync(self::ENTITY_TYPE_DIAGNOSTIC_REPORT)) {
             return;
         }
@@ -649,6 +729,10 @@ class PatientSummary extends BasePatientComponent
 
     public function getDiagnosticReports(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         // Short diagnostic reports are open by a declaration (rule 1) or by the managing organization (rule 2) only
         $diagnosticReports = Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
             ? DiagnosticReport::readableFor($this->patient(), true)
@@ -667,6 +751,10 @@ class PatientSummary extends BasePatientComponent
 
     public function syncDevices(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         if ($this->cannotStartSync(self::ENTITY_TYPE_DEVICE)) {
             return;
         }
@@ -705,6 +793,10 @@ class PatientSummary extends BasePatientComponent
 
     public function getDevices(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         // Short devices are open by a declaration (rule 1) or by the recorder's legal entity (rule 2) only
         $devices = Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
             ? Device::readableFor($this->patient(), true)
@@ -725,6 +817,10 @@ class PatientSummary extends BasePatientComponent
      */
     public function syncCarePlans(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         try {
             $response = EHealth::carePlan()->getSummary($this->uuid);
             $validatedData = $response->validate();
@@ -737,10 +833,24 @@ class PatientSummary extends BasePatientComponent
 
     public function syncProcedures(): void
     {
-        try {
-            $response = EHealth::procedure()->getSummary($this->uuid);
+        if (!$this->canReadSummary()) {
+            return;
+        }
 
-            Repository::procedure()->sync($this->patient(), $response->validate());
+        try {
+            $page = 1;
+            $records = [];
+            // Validate every summary page before replacing local records or reporting completion.
+            do {
+                $response = EHealth::procedure()->getSummary($this->uuid, ['page' => $page]);
+                $records = array_merge($records, $response->validate());
+                if (($response->getPaging()['page_number'] ?? $page) !== $page) {
+                    throw new InvalidArgumentException('Procedure summary returned an unexpected page.');
+                }
+                $page++;
+            } while ($response->isNotLast());
+
+            Repository::procedure()->sync($this->patient(), $records);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while synchronizing procedures');
 
@@ -759,6 +869,10 @@ class PatientSummary extends BasePatientComponent
 
     public function getProcedures(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         // Short procedures are open by a declaration (rule 1) or by the managing organization (rule 2) only
         $procedures = Declaration::accessGrantedTo(Auth::user(), $this->patient(), legalEntity())->exists()
             ? Procedure::readableFor($this->patient(), true)
@@ -782,6 +896,10 @@ class PatientSummary extends BasePatientComponent
      */
     public function searchMergedPersons(): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         if (Auth::user()->cannot('viewMergedPersons', Person::class)) {
             Session::flash('error', __('patients.policy.view_merged_persons'));
 
@@ -851,6 +969,10 @@ class PatientSummary extends BasePatientComponent
      */
     public function updatedSelectedMergedPerson(string $mergedUuid): void
     {
+        if (!$this->canReadSummary()) {
+            return;
+        }
+
         if ($mergedUuid === '' || $this->personId === null) {
             return;
         }
