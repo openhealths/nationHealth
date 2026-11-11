@@ -7,6 +7,7 @@ use App\Services\Dictionary\DictionaryManager;
 use App\Services\SignatureService;
 use Carbon\CarbonImmutable;
 use App\Models\LegalEntity;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 
 if (!function_exists('removeEmptyKeys')) {
     function removeEmptyKeys(array $array): array
@@ -166,6 +167,18 @@ if (!function_exists('dictionary')) {
     function dictionary(): DictionaryManager
     {
         return app(DictionaryManager::class);
+    }
+}
+
+if (!function_exists('objectMapper')) {
+    /**
+     * The object mapper configured in AppServiceProvider.
+     *
+     * @return ObjectMapperInterface
+     */
+    function objectMapper(): ObjectMapperInterface
+    {
+        return app(ObjectMapperInterface::class);
     }
 }
 

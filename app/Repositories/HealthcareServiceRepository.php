@@ -76,7 +76,7 @@ class HealthcareServiceRepository
                 ->keyBy('uuid');
 
             $prepared = collect($items)->map(static function (array $item) use ($existingConceptIds): array {
-                $data = HealthcareServiceData::fromSource(new HealthcareServiceResponse($item));
+                $data = objectMapper()->map(new HealthcareServiceResponse($item), HealthcareServiceData::class);
                 $existing = $existingConceptIds->get($data->uuid);
 
                 // Casts on the model encode JSON columns and format eHealth dates

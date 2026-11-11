@@ -166,7 +166,7 @@ class HealthcareServiceIndex extends Component
         }
 
         try {
-            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
+            $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
 
             Repository::healthcareService()->saveMapped($healthcareServiceData, $healthcareService, legalEntity());
 
@@ -195,7 +195,7 @@ class HealthcareServiceIndex extends Component
         }
 
         try {
-            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
+            $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
 
             Repository::healthcareService()->saveMapped($healthcareServiceData, $healthcareService, legalEntity());
 

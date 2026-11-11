@@ -81,7 +81,7 @@ class HealthcareServiceUpdate extends Component
             return;
         }
 
-        $healthcareServiceEhealthMapped = EhealthData::fromForm($this->form)->toArray();
+        $healthcareServiceEhealthMapped = objectMapper()->map($this->form, EhealthData::class)->toArray();
 
         try {
             // Only mutable fields are sent; the API format drops empty values, while for a PATCH they are exactly what clears the field
@@ -97,7 +97,7 @@ class HealthcareServiceUpdate extends Component
         }
 
         try {
-            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
+            $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
 
             Repository::healthcareService()->saveMapped(
                 $healthcareServiceData,
