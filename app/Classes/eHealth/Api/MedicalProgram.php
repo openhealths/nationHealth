@@ -6,6 +6,7 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\SchemaResponseContract;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -17,6 +18,8 @@ class MedicalProgram extends Request
 
     public function getById(string $id): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(static fn (EHealthResponse $response): array => SchemaResponseContract::validate($response, 'GET /api/medical_programs/id'));
+
         return $this->get(self::URL . '/' . $id);
     }
 
@@ -29,6 +32,8 @@ class MedicalProgram extends Request
      */
     public function getMany(array $filters = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(static fn (EHealthResponse $response): array => SchemaResponseContract::validate($response, 'GET /api/medical_programs'));
+
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge(

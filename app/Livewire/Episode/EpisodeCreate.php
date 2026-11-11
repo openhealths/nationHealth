@@ -11,9 +11,11 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\EHealthJobResolver;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
 use Ramsey\Uuid\Uuid;
 use Throwable;
 
@@ -56,13 +58,18 @@ class EpisodeCreate extends BaseEpisodeComponent
 
         try {
             $response = EHealth::episode()->create($this->uuid, Arr::toSnakeCase($formattedData));
+            $resolver = app(EHealthJobResolver::class);
+            $resolver->assertSuccessful($resolver->resolve($response->validate()));
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.validation_error'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while creating episode');
 
             return;
         }
 
-        logger()->debug('Job ID to further debug', $response->getData());
         // eHealth accepted the episode; only now persist it locally
         try {
             Repository::episode()->store($formattedData, $this->patient());

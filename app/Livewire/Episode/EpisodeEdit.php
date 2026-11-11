@@ -14,10 +14,12 @@ use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\EHealthJobResolver;
 use App\Services\MedicalEvents\Fhir;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Throwable;
 
@@ -130,7 +132,13 @@ class EpisodeEdit extends BaseEpisodeComponent
         $formattedData = $this->formatEpisode($validated, Status::ACTIVE);
 
         try {
-            EHealth::episode()->create($this->uuid, Arr::toSnakeCase($formattedData));
+            $response = EHealth::episode()->create($this->uuid, Arr::toSnakeCase($formattedData));
+            $resolver = app(EHealthJobResolver::class);
+            $resolver->assertSuccessful($resolver->resolve($response->validate()));
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.validation_error'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while creating episode');
 
@@ -223,7 +231,13 @@ class EpisodeEdit extends BaseEpisodeComponent
         $formattedData = Fhir::episode()->toUpdateFhir($validated);
 
         try {
-            EHealth::episode()->update($this->uuid, $episode->uuid, Arr::toSnakeCase($formattedData));
+            $response = EHealth::episode()->update($this->uuid, $episode->uuid, Arr::toSnakeCase($formattedData));
+            $resolver = app(EHealthJobResolver::class);
+            $resolver->assertSuccessful($resolver->resolve($response->validate()));
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.validation_error'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while updating episode');
 

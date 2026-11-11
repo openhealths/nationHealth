@@ -6,16 +6,11 @@ namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\MedicalEventsErrorTranslator;
-use App\Classes\eHealth\ValidationRuleBuilder;
 use App\Contracts\ApiErrorTranslator;
-use App\Enums\Episode\Status;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class Episode extends PatientApiBase
 {
@@ -31,6 +26,8 @@ class Episode extends PatientApiBase
      */
     public function create(string $id, array $data): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('POST /api/patients/{patient_id}/episodes', false);
+
         return $this->post(self::URL . "/$id/episodes", $data);
     }
 
@@ -47,6 +44,8 @@ class Episode extends PatientApiBase
      */
     public function update(string $patientId, string $episodeId, array $data): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('PATCH /api/patients/{patient_id}/episodes/{episode_id}', false);
+
         return $this->patch(self::URL . "/$patientId/episodes/$episodeId", $data);
     }
 
@@ -63,6 +62,8 @@ class Episode extends PatientApiBase
      */
     public function cancel(string $patientId, string $episodeId, array $data): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('PATCH /api/patients/{patient_id}/episodes/{episode_id}/actions/cancel', false);
+
         return $this->patch(self::URL . "/$patientId/episodes/$episodeId/actions/cancel", $data);
     }
 
@@ -79,6 +80,8 @@ class Episode extends PatientApiBase
      */
     public function close(string $patientId, string $episodeId, array $data): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('PATCH /api/patients/{patient_id}/episodes/{episode_id}/actions/close', false);
+
         return $this->patch(self::URL . "/$patientId/episodes/$episodeId/actions/close", $data);
     }
 
@@ -94,7 +97,7 @@ class Episode extends PatientApiBase
      */
     public function getById(string $patientId, string $episodeId): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateEpisode(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/episodes/{episode_id}', true);
 
         return $this->get(self::URL . "/$patientId/episodes/$episodeId");
     }
@@ -120,7 +123,8 @@ class Episode extends PatientApiBase
      */
     public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateEpisodes(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/episodes', true);
+
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
@@ -147,7 +151,8 @@ class Episode extends PatientApiBase
      */
     public function getShortEpisodes(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateShortEpisodes(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/summary/episodes', true);
+
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
@@ -165,163 +170,4 @@ class Episode extends PatientApiBase
         return new MedicalEventsErrorTranslator();
     }
 
-    /**
-     * Validate episodes data from eHealth API.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateShortEpisodes(EHealthResponse $response): array
-    {
-        $replaced = [];
-        foreach ($response->getData() as $data) {
-            $replaced[] = $this->replaceEHealthPropNames($data);
-        }
-
-        $rules = collect($this->shortEpisodeValidationRules())
-            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
-            ->toArray();
-
-        $validator = Validator::make($replaced, $rules);
-
-        if ($validator->fails()) {
-            Log::channel('e_health_errors')->error(
-                'Episode validation failed: ' . implode(', ', $validator->errors()->all())
-            );
-        }
-
-        return $validator->validate();
-    }
-
-    /**
-     * Validate a single episode from eHealth API response.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateEpisode(EHealthResponse $response): array
-    {
-        $replaced = [$this->replaceEHealthPropNames($response->getData())];
-
-        return $this->runEpisodeValidation($replaced)[0];
-    }
-
-    /**
-     * Validate a list of episodes from eHealth API response.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateEpisodes(EHealthResponse $response): array
-    {
-        $replaced = [];
-        foreach ($response->getData() as $data) {
-            $replaced[] = $this->replaceEHealthPropNames($data);
-        }
-
-        return $this->runEpisodeValidation($replaced);
-    }
-
-    /**
-     * Apply episode validation rules to a pre-processed list of episode data.
-     *
-     * @param  array  $replacedItems
-     * @return array
-     */
-    private function runEpisodeValidation(array $replacedItems): array
-    {
-        $rules = collect($this->episodeValidationRules())
-            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
-            ->toArray();
-
-        $validator = Validator::make($replacedItems, $rules);
-
-        if ($validator->fails()) {
-            Log::channel('e_health_errors')->error(
-                'Episode validation failed: ' . implode(', ', $validator->errors()->all())
-            );
-        }
-
-        return $validator->validate();
-    }
-
-    /**
-     * List of validation rules for episodes from eHealth.
-     *
-     * @return array
-     */
-    protected function shortEpisodeValidationRules(): array
-    {
-        return ValidationRuleBuilder::merge(
-            [
-                'uuid' => ['required', 'uuid'],
-                'name' => ['required', 'string', 'max:255'],
-                'status' => ['required', 'string', Rule::in(Status::values())],
-                'ehealth_inserted_at' => ['required', 'date'],
-                'ehealth_updated_at' => ['required', 'date']
-            ],
-            ValidationRuleBuilder::periodRules('period')
-        );
-    }
-
-    /**
-     * List of validation rules for episodes from eHealth.
-     *
-     * @return array
-     */
-    protected function episodeValidationRules(): array
-    {
-        return ValidationRuleBuilder::merge(
-            [
-                'closing_summary' => ['nullable', 'string'],
-                'explanatory_letter' => ['nullable', 'string', 'max:255'],
-                'uuid' => ['required', 'uuid'],
-                'name' => ['required', 'string', 'max:255'],
-                'status' => ['required', 'string', Rule::in(Status::values())],
-                'ehealth_inserted_at' => ['required', 'date'],
-                'ehealth_updated_at' => ['required', 'date']
-            ],
-
-            // Identifier relationships
-            ValidationRuleBuilder::identifierRules('care_manager', true),
-            ValidationRuleBuilder::identifierRules('managing_organization', true),
-
-            // Current diagnoses
-            [
-                'current_diagnoses' => ['nullable', 'array'],
-                'current_diagnoses.*.rank' => ['nullable', 'integer']
-            ],
-            ValidationRuleBuilder::codeableConceptRules('current_diagnoses.*.code'),
-            ValidationRuleBuilder::identifierRules('current_diagnoses.*.condition'),
-            ValidationRuleBuilder::codeableConceptRules('current_diagnoses.*.role'),
-
-            // Diagnoses history
-            [
-                'diagnoses_history' => ['nullable', 'array'],
-                'diagnoses_history.*.date' => ['nullable', 'date'],
-                'diagnoses_history.*.is_active' => ['nullable', 'boolean'],
-                'diagnoses_history.*.diagnoses.*.rank' => ['nullable', 'integer']
-            ],
-            ValidationRuleBuilder::identifierRules('diagnoses_history.*.evidence'),
-            ValidationRuleBuilder::codeableConceptRules('diagnoses_history.*.diagnoses.*.code'),
-            ValidationRuleBuilder::identifierRules('diagnoses_history.*.diagnoses.*.condition'),
-            ValidationRuleBuilder::codeableConceptRules('diagnoses_history.*.diagnoses.*.role'),
-            ValidationRuleBuilder::periodRules('period', true),
-
-            // Status History
-            [
-                'status_history' => ['required', 'array'],
-                'status_history.*.status' => ['required', 'string', Rule::in(Status::values())],
-                'status_history.*.ehealth_inserted_at' => ['required', 'date'],
-                'status_history.*.ehealth_inserted_by' => ['required', 'uuid']
-            ],
-            ValidationRuleBuilder::codeableConceptRules('status_history.*.status_reason'),
-
-            // Codeable concept relationships
-            ValidationRuleBuilder::codeableConceptRules('status_reason'),
-
-            // Coding relationships
-            ValidationRuleBuilder::codingRules('type', true)
-        );
-    }
 }

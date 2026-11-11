@@ -39,7 +39,7 @@ class ConfigurationMetadataSync implements ShouldQueue
     public function handle(): void
     {
         try {
-            $resources = EHealth::configuration()->getMetadata()->getData();
+            $resources = EHealth::configuration()->getMetadata()->validate();
 
             foreach ($resources as $resource) {
                 $changed = $this->syncResource($resource['resource'], $resource['updated_at']);

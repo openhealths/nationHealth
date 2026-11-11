@@ -6,16 +6,11 @@ namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\MedicalEventsErrorTranslator;
-use App\Classes\eHealth\ValidationRuleBuilder;
 use App\Contracts\ApiErrorTranslator;
-use App\Enums\Person\DiagnosticReportStatus;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class DiagnosticReport extends PatientApiBase
 {
@@ -48,6 +43,8 @@ class DiagnosticReport extends PatientApiBase
      */
     public function cancel(string $uuid, array $data = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateSubmittedJob(...));
+
         return $this->patch(self::URL . "/$uuid/diagnostic_report_package", $data);
     }
 
@@ -63,7 +60,7 @@ class DiagnosticReport extends PatientApiBase
      */
     public function getById(string $patientId, string $diagnosticReportId): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateDiagnosticReport(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/diagnostic_reports/{diagnostic_report_id}');
 
         return $this->get(self::URL . "/$patientId/diagnostic_reports/$diagnosticReportId");
     }
@@ -92,7 +89,8 @@ class DiagnosticReport extends PatientApiBase
      */
     public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateDiagnosticReports(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/diagnostic_reports/');
+
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $this->format($query, ['issued_from', 'issued_to']));
@@ -112,7 +110,8 @@ class DiagnosticReport extends PatientApiBase
      */
     public function getSummary(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateDiagnosticReports(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/summary/diagnostic_reports/');
+
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
@@ -130,108 +129,4 @@ class DiagnosticReport extends PatientApiBase
         return new MedicalEventsErrorTranslator();
     }
 
-    /**
-     * Validate a single diagnostic report from eHealth API response.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateDiagnosticReport(EHealthResponse $response): array
-    {
-        $replaced = [$this->replaceEHealthPropNames($response->getData())];
-
-        return $this->runDiagnosticReportValidation($replaced)[0];
-    }
-
-    /**
-     * Validate a list of diagnostic reports from eHealth API response.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateDiagnosticReports(EHealthResponse $response): array
-    {
-        $replaced = [];
-        foreach ($response->getData() as $data) {
-            $replaced[] = $this->replaceEHealthPropNames($data);
-        }
-
-        return $this->runDiagnosticReportValidation($replaced);
-    }
-
-    /**
-     * Apply diagnostic report validation rules to a pre-processed list of diagnostic report data.
-     *
-     * @param  array  $replacedItems
-     * @return array
-     */
-    private function runDiagnosticReportValidation(array $replacedItems): array
-    {
-        $rules = collect($this->diagnosticReportValidationRules())
-            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
-            ->toArray();
-
-        $validator = Validator::make($replacedItems, $rules);
-
-        if ($validator->fails()) {
-            Log::channel('e_health_errors')->error(
-                'Diagnostic report validation failed: ' . implode(', ', $validator->errors()->all())
-            );
-        }
-
-        return $validator->validate();
-    }
-
-    /**
-     * Validation rules for diagnostic report data.
-     *
-     * @return array
-     */
-    protected function diagnosticReportValidationRules(): array
-    {
-        return ValidationRuleBuilder::merge(
-            // Basic fields
-            [
-                'uuid' => ['required', 'uuid'],
-                'status' => ['required', Rule::in(DiagnosticReportStatus::values())],
-                'effective_date_time' => ['nullable', 'date'],
-                'issued' => ['required', 'date'],
-                'primary_source' => ['required', 'boolean'],
-                'performer' => ['nullable', 'array'],
-                'conclusion' => ['nullable', 'string'],
-                'explanatory_letter' => ['nullable', 'string', 'max:255'],
-                'ehealth_inserted_at' => ['required', 'date'],
-                'ehealth_updated_at' => ['required', 'date']
-            ],
-
-            // Identifier relationships
-            ValidationRuleBuilder::identifierRules('based_on'),
-            ValidationRuleBuilder::identifierRules('division'),
-            ValidationRuleBuilder::identifierRules('code', true),
-            ValidationRuleBuilder::identifierRules('encounter'),
-            ValidationRuleBuilder::identifierRules('origin_episode'),
-            ValidationRuleBuilder::identifierRules('recorded_by', true),
-            ValidationRuleBuilder::identifierRules('managing_organization'),
-
-            // Codeable concept relationships
-            ValidationRuleBuilder::codeableConceptRules('report_origin'),
-            ValidationRuleBuilder::codeableConceptRules('conclusion_code'),
-            ValidationRuleBuilder::codeableConceptRules('cancellation_reason'),
-
-            // Codeable concept collections
-            ValidationRuleBuilder::codeableConceptCollectionRules('category', true),
-
-            // Performer relationships
-            ValidationRuleBuilder::referenceRules('performer.*', true),
-            ValidationRuleBuilder::referenceRules('results_interpreter'),
-
-            // Special relationships
-            ValidationRuleBuilder::paperReferralRules(),
-            ValidationRuleBuilder::periodRules(),
-
-            // Collections of identifiers
-            ValidationRuleBuilder::identifierCollectionRules('specimens'),
-            ValidationRuleBuilder::identifierCollectionRules('used_references')
-        );
-    }
 }

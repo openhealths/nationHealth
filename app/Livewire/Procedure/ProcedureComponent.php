@@ -443,9 +443,13 @@ class ProcedureComponent extends Component
                 $this->patientUuid,
                 ['managing_organization_id' => legalEntity()->uuid]
             );
-            $this->episodes = collect($response->getData())
-                ->map(static fn (array $item) => Arr::only($item, ['id', 'name', 'status', 'inserted_at']))
+            $this->episodes = collect($response->validate())
+                ->map(static fn (array $item): array => ['id' => $item['uuid'], 'name' => $item['name'], 'status' => $item['status'], 'inserted_at' => $item['ehealth_inserted_at']])
                 ->toArray();
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when getting episodes');
 

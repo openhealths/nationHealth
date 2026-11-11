@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Unit\CarePlan;
 
-use Illuminate\Validation\ValidationException;
-use RuntimeException;
-
 use App\Classes\eHealth\Api\Approval;
+use App\Classes\eHealth\Api\Person;
+
 use App\Classes\eHealth\EHealthResponse;
+use App\Enums\Person\AuthenticationMethod;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Models\CarePlan;
 use App\Models\MedicalEvents\Sql\Approval as ApprovalModel;
@@ -16,12 +16,12 @@ use App\Models\Person\Person as Patient;
 use App\Services\MedicalEvents\CarePlanApprovalService;
 use App\Services\MedicalEvents\PatientApprovalService;
 use GuzzleHttp\Psr7\Response;
+use Illuminate\Validation\ValidationException;
 use Mockery;
-use Tests\TestCase;
-use App\Classes\eHealth\Api\Person;
-use App\Enums\Person\AuthenticationMethod;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionMethod;
+use RuntimeException;
+use Tests\TestCase;
 
 class ApprovalResponseContractTest extends TestCase
 {
@@ -371,6 +371,8 @@ class ApprovalResponseContractTest extends TestCase
         $response = new EHealthResponse(new Response(200, [], json_encode(['data' => [[
             'id' => '11111111-1111-4111-8111-111111111111',
             'type' => 'THIRD_PERSON',
+            'inserted_at' => '2026-11-11T10:00:00Z',
+            'inserted_by' => '11111111-1111-4111-8111-111111111111',
             'value' => '22222222-2222-4222-8222-222222222222',
             'reference' => ['type' => 'OTP', 'phone_number' => '+38093*****85'],
         ]]], JSON_THROW_ON_ERROR)));

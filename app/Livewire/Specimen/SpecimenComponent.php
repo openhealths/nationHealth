@@ -256,13 +256,18 @@ abstract class SpecimenComponent extends Component
                 'signed_data' => $signedContent->getBase64Data(),
                 'signed_data_encoding' => 'base64'
             ]);
+            $receipt = $response->validate();
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while sending specimen');
 
             return;
         }
 
-        logger()->debug('Job ID to further debug', $response->getData());
+        logger()->debug('Validated specimen submission', $receipt);
 
         // The stored draft is replaced by the signed specimen, so it can not be signed a second time
         try {

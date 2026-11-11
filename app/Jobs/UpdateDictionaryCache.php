@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class UpdateDictionaryCache implements ShouldQueue
 {
@@ -47,6 +48,16 @@ class UpdateDictionaryCache implements ShouldQueue
         try {
             if ($this->bearerToken) {
                 session()->put(config('ehealth.api.oauth.bearer_token'), $this->bearerToken);
+            }
+
+            if ($manager->requiresCompleteContract($this->dictionaryKey)) {
+                // Old queued page jobs also refresh atomically; never append a
+                // partial catalog to the current authoritative prescribing rules.
+                $data = $manager->fetchCompleteValidated($this->dictionaryKey);
+                Cache::put($this->dictionaryKey, $data, now()->addWeek());
+                Cache::put($this->dictionaryKey.':fresh', true, now()->endOfDay());
+
+                return;
             }
 
             $response = $manager->fetchPage($this->dictionaryKey, $this->pageNumber);
@@ -100,7 +111,7 @@ class UpdateDictionaryCache implements ShouldQueue
             ]);
 
             throw $e; // Will retry due to network issues
-        } catch (EHealthResponseException|EHealthValidationException $e) {
+        } catch (EHealthResponseException|EHealthValidationException|ValidationException $e) {
             Log::error("Dictionary API error - will not retry", [
                 'dictionary' => $this->dictionaryKey,
                 'page' => $this->pageNumber,

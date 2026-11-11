@@ -48,8 +48,10 @@ DOMAIN_PATHS=(
   tests/Unit/Services/MedicalEvents/ReferralPrintoutCode128Test.php
   tests/Unit/Services/MedicalEvents/DeviceRequestMapperTest.php
   tests/Unit/Services/MedicalEvents/DeviceRequestPrescribingTest.php
+  tests/Unit/Services/MedicalEvents/DeviceProgramParticipationGuardTest.php
   tests/Unit/Services/MedicalEvents/EncounterReferralDisplayTest.php
   tests/Unit/eHealth/Api/Patient/MedicationRequestRejectPayloadTest.php
+  tests/Unit/eHealth
   tests/Unit/eHealth/Api/ConfigurationQueryTest.php
   tests/Feature/Employee
   tests/Feature/Party

@@ -1,0 +1,4078 @@
+{
+  "GET /api/patients/{patient_id}/episodes/{episode_id}": {
+    "data": {
+      "id": "90a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+      "inserted_at": "2018-08-02T10:45:16.000Z",
+      "updated_at": "2018-08-02T10:45:16.000Z",
+      "type": {
+        "system": "eHealth/episode_types",
+        "code": "primary_care"
+      },
+      "status": "active",
+      "name": "Діабет 2018",
+      "current_diagnoses": [
+        {
+          "condition": {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "condition"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "null"
+          },
+          "code": {
+            "coding": [
+              {
+                "system": "eHealth/ICPC2/conditions",
+                "code": "A20"
+              }
+            ]
+          },
+          "role": {
+            "coding": [
+              {
+                "system": "eHealth/diagnosis_roles",
+                "code": "CC"
+              }
+            ]
+          },
+          "rank": 1
+        }
+      ],
+      "diagnoses_history": [
+        {
+          "date": "2018-08-02T10:45:16.000Z",
+          "evidence": {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "encounter"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "null"
+          },
+          "diagnoses": [
+            {
+              "condition": {
+                "identifier": {
+                  "type": {
+                    "coding": [
+                      {
+                        "system": "eHealth/resources",
+                        "code": "condition"
+                      }
+                    ]
+                  },
+                  "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+                },
+                "display_value": "null"
+              },
+              "code": {
+                "coding": [
+                  {
+                    "system": "eHealth/ICPC2/conditions",
+                    "code": "A20"
+                  }
+                ]
+              },
+              "role": {
+                "coding": [
+                  {
+                    "system": "eHealth/diagnosis_roles",
+                    "code": "CC"
+                  }
+                ]
+              },
+              "rank": 1
+            },
+            {
+              "condition": {
+                "identifier": {
+                  "type": {
+                    "coding": [
+                      {
+                        "system": "eHealth/resources",
+                        "code": "condition"
+                      }
+                    ]
+                  },
+                  "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+                },
+                "display_value": "null"
+              },
+              "code": {
+                "coding": [
+                  {
+                    "system": "eHealth/ICPC2/conditions",
+                    "code": "A20"
+                  }
+                ]
+              },
+              "role": {
+                "coding": [
+                  {
+                    "system": "eHealth/diagnosis_roles",
+                    "code": "CC"
+                  }
+                ]
+              },
+              "rank": 1
+            }
+          ],
+          "is_active": "true"
+        }
+      ],
+      "status_history": [
+        {
+          "status": "active",
+          "status reason": {
+            "coding": [
+              {
+                "system": "eHealth/episode_closing_reasons",
+                "code": "cured"
+              }
+            ]
+          },
+          "inserted_at": "2018-08-02T10:45:16.000Z"
+        }
+      ],
+      "managing_organization": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "legal_entity"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "Медікал Солюшнc"
+      },
+      "period": {
+        "start": "2018-08-02T10:45:16.000Z",
+        "end": "2018-08-03T11:00:00.000Z"
+      },
+      "care_manager": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "employee"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "closing_summary": "Носові шляхи вільні, горло рожеве, температура в нормі",
+      "status_reason": {
+        "coding": [
+          {
+            "system": "eHealth/episode_closing_reasons",
+            "code": "cured"
+          }
+        ]
+      },
+      "explanatory_letter": "Епізод був відмінений у зв'язку з помилкою при виборі пацієнта"
+    },
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "PATCH /api/patients/{patient_id}/episodes/{episode_id}": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/patients/{patient_id}/episodes": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "id": "90a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+        "inserted_at": "2018-08-02T10:45:16.000Z",
+        "updated_at": "2018-08-02T10:45:16.000Z",
+        "type": {
+          "system": "eHealth/episode_types",
+          "code": "primary_care"
+        },
+        "status": "active",
+        "name": "Діабет 2018",
+        "current_diagnoses": [
+          {
+            "condition": {
+              "identifier": {
+                "type": {
+                  "coding": [
+                    {
+                      "system": "eHealth/resources",
+                      "code": "condition"
+                    }
+                  ]
+                },
+                "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+              },
+              "display_value": "null"
+            },
+            "code": {
+              "coding": [
+                {
+                  "system": "eHealth/ICPC2/conditions",
+                  "code": "A20"
+                }
+              ]
+            },
+            "role": {
+              "coding": [
+                {
+                  "system": "eHealth/diagnosis_roles",
+                  "code": "CC"
+                }
+              ]
+            },
+            "rank": 1
+          }
+        ],
+        "diagnoses_history": [
+          {
+            "date": "2018-08-02T10:45:16.000Z",
+            "evidence": {
+              "identifier": {
+                "type": {
+                  "coding": [
+                    {
+                      "system": "eHealth/resources",
+                      "code": "encounter"
+                    }
+                  ]
+                },
+                "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+              },
+              "display_value": "null"
+            },
+            "diagnoses": [
+              {
+                "condition": {
+                  "identifier": {
+                    "type": {
+                      "coding": [
+                        {
+                          "system": "eHealth/resources",
+                          "code": "condition"
+                        }
+                      ]
+                    },
+                    "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+                  },
+                  "display_value": "null"
+                },
+                "code": {
+                  "coding": [
+                    {
+                      "system": "eHealth/ICPC2/conditions",
+                      "code": "A20"
+                    }
+                  ]
+                },
+                "role": {
+                  "coding": [
+                    {
+                      "system": "eHealth/diagnosis_roles",
+                      "code": "CC"
+                    }
+                  ]
+                },
+                "rank": 1
+              },
+              {
+                "condition": {
+                  "identifier": {
+                    "type": {
+                      "coding": [
+                        {
+                          "system": "eHealth/resources",
+                          "code": "condition"
+                        }
+                      ]
+                    },
+                    "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+                  },
+                  "display_value": "null"
+                },
+                "code": {
+                  "coding": [
+                    {
+                      "system": "eHealth/ICPC2/conditions",
+                      "code": "A20"
+                    }
+                  ]
+                },
+                "role": {
+                  "coding": [
+                    {
+                      "system": "eHealth/diagnosis_roles",
+                      "code": "CC"
+                    }
+                  ]
+                },
+                "rank": 1
+              }
+            ],
+            "is_active": "true"
+          }
+        ],
+        "status_history": [
+          {
+            "status": "active",
+            "status reason": {
+              "coding": [
+                {
+                  "system": "eHealth/episode_closing_reasons",
+                  "code": "cured"
+                }
+              ]
+            },
+            "inserted_at": "2018-08-02T10:45:16.000Z"
+          }
+        ],
+        "managing_organization": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "legal_entity"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "Медікал Солюшнc"
+        },
+        "period": {
+          "start": "2018-08-02T10:45:16.000Z",
+          "end": "2018-08-03T11:00:00.000Z"
+        },
+        "care_manager": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "employee"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "closing_summary": "Носові шляхи вільні, горло рожеве, температура в нормі",
+        "status_reason": {
+          "coding": [
+            {
+              "system": "eHealth/episode_closing_reasons",
+              "code": "cured"
+            }
+          ]
+        },
+        "explanatory_letter": "Епізод був відмінений у зв'язку з помилкою при виборі пацієнта"
+      }
+    ],
+    "paging": {
+      "page": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 20
+    }
+  },
+  "POST /api/patients/{patient_id}/episodes": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/patients/{patient_id}/episodes/approved": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "id": "90a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+        "inserted_at": "2018-08-02T10:45:16.000Z",
+        "updated_at": "2018-08-02T10:45:16.000Z",
+        "type": {
+          "system": "eHealth/episode_types",
+          "code": "primary_care"
+        },
+        "status": "active",
+        "name": "Діабет 2018",
+        "current_diagnoses": [
+          {
+            "condition": {
+              "identifier": {
+                "type": {
+                  "coding": [
+                    {
+                      "system": "eHealth/resources",
+                      "code": "condition"
+                    }
+                  ]
+                },
+                "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+              },
+              "display_value": "null"
+            },
+            "code": {
+              "coding": [
+                {
+                  "system": "eHealth/ICPC2/conditions",
+                  "code": "A20"
+                }
+              ]
+            },
+            "role": {
+              "coding": [
+                {
+                  "system": "eHealth/diagnosis_roles",
+                  "code": "CC"
+                }
+              ]
+            },
+            "rank": 1
+          }
+        ],
+        "diagnoses_history": [
+          {
+            "date": "2018-08-02T10:45:16.000Z",
+            "evidence": {
+              "identifier": {
+                "type": {
+                  "coding": [
+                    {
+                      "system": "eHealth/resources",
+                      "code": "encounter"
+                    }
+                  ]
+                },
+                "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+              },
+              "display_value": "null"
+            },
+            "diagnoses": [
+              {
+                "condition": {
+                  "identifier": {
+                    "type": {
+                      "coding": [
+                        {
+                          "system": "eHealth/resources",
+                          "code": "condition"
+                        }
+                      ]
+                    },
+                    "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+                  },
+                  "display_value": "null"
+                },
+                "code": {
+                  "coding": [
+                    {
+                      "system": "eHealth/ICPC2/conditions",
+                      "code": "A20"
+                    }
+                  ]
+                },
+                "role": {
+                  "coding": [
+                    {
+                      "system": "eHealth/diagnosis_roles",
+                      "code": "CC"
+                    }
+                  ]
+                },
+                "rank": 1
+              },
+              {
+                "condition": {
+                  "identifier": {
+                    "type": {
+                      "coding": [
+                        {
+                          "system": "eHealth/resources",
+                          "code": "condition"
+                        }
+                      ]
+                    },
+                    "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+                  },
+                  "display_value": "null"
+                },
+                "code": {
+                  "coding": [
+                    {
+                      "system": "eHealth/ICPC2/conditions",
+                      "code": "A20"
+                    }
+                  ]
+                },
+                "role": {
+                  "coding": [
+                    {
+                      "system": "eHealth/diagnosis_roles",
+                      "code": "CC"
+                    }
+                  ]
+                },
+                "rank": 1
+              }
+            ],
+            "is_active": "true"
+          }
+        ],
+        "status_history": [
+          {
+            "status": "active",
+            "status reason": {
+              "coding": [
+                {
+                  "system": "eHealth/episode_closing_reasons",
+                  "code": "cured"
+                }
+              ]
+            },
+            "inserted_at": "2018-08-02T10:45:16.000Z"
+          }
+        ],
+        "managing_organization": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "legal_entity"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "Медікал Солюшнc"
+        },
+        "period": {
+          "start": "2018-08-02T10:45:16.000Z",
+          "end": "2018-08-03T11:00:00.000Z"
+        },
+        "care_manager": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "employee"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "closing_summary": "Носові шляхи вільні, горло рожеве, температура в нормі",
+        "status_reason": {
+          "coding": [
+            {
+              "system": "eHealth/episode_closing_reasons",
+              "code": "cured"
+            }
+          ]
+        },
+        "explanatory_letter": "Епізод був відмінений у зв'язку з помилкою при виборі пацієнта"
+      }
+    ],
+    "paging": {
+      "page": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 20
+    }
+  },
+  "GET /api/patients/{patient_id}/diagnoses_groups/episodes": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "id": "90a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+        "name": "Діабет 2018",
+        "status": "active",
+        "period": {
+          "start": "2018-08-02T10:45:16.000Z",
+          "end": "2018-08-03T11:00:00.000Z"
+        },
+        "inserted_at": "2018-08-02T10:45:16.000Z",
+        "updated_at": "2018-08-02T10:45:16.000Z",
+        "managing_organization": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "legal_entity"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "Медікал Солюшнc"
+        },
+        "diagnoses": [
+          {
+            "condition": {
+              "identifier": {
+                "type": {
+                  "coding": [
+                    {
+                      "system": "eHealth/resources",
+                      "code": "condition"
+                    }
+                  ]
+                },
+                "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+              },
+              "display_value": "null"
+            },
+            "code": {
+              "coding": [
+                {
+                  "system": "eHealth/ICPC2/conditions",
+                  "code": "A20"
+                }
+              ]
+            },
+            "role": {
+              "coding": [
+                {
+                  "system": "eHealth/diagnosis_roles",
+                  "code": "CC"
+                }
+              ]
+            },
+            "rank": 1
+          }
+        ]
+      }
+    ],
+    "paging": {
+      "page": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 20
+    }
+  },
+  "PATCH /api/patients/{patient_id}/episodes/{episode_id}/actions/close": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "PATCH /api/patients/{patient_id}/episodes/{episode_id}/actions/cancel": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/patients/{patient_id}/episodes/{episode_id}/encounters": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "id": "465fb6fe-2dea-4b8a-9ef7-58379d1eaab0",
+        "origin_episode": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "episode"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "status": "finised",
+        "period": {
+          "start": "2018-08-02T10:45:16.000Z",
+          "end": "2018-08-02T11:00:00.000Z"
+        },
+        "incoming_referral": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "service_request"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "paper_referral": {
+          "requisition": "1111-2222-3333-4444",
+          "requester_legal_entity_name": "Some clinic",
+          "requester_legal_entity_edrpou": "12345678",
+          "requester_employee_name": "John",
+          "service_request_date": "2018-10-08",
+          "note": "Some notes"
+        },
+        "inserted_at": "2018-08-02T10:45:16.000Z",
+        "updated_at": "2018-08-02T10:45:16.000Z",
+        "visit": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "visit"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "episode": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "episode"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "class": {
+          "system": "eHealth/encounter_classes",
+          "code": "inpatient"
+        },
+        "type": {
+          "coding": [
+            {
+              "system": "eHealth/encounter_types",
+              "code": "PC"
+            }
+          ]
+        },
+        "performer": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "employee"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "Шевченко Олесь Вікторович"
+        },
+        "reasons": [
+          {
+            "coding": [
+              {
+                "system": "eHealth/ICPC2/reasons",
+                "code": "A02"
+              }
+            ]
+          },
+          {
+            "coding": [
+              {
+                "system": "eHealth/ICPC2/reasons",
+                "code": "D09"
+              }
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "condition": {
+              "identifier": {
+                "type": {
+                  "coding": [
+                    {
+                      "system": "eHealth/resources",
+                      "code": "condition"
+                    }
+                  ]
+                },
+                "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+              },
+              "display_value": "null"
+            },
+            "code": {
+              "coding": [
+                {
+                  "system": "eHealth/ICPC2/conditions",
+                  "code": "A20"
+                }
+              ]
+            },
+            "role": {
+              "coding": [
+                {
+                  "system": "eHealth/diagnosis_roles",
+                  "code": "CC"
+                }
+              ]
+            },
+            "rank": 1
+          }
+        ],
+        "actions": [
+          {
+            "coding": [
+              {
+                "system": "eHealth/ICPC2/actions",
+                "code": "T47"
+              }
+            ]
+          },
+          {
+            "coding": [
+              {
+                "system": "eHealth/ICPC2/actions",
+                "code": "T47"
+              }
+            ]
+          }
+        ],
+        "action_references": [
+          {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "service"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            }
+          }
+        ],
+        "division": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "division"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "prescriptions": "Дієта №1, Омепразолу 40 мг 1 раз на добу + амоксициліну 500 мг + метронідазолу 400 мг при необхідності 500 мг або тинідазолу 500 мг 3 рази на добу протягом 1 тижня",
+        "supporting_info": [
+          {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "observation"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "null"
+          },
+          {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "diagnostic_report"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "null"
+          }
+        ],
+        "cancellation_reason": {
+          "coding": [
+            {
+              "system": "eHealth/episode_closing_reasons",
+              "code": "cured"
+            }
+          ]
+        },
+        "explanatory_letter": "Діагноз був відмінений у зв'язку з помилкою при виборі пацієнта",
+        "hospitalization": {
+          "admit_source": {
+            "coding": [
+              {
+                "system": "Health/encounter_admit_source",
+                "code": "default"
+              }
+            ]
+          },
+          "re_admission": {
+            "coding": [
+              {
+                "system": "Health/encounter_re_admission",
+                "code": "default"
+              }
+            ]
+          },
+          "destination": {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "division/legal_entity"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "null"
+          },
+          "discharge_disposition": {
+            "coding": [
+              {
+                "system": "Health/encounter_discharge_disposition",
+                "code": "default"
+              }
+            ]
+          },
+          "discharge_department": {
+            "coding": [
+              {
+                "system": "Health/encounter_discharge_department",
+                "code": "default"
+              }
+            ]
+          },
+          "pre_admission_identifier": "12345"
+        },
+        "participant": [
+          {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "employee"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "Шевченко Олесь Вікторович"
+          }
+        ]
+      }
+    ],
+    "paging": {
+      "page": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 20
+    }
+  },
+  "GET /api/patients/{patient_id}/episodes/{episode_id}/encounters/{encounter_id}": {
+    "data": {
+      "id": "465fb6fe-2dea-4b8a-9ef7-58379d1eaab0",
+      "origin_episode": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "episode"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "status": "finised",
+      "period": {
+        "start": "2018-08-02T10:45:16.000Z",
+        "end": "2018-08-02T11:00:00.000Z"
+      },
+      "incoming_referral": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "service_request"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "paper_referral": {
+        "requisition": "1111-2222-3333-4444",
+        "requester_legal_entity_name": "Some clinic",
+        "requester_legal_entity_edrpou": "12345678",
+        "requester_employee_name": "John",
+        "service_request_date": "2018-10-08",
+        "note": "Some notes"
+      },
+      "inserted_at": "2018-08-02T10:45:16.000Z",
+      "updated_at": "2018-08-02T10:45:16.000Z",
+      "visit": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "visit"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "episode": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "episode"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "class": {
+        "system": "eHealth/encounter_classes",
+        "code": "inpatient"
+      },
+      "type": {
+        "coding": [
+          {
+            "system": "eHealth/encounter_types",
+            "code": "PC"
+          }
+        ]
+      },
+      "performer": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "employee"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "Шевченко Олесь Вікторович"
+      },
+      "reasons": [
+        {
+          "coding": [
+            {
+              "system": "eHealth/ICPC2/reasons",
+              "code": "A02"
+            }
+          ]
+        },
+        {
+          "coding": [
+            {
+              "system": "eHealth/ICPC2/reasons",
+              "code": "D09"
+            }
+          ]
+        }
+      ],
+      "diagnoses": [
+        {
+          "condition": {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "condition"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "null"
+          },
+          "code": {
+            "coding": [
+              {
+                "system": "eHealth/ICPC2/conditions",
+                "code": "A20"
+              }
+            ]
+          },
+          "role": {
+            "coding": [
+              {
+                "system": "eHealth/diagnosis_roles",
+                "code": "CC"
+              }
+            ]
+          },
+          "rank": 1
+        }
+      ],
+      "actions": [
+        {
+          "coding": [
+            {
+              "system": "eHealth/ICPC2/actions",
+              "code": "T47"
+            }
+          ]
+        },
+        {
+          "coding": [
+            {
+              "system": "eHealth/ICPC2/actions",
+              "code": "T47"
+            }
+          ]
+        }
+      ],
+      "action_references": [
+        {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "service"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          }
+        }
+      ],
+      "division": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "division"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "prescriptions": "Дієта №1, Омепразолу 40 мг 1 раз на добу + амоксициліну 500 мг + метронідазолу 400 мг при необхідності 500 мг або тинідазолу 500 мг 3 рази на добу протягом 1 тижня",
+      "supporting_info": [
+        {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "observation"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "diagnostic_report"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        }
+      ],
+      "cancellation_reason": {
+        "coding": [
+          {
+            "system": "eHealth/episode_closing_reasons",
+            "code": "cured"
+          }
+        ]
+      },
+      "explanatory_letter": "Діагноз був відмінений у зв'язку з помилкою при виборі пацієнта",
+      "hospitalization": {
+        "admit_source": {
+          "coding": [
+            {
+              "system": "Health/encounter_admit_source",
+              "code": "default"
+            }
+          ]
+        },
+        "re_admission": {
+          "coding": [
+            {
+              "system": "Health/encounter_re_admission",
+              "code": "default"
+            }
+          ]
+        },
+        "destination": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "division/legal_entity"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "discharge_disposition": {
+          "coding": [
+            {
+              "system": "Health/encounter_discharge_disposition",
+              "code": "default"
+            }
+          ]
+        },
+        "discharge_department": {
+          "coding": [
+            {
+              "system": "Health/encounter_discharge_department",
+              "code": "default"
+            }
+          ]
+        },
+        "pre_admission_identifier": "12345"
+      },
+      "participant": [
+        {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "employee"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "Шевченко Олесь Вікторович"
+        }
+      ]
+    },
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/patients/{patient_id}/encounters/{encounter_id}": {
+    "data": {
+      "id": "465fb6fe-2dea-4b8a-9ef7-58379d1eaab0",
+      "origin_episode": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "episode"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "status": "finised",
+      "period": {
+        "start": "2018-08-02T10:45:16.000Z",
+        "end": "2018-08-02T11:00:00.000Z"
+      },
+      "incoming_referral": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "service_request"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "paper_referral": {
+        "requisition": "1111-2222-3333-4444",
+        "requester_legal_entity_name": "Some clinic",
+        "requester_legal_entity_edrpou": "12345678",
+        "requester_employee_name": "John",
+        "service_request_date": "2018-10-08",
+        "note": "Some notes"
+      },
+      "inserted_at": "2018-08-02T10:45:16.000Z",
+      "updated_at": "2018-08-02T10:45:16.000Z",
+      "visit": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "visit"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "episode": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "episode"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "class": {
+        "system": "eHealth/encounter_classes",
+        "code": "inpatient"
+      },
+      "type": {
+        "coding": [
+          {
+            "system": "eHealth/encounter_types",
+            "code": "PC"
+          }
+        ]
+      },
+      "performer": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "employee"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "Шевченко Олесь Вікторович"
+      },
+      "reasons": [
+        {
+          "coding": [
+            {
+              "system": "eHealth/ICPC2/reasons",
+              "code": "A02"
+            }
+          ]
+        },
+        {
+          "coding": [
+            {
+              "system": "eHealth/ICPC2/reasons",
+              "code": "D09"
+            }
+          ]
+        }
+      ],
+      "diagnoses": [
+        {
+          "condition": {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "condition"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "null"
+          },
+          "code": {
+            "coding": [
+              {
+                "system": "eHealth/ICPC2/conditions",
+                "code": "A20"
+              }
+            ]
+          },
+          "role": {
+            "coding": [
+              {
+                "system": "eHealth/diagnosis_roles",
+                "code": "CC"
+              }
+            ]
+          },
+          "rank": 1
+        }
+      ],
+      "actions": [
+        {
+          "coding": [
+            {
+              "system": "eHealth/ICPC2/actions",
+              "code": "T47"
+            }
+          ]
+        },
+        {
+          "coding": [
+            {
+              "system": "eHealth/ICPC2/actions",
+              "code": "T47"
+            }
+          ]
+        }
+      ],
+      "action_references": [
+        {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "service"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          }
+        }
+      ],
+      "division": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "division"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "prescriptions": "Дієта №1, Омепразолу 40 мг 1 раз на добу + амоксициліну 500 мг + метронідазолу 400 мг при необхідності 500 мг або тинідазолу 500 мг 3 рази на добу протягом 1 тижня",
+      "supporting_info": [
+        {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "observation"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "diagnostic_report"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        }
+      ],
+      "cancellation_reason": {
+        "coding": [
+          {
+            "system": "eHealth/episode_closing_reasons",
+            "code": "cured"
+          }
+        ]
+      },
+      "explanatory_letter": "Діагноз був відмінений у зв'язку з помилкою при виборі пацієнта",
+      "hospitalization": {
+        "admit_source": {
+          "coding": [
+            {
+              "system": "Health/encounter_admit_source",
+              "code": "default"
+            }
+          ]
+        },
+        "re_admission": {
+          "coding": [
+            {
+              "system": "Health/encounter_re_admission",
+              "code": "default"
+            }
+          ]
+        },
+        "destination": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "division/legal_entity"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "discharge_disposition": {
+          "coding": [
+            {
+              "system": "Health/encounter_discharge_disposition",
+              "code": "default"
+            }
+          ]
+        },
+        "discharge_department": {
+          "coding": [
+            {
+              "system": "Health/encounter_discharge_department",
+              "code": "default"
+            }
+          ]
+        },
+        "pre_admission_identifier": "12345"
+      },
+      "participant": [
+        {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "employee"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "Шевченко Олесь Вікторович"
+        }
+      ]
+    },
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/patients/{patient_id}/encounters": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "id": "465fb6fe-2dea-4b8a-9ef7-58379d1eaab0",
+        "origin_episode": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "episode"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "status": "finised",
+        "period": {
+          "start": "2018-08-02T10:45:16.000Z",
+          "end": "2018-08-02T11:00:00.000Z"
+        },
+        "incoming_referral": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "service_request"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "paper_referral": {
+          "requisition": "1111-2222-3333-4444",
+          "requester_legal_entity_name": "Some clinic",
+          "requester_legal_entity_edrpou": "12345678",
+          "requester_employee_name": "John",
+          "service_request_date": "2018-10-08",
+          "note": "Some notes"
+        },
+        "inserted_at": "2018-08-02T10:45:16.000Z",
+        "updated_at": "2018-08-02T10:45:16.000Z",
+        "visit": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "visit"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "episode": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "episode"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "class": {
+          "system": "eHealth/encounter_classes",
+          "code": "inpatient"
+        },
+        "type": {
+          "coding": [
+            {
+              "system": "eHealth/encounter_types",
+              "code": "PC"
+            }
+          ]
+        },
+        "performer": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "employee"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "Шевченко Олесь Вікторович"
+        },
+        "reasons": [
+          {
+            "coding": [
+              {
+                "system": "eHealth/ICPC2/reasons",
+                "code": "A02"
+              }
+            ]
+          },
+          {
+            "coding": [
+              {
+                "system": "eHealth/ICPC2/reasons",
+                "code": "D09"
+              }
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "condition": {
+              "identifier": {
+                "type": {
+                  "coding": [
+                    {
+                      "system": "eHealth/resources",
+                      "code": "condition"
+                    }
+                  ]
+                },
+                "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+              },
+              "display_value": "null"
+            },
+            "code": {
+              "coding": [
+                {
+                  "system": "eHealth/ICPC2/conditions",
+                  "code": "A20"
+                }
+              ]
+            },
+            "role": {
+              "coding": [
+                {
+                  "system": "eHealth/diagnosis_roles",
+                  "code": "CC"
+                }
+              ]
+            },
+            "rank": 1
+          }
+        ],
+        "actions": [
+          {
+            "coding": [
+              {
+                "system": "eHealth/ICPC2/actions",
+                "code": "T47"
+              }
+            ]
+          },
+          {
+            "coding": [
+              {
+                "system": "eHealth/ICPC2/actions",
+                "code": "T47"
+              }
+            ]
+          }
+        ],
+        "action_references": [
+          {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "service"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            }
+          }
+        ],
+        "division": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "division"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "prescriptions": "Дієта №1, Омепразолу 40 мг 1 раз на добу + амоксициліну 500 мг + метронідазолу 400 мг при необхідності 500 мг або тинідазолу 500 мг 3 рази на добу протягом 1 тижня",
+        "supporting_info": [
+          {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "observation"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "null"
+          },
+          {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "diagnostic_report"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "null"
+          }
+        ],
+        "cancellation_reason": {
+          "coding": [
+            {
+              "system": "eHealth/episode_closing_reasons",
+              "code": "cured"
+            }
+          ]
+        },
+        "explanatory_letter": "Діагноз був відмінений у зв'язку з помилкою при виборі пацієнта",
+        "hospitalization": {
+          "admit_source": {
+            "coding": [
+              {
+                "system": "Health/encounter_admit_source",
+                "code": "default"
+              }
+            ]
+          },
+          "re_admission": {
+            "coding": [
+              {
+                "system": "Health/encounter_re_admission",
+                "code": "default"
+              }
+            ]
+          },
+          "destination": {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "division/legal_entity"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "null"
+          },
+          "discharge_disposition": {
+            "coding": [
+              {
+                "system": "Health/encounter_discharge_disposition",
+                "code": "default"
+              }
+            ]
+          },
+          "discharge_department": {
+            "coding": [
+              {
+                "system": "Health/encounter_discharge_department",
+                "code": "default"
+              }
+            ]
+          },
+          "pre_admission_identifier": "12345"
+        },
+        "participant": [
+          {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "employee"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "Шевченко Олесь Вікторович"
+          }
+        ]
+      }
+    ],
+    "paging": {
+      "page": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 20
+    }
+  },
+  "GET /api/patients/{patient_id}/devices/{device_id}": {
+    "data": {
+      "id": "90a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+      "identifier": [
+        {
+          "type": {
+            "coding": [
+              {
+                "system": "external_system",
+                "code": "prozoro"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        }
+      ],
+      "name": [
+        {
+          "type": "user_friendly",
+          "value": "Тест-смужки Accu-Chek Active для глюкометра"
+        }
+      ],
+      "status": "inactive",
+      "serial_number": "NSPX30",
+      "property": [
+        {
+          "code": {
+            "coding": [
+              {
+                "system": "device_properties",
+                "code": "default"
+              }
+            ]
+          },
+          "value_quantity": {
+            "value": 13,
+            "comparator": ">",
+            "unit": "kg",
+            "system": "eHealth/ucum/units",
+            "code": "kg"
+          }
+        }
+      ],
+      "type": {
+        "coding": [
+          {
+            "system": "device_definition_classification_type",
+            "code": "2345678"
+          }
+        ]
+      },
+      "lot_number": "RZ12345678",
+      "manufacturer": "GlobalMed, Inc",
+      "manufacture_date": "1999-01-01T00:00:00.000Z",
+      "expiration_date": "2020-01-01T00:00:00.000Z",
+      "model_number": "NSPX30",
+      "note": "Імплант був вилучений по причині заміни на новий",
+      "definition": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "device_definition"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "parent": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "device"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "recorder": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "employee"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "context": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "encounter"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "status_reason": {
+        "coding": [
+          {
+            "system": "device_status_reasons",
+            "code": "default"
+          }
+        ]
+      },
+      "inserted_at": "2018-08-02T10:55:00.000Z",
+      "updated_at": "2018-08-02T10:55:00.000Z",
+      "primary_source": false,
+      "report_origin": {
+        "coding": [
+          {
+            "system": "eHealth/report_origins",
+            "code": "patient"
+          }
+        ],
+        "text": "зі слів пацієнта"
+      }
+    },
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/patients/{patient_id}/devices": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "id": "90a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+        "identifier": [
+          {
+            "type": {
+              "coding": [
+                {
+                  "system": "external_system",
+                  "code": "prozoro"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          }
+        ],
+        "name": [
+          {
+            "type": "user_friendly",
+            "value": "Тест-смужки Accu-Chek Active для глюкометра"
+          }
+        ],
+        "status": "inactive",
+        "serial_number": "NSPX30",
+        "property": [
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "device_properties",
+                  "code": "default"
+                }
+              ]
+            },
+            "value_quantity": {
+              "value": 13,
+              "comparator": ">",
+              "unit": "kg",
+              "system": "eHealth/ucum/units",
+              "code": "kg"
+            }
+          }
+        ],
+        "type": {
+          "coding": [
+            {
+              "system": "device_definition_classification_type",
+              "code": "2345678"
+            }
+          ]
+        },
+        "lot_number": "RZ12345678",
+        "manufacturer": "GlobalMed, Inc",
+        "manufacture_date": "1999-01-01T00:00:00.000Z",
+        "expiration_date": "2020-01-01T00:00:00.000Z",
+        "model_number": "NSPX30",
+        "note": "Імплант був вилучений по причині заміни на новий",
+        "definition": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "device_definition"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "parent": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "device"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "recorder": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "employee"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "context": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "encounter"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "status_reason": {
+          "coding": [
+            {
+              "system": "device_status_reasons",
+              "code": "default"
+            }
+          ]
+        },
+        "inserted_at": "2018-08-02T10:55:00.000Z",
+        "updated_at": "2018-08-02T10:55:00.000Z",
+        "primary_source": false,
+        "report_origin": {
+          "coding": [
+            {
+              "system": "eHealth/report_origins",
+              "code": "patient"
+            }
+          ],
+          "text": "зі слів пацієнта"
+        }
+      }
+    ],
+    "paging": {
+      "page": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 20
+    }
+  },
+  "GET /api/patients/{patient_id}/device_associations/{device_association_id}": {
+    "data": {
+      "id": "80a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+      "status": "inactive",
+      "body_site": {
+        "coding": [
+          {
+            "system": "eHealth/body_structures",
+            "code": "head"
+          }
+        ]
+      },
+      "association_date": "2024-08-02",
+      "recorded": "2024-08-05T09:00:00.000Z",
+      "status_reason": {
+        "coding": [
+          {
+            "system": "device_association_status_reasons",
+            "code": "default"
+          }
+        ]
+      },
+      "device": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "device"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "context": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "encounter"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "recorder": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "employee"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "inserted_at": "2018-08-02T10:55:00.000Z",
+      "updated_at": "2018-08-02T10:55:00.000Z",
+      "inserted_by": "9183a36b-4d45-4244-9339-63d81cd08d9c",
+      "updated_by": "9183a36b-4d45-4244-9339-63d81cd08d9c",
+      "primary_source": false,
+      "report_origin": {
+        "coding": [
+          {
+            "system": "eHealth/report_origins",
+            "code": "patient"
+          }
+        ],
+        "text": "зі слів пацієнта"
+      }
+    },
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/patients/{patient_id}/device_associations": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "id": "80a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+        "status": "inactive",
+        "body_site": {
+          "coding": [
+            {
+              "system": "eHealth/body_structures",
+              "code": "head"
+            }
+          ]
+        },
+        "association_date": "2024-08-02",
+        "recorded": "2024-08-05T09:00:00.000Z",
+        "status_reason": {
+          "coding": [
+            {
+              "system": "device_association_status_reasons",
+              "code": "default"
+            }
+          ]
+        },
+        "device": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "device"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "context": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "encounter"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "recorder": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "employee"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "inserted_at": "2018-08-02T10:55:00.000Z",
+        "updated_at": "2018-08-02T10:55:00.000Z",
+        "inserted_by": "9183a36b-4d45-4244-9339-63d81cd08d9c",
+        "updated_by": "9183a36b-4d45-4244-9339-63d81cd08d9c",
+        "primary_source": false,
+        "report_origin": {
+          "coding": [
+            {
+              "system": "eHealth/report_origins",
+              "code": "patient"
+            }
+          ],
+          "text": "зі слів пацієнта"
+        }
+      }
+    ],
+    "paging": {
+      "page": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 20
+    }
+  },
+  "GET /api/patients/{patient_id}/detected_issues/{detected_issue_id}": {
+    "data": {
+      "id": "80a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+      "status": "inactive",
+      "code": {
+        "coding": [
+          {
+            "system": "detected_issue_categories",
+            "code": "default"
+          }
+        ]
+      },
+      "identified_date_time": "2018-08-02T10:45:16.000Z",
+      "detail": "some description",
+      "based_on": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "detected_issue"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        }
+      },
+      "encounter": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "encounter"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "primary_source": true,
+      "recorder": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "employee"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "author": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "employee"
+              }
+            ],
+            "text": "Галина Олександрівна"
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        }
+      },
+      "implicated": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "device"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "subject": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "device"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "status_reason": {
+        "coding": [
+          {
+            "system": "detected_issue_status_reasons",
+            "code": "default"
+          }
+        ]
+      },
+      "inserted_at": "2018-08-02T10:55:00.000Z",
+      "updated_at": "2018-08-02T10:55:00.000Z",
+      "inserted_by": "9183a36b-4d45-4244-9339-63d81cd08d9c",
+      "updated_by": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+    },
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/patients/{patient_id}/detected_issues": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "id": "80a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+        "status": "inactive",
+        "code": {
+          "coding": [
+            {
+              "system": "detected_issue_categories",
+              "code": "default"
+            }
+          ]
+        },
+        "identified_date_time": "2018-08-02T10:45:16.000Z",
+        "detail": "some description",
+        "based_on": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "detected_issue"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          }
+        },
+        "encounter": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "encounter"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "primary_source": true,
+        "recorder": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "employee"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "author": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "employee"
+                }
+              ],
+              "text": "Галина Олександрівна"
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          }
+        },
+        "implicated": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "device"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "subject": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "device"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "status_reason": {
+          "coding": [
+            {
+              "system": "detected_issue_status_reasons",
+              "code": "default"
+            }
+          ]
+        },
+        "inserted_at": "2018-08-02T10:55:00.000Z",
+        "updated_at": "2018-08-02T10:55:00.000Z",
+        "inserted_by": "9183a36b-4d45-4244-9339-63d81cd08d9c",
+        "updated_by": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+      }
+    ],
+    "paging": {
+      "page": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 20
+    }
+  },
+  "POST /api/patients/{patient_id}/specimens": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "PATCH /api/patients/{patient_id}/specimens/{id}/actions/process": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "PATCH /api/patients/{patient_id}/specimens/{id}/actions/invalidate": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "PATCH /api/patients/{patient_id}/specimens/{id}/actions/reject": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "PATCH /api/patients/{patient_id}/specimens/{id}/actions/cancel": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/patients/{patient_id}/compositions/{id}/episodes/{episode_id}": {
+    "data": {
+      "id": "90a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+      "inserted_at": "2018-08-02T10:45:16.000Z",
+      "updated_at": "2018-08-02T10:45:16.000Z",
+      "type": {
+        "system": "eHealth/episode_types",
+        "code": "primary_care"
+      },
+      "status": "active",
+      "name": "Діабет 2018",
+      "current_diagnoses": [
+        {
+          "condition": {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "condition"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "null"
+          },
+          "code": {
+            "coding": [
+              {
+                "system": "eHealth/ICPC2/conditions",
+                "code": "A20"
+              }
+            ]
+          },
+          "role": {
+            "coding": [
+              {
+                "system": "eHealth/diagnosis_roles",
+                "code": "CC"
+              }
+            ]
+          },
+          "rank": 1
+        }
+      ],
+      "diagnoses_history": [
+        {
+          "date": "2018-08-02T10:45:16.000Z",
+          "evidence": {
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "eHealth/resources",
+                    "code": "encounter"
+                  }
+                ]
+              },
+              "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+            },
+            "display_value": "null"
+          },
+          "diagnoses": [
+            {
+              "condition": {
+                "identifier": {
+                  "type": {
+                    "coding": [
+                      {
+                        "system": "eHealth/resources",
+                        "code": "condition"
+                      }
+                    ]
+                  },
+                  "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+                },
+                "display_value": "null"
+              },
+              "code": {
+                "coding": [
+                  {
+                    "system": "eHealth/ICPC2/conditions",
+                    "code": "A20"
+                  }
+                ]
+              },
+              "role": {
+                "coding": [
+                  {
+                    "system": "eHealth/diagnosis_roles",
+                    "code": "CC"
+                  }
+                ]
+              },
+              "rank": 1
+            },
+            {
+              "condition": {
+                "identifier": {
+                  "type": {
+                    "coding": [
+                      {
+                        "system": "eHealth/resources",
+                        "code": "condition"
+                      }
+                    ]
+                  },
+                  "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+                },
+                "display_value": "null"
+              },
+              "code": {
+                "coding": [
+                  {
+                    "system": "eHealth/ICPC2/conditions",
+                    "code": "A20"
+                  }
+                ]
+              },
+              "role": {
+                "coding": [
+                  {
+                    "system": "eHealth/diagnosis_roles",
+                    "code": "CC"
+                  }
+                ]
+              },
+              "rank": 1
+            }
+          ],
+          "is_active": "true"
+        }
+      ],
+      "status_history": [
+        {
+          "status": "active",
+          "status reason": {
+            "coding": [
+              {
+                "system": "eHealth/episode_closing_reasons",
+                "code": "cured"
+              }
+            ]
+          },
+          "inserted_at": "2018-08-02T10:45:16.000Z"
+        }
+      ],
+      "managing_organization": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "legal_entity"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "Медікал Солюшнc"
+      },
+      "period": {
+        "start": "2018-08-02T10:45:16.000Z",
+        "end": "2018-08-03T11:00:00.000Z"
+      },
+      "care_manager": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "employee"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "closing_summary": "Носові шляхи вільні, горло рожеве, температура в нормі",
+      "status_reason": {
+        "coding": [
+          {
+            "system": "eHealth/episode_closing_reasons",
+            "code": "cured"
+          }
+        ]
+      },
+      "explanatory_letter": "Епізод був відмінений у зв'язку з помилкою при виборі пацієнта"
+    },
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/patients/{patient_id}/summary/episodes": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "id": "90a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+        "name": "Діабет 2018",
+        "status": "active",
+        "period": {
+          "start": "2018-08-02T10:45:16.000Z",
+          "end": "2018-08-03T11:00:00.000Z"
+        },
+        "inserted_at": "2018-08-02T10:45:16.000Z",
+        "updated_at": "2018-08-02T10:45:16.000Z"
+      }
+    ],
+    "paging": {
+      "page": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 20
+    }
+  },
+  "GET /api/patients/{patient_id}/summary/encounters": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "id": "465fb6fe-2dea-4b8a-9ef7-58379d1eaab0",
+        "status": "finised",
+        "period": {
+          "start": "2018-08-02T10:45:16.000Z",
+          "end": "2018-08-02T11:00:00.000Z"
+        },
+        "episode": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "episode"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          }
+        },
+        "class": {
+          "system": "eHealth/encounter_classes",
+          "code": "inpatient"
+        },
+        "type": {
+          "coding": [
+            {
+              "system": "eHealth/encounter_types",
+              "code": "discharge"
+            }
+          ]
+        },
+        "performer_speciality": {
+          "coding": [
+            {
+              "system": "SPECIALITY_TYPE",
+              "code": "VIROLOGY"
+            }
+          ]
+        }
+      }
+    ],
+    "paging": {
+      "page": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 20
+    }
+  },
+  "GET /api/patients/{patient_id}/summary/encounters/{encounter_id}": {
+    "data": {
+      "id": "465fb6fe-2dea-4b8a-9ef7-58379d1eaab0",
+      "status": "finised",
+      "period": {
+        "start": "2018-08-02T10:45:16.000Z",
+        "end": "2018-08-02T11:00:00.000Z"
+      },
+      "episode": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "episode"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        }
+      },
+      "class": {
+        "system": "eHealth/encounter_classes",
+        "code": "inpatient"
+      },
+      "type": {
+        "coding": [
+          {
+            "system": "eHealth/encounter_types",
+            "code": "discharge"
+          }
+        ]
+      },
+      "performer_speciality": {
+        "coding": [
+          {
+            "system": "SPECIALITY_TYPE",
+            "code": "VIROLOGY"
+          }
+        ]
+      }
+    },
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/patients/{patient_id}/summary/diagnoses": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "condition": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "condition"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "eHealth/ICPC2/conditions",
+              "code": "A20"
+            }
+          ]
+        },
+        "role": {
+          "coding": [
+            {
+              "system": "eHealth/diagnosis_roles",
+              "code": "CC"
+            }
+          ]
+        },
+        "rank": 1
+      },
+      {
+        "condition": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "condition"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "eHealth/ICPC2/conditions",
+              "code": "A20"
+            }
+          ]
+        },
+        "role": {
+          "coding": [
+            {
+              "system": "eHealth/diagnosis_roles",
+              "code": "CC"
+            }
+          ]
+        },
+        "rank": 1
+      }
+    ],
+    "paging": {
+      "page": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 20
+    }
+  },
+  "GET /api/patients/{patient_id}/summary/devices/{device_id}": {
+    "data": {
+      "id": "90a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+      "identifier": [
+        {
+          "type": {
+            "coding": [
+              {
+                "system": "external_system",
+                "code": "prozoro"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        }
+      ],
+      "name": [
+        {
+          "type": "user_friendly",
+          "value": "Тест-смужки Accu-Chek Active для глюкометра"
+        }
+      ],
+      "status": "inactive",
+      "serial_number": "NSPX30",
+      "property": [
+        {
+          "code": {
+            "coding": [
+              {
+                "system": "device_properties",
+                "code": "default"
+              }
+            ]
+          },
+          "value_quantity": {
+            "value": 13,
+            "comparator": ">",
+            "unit": "kg",
+            "system": "eHealth/ucum/units",
+            "code": "kg"
+          }
+        }
+      ],
+      "type": {
+        "coding": [
+          {
+            "system": "device_definition_classification_type",
+            "code": "2345678"
+          }
+        ]
+      },
+      "lot_number": "RZ12345678",
+      "manufacturer": "GlobalMed, Inc",
+      "manufacture_date": "1999-01-01T00:00:00.000Z",
+      "expiration_date": "2020-01-01T00:00:00.000Z",
+      "model_number": "NSPX30",
+      "note": "Імплант був вилучений по причині заміни на новий",
+      "definition": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "device_definition"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "parent": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "device"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "recorder": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "employee"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "context": {
+        "identifier": {
+          "type": {
+            "coding": [
+              {
+                "system": "eHealth/resources",
+                "code": "encounter"
+              }
+            ]
+          },
+          "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+        },
+        "display_value": "null"
+      },
+      "status_reason": {
+        "coding": [
+          {
+            "system": "device_status_reasons",
+            "code": "default"
+          }
+        ]
+      },
+      "inserted_at": "2018-08-02T10:55:00.000Z",
+      "updated_at": "2018-08-02T10:55:00.000Z",
+      "primary_source": false,
+      "report_origin": {
+        "coding": [
+          {
+            "system": "eHealth/report_origins",
+            "code": "patient"
+          }
+        ],
+        "text": "зі слів пацієнта"
+      }
+    },
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/patients/{patient_id}/summary/devices": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "id": "90a9e15b-b71b-4caf-8f2e-ff247e8a5600",
+        "identifier": [
+          {
+            "type": {
+              "coding": [
+                {
+                  "system": "external_system",
+                  "code": "prozoro"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          }
+        ],
+        "name": [
+          {
+            "type": "user_friendly",
+            "value": "Тест-смужки Accu-Chek Active для глюкометра"
+          }
+        ],
+        "status": "inactive",
+        "serial_number": "NSPX30",
+        "property": [
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "device_properties",
+                  "code": "default"
+                }
+              ]
+            },
+            "value_quantity": {
+              "value": 13,
+              "comparator": ">",
+              "unit": "kg",
+              "system": "eHealth/ucum/units",
+              "code": "kg"
+            }
+          }
+        ],
+        "type": {
+          "coding": [
+            {
+              "system": "device_definition_classification_type",
+              "code": "2345678"
+            }
+          ]
+        },
+        "lot_number": "RZ12345678",
+        "manufacturer": "GlobalMed, Inc",
+        "manufacture_date": "1999-01-01T00:00:00.000Z",
+        "expiration_date": "2020-01-01T00:00:00.000Z",
+        "model_number": "NSPX30",
+        "note": "Імплант був вилучений по причині заміни на новий",
+        "definition": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "device_definition"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "parent": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "device"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "recorder": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "employee"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "context": {
+          "identifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "eHealth/resources",
+                  "code": "encounter"
+                }
+              ]
+            },
+            "value": "9183a36b-4d45-4244-9339-63d81cd08d9c"
+          },
+          "display_value": "null"
+        },
+        "status_reason": {
+          "coding": [
+            {
+              "system": "device_status_reasons",
+              "code": "default"
+            }
+          ]
+        },
+        "inserted_at": "2018-08-02T10:55:00.000Z",
+        "updated_at": "2018-08-02T10:55:00.000Z",
+        "primary_source": false,
+        "report_origin": {
+          "coding": [
+            {
+              "system": "eHealth/report_origins",
+              "code": "patient"
+            }
+          ],
+          "text": "зі слів пацієнта"
+        }
+      }
+    ],
+    "paging": {
+      "page": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 20
+    }
+  },
+  "POST /api/patients/{patient_id}/device_requests/prequalify": {
+    "meta": {
+      "code": 200,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    },
+    "data": [
+      {
+        "program_id": "59781de0-2e64-4359-b716-bcc05a32c10f",
+        "program_name": "Доступні медичні вироби",
+        "status": "INVALID",
+        "rejection_reason": "No appropriate participants found for this medical program"
+      }
+    ]
+  },
+  "POST /api/patients/{patient_id}/device_requests": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "PATCH /api/patients/{patient_id}/device_requests/{device_request_id}/actions/resend": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "PATCH /api/patients/{patient_id}/device_requests/{device_request_id}/actions/revoke": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "PATCH /api/patients/{patient_id}/device_requests/{device_request_id}/actions/complete": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "PATCH /api/patients/{patient_id}/device_requests/{device_request_id}/actions/mark_in_error": {
+    "data": {
+      "status": "pending",
+      "eta": "2018-08-02T10:45:16.000Z",
+      "links": [
+        {
+          "entity": "job",
+          "href": "/Jobs/NBXk9EyErUZv1RhXgyvgg"
+        }
+      ]
+    },
+    "meta": {
+      "code": 202,
+      "url": "http://example.com/resource",
+      "type": "object",
+      "request_id": "req-adasdoijasdojsda"
+    }
+  },
+  "GET /api/v2/dictionaries": {
+    "meta": {
+      "code": 200,
+      "url": "https://example.com/resource",
+      "type": "object",
+      "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+    },
+    "data": [
+      {
+        "name": "eHealth/ICF/classifiers",
+        "description": "Класифікатори МКФ",
+        "values": [
+          {
+            "code": "b1142",
+            "updated_at": "2017-04-20T19:14:13Z",
+            "inserted_at": "2017-04-20T19:14:13Z",
+            "id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+            "description": "Орієнтація в особі",
+            "is_active": true,
+            "child_values": [
+              {
+                "is_active": true,
+                "child_values": [],
+                "code": "b11429",
+                "description": "Орієнтація в особі неуточнена"
+              }
+            ]
+          }
+        ],
+        "labels": [
+          "SYSTEM",
+          "EXTERNAL"
+        ],
+        "is_active": true
+      },
+      {
+        "labels": [
+          "SYSTEM",
+          "EXTERNAL"
+        ],
+        "is_active": true,
+        "name": "eHealth/ICPC2/condition_codes",
+        "description": "Коди станів за ICPC2",
+        "values": [
+          {
+            "code": "D88",
+            "updated_at": "2017-04-20T19:14:13Z",
+            "inserted_at": "2017-04-20T19:14:13Z",
+            "id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+            "description": "Апендицит",
+            "is_active": true,
+            "child_values": []
+          }
+        ]
+      }
+    ]
+  },
+  "GET /api/configurations/metadata": {
+    "meta": {
+      "code": 200,
+      "url": "https://example.com/resource",
+      "type": "object",
+      "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+    },
+    "data": [
+      {
+        "resource": "composition_configuration",
+        "updated_at": "2018-08-02T10:45:16.000Z"
+      }
+    ]
+  },
+  "GET /api/composition_configurations": {
+    "meta": {
+      "code": 200,
+      "url": "https://example.com/resource",
+      "type": "object",
+      "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+    },
+    "data": [
+      {
+        "id": "e477a845-972b-47a1-8ca3-1c71e4fd00c2",
+        "type": {
+          "coding": [
+            {
+              "system": "COMPOSITION_TYPES",
+              "code": "DRIVERS"
+            }
+          ]
+        },
+        "category": {
+          "coding": [
+            {
+              "system": "COMPOSITION_CATEGORIES",
+              "code": "DRIVERS_GROUP1"
+            }
+          ]
+        },
+        "is_active": true,
+        "settings": "{ \"COMPOSITION_PERSON_GENDER\": { \"check\": [ \"female\", \"male\" ] }, \"COMPOSITION_SECTION_EMPTY_REASON\": { \"check\": [\"NILKNOWN\", \"NOTASKED\", \"WITHHELD\", \"UNAVAILABLE\", \"CLOSED\"] }, \"COMPOSITION_SECTION_NESTING_LEVEL\": { \"check\": 5 }, \"COMPOSITION_SECTION_COUNT_LIMIT\": { \"check\": 100 }, \"COMPOSITION_SECTION_ORDERBY\": { \"check\": [ \"USER\", \"SYSTEM\", \"EVENT-DATE\", \"ALPHABETIC\", \"CATEGORY\" ] }, \"COMPOSITION_DRIVER_RELATED_CODES\": [ { \"condition\": { \"code\": \"01.\", \"system\": \"eHealth/composition_additional_condition_admission\" }, \"check\": [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\"] }, { \"condition\": { \"code\": \"01.01.\", \"system\": \"eHealth/composition_additional_condition_admission\" }, \"check\": [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\"] }, { \"condition\": { \"code\": \"01.02.\", \"system\": \"eHealth/composition_additional_condition_admission\" }, \"check\": [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\"] }]}",
+        "inserted_at": "2017-04-20T19:14:13Z",
+        "inserted_by": "e1453f4c-1077-4e85-8c98-c13ffca0063e",
+        "updated_at": "2018-08-02T10:45:16.000Z",
+        "updated_by": "2922a240-63db-404e-b730-09222bfeb2dd"
+      }
+    ],
+    "paging": {
+      "page_number": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 23
+    }
+  },
+  "GET /api/devices_configurations": {
+    "meta": {
+      "code": 200,
+      "url": "https://example.com/resource",
+      "type": "object",
+      "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+    },
+    "data": [
+      {
+        "id": "e477a845-972b-47a1-8ca3-1c71e4fd00c2",
+        "code": "3114",
+        "settings": "{\"DEVICE_REQUIRED_PARAMETERS\": [{\"check\": [{\"code\": \"presence_of_brakes\", \"system\": \"device_request_code_parameter\"}]}]}",
+        "system": "device_code_system",
+        "is_active": true,
+        "inserted_at": "2017-04-20T19:14:13Z",
+        "inserted_by": "e1453f4c-1077-4e85-8c98-c13ffca0063e",
+        "updated_at": "2018-08-02T10:45:16.000Z",
+        "updated_by": "2922a240-63db-404e-b730-09222bfeb2dd"
+      }
+    ],
+    "paging": {
+      "page_number": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 23
+    }
+  },
+  "GET /api/device_parameters_configurations": {
+    "meta": {
+      "code": 200,
+      "url": "https://example.com/resource",
+      "type": "object",
+      "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+    },
+    "data": [
+      {
+        "id": "e477a845-972b-47a1-8ca3-1c71e4fd00c2",
+        "code": "presence_of_a_hygienic_hole",
+        "settings": "{\"DEVICE_PARAMETER_DATA_TYPE\": {\"check\": \"codeable_concept\"}, \"DEVICE_PARAMETER_DICTIONARY\": {\"check\": \"device_properties\"}}",
+        "system": "device_request_code_parameter",
+        "is_active": true,
+        "inserted_at": "2017-04-20T19:14:13Z",
+        "inserted_by": "e1453f4c-1077-4e85-8c98-c13ffca0063e",
+        "updated_at": "2018-08-02T10:45:16.000Z",
+        "updated_by": "2922a240-63db-404e-b730-09222bfeb2dd"
+      }
+    ],
+    "paging": {
+      "page_number": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 23
+    }
+  },
+  "GET /api/dictionaries_configurations": {
+    "meta": {
+      "code": 200,
+      "url": "https://example.com/resource",
+      "type": "object",
+      "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+    },
+    "data": [
+      {
+        "id": "e477a845-972b-47a1-8ca3-1c71e4fd00c2",
+        "settings": "[{\"codes\": [\"18_03_06\", \"12_22_06\", \"06_03_15\", \"18_12_10\", \"09_33_07\", \"06_06_15\", \"22_27_12\", \"09_12_15\", \"09_12_12\", \"06_24_09\", \"12_06_06\", \"12_22_18\", \"12_36_12\", \"09_12_03\", \"06_18_18\", \"04_48_15\", \"12_03_12\", \"12_06_12\", \"09_33_05\", \"09_06_24\", \"06_18_03\", \"06_18_06\", \"04_33_03\", \"09_06_15\", \"18_18_06\", \"06_06_13\", \"06_18_15\", \"18_09_03\", \"18_18_03\", \"12_22_09\", \"18_03_15\", \"06_12_19\", \"09_12_09\", \"06_12_17\", \"06_12_16\", \"06_06_21\", \"06_03_12\", \"06_03_18\", \"12_03_16\", \"06_24_03\", \"12_18_06\", \"18_12_07\", \"06_24_06\", \"06_12_13\", \"12_06_03\", \"12_23_06\", \"06_24_18\", \"09_03_24\", \"06_24_40\", \"12_06_09\", \"12_07_05\", \"12_23_03\", \"09_12_25\", \"12_03_09\", \"06_03_06\", \"06_06_24\", \"06_24_15\", \"06_12_09\", \"15_03_03\", \"06_24_12\", \"06_06_06\", \"06_12_18\", \"06_06_20\", \"09_06_18\", \"04_33_06\", \"04_48_07\", \"18_09_39\", \"18_09_21\", \"12_27_15\", \"06_18_21\", \"06_06_30\", \"05_36_03\", \"06_18_12\", \"18_12_18\", \"06_18_45\", \"12_39_03\", \"09_06_12\", \"06_30_18\", \"05_36_06\", \"06_06_12\", \"06_06_19\", \"06_03_03\", \"06_12_12\", \"04_06_06\", \"06_06_03\", \"06_18_09\", \"06_12_03\", \"12_03_06\", \"22_24_06\", \"12_22_03\", \"18_30_21\", \"22_27_04\", \"06_03_09\", \"12_24_24\", \"12_36_03\", \"22_18_03\", \"12_18_09\", \"12_03_03\", \"12_31_18\", \"06_12_15\", \"06_12_06\"], \"system\": \"eHealth/assistive_devices\"}]",
+        "name": "assistive_devices",
+        "is_active": true,
+        "inserted_at": "2017-04-20T19:14:13Z",
+        "inserted_by": "e1453f4c-1077-4e85-8c98-c13ffca0063e",
+        "updated_at": "2018-08-02T10:45:16.000Z",
+        "updated_by": "2922a240-63db-404e-b730-09222bfeb2dd"
+      }
+    ],
+    "paging": {
+      "page_number": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 23
+    }
+  },
+  "GET /api/observation_configurations": {
+    "meta": {
+      "code": 200,
+      "url": "https://example.com/resource",
+      "type": "object",
+      "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+    },
+    "data": [
+      {
+        "id": "e477a845-972b-47a1-8ca3-1c71e4fd00c2",
+        "code": "_WHODAS_2.0",
+        "system": "eHealth/LOINC/observation_codes",
+        "is_active": true,
+        "settings": "{\"CATEGORY\": {\"check\": [{\"code\": \"survey\", \"system\": \"eHealth/observation_categories\"}]}, \"RESULT_TYPE\": {\"check\": \"codeable_concept\"}, \"RESULT_BINDING\": {\"check\": [\"eHealth/LOINC/LL5900-7\"]}, \"COMPONENTS_UNIQUE\": {\"check\": true}, \"COMPONENTS_REQUIRED\": {\"check\": [{\"code\": \"SPINE_LEVEL\", \"system\": \"eHealth/custom/observation_components\"}]}}",
+        "inserted_at": "2017-04-20T19:14:13Z",
+        "inserted_by": "e1453f4c-1077-4e85-8c98-c13ffca0063e",
+        "updated_at": "2018-08-02T10:45:16.000Z",
+        "updated_by": "2922a240-63db-404e-b730-09222bfeb2dd"
+      }
+    ],
+    "paging": {
+      "page_number": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 23
+    }
+  },
+  "GET /api/persons/{id}/authentication_methods": {
+    "meta": {
+      "code": 200,
+      "url": "https://example.com/resource",
+      "type": "object",
+      "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+    },
+    "data": [
+      {
+        "id": "b94893f5-b66b-4431-b023-d5b5c037caef",
+        "type": "THIRD_PERSON",
+        "value": "34d4aca0-ee15-4d2d-9ab8-336e5ba1f9c7",
+        "alias": "husband",
+        "ended_at": "2020-01-10 18:23:34.217335",
+        "started_at": "2020-01-01 18:23:34.217335",
+        "is_active": true,
+        "person_id": "50320ee5-2bca-472c-a1a0-28e2e003ec2a",
+        "confidant_person": {
+          "id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+          "name": "Петров А.А.",
+          "gender": "MALE",
+          "tax_id": "******50",
+          "no_tax_id": false,
+          "unzr": "**********99",
+          "documents_person": [
+            {
+              "number": "******18",
+              "type": "PASSPORT"
+            }
+          ],
+          "phones": {
+            "number": "+38093*****85"
+          }
+        },
+        "inserted_at": "2021-11-09T00:00:00.000Z",
+        "updated_at": "2021-11-09T00:00:00.000Z",
+        "inserted_by": "A65C8369-CE3A-44D6-839B-8856E3DC4CA3",
+        "updated_by": "A65C8369-CE3A-44D6-839B-8856E3DC4CA3"
+      },
+      {
+        "id": "b84893f5-b66b-4431-b023-d5b5c037caef",
+        "type": "OTP",
+        "phone_number": "+38093*****85",
+        "ended_at": "2020-01-10 18:23:34.217335",
+        "started_at": "2020-01-01 18:23:34.217335",
+        "is_active": true,
+        "inserted_by": "A65C8369-CE3A-44D6-839B-8856E3DC4CA3",
+        "updated_by": "A65C8369-CE3A-44D6-839B-8856E3DC4CA3",
+        "person_id": "50320ee5-2bca-472c-a1a0-28e2e003ec2a",
+        "inserted_at": "2021-11-09T00:00:00.000Z",
+        "updated_at": "2021-11-09T00:00:00.000Z"
+      }
+    ]
+  },
+  "GET /api/medical_programs": {
+    "meta": {
+      "code": 200,
+      "url": "https://example.com/resource",
+      "type": "object",
+      "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+    },
+    "data": [
+      {
+        "id": "c7d52544-0bd4-4129-97b0-2d72633e0490",
+        "name": "Доступні ліки",
+        "medical_program_settings": {
+          "care_plan_required": true,
+          "dispense_allowed": true,
+          "dispense_period_day": 90,
+          "request_allowed": true,
+          "request_max_period_day": 90,
+          "skip_request_employee_declaration_verify": true,
+          "skip_request_legal_entity_declaration_verify": true,
+          "skip_treatment_period": true,
+          "skip_employee_validation": true,
+          "speciality_types_allowed": [
+            "ENDOCRINOLOGY",
+            "PEDIATRIC_NEUROLOGY"
+          ],
+          "speciality_types_request_allowed": [
+            "ENDOCRINOLOGY",
+            "FAMILY_DOCTOR"
+          ],
+          "speciality_types_care_plan_activity_allowed": [
+            "ENDOCRINOLOGY",
+            "NEUROLOGY"
+          ],
+          "conditions_icd10_am_allowed": [
+            "A00.0",
+            "A00.1"
+          ],
+          "conditions_icpc2_allowed": [
+            "A01",
+            "A02"
+          ],
+          "providing_conditions_allowed": [
+            "INPATIENT",
+            "OUTPATIENT"
+          ],
+          "multi_medication_dispense_allowed": true,
+          "skip_medication_dispense_sign": true,
+          "skip_contract_provision_verify": true,
+          "medical_program_change_on_dispense_allowed": true,
+          "patient_categories_allowed": [
+            "insulin_1",
+            "insulin_2"
+          ],
+          "license_types_allowed": [
+            "PHARMACY",
+            "PHARMACY_DRUGS"
+          ],
+          "device_request_allowed_code_types": [
+            "CLASSIFICATION_TYPE",
+            "DEVICE_DEFINITION"
+          ],
+          "request_notification_disabled": true,
+          "skip_dispense_division_dls_verify": true
+        },
+        "medical_program_settings_text": "Some text",
+        "is_active": true,
+        "medication_dispense_allowed": true,
+        "medication_dispense_allowed_text": "Some text",
+        "medication_request_allowed": true,
+        "medication_request_allowed_text": "Some text",
+        "type": "MEDICATION",
+        "funding_source": "NHS",
+        "mr_blank_type": "F-1",
+        "inserted_at": "2017-04-20T19:14:13Z",
+        "inserted_by": "e1453f4c-1077-4e85-8c98-c13ffca0063e",
+        "updated_at": "2017-04-20T19:14:13Z",
+        "updated_by": "2922a240-63db-404e-b730-09222bfeb2dd"
+      }
+    ],
+    "paging": {
+      "page_number": 2,
+      "page_size": 50,
+      "total_entries": 1000,
+      "total_pages": 23
+    }
+  },
+  "GET /api/medical_programs/id": {
+    "meta": {
+      "code": 200,
+      "url": "https://example.com/resource",
+      "type": "object",
+      "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+    },
+    "data": {
+      "id": "c7d52544-0bd4-4129-97b0-2d72633e0490",
+      "name": "Доступні ліки",
+      "medical_program_settings": {
+        "care_plan_required": true,
+        "dispense_allowed": true,
+        "dispense_period_day": 90,
+        "request_allowed": true,
+        "request_max_period_day": 90,
+        "skip_request_employee_declaration_verify": true,
+        "skip_request_legal_entity_declaration_verify": true,
+        "skip_treatment_period": true,
+        "skip_employee_validation": true,
+        "speciality_types_allowed": [
+          "ENDOCRINOLOGY",
+          "PEDIATRIC_NEUROLOGY"
+        ],
+        "speciality_types_request_allowed": [
+          "ENDOCRINOLOGY",
+          "FAMILY_DOCTOR"
+        ],
+        "speciality_types_care_plan_activity_allowed": [
+          "ENDOCRINOLOGY",
+          "NEUROLOGY"
+        ],
+        "conditions_icd10_am_allowed": [
+          "A00.0",
+          "A00.1"
+        ],
+        "conditions_icpc2_allowed": [
+          "A01",
+          "A02"
+        ],
+        "providing_conditions_allowed": [
+          "INPATIENT",
+          "OUTPATIENT"
+        ],
+        "multi_medication_dispense_allowed": true,
+        "skip_medication_dispense_sign": true,
+        "skip_contract_provision_verify": true,
+        "medical_program_change_on_dispense_allowed": true,
+        "patient_categories_allowed": [
+          "insulin_1",
+          "insulin_2"
+        ],
+        "license_types_allowed": [
+          "PHARMACY",
+          "PHARMACY_DRUGS"
+        ],
+        "device_request_allowed_code_types": [
+          "CLASSIFICATION_TYPE",
+          "DEVICE_DEFINITION"
+        ],
+        "request_notification_disabled": true,
+        "skip_dispense_division_dls_verify": true
+      },
+      "medical_program_settings_text": "Some text",
+      "is_active": true,
+      "medication_dispense_allowed": true,
+      "medication_dispense_allowed_text": "Some text",
+      "medication_request_allowed": true,
+      "medication_request_allowed_text": "Some text",
+      "type": "MEDICATION",
+      "funding_source": "NHS",
+      "mr_blank_type": "F-1",
+      "inserted_at": "2017-04-20T19:14:13Z",
+      "inserted_by": "e1453f4c-1077-4e85-8c98-c13ffca0063e",
+      "updated_at": "2017-04-20T19:14:13Z",
+      "updated_by": "2922a240-63db-404e-b730-09222bfeb2dd"
+    }
+  }
+}

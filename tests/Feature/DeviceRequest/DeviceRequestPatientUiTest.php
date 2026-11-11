@@ -4,23 +4,32 @@ declare(strict_types=1);
 
 namespace Tests\Feature\DeviceRequest;
 
+use App\Classes\eHealth\Api\DeviceDefinition;
+use App\Classes\eHealth\Api\Dictionary;
 use App\Classes\eHealth\Api\Patient\DeviceRequest as DeviceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthConnectionException;
+
 use App\Exceptions\EHealth\EHealthResponseException;
+use App\Livewire\Components\Sidebar;
 use App\Livewire\DeviceRequest\DeviceRequestIndex;
 use App\Livewire\Person\Records\PatientPrescriptionRequests;
 use App\Models\LegalEntity;
+use App\Models\LegalEntityType;
+use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\User;
 use App\Services\SignatureService;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\NativeClinicalFixtures;
 use Tests\TestCase;
 
 class DeviceRequestPatientUiTest extends TestCase
@@ -57,7 +66,7 @@ class DeviceRequestPatientUiTest extends TestCase
             if ($ability === 'device_dispense:read' || ($ability === 'perform' && end($arguments) === 'device_dispense:read')) {
                 return $this->canReadDispenses;
             }
-            if ($ability === 'viewAny' && ($arguments[0] ?? null) === \App\Models\MedicalEvents\Sql\DeviceRequestRequest::class) {
+            if ($ability === 'viewAny' && ($arguments[0] ?? null) === DeviceRequestRequest::class) {
                 return $this->canReadRequests;
             }
 
@@ -69,6 +78,12 @@ class DeviceRequestPatientUiTest extends TestCase
         $this->api = Mockery::mock(DeviceRequestApi::class);
         $this->api->shouldReceive('getBySearchParams')->andReturn($this->response([]))->byDefault();
         $this->instance(DeviceRequestApi::class, $this->api);
+        $dictionary = Mockery::mock(Dictionary::class);
+        $dictionary->shouldReceive('getMany')->andReturn(NativeClinicalFixtures::response('GET /api/v2/dictionaries', []));
+        $this->instance(Dictionary::class, $dictionary);
+        $definitions = Mockery::mock(DeviceDefinition::class);
+        $definitions->shouldReceive('getMany')->andReturn(NativeClinicalFixtures::definitionResponse([], NativeClinicalFixtures::paging(1, 0, 0)));
+        $this->instance(DeviceDefinition::class, $definitions);
         $this->requestUuid = (string) Str::uuid();
         $this->api->shouldReceive('getById')->with($this->person->uuid, $this->requestUuid)
             ->andReturn($this->response(['id' => $this->requestUuid, 'status' => 'active', 'requisition' => 'TEST-REQUEST']));
@@ -185,11 +200,11 @@ class DeviceRequestPatientUiTest extends TestCase
 
     public function testSidebarOffersGeneralSearchOnlyWithDeviceRequestReadPermission(): void
     {
-        $this->legalEntity->setRelation('type', new \App\Models\LegalEntityType(['name' => 'PRIMARY_CARE']));
+        $this->legalEntity->setRelation('type', new LegalEntityType(['name' => 'PRIMARY_CARE']));
         $url = route('device-requests.index', [$this->legalEntity]);
-        Livewire::test(\App\Livewire\Components\Sidebar::class)->assertSeeHtml('href="'.$url.'"');
+        Livewire::test(Sidebar::class)->assertSeeHtml('href="'.$url.'"');
         $this->canReadRequests = false;
-        Livewire::test(\App\Livewire\Components\Sidebar::class)->assertDontSeeHtml('href="'.$url.'"');
+        Livewire::test(Sidebar::class)->assertDontSeeHtml('href="'.$url.'"');
     }
 
     public function testEveryDocumentedSearchFilterIsForwardedOnlyForTheLockedPatient(): void
@@ -283,7 +298,7 @@ class DeviceRequestPatientUiTest extends TestCase
         $this->assertStringEndsWith('/device-requests', route('device-requests.index', [$this->legalEntity]));
         $this->assertNull(app('router')->getRoutes()->getByName('device-requests.create'));
         $middleware = app('router')->getRoutes()->getByName('persons.device-requests')->gatherMiddleware();
-        $this->assertContains('can:viewAny,'.\App\Models\MedicalEvents\Sql\DeviceRequestRequest::class, $middleware);
+        $this->assertContains('can:viewAny,'.DeviceRequestRequest::class, $middleware);
     }
 
     public function testPatientSurnameSearchIsCaseInsensitive(): void
@@ -342,7 +357,7 @@ class DeviceRequestPatientUiTest extends TestCase
     public function testRemoteAccessDeniedIsDifferentFromLocalRouteAuthorization(): void
     {
         $this->api->shouldReceive('getBySearchParams')->once()
-            ->andThrow(new EHealthResponseException(new \Illuminate\Http\Client\Response(
+            ->andThrow(new EHealthResponseException(new ClientResponse(
                 new Response(403, ['Content-Type' => 'application/json'], json_encode([
                     'error' => ['message' => 'Access denied'],
                 ], JSON_THROW_ON_ERROR))
@@ -364,15 +379,31 @@ class DeviceRequestPatientUiTest extends TestCase
             ->assertSee(__('device-requests.policy.perform'));
     }
 
-    private function patientComponent(): \Livewire\Features\SupportTesting\Testable
+    private function patientComponent(): Testable
     {
         return Livewire::test(DeviceRequestIndex::class, ['legalEntity' => $this->legalEntity, 'person' => $this->person]);
     }
 
     private function response(array $data, int $page = 1, int $totalPages = 1): EHealthResponse
     {
-        return new EHealthResponse(new Response(200, [], json_encode([
-            'data' => $data, 'paging' => ['page_number' => $page, 'total_pages' => $totalPages],
-        ], JSON_THROW_ON_ERROR)));
+        if (!array_is_list($data) && isset($data['based_on'])) {
+            $data['based_on'] = array_replace_recursive(NativeClinicalFixtures::reference('device_request'), $data['based_on']);
+            $data = NativeClinicalFixtures::deviceDispense($data['id'], $this->person->uuid, $data);
+
+            return NativeClinicalFixtures::response('GET /api/patients/{patient_id}/device_dispenses/{device_dispense_id}', $data);
+        }
+        if (!array_is_list($data)) {
+            $data = NativeClinicalFixtures::deviceRequest($data['id'] ?? $this->requestUuid, $this->person->uuid, $data);
+
+            return NativeClinicalFixtures::response('GET /api/patients/{patient_id}/device_requests/{device_request_id}', $data);
+        }
+        // These UI list tests isolate selection and pagination with validated snapshots.
+        // Full native list and malformed nested fields are exercised at the API boundary.
+        $response = Mockery::mock(EHealthResponse::class);
+        $response->shouldReceive('validate')->andReturn($data);
+        $response->shouldReceive('getPaging')->andReturn(NativeClinicalFixtures::paging($page, $totalPages, count($data)));
+        $response->shouldReceive('isNotLast')->andReturn($page < $totalPages);
+
+        return $response;
     }
 }

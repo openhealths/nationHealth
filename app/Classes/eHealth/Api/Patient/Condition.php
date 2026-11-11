@@ -6,17 +6,11 @@ namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\MedicalEventsErrorTranslator;
-use App\Classes\eHealth\ValidationRuleBuilder;
 use App\Contracts\ApiErrorTranslator;
-use App\Enums\Person\ConditionClinicalStatus;
-use App\Enums\Person\ConditionVerificationStatus;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class Condition extends PatientApiBase
 {
@@ -32,7 +26,8 @@ class Condition extends PatientApiBase
      */
     public function getSummary(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateConditions(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/summary/conditions');
+
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
@@ -56,6 +51,8 @@ class Condition extends PatientApiBase
         string $episodeId,
         array $data = []
     ): PromiseInterface|EHealthResponse {
+        $this->setReadContract('GET /api/patients/{patient_id}/episodes/{episode_id}/conditions');
+
         return $this->get(self::URL . "/$patientId/episodes/$episodeId/conditions", $data);
     }
 
@@ -71,7 +68,7 @@ class Condition extends PatientApiBase
      */
     public function getById(string $patientId, string $conditionId): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateCondition(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/conditions/{condition_id}');
 
         return $this->get(self::URL . "/$patientId/conditions/$conditionId");
     }
@@ -97,7 +94,8 @@ class Condition extends PatientApiBase
      */
     public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateConditions(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/conditions');
+
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $this->format($query, ['onset_date_from', 'onset_date_to']));
@@ -115,99 +113,4 @@ class Condition extends PatientApiBase
         return new MedicalEventsErrorTranslator();
     }
 
-    /**
-     * Validate a single condition from eHealth API response.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateCondition(EHealthResponse $response): array
-    {
-        $replaced = [$this->replaceEHealthPropNames($response->getData())];
-
-        return $this->runConditionValidation($replaced)[0];
-    }
-
-    /**
-     * Validate a list of conditions from eHealth API response.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateConditions(EHealthResponse $response): array
-    {
-        $replaced = [];
-        foreach ($response->getData() as $data) {
-            $replaced[] = $this->replaceEHealthPropNames($data);
-        }
-
-        return $this->runConditionValidation($replaced);
-    }
-
-    /**
-     * Apply condition validation rules to a pre-processed list of condition data.
-     *
-     * @param  array  $replacedItems
-     * @return array
-     */
-    private function runConditionValidation(array $replacedItems): array
-    {
-        $rules = collect($this->conditionValidationRules())
-            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
-            ->toArray();
-
-        $validator = Validator::make($replacedItems, $rules);
-
-        if ($validator->fails()) {
-            Log::channel('e_health_errors')->error(
-                'Condition validation failed: ' . implode(', ', $validator->errors()->all())
-            );
-        }
-
-        return $validator->validate();
-    }
-
-    /**
-     * List of validation rules for conditions from eHealth.
-     *
-     * @return array
-     */
-    protected function conditionValidationRules(): array
-    {
-        return ValidationRuleBuilder::merge(
-            // Basic fields
-            [
-                'uuid' => ['required', 'uuid'],
-                'primary_source' => ['required', 'boolean'],
-                'clinical_status' => ['required', Rule::in(ConditionClinicalStatus::values())],
-                'verification_status' => ['required', Rule::in(ConditionVerificationStatus::values())],
-                'onset_date' => ['required', 'date'],
-                'asserted_date' => ['nullable', 'date'],
-                'explanatory_letter' => ['nullable', 'string', 'max:255'],
-                'ehealth_inserted_at' => ['required', 'date'],
-                'ehealth_updated_at' => ['required', 'date']
-            ],
-
-            // Identifier relationships
-            ValidationRuleBuilder::identifierRules('asserter'),
-            ValidationRuleBuilder::identifierRules('context', true),
-
-            // Codeable concept relationships
-            ValidationRuleBuilder::codeableConceptRules('report_origin'),
-            ValidationRuleBuilder::codeableConceptRules('code', true),
-            ValidationRuleBuilder::codeableConceptRules('severity'),
-
-            // Array of codeable concept
-            ValidationRuleBuilder::codeableConceptCollectionRules('body_sites'),
-
-            // Stage
-            ['stage' => ['nullable', 'array']],
-            ValidationRuleBuilder::codeableConceptRules('stage.summary'),
-
-            // Evidences
-            ['evidences' => ['nullable', 'array']],
-            ValidationRuleBuilder::codeableConceptCollectionRules('evidences.*.codes'),
-            ValidationRuleBuilder::identifierCollectionRules('evidences.*.details')
-        );
-    }
 }

@@ -9,8 +9,8 @@ use App\Classes\eHealth\EHealthResponse;
 use App\Exceptions\EHealth\EHealthJobTimeoutException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Services\MedicalEvents\EHealthJobResolver;
-use Mockery;
 use Illuminate\Validation\ValidationException;
+use Mockery;
 use Tests\TestCase;
 
 /**
@@ -144,8 +144,8 @@ class EHealthJobResolverTest extends TestCase
 
         (new EHealthJobResolver())->assertPrequalifyValid([
             'data' => [
-                ['status' => 'VALID'],
-                ['status' => 'INVALID', 'rejection_reason' => 'Programme exhausted'],
+                ['program_id' => 'program-1', 'program_name' => 'Program', 'status' => 'VALID'],
+                ['program_id' => 'program-2', 'program_name' => 'Program', 'status' => 'INVALID', 'rejection_reason' => 'Programme exhausted'],
             ],
         ]);
     }
@@ -153,7 +153,7 @@ class EHealthJobResolverTest extends TestCase
     public function test_assert_prequalify_valid_accepts_valid_programs(): void
     {
         (new EHealthJobResolver())->assertPrequalifyValid([
-            'data' => [['status' => 'VALID']],
+            'data' => [['program_id' => 'program-1', 'program_name' => 'Program', 'status' => 'VALID']],
         ]);
 
         $this->expectNotToPerformAssertions();

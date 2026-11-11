@@ -25,10 +25,11 @@ use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\Dictionary\Dictionaries\RuleEngineRuleDictionary;
 use App\Services\Dictionary\Dictionaries\ServiceDictionary;
 use Exception;
-use Illuminate\Support\Facades\Log;
-use InvalidArgumentException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 /**
  * Dictionary Manager for handling multiple dictionary sources.
@@ -184,21 +185,22 @@ class DictionaryManager
                     return collect($staleData);
                 }
 
-                $response = $dictionary->fetch();
-                $freshData = $dictionary instanceof BasicDictionary
-                    ? BasicDictionary::prune($response->getData())
-                    : $response->getData();
-                $paging = $response->getPaging();
-                $totalPages = $paging['total_pages'] ?? 1;
+                $totalPages = 1;
+                if ($this->requiresCompleteContract($key)) {
+                    $freshData = $this->fetchCompleteValidated($key);
+                } else {
+                    $response = $dictionary->fetch();
+                    $freshData = $response->getData();
+                    $totalPages = $response->getPaging()['total_pages'] ?? 1;
+                }
 
+                // Selected clinical catalogs become authoritative only after every
+                // page validates; a bad late page leaves the prior cache untouched.
                 Cache::put($cacheKey, $freshData, now()->addWeek());
                 Cache::put($freshKey, true, now()->endOfDay());
-
-                if ($totalPages > 1) {
-                    for ($page = 2; $page <= $totalPages; $page++) {
-                        UpdateDictionaryCache::dispatch($dictionary->getKey(), $page)
-                            ->delay(now()->addSeconds($page * 2));
-                    }
+                for ($page = 2; $page <= $totalPages; $page++) {
+                    UpdateDictionaryCache::dispatch($dictionary->getKey(), $page)
+                        ->delay(now()->addSeconds($page * 2));
                 }
 
                 return collect($freshData);
@@ -206,7 +208,7 @@ class DictionaryManager
                 $exception->handle("Dictionary '$key' connection failed");
 
                 return collect(Cache::get($cacheKey, []));
-            } catch (EHealthResponseException|EHealthValidationException $e) {
+            } catch (EHealthResponseException|EHealthValidationException|ValidationException $e) {
                 Log::error("Dictionary '$key' API error", ['error' => $e->getMessage()]);
 
                 return collect(Cache::get($cacheKey, []));
@@ -233,6 +235,38 @@ class DictionaryManager
                 'error' => $exception->getMessage()
             ]);
         }
+    }
+
+    public function requiresCompleteContract(string $key): bool
+    {
+        return in_array($key, [BasicDictionary::KEY, MedicalProgramDictionary::KEY, DrugDictionary::KEY, DeviceDefinitionDictionary::KEY], true);
+    }
+
+    /** Return all selected catalog pages before any caller replaces cached rules. */
+    public function fetchCompleteValidated(string $key): array
+    {
+        $data = [];
+        $page = 1;
+        $totalPages = null;
+        do {
+            $response = $this->fetchPage($key, $page);
+            $rows = $response->validate();
+            $paging = $response->getPaging();
+            if ($paging !== []) {
+                if (!isset($paging['page_number'], $paging['total_pages'])
+                    || $paging['page_number'] !== $page
+                    || ($totalPages !== null && $paging['total_pages'] !== $totalPages)) {
+                    throw ValidationException::withMessages(['paging' => __('device-requests.validation.configuration_incomplete')]);
+                }
+                $totalPages = $paging['total_pages'];
+            } elseif ($page > 1) {
+                throw ValidationException::withMessages(['paging' => __('device-requests.validation.configuration_incomplete')]);
+            }
+            $data = array_merge($data, $key === BasicDictionary::KEY ? BasicDictionary::prune($rows) : $rows);
+            $page++;
+        } while ($totalPages !== null && $page <= $totalPages);
+
+        return $data;
     }
 
     /**

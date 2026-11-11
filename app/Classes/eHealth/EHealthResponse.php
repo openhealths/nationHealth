@@ -114,7 +114,13 @@ class EHealthResponse extends Response
      */
     public function getPaging(): array
     {
-        return $this->json(self::PAGING_PATH, []);
+        $paging = $this->json(self::PAGING_PATH, []);
+        // Medical Events uses `page`; expose the common spelling after callers validate.
+        if (isset($paging['page']) && !isset($paging['page_number'])) {
+            $paging['page_number'] = $paging['page'];
+        }
+
+        return $paging;
     }
 
     /**

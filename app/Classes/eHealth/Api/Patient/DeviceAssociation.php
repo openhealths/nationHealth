@@ -6,16 +6,11 @@ namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\MedicalEventsErrorTranslator;
-use App\Classes\eHealth\ValidationRuleBuilder;
 use App\Contracts\ApiErrorTranslator;
-use App\Enums\DeviceAssociation\Status;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class DeviceAssociation extends PatientApiBase
 {
@@ -47,7 +42,8 @@ class DeviceAssociation extends PatientApiBase
      */
     public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateDeviceAssociations(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/device_associations');
+
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge(
@@ -77,7 +73,7 @@ class DeviceAssociation extends PatientApiBase
      */
     public function getById(string $patientId, string $deviceAssociationId): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateDeviceAssociation(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/device_associations/{device_association_id}');
 
         return $this->get(self::URL . "/$patientId/device_associations/$deviceAssociationId");
     }
@@ -92,80 +88,4 @@ class DeviceAssociation extends PatientApiBase
         return new MedicalEventsErrorTranslator();
     }
 
-    /**
-     * Validate a single device association from eHealth API response.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateDeviceAssociation(EHealthResponse $response): array
-    {
-        return $this->runDeviceAssociationValidation([$this->replaceEHealthPropNames($response->getData())])[0];
-    }
-
-    /**
-     * Validate device associations collection from eHealth API.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateDeviceAssociations(EHealthResponse $response): array
-    {
-        $replaced = [];
-        foreach ($response->getData() as $data) {
-            $replaced[] = $this->replaceEHealthPropNames($data);
-        }
-
-        return $this->runDeviceAssociationValidation($replaced);
-    }
-
-    /**
-     * Apply device association validation rules to a pre-processed list of device association data.
-     *
-     * @param  array  $replacedItems
-     * @return array
-     */
-    private function runDeviceAssociationValidation(array $replacedItems): array
-    {
-        $rules = collect($this->deviceAssociationValidationRules())
-            ->mapWithKeys(static fn (array $rule, string $key): array => ["*.$key" => $rule])
-            ->toArray();
-
-        $validator = Validator::make($replacedItems, $rules);
-
-        if ($validator->fails()) {
-            Log::channel('e_health_errors')->error(
-                'Device association validation failed: ' . implode(', ', $validator->errors()->all())
-            );
-        }
-
-        return $validator->validate();
-    }
-
-    /**
-     * List of validation rules for device associations from eHealth.
-     *
-     * @return array
-     */
-    protected function deviceAssociationValidationRules(): array
-    {
-        return ValidationRuleBuilder::merge(
-            [
-                'uuid' => ['required', 'uuid'],
-                'status' => ['required', Rule::in(Status::values())],
-                'association_date' => ['nullable', 'date'],
-                'recorded' => ['required', 'date'],
-                'primary_source' => ['required', 'boolean'],
-                'explanatory_letter' => ['nullable', 'string', 'max:255'],
-                'ehealth_inserted_at' => ['nullable', 'date'],
-                'ehealth_updated_at' => ['nullable', 'date']
-            ],
-            ValidationRuleBuilder::identifierRules('device', true),
-            ValidationRuleBuilder::identifierRules('context', true),
-            ValidationRuleBuilder::identifierRules('recorder', true),
-            ValidationRuleBuilder::codeableConceptRules('body_site'),
-            ValidationRuleBuilder::codeableConceptRules('report_origin'),
-            ValidationRuleBuilder::codeableConceptRules('status_reason')
-        );
-    }
 }

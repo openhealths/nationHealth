@@ -6,10 +6,10 @@ namespace App\Livewire\Dictionary;
 
 use App\Classes\eHealth\EHealth;
 use App\Enums\MedicalProgram\Type;
-use App\Models\LegalEntity;
-use App\Traits\FormTrait;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Models\LegalEntity;
+use App\Traits\FormTrait;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Session;
@@ -172,6 +172,11 @@ class DrugList extends Component
 
         try {
             $response = EHealth::drug()->getMany($filters);
+            $rows = $response->validate();
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+
+            return new LengthAwarePaginator([], 0, $perPage, 1);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when searching for drugs list.');
 
@@ -179,7 +184,7 @@ class DrugList extends Component
         }
 
         return new LengthAwarePaginator(
-            collect($response->getData()),
+            collect($rows),
             $response->getPaging()['total_entries'],
             $perPage,
             $currentPage,

@@ -6,6 +6,7 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\SchemaResponseContract;
 use App\Classes\eHealth\ValidationRuleBuilder;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
@@ -122,6 +123,7 @@ class Patient extends Request
      */
     public function getDevices(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(static fn (EHealthResponse $response): array => SchemaResponseContract::validate($response, 'GET /api/patients/{patient_id}/summary/devices'));
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
@@ -156,11 +158,7 @@ class Patient extends Request
      */
     protected function validateDiagnoses(EHealthResponse $response): array
     {
-        $rules = collect($this->diagnosisValidationRules())
-            ->mapWithKeys(static fn (array $rule, string $field): array => ["*.$field" => $rule])
-            ->toArray();
-
-        return Validator::make($response->getData(), $rules)->validate();
+        return SchemaResponseContract::validate($response, 'GET /api/patients/{patient_id}/summary/diagnoses');
     }
 
     /**

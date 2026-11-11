@@ -6,6 +6,7 @@ namespace App\Classes\eHealth\Api;
 
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\SchemaResponseContract;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -31,6 +32,8 @@ class Configuration extends Request
      */
     public function getMetadata(array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(static fn (EHealthResponse $response): array => SchemaResponseContract::validate($response, 'GET /api/configurations/metadata'));
+
         return $this->get(self::URL_METADATA, $query);
     }
 
@@ -55,6 +58,8 @@ class Configuration extends Request
      */
     public function getCompositions(array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(static fn (EHealthResponse $response): array => SchemaResponseContract::validate($response, 'GET /api/composition_configurations'));
+
         $this->setDefaultPageSize();
 
         return $this->get(self::URL_COMPOSITIONS, $query);
@@ -81,6 +86,8 @@ class Configuration extends Request
      */
     public function getDevices(array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(static fn (EHealthResponse $response): array => SchemaResponseContract::validate($response, 'GET /api/devices_configurations'));
+
         $this->setDefaultPageSize();
 
         return $this->get(self::URL_DEVICES, $this->normalizeActiveFilter($query));
@@ -107,6 +114,8 @@ class Configuration extends Request
      */
     public function getDeviceParameters(array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(static fn (EHealthResponse $response): array => SchemaResponseContract::validate($response, 'GET /api/device_parameters_configurations'));
+
         $this->setDefaultPageSize();
 
         return $this->get(self::URL_DEVICE_PARAMETERS, $this->normalizeActiveFilter($query));
@@ -132,6 +141,8 @@ class Configuration extends Request
      */
     public function getDictionaries(array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(static fn (EHealthResponse $response): array => SchemaResponseContract::validate($response, 'GET /api/dictionaries_configurations'));
+
         $this->setDefaultPageSize();
 
         return $this->get(self::URL_DICTIONARIES, $this->normalizeActiveFilter($query));
@@ -158,6 +169,8 @@ class Configuration extends Request
      */
     public function getObservations(array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(static fn (EHealthResponse $response): array => SchemaResponseContract::validate($response, 'GET /api/observation_configurations'));
+
         $this->setDefaultPageSize();
 
         return $this->get(self::URL_OBSERVATIONS, $query);

@@ -6,6 +6,8 @@ namespace Tests\Feature\DeviceRequest;
 
 use App\Classes\eHealth\Api\Patient\DeviceDispense as DeviceDispenseApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Classes\eHealth\SchemaResponseContract;
+use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Livewire\DeviceDispense\DeviceDispenses;
 use App\Models\LegalEntity;
@@ -22,7 +24,7 @@ use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Mockery;
-use ReflectionMethod;
+use Tests\Support\NativeClinicalFixtures;
 use Tests\TestCase;
 
 class DeviceDispensePatientViewTest extends TestCase
@@ -187,15 +189,19 @@ class DeviceDispensePatientViewTest extends TestCase
 
     private function response(string $uuid, string $status = 'completed'): EHealthResponse
     {
-        $validator = new ReflectionMethod(DeviceDispenseApi::class, 'validateDeviceDispense');
-        $api = new DeviceDispenseApi();
+        $data = NativeClinicalFixtures::deviceDispense($uuid, $this->person->uuid);
+        if ($status !== 'completed') {
+            $data['primary_source'] = 'invalid';
+        }
+        $api = new class extends DeviceDispenseApi
+        {
+            public function mapped(EHealthResponse $response): array
+            {
+                return $this->replaceEHealthPropNames(Arr::toSnakeCase(SchemaResponseContract::validate($response, 'GET /api/patients/{patient_id}/device_dispenses/{device_dispense_id}')));
+            }
+        };
 
-        return new EHealthResponse(new Response(200, [], json_encode(['data' => [
-            'id' => $uuid,
-            'status' => $status,
-            'inserted_at' => '2026-10-20T09:00:00Z',
-            'details' => [['quantity' => ['value' => 5, 'system' => 'device_unit', 'code' => 'piece']]],
-        ]], JSON_THROW_ON_ERROR)), fn (EHealthResponse $response): array => $validator->invoke($api, $response));
+        return new EHealthResponse(new Response(200, [], json_encode(['data' => $data], JSON_THROW_ON_ERROR)), fn (EHealthResponse $response): array => $api->mapped($response));
     }
 }
 

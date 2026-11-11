@@ -183,7 +183,7 @@ class DeviceProgramParticipationGuard
      */
     public function deviceAllowsCarePlanActivity(array $device, ?string $programId = null): bool
     {
-        $isActive = $device['is_active'] ?? $device['isActive'] ?? true;
+        $isActive = $device['is_active'] ?? ($device['isActive'] ?? true);
         if (!filter_var($isActive, FILTER_VALIDATE_BOOLEAN)) {
             return false;
         }
@@ -253,13 +253,22 @@ class DeviceProgramParticipationGuard
     {
         try {
             $page = 1;
+            $totalPages = null;
+            $match = 'missing';
             do {
                 $response = EHealth::deviceDefinition()->getMany([
                     'medical_program_id' => $programId,
                     'page_size' => 300,
                     'page' => $page,
                 ]);
-                $devices = $response->getData();
+                $devices = $response->validate();
+                $paging = $response->getPaging();
+                if (!isset($paging['page_number'], $paging['total_pages'])
+                    || $paging['page_number'] !== $page
+                    || ($totalPages !== null && $paging['total_pages'] !== $totalPages)) {
+                    return null;
+                }
+                $totalPages = $paging['total_pages'];
 
                 if (!is_array($devices)) {
                     return null;
@@ -270,31 +279,30 @@ class DeviceProgramParticipationGuard
                         continue;
                     }
 
-                    $id = (string) ($device['id'] ?? $device['uuid'] ?? '');
+                    $id = (string) ($device['id'] ?? ($device['uuid'] ?? ''));
                     if ($id !== $deviceDefinitionId) {
                         continue;
                     }
 
-                    $isActive = $device['is_active'] ?? $device['isActive'] ?? true;
+                    $isActive = $device['is_active'] ?? ($device['isActive'] ?? true);
                     if (!filter_var($isActive, FILTER_VALIDATE_BOOLEAN)) {
-                        return 'inactive';
+                        $match = 'inactive';
+                        continue;
                     }
 
                     if (!$this->deviceAllowsCarePlanActivity($device, $programId)) {
-                        return 'inactive';
+                        $match = 'inactive';
+                        continue;
                     }
 
-                    return 'active';
+                    $match = 'active';
                 }
 
-                $paging = $response->getPaging();
-                if (!isset($paging['page_number'], $paging['total_pages']) || (int) $paging['page_number'] !== $page) {
-                    return null;
-                }
                 $page++;
-            } while ($page <= (int) ($paging['total_pages'] ?? 1));
+            } while ($page <= $totalPages);
 
-            return 'missing';
+            // A match becomes authoritative only after all catalog pages validate.
+            return $match;
         } catch (Throwable $exception) {
             Log::warning('DeviceProgramParticipationGuard: device catalog lookup failed', [
                 'program_id' => $programId,

@@ -14,6 +14,7 @@ use App\Services\MedicalEvents\Fhir;
 use App\Traits\FormTrait;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -76,6 +77,10 @@ class SpecimenIndex extends Component
         try {
             $response = EHealth::specimen()->getByAccessionIdentifier($this->searchId);
             $this->specimen = Arr::toCamelCase($response->validate());
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while searching specimen by accession identifier');
         }
@@ -105,13 +110,18 @@ class SpecimenIndex extends Component
                 data_get($this->specimen, 'uuid'),
                 Arr::toSnakeCase(Fhir::specimen()->toProcessFhir($validated))
             );
+            $receipt = $response->validate();
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while processing the specimen');
 
             return;
         }
 
-        logger()->debug('Job ID to further debug', $response->getData());
+        logger()->debug('Validated specimen submission', $receipt);
 
         $this->showProcessModal = false;
         Session::flash('success', __('specimens.messages.process_request_sent'));
@@ -138,13 +148,18 @@ class SpecimenIndex extends Component
                 data_get($this->specimen, 'uuid'),
                 Arr::toSnakeCase(Fhir::specimen()->toInvalidateFhir($validated))
             );
+            $receipt = $response->validate();
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while invalidating the specimen');
 
             return;
         }
 
-        logger()->debug('Job ID to further debug', $response->getData());
+        logger()->debug('Validated specimen submission', $receipt);
 
         $this->showInvalidateModal = false;
         Session::flash('success', __('specimens.messages.invalidate_request_sent'));
@@ -171,13 +186,18 @@ class SpecimenIndex extends Component
                 data_get($this->specimen, 'uuid'),
                 Arr::toSnakeCase(Fhir::specimen()->toRejectFhir($validated))
             );
+            $receipt = $response->validate();
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while rejecting the specimen');
 
             return;
         }
 
-        logger()->debug('Job ID to further debug', $response->getData());
+        logger()->debug('Validated specimen submission', $receipt);
 
         $this->showRejectModal = false;
         Session::flash('success', __('specimens.messages.reject_request_sent'));

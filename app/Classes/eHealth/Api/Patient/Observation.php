@@ -6,17 +6,11 @@ namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\MedicalEventsErrorTranslator;
-use App\Classes\eHealth\ValidationRuleBuilder;
 use App\Contracts\ApiErrorTranslator;
-use App\Enums\Person\ObservationStatus;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
-use App\Core\Arr;
 
 class Observation extends PatientApiBase
 {
@@ -34,6 +28,8 @@ class Observation extends PatientApiBase
         string $episodeUuid,
         array $data = []
     ): PromiseInterface|EHealthResponse {
+        $this->setReadContract('GET /api/patients/{patient_id}/episodes/{episode_id}/observations');
+
         return $this->get(self::URL . "/$patientUuid/episodes/$episodeUuid/observations", $data);
     }
 
@@ -49,7 +45,7 @@ class Observation extends PatientApiBase
      */
     public function getById(string $patientId, string $observationId): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateObservation(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/observations/{observation_id}');
 
         return $this->get(self::URL . "/$patientId/observations/$observationId");
     }
@@ -66,7 +62,8 @@ class Observation extends PatientApiBase
      */
     public function getSummary(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateObservations(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/summary/observations');
+
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $this->format($query, ['issued_from', 'issued_to']));
@@ -98,7 +95,8 @@ class Observation extends PatientApiBase
      */
     public function getBySearchParams(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateObservations(...));
+        $this->setReadContract('GET /api/patients/{patient_id}/observations');
+
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $this->format($query, ['issued_from', 'issued_to']));
@@ -118,6 +116,8 @@ class Observation extends PatientApiBase
      */
     public function getSummaryById(string $patientId, string $id): PromiseInterface|EHealthResponse
     {
+        $this->setReadContract('GET /api/patients/{patient_id}/summary/observations/{id}');
+
         return $this->get(self::URL . "/$patientId/summary/observations/$id");
     }
 
@@ -129,147 +129,6 @@ class Observation extends PatientApiBase
     protected function errorTranslator(): ApiErrorTranslator
     {
         return new MedicalEventsErrorTranslator();
-    }
-
-    /**
-     * Validate a single observation from eHealth API response.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateObservation(EHealthResponse $response): array
-    {
-        $replaced = [$this->replaceEHealthPropNames(Arr::toSnakeCase($response->getData()))];
-
-        return $this->runObservationValidation($replaced)[0];
-    }
-
-    /**
-     * Validate a list of observations from eHealth API response.
-     *
-     * @param  EHealthResponse  $response
-     * @return array
-     */
-    protected function validateObservations(EHealthResponse $response): array
-    {
-        $replaced = [];
-        foreach ($response->getData() as $data) {
-            $replaced[] = $this->replaceEHealthPropNames(Arr::toSnakeCase($data));
-        }
-
-        return $this->runObservationValidation($replaced);
-    }
-
-    /**
-     * Apply observation validation rules to a pre-processed list of observation data.
-     *
-     * @param  array  $replacedItems
-     * @return array
-     */
-    private function runObservationValidation(array $replacedItems): array
-    {
-        $rules = collect($this->observationValidationRules())
-            ->mapWithKeys(static fn ($rule, $key) => ["*.$key" => $rule])
-            ->toArray();
-
-        $validator = Validator::make($replacedItems, $rules);
-
-        if ($validator->fails()) {
-            Log::channel('e_health_errors')->error(
-                'Observation validation failed: ' . implode(', ', $validator->errors()->all())
-            );
-        }
-
-        return $validator->validate();
-    }
-
-    /**
-     * Validation rules for observation data.
-     *
-     * @return array
-     */
-    protected function observationValidationRules(): array
-    {
-        return ValidationRuleBuilder::merge(
-            // Basic fields
-            [
-                'uuid' => ['required', 'string'],
-                'status' => ['required', Rule::in(ObservationStatus::values())],
-                'effective_date_time' => ['nullable', 'date'],
-                'issued' => ['required', 'date'],
-                'ehealth_inserted_at' => ['required', 'date'],
-                'ehealth_updated_at' => ['required', 'date'],
-                'primary_source' => ['required', 'boolean'],
-                'comment' => ['nullable', 'string'],
-                'reference_ranges' => ['nullable', 'array'], // TODO: add validation
-                'explanatory_letter' => ['nullable', 'string', 'max:255'],
-            ],
-            ValidationRuleBuilder::periodRules(),
-
-            // Identifier relationships
-            ValidationRuleBuilder::identifierRules('diagnostic_report'),
-            ValidationRuleBuilder::identifierRules('context'),
-            ValidationRuleBuilder::identifierCollectionRules('performer'),
-            ValidationRuleBuilder::identifierRules('specimen'),
-            ValidationRuleBuilder::identifierRules('device'),
-            ValidationRuleBuilder::identifierCollectionRules('based_on'),
-
-            // Codeable concept relationships
-            ValidationRuleBuilder::codeableConceptRules('code', true),
-            ValidationRuleBuilder::codeableConceptRules('report_origin'),
-            ValidationRuleBuilder::codeableConceptRules('interpretation'),
-            ValidationRuleBuilder::codeableConceptRules('body_site'),
-            ValidationRuleBuilder::codeableConceptRules('method'),
-
-            // Codeable concept collections
-            ValidationRuleBuilder::codeableConceptCollectionRules('categories', true),
-
-            // Effective period
-            ValidationRuleBuilder::periodRules(),
-
-            // Observation value
-            $this->valueValidationRules(),
-
-            // Components
-            [
-                'components' => ['nullable', 'array'],
-                'components.*.reference_ranges' => ['nullable', 'array'],
-                'components.*.value_codeable_concept.coding.*.extension' => ['nullable', 'array'],
-            ],
-            ValidationRuleBuilder::codeableConceptRules('components.*.code'),
-            ValidationRuleBuilder::codeableConceptRules('components.*.interpretation'),
-            $this->valueValidationRules('components.*.')
-        );
-    }
-
-    /**
-     * Validation rules for observation value fields.
-     *
-     * @param  string  $prefix
-     * @return array
-     */
-    private function valueValidationRules(string $prefix = ''): array
-    {
-        return ValidationRuleBuilder::merge(
-            [
-                $prefix . 'value_quantity' => ['nullable', 'array'],
-                $prefix . 'value_quantity.value' => ['required_with:' . $prefix . 'value_quantity', 'numeric'],
-                $prefix . 'value_quantity.comparator' => ['nullable', 'string', 'max:255'],
-                $prefix . 'value_quantity.unit' => ['nullable', 'string', 'max:255'],
-                $prefix . 'value_quantity.system' => ['nullable', 'string', 'max:255'],
-                $prefix . 'value_quantity.code' => ['nullable', 'string', 'max:255'],
-
-                $prefix . 'value_string' => ['nullable', 'string'],
-                $prefix . 'value_boolean' => ['nullable', 'boolean'],
-                $prefix . 'value_date_time' => ['nullable', 'date'],
-                $prefix . 'value_time' => ['nullable', 'string', 'max:255'],
-
-                $prefix . 'value_range' => ['nullable', 'array'],
-                $prefix . 'value_ratio' => ['nullable', 'array'],
-                $prefix . 'value_sampled_data' => ['nullable', 'array'],
-            ],
-            ValidationRuleBuilder::codeableConceptRules($prefix . 'value_codeable_concept')
-        );
     }
 
 }

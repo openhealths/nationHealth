@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents;
 
 use App\Classes\eHealth\EHealth;
+use App\Classes\eHealth\SchemaResponseContract;
 use App\Exceptions\EHealth\EHealthJobTimeoutException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Resolves asynchronous eHealth jobs.
@@ -125,21 +127,27 @@ class EHealthJobResolver
     public function assertPrequalifyValid(array $responseData): void
     {
         $results = $responseData['data'] ?? $responseData;
-
-        if (!is_array($results)) {
-            return;
-        }
-
-        if (isset($results['status']) && !array_is_list($results)) {
-            $results = [$results];
+        try {
+            // All prequalify domains return typed program verdicts. An empty or
+            // malformed result cannot authorize a program-dependent clinical write.
+            SchemaResponseContract::validateData($results, [
+                'type' => 'array', 'minItems' => 1,
+                'items' => [
+                    'type' => 'object', 'required' => ['program_id', 'program_name', 'status'],
+                    'properties' => [
+                        'program_id' => ['type' => 'string', 'minLength' => 1],
+                        'program_name' => ['type' => 'string', 'minLength' => 1],
+                        'status' => ['type' => 'string', 'enum' => ['VALID', 'INVALID']],
+                        'rejection_reason' => ['type' => 'string'],
+                    ],
+                ],
+            ]);
+        } catch (ValidationException $exception) {
+            throw new EHealthValidationException(['error' => ['message' => __('care-plan.referral_prequalify_failed')]]);
         }
 
         foreach ($results as $result) {
-            if (!is_array($result)) {
-                continue;
-            }
-
-            if (strtoupper((string) ($result['status'] ?? '')) === 'INVALID') {
+            if ($result['status'] === 'INVALID') {
                 throw new EHealthValidationException([
                     'error' => [
                         'message' => $result['rejection_reason']

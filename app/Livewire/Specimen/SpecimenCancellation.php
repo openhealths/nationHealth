@@ -106,7 +106,12 @@ class SpecimenCancellation extends Component
 
         try {
             $response = EHealth::specimen()->getDetails($this->patientId, $this->specimenId);
-            $specimen = Arr::toCamelCase($response->validate());
+            $nativeSpecimen = $response->validate();
+            $specimen = Arr::toCamelCase($nativeSpecimen);
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while loading the specimen for cancellation');
 
@@ -122,7 +127,7 @@ class SpecimenCancellation extends Component
 
         try {
             $signedContent = new CipherRequest()->signData(
-                Fhir::specimen()->toCancellationPackage($response->getData(), $validated['cancellationReason']),
+                Fhir::specimen()->toCancellationPackage($nativeSpecimen, $validated['cancellationReason']),
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
@@ -140,7 +145,11 @@ class SpecimenCancellation extends Component
             EHealth::specimen()->cancel($this->patientId, $this->specimenId, [
                 'signed_data' => $signedContent->getBase64Data(),
                 'signed_data_encoding' => 'base64'
-            ]);
+            ])->validate();
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.response_contract_invalid'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while sending specimen cancellation package');
 

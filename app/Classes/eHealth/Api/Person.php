@@ -7,6 +7,7 @@ namespace App\Classes\eHealth\Api;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\PersonErrorTranslator;
+use App\Classes\eHealth\SchemaResponseContract;
 use App\Contracts\ApiErrorTranslator;
 use App\Core\Arr;
 use App\Enums\Person\AuthenticationMethod;
@@ -611,39 +612,9 @@ class Person extends Request
 
     protected function validateAuthMethods(EHealthResponse $response): array
     {
-        $data = $response->getData();
-        $thirdPerson = AuthenticationMethod::THIRD_PERSON->value;
-        $notAvailable = AuthenticationMethod::NA->value;
+        $native = SchemaResponseContract::validate($response, 'GET /api/persons/{id}/authentication_methods');
 
-        $replaced = self::replaceEHealthPropNames($data);
-
-        $validator = Validator::make($replaced, [
-            '*.uuid' => ["required_unless:*.type,$notAvailable", 'nullable', 'uuid'],
-            '*.type' => ['required', 'string', Rule::in(AuthenticationMethod::values())],
-            '*.alias' => ['nullable', 'string', 'max:255'],
-            '*.ehealth_ended_at' => ['nullable', 'date'],
-            '*.value' => ["required_if:*.type,$thirdPerson", 'nullable', 'uuid'],
-            '*.phone_number' => ['nullable', 'string', 'max:255'],
-            '*.reference' => ['nullable', 'array:type,phone_number'],
-            '*.reference.type' => ['nullable', Rule::in(['OTP', 'OFFLINE', 'NA'])],
-            '*.reference.phone_number' => ['nullable', 'string', 'max:255'],
-            '*.confidant_person' => ['nullable', 'array'],
-            '*.confidant_person.documents_person.*.number' => ['nullable', 'string', 'max:255'],
-            '*.confidant_person.documents_person.*.type' => ['nullable', new InDictionary('DOCUMENT_TYPE')],
-            '*.confidant_person.gender' => ['nullable', new InDictionary('GENDER')],
-            '*.confidant_person.name' => ['nullable', 'string', 'max:255'],
-            '*.confidant_person.uuid' => ['nullable', 'uuid'],
-            '*.confidant_person.no_tax_id' => ['nullable', 'boolean:strict'],
-            '*.confidant_person.phones.number' => ['nullable', 'string'],
-            '*.confidant_person.tax_id' => ['nullable', 'string'],
-            '*.confidant_person.unzr' => ['nullable', 'string']
-        ]);
-
-        if ($validator->fails()) {
-            Log::channel('e_health_errors')->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
-        }
-
-        return $validator->validate();
+        return self::replaceEHealthPropNames($native);
     }
 
     /**

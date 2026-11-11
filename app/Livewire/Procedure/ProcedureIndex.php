@@ -17,9 +17,9 @@ use App\Jobs\ProcedureSync;
 use App\Livewire\Person\Records\BasePatientComponent;
 use App\Livewire\Procedure\Forms\ProcedureCancellationForm as Form;
 use App\Models\Declaration;
+use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Models\LegalEntity;
-use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\Identifier;
@@ -45,8 +45,8 @@ class ProcedureIndex extends BasePatientComponent
 {
     use BatchLegalEntityQueries;
     use HandlesSyncBatch;
-    use WithPagination;
     use WithFileUploads;
+    use WithPagination;
 
     public Form $form;
 
@@ -463,7 +463,7 @@ class ProcedureIndex extends BasePatientComponent
     ): array {
         $procedureRaw = EHealth::procedure()
             ->getById($this->uuid, $procedure->uuid)
-            ->getData();
+            ->validate();
 
         return Fhir::procedure()->toCancellationPackage(
             $procedureRaw,

@@ -22,6 +22,7 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Repositories\MedicalEvents\Repository;
 use App\Rules\InDictionary;
+use App\Services\MedicalEvents\EHealthJobResolver;
 use App\Services\MedicalEvents\Fhir;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
@@ -30,6 +31,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
 use Throwable;
@@ -131,6 +133,10 @@ class EpisodeIndex extends BasePatientComponent
                 $this->uuid,
                 $this->hasPatientAccess ? [] : ['managing_organization_id' => legalEntity()->uuid]
             );
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.validation_error'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while synchronizing episodes');
 
@@ -252,6 +258,11 @@ class EpisodeIndex extends BasePatientComponent
             $response = EHealth::episode()->getBySearchParams($this->uuid, $params);
             $episodes = Arr::toCamelCase($this->formatDatesForDisplay($response->validate()));
             $total = $response->getPaging()['total_entries'];
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.validation_error'));
+
+            $episodes = [];
+            $total = 0;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while searching episodes');
             $episodes = [];
@@ -316,6 +327,10 @@ class EpisodeIndex extends BasePatientComponent
         try {
             $response = EHealth::episode()->getById($this->uuid, $id);
             Repository::episode()->syncFull($this->patient(), [$response->validate()]);
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.validation_error'));
+
+            return null;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while getting episode');
 
@@ -376,11 +391,17 @@ class EpisodeIndex extends BasePatientComponent
         $formattedData = Fhir::episode()->toCancelFhir($this->cancellationForm->validate());
 
         try {
-            EHealth::episode()->cancel(
+            $response = EHealth::episode()->cancel(
                 $this->uuid,
                 $episode->uuid,
                 removeEmptyKeys(Arr::toSnakeCase($formattedData))
             );
+            $resolver = app(EHealthJobResolver::class);
+            $resolver->assertSuccessful($resolver->resolve($response->validate()));
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.validation_error'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while cancelling episode');
 
@@ -443,11 +464,17 @@ class EpisodeIndex extends BasePatientComponent
         $formattedData = Fhir::episode()->toCloseFhir($this->closingForm->validate());
 
         try {
-            EHealth::episode()->close(
+            $response = EHealth::episode()->close(
                 $this->uuid,
                 $episode->uuid,
                 removeEmptyKeys(Arr::toSnakeCase($formattedData))
             );
+            $resolver = app(EHealthJobResolver::class);
+            $resolver->assertSuccessful($resolver->resolve($response->validate()));
+        } catch (ValidationException $exception) {
+            Session::flash('error', __('errors.ehealth.messages.validation_error'));
+
+            return;
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while closing episode');
 

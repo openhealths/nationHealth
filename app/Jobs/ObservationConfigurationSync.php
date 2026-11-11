@@ -10,8 +10,10 @@ use App\Repositories\ObservationConfigRepository;
 use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 class ObservationConfigurationSync implements ShouldQueue
 {
@@ -49,17 +51,35 @@ class ObservationConfigurationSync implements ShouldQueue
             }
 
             $page = 1;
+            $items = [];
+            $totalPages = null;
 
             do {
                 $response = EHealth::configuration()->getObservations([...$query, 'page' => $page]);
 
-                foreach ($response->getData() as $item) {
-                    $this->upsertItem($item);
+                $rows = $response->validate();
+                $paging = $response->getPaging();
+                if (($paging['page_number'] ?? null) !== $page || ($totalPages !== null && ($paging['total_pages'] ?? null) !== $totalPages)) {
+                    throw new RuntimeException('Observation configuration paging changed during synchronization.');
+                }
+                $totalPages = $paging['total_pages'];
+                foreach ($rows as $item) {
+                    $item['settings'] = json_decode($item['settings'], true, flags: JSON_THROW_ON_ERROR);
+                    if (!is_array($item['settings'])) {
+                        throw new RuntimeException('Observation configuration settings must encode an object.');
+                    }
+                    $items[] = $item;
                 }
 
                 $page++;
             } while ($response->isNotLast());
 
+            // No configuration is changed until every page and settings object is valid.
+            DB::transaction(function () use ($items): void {
+                foreach ($items as $item) {
+                    $this->upsertItem($item);
+                }
+            });
             $observationConfigRepository->flush();
         } catch (Exception $exception) {
             Log::channel('task_scheduling')->error('Observation configurations sync failed.', [

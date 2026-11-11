@@ -472,7 +472,8 @@ class DeviceRequestForm extends Component
             $prepared = $service->prepare($this->person, $this->legalEntity, $saved['data'], $saved['carePlanUuid'], $saved['activityUuid']);
             $signedData = signatureService()->signData($prepared['payload'], $this->form['password'], $this->form['knedp'], $this->form['keyContainerUpload'], (string) Auth::user()->party->taxId);
             $response = EHealth::deviceRequest()->createSigned($this->person->uuid, ['signed_data' => $signedData, 'signed_data_encoding' => 'base64']);
-            app(EHealthJobResolver::class)->resolve($response->getData());
+            $resolver = app(EHealthJobResolver::class);
+            $resolver->assertSuccessful($resolver->resolve($response->validate()));
             $remote = $service->details($this->person, $record->uuid);
 
             if (($remote['status'] ?? '') !== 'active' || empty($remote['requisition'])) {

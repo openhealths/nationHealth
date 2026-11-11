@@ -489,7 +489,7 @@ class DiagnosticReportIndex extends BasePatientComponent
     ): array {
         $reportRaw = EHealth::diagnosticReport()
             ->getById($this->uuid, $diagnosticReport->uuid)
-            ->getData();
+            ->validate();
 
         try {
             $observationsRaw = $this->loadObservationRawData($diagnosticReport->uuid, onlyActive: true);
@@ -522,7 +522,7 @@ class DiagnosticReportIndex extends BasePatientComponent
                 'page' => $page,
             ]);
 
-            $pageData = collect($response->getData());
+            $pageData = collect($response->validate());
 
             if ($onlyActive) {
                 $pageData = $pageData->filter(
