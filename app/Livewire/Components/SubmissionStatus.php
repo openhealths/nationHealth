@@ -5,11 +5,17 @@ declare(strict_types=1);
 namespace App\Livewire\Components;
 
 use App\Classes\eHealth\EHealth;
+use App\Enums\CarePlanStatus;
+use App\Enums\Composition\CompositionJobStatus;
 use App\Enums\JobStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\RemoteEHealthLinksProcessing;
+use App\Models\CarePlan;
 use App\Models\EhealthLink;
+use App\Models\MedicalEvents\Sql\CompositionOperation;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Session;
@@ -81,7 +87,7 @@ class SubmissionStatus extends Component
      */
     public function mount(string $recordType, int $recordId, string $recordStatusLabel, ?string $editUrl = null, ?int $compositionOperationId = null): void
     {
-        if ($recordType === \App\Models\CarePlan::class) {
+        if ($recordType === CarePlan::class) {
             $this->carePlanId = $recordId;
             $this->refreshCarePlanSubmission(notifyParent: false);
 
@@ -91,7 +97,7 @@ class SubmissionStatus extends Component
             $this->compositionOperationId = $compositionOperationId;
             $operation = $this->compositionOperation();
             $this->jobId = $operation->remoteJobId;
-            $this->statusLabel = \App\Enums\Composition\CompositionJobStatus::from($operation->status)->label();
+            $this->statusLabel = CompositionJobStatus::from($operation->status)->label();
             $this->editUrl = null;
 
             return;
@@ -118,16 +124,16 @@ class SubmissionStatus extends Component
      */
     public function openDetails(): void
     {
-        if ($this->carePlanId !== null) {
-            $this->refreshCarePlanSubmission();
+        if ($this->carePlanId !== null && !$this->refreshCarePlanSubmission()) {
+            return;
         }
         if ($this->jobId === null) {
             return;
         }
         if ($this->compositionOperationId !== null) {
             $operation = $this->compositionOperation();
-            app(\App\Repositories\MedicalEvents\CompositionOperationRepository::class)->queue($operation);
-            $this->statusLabel = \App\Enums\Composition\CompositionJobStatus::from($operation->status)->label();
+            MedicalEventsRepository::compositionOperation()->queue($operation);
+            $this->statusLabel = CompositionJobStatus::from($operation->status)->label();
             $this->job = [
                 'id' => $operation->remoteJobId,
                 'status' => $this->statusLabel,
@@ -193,27 +199,39 @@ class SubmissionStatus extends Component
         }
     }
 
-    protected function refreshCarePlanSubmission(bool $notifyParent = true): void
+    protected function refreshCarePlanSubmission(bool $notifyParent = true): bool
     {
-        $snapshot = app(\App\Repositories\CarePlanRepository::class)->submissionForDisplay($this->carePlanId);
+        $snapshot = Repository::carePlan()->submissionForDisplay($this->carePlanId);
         $plan = $snapshot['plan'];
         abort_unless($plan !== null, 404);
-        $this->authorize('view', $plan);
+        if (Auth::user()->cannot('view', $plan)) {
+            $this->statusLabel = __('care-plan.sync_access_denied');
+            $this->jobId = null;
+            $this->submissionId = null;
+            $this->carePlanEditUrl = null;
+            $this->job = [];
+            $this->showDetails = false;
+            Session::flash('error', __('care-plan.sync_access_denied'));
+
+            return false;
+        }
         $submission = $snapshot['submission'];
-        $this->statusLabel = JobStatus::tryFrom($submission['status'] ?? '')?->label() ?? \App\Enums\CarePlanStatus::labelFor($plan->status);
+        $this->statusLabel = JobStatus::tryFrom($submission['status'] ?? '')?->label() ?? CarePlanStatus::labelFor($plan->status);
         $this->submissionId = $submission['id'];
         $this->jobId = $snapshot['jobId'];
-        $canEdit = \App\Enums\CarePlanStatus::fromStored($plan->status) === \App\Enums\CarePlanStatus::DRAFT
+        $canEdit = CarePlanStatus::fromStored($plan->status) === CarePlanStatus::DRAFT
             && !in_array($submission['status'], [JobStatus::PENDING->value, JobStatus::PROCESSING->value, JobStatus::PROCESSED->value], true)
             && Auth::user()->can('update', $plan);
         $this->carePlanEditUrl = $canEdit ? route('care-plans.edit', [legalEntity(), $plan->id]) : null;
         if ($notifyParent) {
             $this->dispatch('care-plan-submission-status-updated');
         }
+
+        return true;
     }
 
-    protected function compositionOperation(): \App\Models\MedicalEvents\Sql\CompositionOperation
+    protected function compositionOperation(): CompositionOperation
     {
-        return app(\App\Repositories\MedicalEvents\CompositionOperationRepository::class)->findForStatus($this->compositionOperationId, Auth::user());
+        return MedicalEventsRepository::compositionOperation()->findForStatus($this->compositionOperationId, Auth::user());
     }
 }

@@ -12,7 +12,7 @@ use JsonException;
 use RuntimeException;
 
 /** Native response contracts extracted from the official MIS and Medical Events OpenAPI snapshots. */
-final class SchemaResponseContract
+class SchemaResponseContract
 {
     private static array $contracts = [];
 

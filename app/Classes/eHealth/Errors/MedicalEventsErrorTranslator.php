@@ -7,7 +7,7 @@ namespace App\Classes\eHealth\Errors;
 /**
  * Translates the errors of the medical events resources.
  */
-final class MedicalEventsErrorTranslator extends BaseErrorTranslator
+class MedicalEventsErrorTranslator extends BaseErrorTranslator
 {
     /**
      * Messages of the medical events resources: original message => translation.

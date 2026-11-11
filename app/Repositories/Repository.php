@@ -6,7 +6,7 @@ namespace App\Repositories;
 
 use App\Repositories\MedicalEvents\ApprovalRepository;
 
-final class Repository
+class Repository
 {
     public static function address(): AddressRepository
     {

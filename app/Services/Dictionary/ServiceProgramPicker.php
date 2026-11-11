@@ -7,7 +7,7 @@ namespace App\Services\Dictionary;
 /**
  * Picks the default medical program for standalone service referrals.
  */
-final class ServiceProgramPicker
+class ServiceProgramPicker
 {
     /**
      * Prefer the state medical guarantees program when it is in the list, otherwise the first one.

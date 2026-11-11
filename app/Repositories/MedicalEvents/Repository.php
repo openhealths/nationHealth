@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
-final class Repository
+class Repository
 {
     public static function identifier(): IdentifierRepository
     {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
-final class MedicalEventsRequestStatuses
+class MedicalEventsRequestStatuses
 {
     /**
      * Statuses excluded when calculating remaining quantity for an activity.

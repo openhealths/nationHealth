@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Dictionary\Mappers;
 
-final class ImmunizationDictionaryMapper
+class ImmunizationDictionaryMapper
 {
     /**
      * Official correspondence between target disease codes and vaccine codes.
@@ -269,7 +269,8 @@ final class ImmunizationDictionaryMapper
     /**
      * Determine whether the target disease corresponds to the vaccine code.
      */
-    public function isTargetDiseaseAllowed(string $vaccineCode, string $targetDiseaseCode): bool {
+    public function isTargetDiseaseAllowed(string $vaccineCode, string $targetDiseaseCode): bool
+    {
         return in_array($targetDiseaseCode, $this->targetDiseaseCodesForVaccine($vaccineCode), true);
     }
 

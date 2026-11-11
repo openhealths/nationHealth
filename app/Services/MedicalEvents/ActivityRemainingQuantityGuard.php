@@ -6,16 +6,17 @@ namespace App\Services\MedicalEvents;
 
 use App\Models\CarePlanActivity;
 use App\Repositories\MedicalEvents\MedicalEventsRequestStatuses;
+use App\Repositories\Repository;
 
 /**
  * Serialises remaining-quantity checks so two Livewire tabs cannot both issue
  * against the same activity after seeing a stale leftover snapshot.
  */
-final class ActivityRemainingQuantityGuard
+class ActivityRemainingQuantityGuard
 {
     public function assertCanIssue(int $activityId, float $qty, callable $issuedSum): CarePlanActivity
     {
-        return app(\App\Repositories\CarePlanActivityRepository::class)->assertCanIssue($activityId, $qty, $issuedSum);
+        return Repository::carePlanActivity()->assertCanIssue($activityId, $qty, $issuedSum);
     }
 
     /**

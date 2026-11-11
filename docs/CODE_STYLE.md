@@ -15,6 +15,12 @@ Conventions for contributors. Link to a specific rule from code review when need
 - Import PHP classes with `use` instead of repeating fully qualified names at call sites.
 - Use explicit parentheses for chained `??` fallbacks and nested conditional expressions.
 
+## Classes
+
+Never declare classes `final`, including helper, DTO, service and test classes.
+Audit existing class declarations throughout every touched PHP file.
+This rule concerns classes; retain method and constant modifiers where required.
+
 ## Class imports
 
 Import classes with `use` and use their short names in code and type declarations,

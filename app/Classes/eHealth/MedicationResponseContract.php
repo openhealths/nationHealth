@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Classes\eHealth;
 
 /** Stable native medication boundary shared by the clinical and pharmacy clients. */
-final class MedicationResponseContract
+class MedicationResponseContract
 {
     public static function validate(EHealthResponse $response, string $operation): array
     {

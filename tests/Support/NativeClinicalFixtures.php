@@ -11,7 +11,7 @@ use GuzzleHttp\Psr7\Response;
 use ReflectionMethod;
 
 /** Explicit complete native Medical Events / General MIS fixtures, independent of schema traversal. */
-final class NativeClinicalFixtures
+class NativeClinicalFixtures
 {
     public const string UUID = '3e34da3d-9b8c-4aaf-be8e-24a161279b6a';
 

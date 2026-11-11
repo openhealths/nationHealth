@@ -9,7 +9,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 
-final class MedicationProgramPicker
+class MedicationProgramPicker
 {
     public const string DEFAULT_ID = '1318eabc-1a1a-42f6-8450-61e11c19eede';
 
