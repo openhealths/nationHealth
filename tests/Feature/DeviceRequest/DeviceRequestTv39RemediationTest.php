@@ -6,6 +6,8 @@ namespace Tests\Feature\DeviceRequest;
 
 use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
 use App\Classes\eHealth\Api\CarePlanActivity;
+use App\Classes\eHealth\Api\Configuration;
+use App\Classes\eHealth\Api\DeviceDefinition;
 use App\Classes\eHealth\Api\Patient\DeviceRequest as DeviceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
@@ -125,6 +127,12 @@ class DeviceRequestTv39RemediationTest extends TestCase
         $component = $this->planHarness($context)->call('selectCarePlan', $context['plan']->id)
             ->call('selectCarePlanActivity', $context['activity']->id);
         $context['plan']->approvals()->update(['is_verified' => false]);
+        // Keep catalog/configuration boundaries observable after consent is revoked.
+        $this->mock(Configuration::class)->shouldNotReceive('getDictionaries');
+        $this->mock(DeviceDefinition::class)->shouldNotReceive('getMany')->shouldNotReceive('getDetails');
+        $service = Mockery::mock(DeviceRequestLifecycleService::class)->makePartial();
+        $service->shouldNotReceive('prepare')->shouldNotReceive('prescribingOptions');
+        $this->instance(DeviceRequestLifecycleService::class, $service);
         $component->call('createDraft')->assertSet('draftId', null)->assertSee(__('device-requests.validation.inactive_plan'))
             ->call('primeSigning')->set('form.knedp', 'test')->set('form.password', 'test')
             ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 1))

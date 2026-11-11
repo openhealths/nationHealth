@@ -610,7 +610,10 @@ class DeviceRequestForm extends Component
 
             return true;
         } catch (Throwable $exception) {
-            $this->refreshOptions();
+            // A rejected consent or field validation must not trigger another catalog request.
+            if (!$exception instanceof ValidationException) {
+                $this->refreshOptions();
+            }
             $this->reportError($exception);
 
             return false;
