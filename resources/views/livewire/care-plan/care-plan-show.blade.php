@@ -516,7 +516,7 @@
                     />
                 </div>
 
-                @include('livewire.medication-request.care-plan-registry')
+                @includeIf('livewire.medication-request.care-plan-registry')
 
                 {{-- Approvals --}}
                 @if (in_array($inpatientApprovalStatus, ['queued', 'pending'], true))
