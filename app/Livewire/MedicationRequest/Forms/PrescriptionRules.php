@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 /** TV39 prescribing rules shared by the two forms and checked again before submission. */
-final class PrescriptionRules
+class PrescriptionRules
 {
     public static function normalize(array $form, array $drug, array $program = [], ?float $planDailyDose = null): array
     {

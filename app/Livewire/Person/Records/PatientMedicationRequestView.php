@@ -128,6 +128,32 @@ class PatientMedicationRequestView extends BasePatientComponent
         }
     }
 
+    /** BA05: only a fresh, patient-scoped native result can confirm rejection or active status. */
+    public function checkValidity(): void
+    {
+        $record = $this->record();
+        if (!$this->allowed('checkValidity', $record)) {
+            return;
+        }
+
+        try {
+            $detail = $this->resourceType() === MedicationRequestRequest::TYPE_REQUEST
+                ? EHealth::medicationRequestRequest()->getById($this->uuid, $record->uuid)->validate()
+                : EHealth::medicationRequest()->getById($this->uuid, $record->uuid)->validate();
+            app(MedicationRequestLifecycleService::class)->assertPatientSnapshot($detail, $this->uuid, $record->uuid);
+            $status = strtolower($detail['status']);
+            $confirmed = in_array($status, ['active', 'rejected', 'expired', 'blocked', 'completed', 'entered-in-error'], true);
+            $message = $confirmed ? 'validity_'.str_replace('-', '_', $status) : 'validity_unconfirmed';
+            // NEW/SIGNED and asynchronous statuses describe requests; they do not certify an issued prescription.
+            $native = array_replace($detail, ['_local_form' => $record->ehealthPayload['_local_form'] ?? []]);
+            Repository::medicationRequest()->storeResource((new MedicationRequestMapper())->fromEHealth($detail), (int) $this->personId, resourceType: $record->resourceType, native: $native);
+            $this->detail = $native;
+            session()->flash($confirmed && $status !== 'active' ? 'warning' : 'info', __('medication-requests.'.$message));
+        } catch (Throwable $exception) {
+            $this->failure($exception);
+        }
+    }
+
     public function openSigning(): void
     {
         $record = $this->record();

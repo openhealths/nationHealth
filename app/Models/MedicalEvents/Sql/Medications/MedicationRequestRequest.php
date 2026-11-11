@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Models\MedicalEvents\Sql\Medications;
 
 use App\Enums\Medication\RequestResourceType;
+
 use App\Enums\Medication\RequestSource;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Period;
+use App\Models\MedicalEvents\Sql\Quantity;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -92,12 +94,12 @@ class MedicationRequestRequest extends Model
 
     public function quantityQuantity(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\MedicalEvents\Sql\Quantity::class, 'quantity_id');
+        return $this->belongsTo(Quantity::class, 'quantity_id');
     }
 
     public function containerQuantity(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\MedicalEvents\Sql\Quantity::class, 'container_quantity_id');
+        return $this->belongsTo(Quantity::class, 'container_quantity_id');
     }
 
     public function references(): BelongsToMany

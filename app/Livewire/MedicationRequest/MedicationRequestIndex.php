@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\MedicationRequest;
 
+use App\Enums\Person\Status;
+
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
 use App\Services\MedicalEvents\MedicationDispenseLifecycleService;
@@ -68,7 +70,7 @@ class MedicationRequestIndex extends Component
             if ($this->searchResults === []) {
                 $this->errorMessage = 'Електронний рецепт не знайдено.';
             } elseif (count($this->searchResults) === 1) {
-                $this->selectRequest((string) ($this->searchResults[0]['id'] ?? $this->searchResults[0]['uuid'] ?? ''));
+                $this->selectRequest((string) ($this->searchResults[0]['id'] ?? ($this->searchResults[0]['uuid'] ?? '')));
             }
         } catch (Throwable $exception) {
             Log::error('Pharmacy eRx search failed: '.$exception->getMessage());
@@ -142,13 +144,13 @@ class MedicationRequestIndex extends Component
             $employee = Auth::user()?->employees()
                 ->where('legal_entity_id', $this->legalEntity->id)
                 ->whereIn('employee_type', ['PHARMACIST', 'PHARMACIST_ADMIN'])
-                ->where('status', \App\Enums\Person\Status::APPROVED)
+                ->where('status', Status::APPROVED)
                 ->with(['division', 'party'])
                 ->first()
                 ?? Auth::user()?->employees()
                     ->where('legal_entity_id', $this->legalEntity->id)
                     ->whereNotNull('division_id')
-                    ->where('status', \App\Enums\Person\Status::APPROVED)
+                    ->where('status', Status::APPROVED)
                     ->with(['division', 'party'])
                     ->first()
                 ?? Auth::user()?->employees()
@@ -206,7 +208,7 @@ class MedicationRequestIndex extends Component
         }
 
         foreach ($this->searchResults as $result) {
-            $id = (string) ($result['id'] ?? $result['uuid'] ?? '');
+            $id = (string) ($result['id'] ?? ($result['uuid'] ?? ''));
             if ($id === $this->selectedRequestId) {
                 return $result;
             }

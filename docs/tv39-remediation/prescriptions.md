@@ -1,6 +1,6 @@
 # TV39 prescription remediation — issue #1203
 
-Approved edition 39 only; baseline upstream/main 3ae4e34e.
+Approved edition 39 only; rebased integration includes upstream/main ea188869 (canonical document routes).
 
 ## Implementation plan
 
@@ -28,13 +28,14 @@ Approved edition 39 only; baseline upstream/main 3ae4e34e.
 | RX-11 | Signed prescription detail offers the official public National Price Catalogue and requests the prescription-specific link using the documented demo endpoint. Matching prescription ID and a valid HTTPS URL are required before displaying the received link. | `TV39PrescriptionRemediationTest`: exact price endpoint and wrong-ID rejection. See environment limitation below. |
 | RX-12 | General detail and care-plan actions display every validated dispensing record with its real date and status; all API pages are read. | `TV39PrescriptionRemediationTest`: two remote pages render each dispensing date/status. |
 | RX-13 | General and care-plan resend require an eligible ACTIVE prescription, notifications enabled, OTP phone and explicit confirmation of the one-time warning. Confirmation is consumed before the PATCH request. | `TV39PrescriptionRemediationTest`: missing confirmation, disabled notifications and denied permissions cause no resend/authentication side effects. `MedicationResponseContractTest`: documented PATCH stays validated. |
-| RX-14 | Policy and server creation require a FINISHED encounter belonging to the current active doctor/specialist and completed on the current day, within patient/institution access. | `TV39PrescriptionRemediationTest`: old-day and another-doctor encounters cannot create a request. `EncounterStandalonePhase6Test`: actual standalone opening and allowed finished encounter flow. |
+| RX-14 / BA06 | Policy and server creation require a FINISHED encounter belonging to the current active DOCTOR, SPECIALIST or MED_COORDINATOR and completed on the current day, within patient/institution access. The separate request registry and validity action use fresh validated MRR/MR statuses. | `TV39PrescriptionRemediationTest`: current actor/coordinator, old-day and another-actor boundaries, status checks and denial without effects. `EncounterStandalonePhase6Test` and `EncounterDocumentPagesTest`: actual standalone opening and canonical routes. |
+| BA08 | The encounter form selects an existing eligible plan and activity through the shared care-plan provider. It uses the encounter's exact performer, rereads selections before creation/signing, and displays native remaining quantity and units. A confirmed, verified, unexpired write approval is evaluated independently of its local status label. | `TV39PrescriptionRemediationTest`: plan/activity selection, approval changes, invalidated choices, selected actor and local NEW approval label with confirmed write access. |
 
 ## Verification and integration
 
 Dedicated SQL database: `tv39_1203`. The guarded PHPUnit configuration is `.local/tv39-remediation-2026-11-11/phpunit-i1203.xml`; application/bootstrap mappings are private test tooling and are not committed.
 
-The combined prescription suites, native signing payload suite, prescribing rules suite, contract suite and standalone encounter suite pass **102 tests / 458 assertions**. Pint passes all **37 changed PHP/Blade files**. `git diff --check` passes. PHPUnit reports an existing deprecation; there are no failing tests.
+The final prescription, patient registry, storage, lifecycle, prescribing rules, native contract/signing and standalone encounter suites pass **215 tests / 984 assertions**. The focused canonical document route and write-scope denial run passes **4 tests / 12 assertions**. Pint passes all **72 PHP/Blade files in the full PR diff**, including pre-existing references in touched files. Import/class resolution, repository factories, added authorization calls and `git diff --check` pass. Existing PHP/PHPUnit deprecations remain; there are no failing tests.
 
 The care-plan authorization helper is an identical dependent hunk from the care-plan remediation owner: it rereads the care plan and returns a translated flash/false on denial. All changed prescription callers guard that result. The care-plan owner includes `livewire.medication-request.care-plan-registry` in `CarePlanShow`; the umbrella integrates these coordinated changes. The existing direct standalone test harness now supplies its real computed category dictionary, avoiding the previous Livewire-property error.
 
@@ -48,7 +49,17 @@ The unsigned rejection contract is **PATCH `/api/medication_request_requests/{id
 
 The exact prescription price-link endpoint **GET `/api/persons/{person_id}/medication_requests/{medication_requests_id}/price_catalog_link`** exists in the official demo 9.15.12 archive and is absent from the archived preprod 9.15.9 specification. Consequently its deployed preprod availability remains unverified. The UI also provides the independently verified public catalogue, `https://ecatalog.moz.gov.ua/`, announced by the State Expert Center on 5 January 2026 and updated 18 February 2026: `https://www.dec.gov.ua/news/zapraczyuvav-vebsajt-naczionalnogo-katalogu-czin-na-likarski-zasoby/`. It never substitutes an invented prescription-specific link after an endpoint error.
 
-Real KEP, real SMS and live ESOZ clinical writes require user-assisted acceptance; automated verification uses HTTP fakes and isolated SQL storage. These operations and manual browser acceptance were not performed by the agent, so code/test closure is separate from live operational acceptance. Shared G01 contracts outside MedicationRequest remain owned by the umbrella follow-up.
+Real KEP, real SMS and live ESOZ clinical writes require user-assisted acceptance; automated verification uses HTTP fakes and isolated SQL storage. These operations and manual browser acceptance were not performed by the agent, so code/test closure is separate from live operational acceptance. Shared G01 contracts are coordinated prerequisites; their cross-module acceptance remains owned by the umbrella.
+
+## Existing document surfaces and acceptance
+
+| Surface | Code/render evidence | Remaining manual acceptance |
+|---|---|---|
+| Interaction | Existing documents remain displayed in the interaction. Canonical prescription creation/detail routes retain the same patient and encounter; create actions enforce the selected current actor and finished-today encounter. | SMD/PMD/current-role opening, visible statuses/actions and navigation to the same document and source interaction. |
+| Patient card | MRR and MR tabs link to actual detail pages and local encounter/care-plan activity bases. Patient-scoped reads/actions and denied paths are covered by the final suites. Preperson routes retain local read behavior; remote prescription creation requires an identified person. | Patient/preperson navigation and visible feedback for current doctor/coordinator/assistant permissions. |
+| Sidebar | Existing prescription and device entries are provided by the shared layout/module flags; no new mandatory menu count is assumed. | Partial sidebar visibility under the institution/module flags and current policies. |
+
+For an existing plan, TV39 3.10.2.1 requires write approval and employment at the same institution as the plan author; it does not require the current employee to be that historical author. Provider and policy checks therefore use the exact selected eligible actor. Creation roles follow the literal DOCTOR/SPECIALIST/MED_COORDINATOR list in TV39 3.9.1.3; view/manage roles remain controlled by their separate policies.
 
 ## Integration regression follow-up
 
@@ -60,6 +71,6 @@ Legacy external list caches classified unsigned requests as prescriptions. Recla
 
 Broader patient registry and standalone signing fixtures now use complete official native response contracts, explicit catalog isolation and current authorization conventions. Actual API validation remains active; search denial uses translated flash feedback and leaves the registry empty. The care-plan synchronization concern imports its resource discriminator explicitly.
 
-The integrated follow-up passes **197 tests / 870 assertions** across prescription storage, lifecycle, rules, patient registry, standalone signing/opening, TV39 regressions, Episode creation and Shared API boundaries in the dedicated `tv39_shared` database. Existing PHP/PHPUnit deprecations remain separate from test failures.
+An earlier umbrella integration checkpoint passed **197 tests / 870 assertions** in `tv39_shared`; the final owned-branch verification above supersedes its prescription result. That historical run does not certify the current umbrella or live ESOZ behavior.
 
 The pharmacy `MedicationDispenseLifecycleService` is outside these physician/assistant prescribing workstations: its sole UI consumer is `MedicationRequestIndex` at the separate pharmacy route, requiring `medication_request:details_pharm` or `medication_dispense:write/process`. Physician dispensing history uses `MedicationRequestLifecycleService::getDispenseHistory`, which reads every validated `MedicationRequest::getDetails` page. Pharmacy PIS redemption was not expanded by this remediation.

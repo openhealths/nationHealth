@@ -4,54 +4,52 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
-use App\Repositories\Repository;
-use App\Enums\CarePlanStatusFilter;
+use App\Core\Arr;
+use App\Enums\CarePlanActivityKind;
 use App\Enums\CarePlanCompletenessFilter;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Database\Eloquent\Builder;
-use App\Jobs\RemoteEHealthLinksProcessing;
-use App\Enums\JobStatus;
-use App\Models\EhealthLink;
-use App\Models\CarePlanActivity;
 use App\Enums\CarePlanStatus;
-use App\Models\CarePlan;
-use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
-use App\Models\Employee\Employee;
+use App\Enums\CarePlanStatusFilter;
+use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
+use App\Enums\JobStatus;
 use App\Enums\Person\EncounterStatus;
+use App\Enums\Person\ObservationStatus;
+use App\Enums\Status;
+use App\Enums\User\Role;
+use App\Jobs\CarePlanInpatientApprovalProcessing;
+use App\Jobs\RemoteEHealthLinksProcessing;
+use App\Models\CarePlan;
+use App\Models\CarePlanActivity;
+use App\Models\Declaration;
+use App\Models\EhealthLink;
+use App\Models\Employee\Employee;
+use App\Models\EmployeeRole;
+use App\Models\Icd10;
+use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Condition;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
-use App\Models\MedicalEvents\Sql\Condition;
-use App\Models\Person\Person;
-use Illuminate\Support\Facades\Auth;
-use InvalidArgumentException;
-use Illuminate\Support\Str;
-use App\Services\MedicalEvents\Fhir;
-use App\Core\Arr;
-use Throwable;
-use Carbon\CarbonImmutable;
-use App\Repositories\MedicalEvents\BaseRepository as MedicalEventsBaseRepository;
-use App\Services\MedicalEvents\FhirResource;
-use App\Models\Icd10;
-use App\Services\Dictionary\Collections\BasicDictionaryCollection;
-use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
-use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Observation;
-use App\Enums\CarePlanActivityKind;
-use App\Enums\Person\ObservationStatus;
-use App\Enums\User\Role;
-use App\Enums\Status;
-use App\Models\EmployeeRole;
-use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
+use App\Models\Person\Person;
 use App\Models\User;
-use App\Models\Declaration;
-use App\Enums\Person\ApprovalStatus;
+use App\Repositories\MedicalEvents\BaseRepository as MedicalEventsBaseRepository;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Services\Dictionary\Collections\BasicDictionaryCollection;
+use App\Services\MedicalEvents\Fhir;
+use App\Services\MedicalEvents\FhirResource;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
-use App\Models\LegalEntity;
-use App\Jobs\CarePlanInpatientApprovalProcessing;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
+use Throwable;
 
 class CarePlanRepository extends MedicalEventsBaseRepository
 {
@@ -85,7 +83,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         if (isset($data['encounterId'])) {
             $encounterUuid = Encounter::whereKey($data['encounterId'])->value('uuid');
         }
-        $data['uuid'] = $data['uuid'] ?? $resource['id'] ?? Str::uuid()->toString();
+        $data['uuid'] = $data['uuid'] ?? ($resource['id'] ?? Str::uuid()->toString());
         if ($authorUuid !== null) {
             $data['author'] = $authorUuid;
         }
@@ -864,6 +862,78 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         return $data;
     }
 
+    /** BA08: local, policy-filtered search shared by encounter document forms. No remote access is requested here. */
+    public function documentPlanChoices(int $personId, string $encounterUuid, User $user, string $search = '', ?string $actingEmployeeUuid = null): array
+    {
+        $person = Person::find($personId);
+        $encounter = $person === null ? null : $this->findEncounter($encounterUuid, $personId);
+        if ($encounter === null || $user->cannot('view', [$encounter, $person])) {
+            return [];
+        }
+        $termsOfService = $this->encounterTermsOfService($encounterUuid, $personId);
+        // Existing plans may be used by another eligible employee with write approval.
+        // A form's explicitly selected actor takes precedence over the encounter author.
+        $employee = $user->getCarePlanWriterEmployee($termsOfService, $actingEmployeeUuid);
+        if ($employee === null) {
+            return [];
+        }
+        $search = trim($search);
+
+        return CarePlan::wherePersonId($personId)->whereLegalEntityId(legalEntity()?->id)
+            ->whereIn('status', [CarePlanStatus::PENDING->value, CarePlanStatus::ACTIVE->value])
+            ->whereNotNull('uuid')->whereNotNull('details_synced_at')
+            ->when($search !== '', static fn (Builder $query) => $query->where(static fn (Builder $matches) => $matches
+                ->whereLike('title', '%'.$search.'%')->orWhereLike('requisition', '%'.$search.'%')->orWhereLike('uuid', '%'.$search.'%')))
+            ->with($this->uiRelations())->orderByDesc('id')->get()
+            ->filter(fn (CarePlan $plan): bool => !$user->cannot('manage', $plan) && !$user->cannot('view', $plan)
+                && $plan->termsOfServiceCode() === $termsOfService && !$this->hasPendingSubmission($plan))
+            ->map(fn (CarePlan $plan): array => [
+                'id' => $plan->id, 'uuid' => $plan->uuid,
+                'label' => trim(($plan->requisition ?: $plan->uuid).' — '.$plan->title),
+                // The form must complete the existing approval flow before selecting/signing an activity.
+                'approvalRequired' => $user->cannot('manageActivities', [$plan, $employee->uuid]),
+            ])->values()->all();
+    }
+
+    public function documentActivityChoices(int $planId, int $personId, string $encounterUuid, User $user, string $kind, ?string $actingEmployeeUuid = null): array
+    {
+        $kind = CarePlanActivityKind::fromInput($kind)->value;
+        if (!collect($this->documentPlanChoices($personId, $encounterUuid, $user, actingEmployeeUuid: $actingEmployeeUuid))->contains('id', $planId)) {
+            return [];
+        }
+        $plan = $this->findById($planId);
+        if ($user->cannot('manageActivities', [$plan, $actingEmployeeUuid])) {
+            return [];
+        }
+        $repository = Repository::carePlanActivity();
+
+        return CarePlanActivity::whereCarePlanId($planId)->whereKind($kind)
+            ->whereIn('status', ['scheduled', 'in-progress'])->whereNotNull('details_synced_at')
+            ->with(CarePlanActivityRepository::FHIR_RELATIONS)->get()
+            ->filter(fn (CarePlanActivity $activity): bool => !$this->hasPendingSubmission($activity))
+            ->map(function (CarePlanActivity $activity) use ($repository, $plan, $kind): array {
+                $resource = $repository->getResource($activity);
+                $detail = $resource['detail'];
+
+                return [
+                    'id' => $activity->id, 'uuid' => $activity->uuid, 'kind' => $kind,
+                    'description' => $detail['description'] ?? null,
+                    'productReference' => $detail['productReference'] ?? null,
+                    'quantity' => $detail['quantity'] ?? null,
+                    // Native remaining quantity and units are kept together; unknown is never treated as unlimited.
+                    'remainingQuantity' => $detail['remainingQuantity'] ?? null,
+                    'remainingQuantityType' => $detail['remainingQuantityType'] ?? null,
+                    'scheduledPeriod' => $detail['scheduledPeriod'] ?? null,
+                    'serviceCreationCapacity' => $kind === CarePlanActivityKind::SERVICE_REQUEST->value
+                        ? $repository->serviceCreationCapacity(
+                            $plan,
+                            (string) data_get($detail, 'productReference.identifier.value', ''),
+                            (string) data_get($detail, 'productReference.identifier.type.coding.0.code', 'service')
+                        ) : null,
+                ];
+            })->values()->all();
+    }
+
     public function loadEncounter(Encounter $encounter): void
     {
         $encounter->loadMissing(['period', 'episode', 'diagnoses.condition']);
@@ -1030,8 +1100,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         // getAttribute('is_verified') avoids the camelCase collision with Approval::isVerified().
         return $plan->approvals->contains(fn ($approval): bool => $approval->grantedTo?->value === $employeeUuid
             && $approval->getAttribute('is_verified') && $approval->accessLevel === 'write'
-            && $approval->expiresAt !== null && $approval->expiresAt->isFuture()
-            && ApprovalStatus::resolve($approval->status)?->isGranted() === true);
+            && $approval->expiresAt !== null && $approval->expiresAt->isFuture());
     }
 
     public function displayedDetails(CarePlan $plan, array $dictionaries): array
@@ -1040,7 +1109,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         $conceptLabel = static function (?array $concept, string $dictionary) use ($dictionaries): string {
             $labels = collect($concept['coding'] ?? [])->map(
                 fn (array $coding): ?string =>
-                $dictionaries[$dictionary][$coding['code'] ?? ''] ?? $coding['display'] ?? null
+                $dictionaries[$dictionary][$coding['code'] ?? ''] ?? ($coding['display'] ?? null)
             )->filter()->unique()->all();
 
             return implode(', ', $labels) ?: ($concept['text'] ?? '—');
@@ -1063,7 +1132,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         $diagnosisCodes = collect($resource['addresses'] ?? [])->flatMap(function (array $address) use ($conditions): array {
             $condition = $conditions->get(data_get($address, 'reference.identifier.value'));
 
-            return $condition?->code ? MedicalEventsRepository::codeableConcept()->toResource($condition->code)['coding'] ?? [] : ($address['coding'] ?? []);
+            return $condition?->code ? (MedicalEventsRepository::codeableConcept()->toResource($condition->code)['coding'] ?? []) : ($address['coding'] ?? []);
         })
             ->where('system', 'eHealth/ICD10_AM/condition_codes')->pluck('code')->all();
         $diagnosisNames = Icd10::whereIn('code', $diagnosisCodes)->pluck('description', 'code');
@@ -1072,7 +1141,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
             $concept = $condition?->code ? MedicalEventsRepository::codeableConcept()->toResource($condition->code) : $address;
             foreach ($concept['coding'] ?? [] as $coding) {
                 $code = $coding['code'] ?? '';
-                $name = $diagnosisNames[$code] ?? $dictionaries['icpc2_codes'][$code] ?? $coding['display'] ?? $concept['text'] ?? '';
+                $name = $diagnosisNames[$code] ?? ($dictionaries['icpc2_codes'][$code] ?? ($coding['display'] ?? ($concept['text'] ?? '')));
                 $diagnoses[] = trim($code.($name && $name !== $code ? ' — '.$name : ''));
             }
         }
@@ -1207,9 +1276,9 @@ class CarePlanRepository extends MedicalEventsBaseRepository
     public function applySubmissionResult(EhealthLink $link, array $jobData): void
     {
         $record = $link->linkable;
-        $data = $jobData['response_data'] ?? $jobData['result'] ?? $jobData['data'] ?? [];
+        $data = $jobData['response_data'] ?? ($jobData['result'] ?? ($jobData['data'] ?? []));
         $data = $data[0] ?? $data;
-        $data = $data['response_data'] ?? $data['result'] ?? $data['data'] ?? $data;
+        $data = $data['response_data'] ?? ($data['result'] ?? ($data['data'] ?? $data));
         $data = $data[0] ?? $data;
         $data = $data['data'] ?? $data;
         $data = Arr::toCamelCase($data);

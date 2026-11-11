@@ -146,6 +146,9 @@
                 <button class="button-sync" wire:click="refreshDetail">
                     {{ __('medication-requests.detail_sync') }}
                 </button>
+                <button class="button-minor" wire:click="checkValidity">
+                    {{ __('medication-requests.check_validity') }}
+                </button>
                 @if (strtolower($detail['status']) === 'new')
                     <button class="button-primary" wire:click="openSigning">
                         {{ __('medication-requests.resume_signing') }}

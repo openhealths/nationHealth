@@ -190,9 +190,9 @@ class EncounterPolicy
     {
         $legalEntityId = $legalEntityId instanceof LegalEntity ? $legalEntityId->id : $legalEntityId;
 
-        $employee = Repository::employee()->activeForLegalEntity($user, legalEntity(), ['DOCTOR', 'SPECIALIST']);
+        $employee = Repository::employee()->activeForLegalEntity($user, legalEntity(), ['DOCTOR', 'SPECIALIST', 'MED_COORDINATOR'], $encounter->performer?->value);
         if ($employee === null || !MedicalEventsRepository::medicationRequest()->eligibleEncounters((int) $patient->id, $employee->uuid)->contains('id', $encounter->id)) {
-            return Response::deny(__('medication-requests.own_finished_encounter_required'));
+            return Response::denyWithStatus(404, __('medication-requests.own_finished_encounter_required'));
         }
 
         return $this->standaloneDocumentResponse($user, $encounter, $patient, $legalEntityId, 'medication_request_request:write');

@@ -38,10 +38,10 @@
                     $rawStatus = (string) ($prescription['status'] ?? '');
                     $status = MedicationRequestStatus::resolve($rawStatus);
                     $uuid = $prescription['uuid'] ?? '';
-                    $requestNumber = $prescription['request_number'] ?? $prescription['requestNumber'] ?? $uuid;
-                    $medicationQty = $prescription['medication_qty'] ?? $prescription['medicationQty'] ?? '—';
-                    $startedAt = $prescription['started_at'] ?? $prescription['startedAt'] ?? null;
-                    $endedAt = $prescription['ended_at'] ?? $prescription['endedAt'] ?? null;
+                    $requestNumber = $prescription['request_number'] ?? ($prescription['requestNumber'] ?? $uuid);
+                    $medicationQty = $prescription['medication_qty'] ?? ($prescription['medicationQty'] ?? '—');
+                    $startedAt = $prescription['started_at'] ?? ($prescription['startedAt'] ?? null);
+                    $endedAt = $prescription['ended_at'] ?? ($prescription['endedAt'] ?? null);
                 @endphp
                 <div class="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm dark:border-gray-700 dark:bg-gray-700/40">
                     <div class="flex flex-wrap items-center gap-4">

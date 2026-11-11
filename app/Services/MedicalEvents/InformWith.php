@@ -8,7 +8,7 @@ namespace App\Services\MedicalEvents;
  * Normalizes the UI/storage form of a person authentication method
  * (`uuid`, `uuid|OTP|+380…`, or an already-mapped eHealth object).
  */
-final class InformWith
+class InformWith
 {
     public static function authMethodId(mixed $informWith): ?string
     {

@@ -4,51 +4,51 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use BackedEnum;
-use Exception;
-use App\Enums\Status;
-use App\Enums\User\Role;
-use InvalidArgumentException;
-use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
 use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionType;
+use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
+use App\Enums\Status;
+use App\Enums\User\Role;
+use App\Models\Employee\Employee;
+use App\Models\Employee\EmployeeRequest;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
-use App\Models\Employee\Employee;
 use App\Models\Role as ModelsRole;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
-use Spatie\Permission\Traits\HasRoles;
+use BackedEnum;
 use Database\Factories\UserFactory;
 use Eloquence\Behaviours\HasCamelCasing;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Models\Employee\EmployeeRequest;
-use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Builder;
-use Spatie\Permission\PermissionRegistrar;
+use Exception;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Spatie\Permission\Models\Role as SpatieRole;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Spatie\Permission\Models\Role as SpatieRole;
+use Spatie\Permission\PermissionRegistrar;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory;
-    use Notifiable,
-        HasCamelCasing,
-        HasRoles {
+    use HasCamelCasing,
+        HasRoles,
+        Notifiable {
             HasRoles::assignRole as assignRoleParent;                // Aliasing original assignRole
             HasRoles::syncPermissions as syncPermissionsParent;      // Aliasing original syncPermissions
             HasRoles::givePermissionTo as givePermissionToParent;    // Aliasing original givePermissionTo
             HasRoles::getAllPermissions as getAllPermissionsParent;  // Alias original getAllPermissions
         }
+    /** @use HasFactory<UserFactory> */
+    use HasFactory;
 
     /**
      * Track if email verification was already sent
@@ -465,24 +465,31 @@ class User extends Authenticatable implements MustVerifyEmail
      * eHealth requires the care plan author to have an active employee_role linking them to a
      * healthcare_service whose providing_condition exactly matches the care plan's terms_of_service
      * (see "Employee does not have active role that correspond to the submitted terms of service").
-     * When $termsOfService is given, we prefer the employee (among this user's DOCTOR/SPECIALIST
-     * employees) that actually has such a matching active role, instead of blindly taking the first
+     * When $termsOfService is given, require a matching active role from this user's
+     * DOCTOR/SPECIALIST/MED_COORDINATOR employees instead of blindly taking the first
      * one by role priority.
      *
      * @param  string|null  $termsOfService  PROVIDING_CONDITION code (OUTPATIENT/INPATIENT/FIELD) the
      *                                       care plan is being submitted with.
      * @return Employee|null
      */
-    public function getCarePlanWriterEmployee(?string $termsOfService = null): ?Employee
+    public function getCarePlanWriterEmployee(?string $termsOfService = null, ?string $employeeUuid = null): ?Employee
     {
-        $candidates = $this->getWriterEmployeeCandidates(Role::DOCTOR, Role::SPECIALIST);
+        $candidates = $this->linkedEmployeesAmong($this->getWriterEmployeeCandidates(Role::DOCTOR, Role::SPECIALIST, Role::MED_COORDINATOR));
+        // A linked earlier position cannot supply an author role unavailable in this login.
+        $candidates = $candidates->filter(fn (Employee $employee): bool => $this->hasAllowedRole($employee->employeeType))->values();
+        $startedIds = Employee::whereIn('id', $candidates->pluck('id'))->where(fn (Builder $query) => $query->whereNull('start_date')->orWhereDate('start_date', '<=', today()))->pluck('id');
+        $candidates = $candidates->whereIn('id', $startedIds)->values();
+        if ($employeeUuid !== null) {
+            $candidates = $candidates->where('uuid', $employeeUuid)->values();
+        }
 
         if ($termsOfService === null) {
             return $candidates->first();
         }
 
-        return $this->findEmployeeWithActiveRoleForProvidingCondition($candidates, $termsOfService)
-            ?? $candidates->first();
+        // Never substitute a different employee for the author of the selected encounter.
+        return $this->findEmployeeWithActiveRoleForProvidingCondition($candidates, $termsOfService);
     }
 
     /**
