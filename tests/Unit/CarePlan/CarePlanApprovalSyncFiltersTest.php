@@ -4,31 +4,31 @@ declare(strict_types=1);
 
 namespace Tests\Unit\CarePlan;
 
-use RuntimeException;
-use Illuminate\Support\Facades\DB;
-use App\Enums\User\Role;
-use App\Enums\Status;
-
 use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Enums\Status;
+use App\Enums\User\Role;
+
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Identifier;
-use GuzzleHttp\Psr7\Response;
-use PHPUnit\Framework\Attributes\DataProvider;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\User;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
 use App\Services\MedicalEvents\CarePlanApprovalService;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 use Tests\TestCase;
-use App\Repositories\Repository;
 
 /**
  * Get approvals must send granted_resource_type + granted_resources filters.

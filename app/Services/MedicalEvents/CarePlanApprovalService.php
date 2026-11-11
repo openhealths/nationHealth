@@ -4,28 +4,28 @@ declare(strict_types=1);
 
 namespace App\Services\MedicalEvents;
 
-use App\Enums\Person\AuthenticationMethod;
+use App\Classes\eHealth\Api\Approval as ApprovalApi;
 
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\CarePlanTermsOfService;
+use App\Enums\Person\AuthenticationMethod;
 use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\User;
-use App\Repositories\Repository;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
-use App\Classes\eHealth\Api\Approval as ApprovalApi;
-use App\Exceptions\EHealth\EHealthValidationException;
+use App\Repositories\Repository;
 use Carbon\CarbonImmutable;
-use Illuminate\Validation\ValidationException;
-use Throwable;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 /**
  * Care Plan adapter over shared MedicalEvents ApprovalRepository + eHealth Approval API.
