@@ -1,3 +1,4 @@
+@if ($encounter !== null)
 @php
     $class = $encounter->class;
     $type = $encounter->type?->coding->first();
@@ -11,11 +12,8 @@
 @endphp
 
 <div>
-    <section class="section-form p-6">
-        <x-header-navigation class="breadcrumb-form" title="{{ $title }}">
-            <x-slot name="title">{{ $title }}</x-slot>
-
-            <x-slot name="actions">
+    <x-layouts.patient :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName" :title="$title" :showLegacyMessages="false">
+            <x-slot name="headerActions">
                 <button
                     wire:click.prevent="sync"
                     type="button"
@@ -25,8 +23,7 @@
                     <span>{{ __('forms.synchronise_with_eHealth') }}</span>
                 </button>
             </x-slot>
-        </x-header-navigation>
-
+        <section class="section-form p-6">
         <div class="form shift-content">
             <fieldset class="fieldset">
                 <legend class="legend">{{ __('forms.main_information') }}</legend>
@@ -113,7 +110,7 @@
                             name="performer"
                             id="performer"
                             class="input peer"
-                            value="{{ $encounter->performer?->displayValue ?? $encounter->performer?->value ?? '-' }}"
+                            value="{{ ($encounter->performer?->displayValue ?? ($encounter->performer?->value ?? '-')) }}"
                             disabled
                         />
                         <label for="performer" class="label">{{ __('medical-events.performer') }}</label>
@@ -124,7 +121,7 @@
                             name="division"
                             id="division"
                             class="input peer"
-                            value="{{ $encounter->division?->displayValue ?? $encounter->division?->value ?? '-' }}"
+                            value="{{ ($encounter->division?->displayValue ?? ($encounter->division?->value ?? '-')) }}"
                             disabled
                         />
                         <label for="division" class="label">{{ __('forms.division') }}</label>
@@ -138,7 +135,7 @@
                             name="episode"
                             id="episode"
                             class="input peer"
-                            value="{{ $encounter->episode?->displayValue ?? $encounter->episode?->value ?? '-' }}"
+                            value="{{ ($encounter->episode?->displayValue ?? ($encounter->episode?->value ?? '-')) }}"
                             disabled
                         />
                         <label for="episode" class="label">{{ __('episodes.label') }}</label>
@@ -163,7 +160,7 @@
                             name="originEpisode"
                             id="originEpisode"
                             class="input peer"
-                            value="{{ $encounter->originEpisode?->displayValue ?? $encounter->originEpisode?->value ?? '-' }}"
+                            value="{{ ($encounter->originEpisode?->displayValue ?? ($encounter->originEpisode?->value ?? '-')) }}"
                             disabled
                         />
                         <label for="originEpisode" class="label">{{ __('encounters.origin_episode') }}</label>
@@ -174,7 +171,7 @@
                             name="incomingReferral"
                             id="incomingReferral"
                             class="input peer"
-                            value="{{ $encounter->incomingReferral?->displayValue ?? $encounter->incomingReferral?->value ?? '-' }}"
+                            value="{{ ($encounter->incomingReferral?->displayValue ?? ($encounter->incomingReferral?->value ?? '-')) }}"
                             disabled
                         />
                         <label for="incomingReferral" class="label">{{ __('encounters.incoming_referral') }}</label>
@@ -334,7 +331,7 @@
                                 name="diagnosisCondition{{ $loop->index }}"
                                 id="diagnosisCondition{{ $loop->index }}"
                                 class="input peer"
-                                value="{{ $diagnosis->condition?->displayValue ?? $diagnosis->condition?->value ?? '-' }}"
+                                value="{{ ($diagnosis->condition?->displayValue ?? ($diagnosis->condition?->value ?? '-')) }}"
                                 disabled
                             />
                             <label
@@ -504,7 +501,7 @@
                                 name="destination"
                                 id="destination"
                                 class="input peer"
-                                value="{{ $hospitalization->destination?->displayValue ?? $hospitalization->destination?->value ?? '-' }}"
+                                value="{{ ($hospitalization->destination?->displayValue ?? ($hospitalization->destination?->value ?? '-')) }}"
                                 disabled
                             />
                             <label
@@ -646,6 +643,38 @@
                 @endif
             </fieldset>
 
+            <fieldset class="fieldset mt-6">
+                <legend class="legend">{{ __('encounters.linked_documents.title') }}</legend>
+                <div class="grid gap-6 md:grid-cols-2">
+                    @foreach ($linkedDocuments as $group => $documents)
+                        <section wire:key="encounter-documents-{{ $group }}" class="fieldset-card p-4">
+                            <h2 class="font-semibold text-gray-900 dark:text-gray-100">
+                                @if ($documents['url'])
+                                    <a href="{{ $documents['url'] }}" class="text-blue-600 hover:underline dark:text-blue-400">{{ $documents['title'] }}</a>
+                                @else
+                                    {{ $documents['title'] }}
+                                @endif
+                                <span class="text-gray-500 dark:text-gray-400">({{ count($documents['records']) }})</span>
+                            </h2>
+                            <ul class="mt-3 space-y-3 text-sm">
+                                @forelse ($documents['records'] as $document)
+                                    <li wire:key="encounter-document-{{ $group }}-{{ $document['id'] }}" class="break-words">
+                                        @if ($document['url'])
+                                            <a href="{{ $document['url'] }}" class="text-blue-600 hover:underline dark:text-blue-400">{{ $document['number'] }}</a>
+                                        @else
+                                            <span class="text-gray-900 dark:text-gray-100">{{ $document['number'] }}</span>
+                                        @endif
+                                        <div class="text-gray-500 dark:text-gray-400">{{ $document['status'] }}</div>
+                                    </li>
+                                @empty
+                                    <li class="text-gray-500 dark:text-gray-400">{{ __('encounters.linked_documents.empty') }}</li>
+                                @endforelse
+                            </ul>
+                        </section>
+                    @endforeach
+                </div>
+            </fieldset>
+
             <div class="mt-8">
                 <a
                     href="{{ $personId ? route('persons.encounters.index', [legalEntity(), 'person' => $personId]) : route('prepersons.encounters.index', [legalEntity(), 'preperson' => $prepersonId]) }}"
@@ -655,5 +684,13 @@
         </div>
     </section>
 
-    <livewire:components.x-message :key="now()->timestamp" />
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
+    </x-layouts.patient>
 </div>
+
+@else
+    <div>
+        <p class="text-red-600">{{ __('encounters.sync_access_denied') }}</p>
+        <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
+    </div>
+@endif

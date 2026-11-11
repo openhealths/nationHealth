@@ -7,7 +7,7 @@ namespace App\Classes\eHealth\Errors;
 /**
  * Translates the errors of the preperson resource.
  */
-final class PrepersonErrorTranslator extends BaseErrorTranslator
+class PrepersonErrorTranslator extends BaseErrorTranslator
 {
     /**
      * Messages of the preperson resource: original message => translation.

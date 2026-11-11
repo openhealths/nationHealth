@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories\MedicalEvents;
 
 use App\Classes\eHealth\EHealth;
+use App\Enums\CarePlanStatus;
 use App\Enums\ClinicalImpression\Status as ClinicalImpressionStatus;
 use App\Enums\DetectedIssue\Status as DetectedIssueStatus;
 use App\Enums\Device\Status as DeviceStatus;
@@ -13,31 +14,41 @@ use App\Enums\DeviceDispense\Status as DeviceDispenseStatus;
 use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\JobStatus;
 use App\Enums\Person\ConditionVerificationStatus;
+use App\Enums\Person\DeviceRequestStatus;
 use App\Enums\Person\DiagnosticReportStatus;
 use App\Enums\Person\EncounterStatus;
 use App\Enums\Person\ImmunizationStatus;
+use App\Enums\Person\MedicationRequestStatus;
 use App\Enums\Person\ObservationStatus;
 use App\Enums\Person\ProcedureStatus;
+use App\Enums\Person\ServiceRequestStatus;
 use App\Enums\Specimen\Status as SpecimenStatus;
 use App\Jobs\RemoteEHealthLinksProcessing;
+use App\Models\CarePlan;
 use App\Models\EhealthLink;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
+use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\DetectedIssue;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\DeviceAssociation;
 use App\Models\MedicalEvents\Sql\DeviceDispense;
+use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Encounter as EncounterSql;
 use App\Models\MedicalEvents\Sql\EncounterDiagnose;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Immunization;
+use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\MedicalEvents\Sql\Procedure;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -58,6 +69,109 @@ class EncounterRepository extends BaseRepository
         return Encounter::forPatient($patient)
             ->with(['episode', 'class', 'performer', 'hospitalization.dischargeDisposition', 'hospitalization.destination'])
             ->findOrFail($id);
+    }
+
+    /** Documents of the encounter and its treatment plans, scoped to the encounter's original patient owner. */
+    public function linkedDocuments(Encounter $encounter, Person|Preperson $patient, User $user): array
+    {
+        if ($user->cannot('view', [$encounter, $patient])
+            || ($encounter->person_id === null) === ($encounter->preperson_id === null)) {
+            return [];
+        }
+
+        // A merged encounter retains its source owner; the displayed patient's FK must never replace it.
+        $owner = $encounter->preperson_id !== null
+            ? Preperson::findOrFail($encounter->preperson_id)
+            : Person::findOrFail($encounter->person_id);
+        $ownerColumn = $owner instanceof Preperson ? 'preperson_id' : 'person_id';
+        $otherOwnerColumn = $owner instanceof Preperson ? 'person_id' : 'preperson_id';
+        $routePrefix = $owner instanceof Preperson ? 'prepersons' : 'persons';
+        $routeOwner = [$ownerColumn === 'person_id' ? 'person' : 'preperson' => $owner->id];
+        $encounterReference = static fn (Builder $reference): Builder => $reference->whereValue($encounter->uuid);
+        $incomingReferralUuid = $encounter->incomingReferral?->value;
+        $referral = Str::isUuid($incomingReferralUuid ?? '')
+            ? ServiceRequestRequest::forPatient($owner)->whereUuid($incomingReferralUuid)
+                ->with(['basedOn', 'basedOnReferences'])->first() : null;
+        $basis = $referral?->basedOnReferences->pluck('value') ?? collect();
+        if ($referral?->basedOn !== null) {
+            $basis->push($referral->basedOn->value);
+        }
+        $basis = $basis->filter(static fn ($uuid): bool => is_string($uuid) && Str::isUuid($uuid))->unique();
+        $plans = $owner instanceof Person
+            ? CarePlan::wherePersonId($owner->id)->where(static function (Builder $plan) use ($encounter, $encounterReference, $basis): void {
+                $plan->whereEncounterId($encounter->id)->orWhereHas('encounterIdentifier', $encounterReference)
+                    ->orWhereIn('uuid', $basis)->orWhereHas('activities', static fn (Builder $activity): Builder => $activity->whereIn('uuid', $basis));
+            })->with('activities:id,care_plan_id,uuid')->get()
+            : collect();
+        $planReferences = $plans->pluck('uuid')->merge($plans->flatMap(static fn (CarePlan $plan): Collection => $plan->activities->pluck('uuid')))->filter()->unique();
+        $planReference = static fn (Builder $reference): Builder => $reference->whereIn('value', $planReferences);
+
+        $referrals = $user->can('search', ServiceRequestRequest::class)
+            ? ServiceRequestRequest::forPatient($owner)->where(static fn (Builder $request): Builder => $request
+                ->whereHas('context', $encounterReference)->orWhereHas('basedOn', $planReference)
+                ->orWhereHas('basedOnReferences', $planReference)
+                ->when($referral !== null, static fn (Builder $incoming): Builder => $incoming->orWhere('uuid', $referral->uuid)))->get()
+            : collect();
+        $prescriptions = $owner instanceof Person
+            ? MedicationRequestRequest::wherePersonId($owner->id)->where(static fn (Builder $request): Builder => $request
+                ->whereHas('context', $encounterReference)->orWhereHas('basedOn', $planReference)
+                ->orWhereHas('references', static fn (Builder $reference): Builder => $planReference($reference)->where('medication_request_references.field', 'basedOn')))
+                ->get()->filter(static fn (MedicationRequestRequest $request): bool => $user->can('view', $request))
+            : collect();
+        $devices = $owner instanceof Person && $user->can('viewAny', DeviceRequestRequest::class)
+            ? DeviceRequestRequest::wherePersonId($owner->id)->where(static fn (Builder $request): Builder => $request
+                ->whereHas('context', $encounterReference)->orWhereHas('basedOn', $planReference))->get()
+            : collect();
+        $compositions = Composition::where($ownerColumn, $owner->id)->whereNull($otherOwnerColumn)
+            ->forEncounter($encounter->uuid)->get()->filter(static fn (Composition $composition): bool => $user->can('view', $composition));
+
+        return [
+            'referrals' => [
+                'title' => __('patients.referrals'),
+                'url' => $owner instanceof Person && $user->can('search', ServiceRequestRequest::class)
+                    ? route('persons.referrals', [legalEntity(), 'person' => $owner->id]) : null,
+                'records' => $referrals->map(static fn (ServiceRequestRequest $request): array => [
+                    'id' => $request->uuid, 'number' => $request->requestNumber ?? $request->uuid,
+                    'status' => ServiceRequestStatus::resolve($request->status)?->label() ?? $request->status, 'url' => null,
+                ])->all(),
+            ],
+            'prescriptions' => [
+                'title' => __('patients.prescriptions'),
+                'url' => $owner instanceof Person && ($user->can('medication_request:read') || $user->can('medication_request_request:read'))
+                    ? route('persons.medication-requests', [legalEntity(), 'person' => $owner->id]) : null,
+                'records' => $prescriptions->map(static fn (MedicationRequestRequest $request): array => [
+                    'id' => $request->uuid, 'number' => $request->requestNumber ?? $request->uuid,
+                    'status' => MedicationRequestStatus::resolve($request->status)?->label() ?? $request->status,
+                    'url' => route($request->resourceType === MedicationRequestRequest::TYPE_REQUEST ? 'persons.prescription-requests.view' : 'persons.medication-requests.view', [legalEntity(), 'person' => $owner->id, 'requestId' => $request->uuid]),
+                ])->all(),
+            ],
+            'device-requests' => [
+                'title' => __('device-requests.labels.patient_tab'),
+                'url' => $owner instanceof Person && $user->can('viewAny', DeviceRequestRequest::class)
+                    ? route('persons.device-requests', [legalEntity(), 'person' => $owner->id]) : null,
+                'records' => $devices->map(static fn (DeviceRequestRequest $request): array => [
+                    'id' => $request->uuid, 'number' => $request->requestNumber ?? $request->uuid,
+                    'status' => DeviceRequestStatus::resolve($request->status)?->label() ?? $request->status,
+                    'url' => route('persons.device-requests.view', [legalEntity(), 'person' => $owner->id, 'deviceRequest' => $request->uuid]),
+                ])->all(),
+            ],
+            'care-plans' => [
+                'title' => __('patients.care_plans'),
+                'url' => $owner instanceof Person && $user->can('search', CarePlan::class)
+                    ? route('persons.care-plans', [legalEntity(), 'person' => $owner->id]) : null,
+                'records' => $plans->filter(static fn (CarePlan $plan): bool => $user->can('view', $plan))->map(static fn (CarePlan $plan): array => [
+                    'id' => $plan->uuid, 'number' => $plan->displayTitle(), 'status' => CarePlanStatus::labelFor($plan->status),
+                    'url' => route('care-plans.show', [legalEntity(), 'carePlan' => $plan->id]),
+                ])->values()->all(),
+            ],
+            'compositions' => [
+                'title' => __('patients.medical_reports'),
+                'url' => $user->can('viewAny', Composition::class) ? route($routePrefix.'.compositions', [legalEntity(), ...$routeOwner]) : null,
+                'records' => $compositions->map(static fn (Composition $composition): array => [
+                    'id' => $composition->uuid, 'number' => $composition->uuid, 'status' => $composition->status->label(), 'url' => null,
+                ])->values()->all(),
+            ],
+        ];
     }
 
     /** @return Collection<int, Condition> */

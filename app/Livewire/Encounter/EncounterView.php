@@ -13,7 +13,9 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Throwable;
@@ -88,23 +90,36 @@ class EncounterView extends BasePatientComponent
      */
     public function sync(): void
     {
-        try {
-            $response = EHealth::encounter()->getById($this->uuid, $this->encounterUuid);
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error while synchronizing the encounter');
+        $encounter = $this->encounter();
+        if (Auth::user()->cannot('view', [$encounter, $this->patient()])) {
+            Session::flash('error', __('encounters.sync_access_denied'));
 
             return;
         }
 
-        $encounter = $this->encounter();
-
-        // A record of a person merged into the patient stays with its own owner
+        // A record of a person merged into the patient stays with its own owner.
         $owner = $encounter->preperson_id !== null
             ? Preperson::findOrFail($encounter->preperson_id)
             : Person::findOrFail($encounter->person_id);
 
         try {
-            Repository::encounter()->sync($owner, [$response->validate()]);
+            $response = EHealth::encounter()->getById($owner->uuid, $encounter->uuid);
+            $data = $response->validate();
+            if (($data['uuid'] ?? null) !== $encounter->uuid) {
+                throw ValidationException::withMessages(['encounter' => __('errors.ehealth.messages.request_error')]);
+            }
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while synchronizing the encounter');
+
+            return;
+        } catch (ValidationException) {
+            Session::flash('error', __('errors.ehealth.messages.request_error'));
+
+            return;
+        }
+
+        try {
+            Repository::encounter()->sync($owner, [$data]);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while synchronizing the encounter');
 
@@ -127,6 +142,8 @@ class EncounterView extends BasePatientComponent
     protected function encounter(): Encounter
     {
         return $this->encounterModel ??= Encounter::readableFor($this->patient(), true)
+            ->where(static fn ($query) => $query->whereNotNull('person_id')->whereNull('preperson_id')
+                ->orWhere(static fn ($preperson) => $preperson->whereNotNull('preperson_id')->whereNull('person_id')))
             ->withRelationships()
             ->whereId($this->encounterId)
             ->firstOrFail();
@@ -134,8 +151,12 @@ class EncounterView extends BasePatientComponent
 
     public function render(): View
     {
+        $encounter = $this->encounter();
+        $canView = Auth::user()->can('view', [$encounter, $this->patient()]);
+
         return view('livewire.encounter.encounter-view')->with([
-            'encounter' => $this->encounter()
+            'encounter' => $canView ? $encounter : null,
+            'linkedDocuments' => $canView ? Repository::encounter()->linkedDocuments($encounter, $this->patient(), Auth::user()) : [],
         ]);
     }
 }

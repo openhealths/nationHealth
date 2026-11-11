@@ -1,3 +1,14 @@
+@use('App\Models\DeclarationRequest')
+@use('App\Models\MedicalEvents\Sql\DetectedIssue')
+@use('App\Models\MedicalEvents\Sql\DeviceAssociation')
+@use('App\Models\MedicalEvents\Sql\DeviceRequestRequest')
+@use('App\Models\MedicalEvents\Sql\Encounter')
+@use('App\Models\Person\Person')
+@use('App\Models\Relations\PersonVerificationDetail')
+@use('Illuminate\Http\Request')
+@use('Illuminate\Support\Facades\Auth')
+@use('Livewire\Livewire')
+@use('Illuminate\Support\Facades\Route')
 @use('App\Models\MedicalEvents\Sql\Composition')
 @props([
     'personId' => null,
@@ -11,16 +22,6 @@
 ])
 
 @php
-    use App\Models\DeclarationRequest;
-    use App\Models\MedicalEvents\Sql\DetectedIssue;
-    use App\Models\MedicalEvents\Sql\DeviceAssociation;
-    use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
-    use App\Models\MedicalEvents\Sql\Encounter;
-    use App\Models\Person\Person;
-    use App\Models\Relations\PersonVerificationDetail;
-    use Illuminate\Http\Request;
-    use Illuminate\Support\Facades\Auth;
-    use Livewire\Livewire;
 
     // A Livewire action runs on its own endpoint, so the page's route is found again from the URL it was sent from
     $currentRoute = Livewire::isLivewireRequest()
@@ -130,7 +131,7 @@
                             @else
                                 <a
                                     href="{{ route('persons.medication-requests', [legalEntity(), 'person' => $personId]) }}"
-                                    class="summary-tab {{ $isCurrentRoute('persons.medication-requests') ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                                    class="summary-tab {{ ($isCurrentRoute('persons.medication-requests*') || $isCurrentRoute('persons.prescription-requests*')) ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                                 >
                                     {{ __('patients.prescriptions') }}
                                 </a>
@@ -157,7 +158,7 @@
                             @can('viewAny', Composition::class)
                                 <a
                                     href="{{ route("$routePrefix.compositions", [legalEntity(), $routeParamKey => $recordId]) }}"
-                                    class="summary-tab {{ request()->routeIs("$routePrefix.compositions") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
+                                    class="summary-tab {{ $isCurrentRoute("$routePrefix.compositions*") ? 'summary-tab-active' : 'summary-tab-inactive' }}"
                                 >
                                     {{ __('patients.medical_reports') }}
                                 </a>
