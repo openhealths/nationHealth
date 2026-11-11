@@ -1,4 +1,5 @@
 @use('Carbon\Carbon')
+@use('Carbon\CarbonImmutable')
 @use('App\Enums\Person\AuthenticationMethod')
 
 <div
@@ -37,7 +38,17 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse ($approvals as $approval)
+                    @php
+                        // Recheck expiry on render: Livewire can retain rows loaded before their access expired.
+                        $visibleApprovals = collect($approvals)->filter(function (array $approval): bool {
+                            $expiresAt = $approval['expiresAt'] ?? ($approval['expires_at'] ?? null);
+
+                            return $expiresAt !== null
+                                ? CarbonImmutable::parse($expiresAt)->isFuture()
+                                : (($approval['requestPending'] ?? false) && !($approval['isVerified'] ?? ($approval['is_verified'] ?? false)));
+                        });
+                    @endphp
+                    @forelse ($visibleApprovals as $approval)
                         <tr class="index-table-tr">
                             <td class="index-table-td">
                                 <div class="flex flex-col">
