@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
+use App\Classes\eHealth\SchemaResponseContract;
 use App\Enums\Person\EncounterStatus;
 use App\Enums\Person\MedicationRequestStatus;
 use App\Models\CarePlan;
@@ -110,8 +111,27 @@ class MedicationRequestRepository extends BaseRepository
 
         return $this->storageTransaction(function () use ($resource, $personId, $employeeId, $divisionId, $source, $resourceType, $native): MedicationRequestRequest {
             $request = $this->model->newQuery()->whereUuid($resource['id'])->lockForUpdate()->first();
-            if ($request !== null && ((int) $request->personId !== $personId || $request->resourceType !== $resourceType)) {
-                throw new InvalidArgumentException('Medication identity or resource type does not match.');
+            if ($request !== null) {
+                if ((int) $request->personId !== $personId) {
+                    throw new InvalidArgumentException('Medication identity or resource type does not match.');
+                }
+                if ($request->resourceType !== $resourceType) {
+                    // Historical list caches classified every external record as a signed prescription.
+                    // Only a complete authoritative MRR detail may correct that unsynchronized projection.
+                    $legacyRequestImport = $request->source === MedicationRequestRequest::SOURCE_EHEALTH
+                        && $request->detailsSyncedAt === null
+                        && $request->resourceType === MedicationRequestRequest::TYPE_PRESCRIPTION
+                        && $resourceType === MedicationRequestRequest::TYPE_REQUEST
+                        && $source === MedicationRequestRequest::SOURCE_EHEALTH
+                        && $native !== null;
+                    if (!$legacyRequestImport) {
+                        throw new InvalidArgumentException('Medication identity or resource type does not match.');
+                    }
+                    SchemaResponseContract::validateOperationData($native, 'request_detail', 'medication');
+                    if ($native['id'] !== $resource['id'] || $native['person']['id'] !== $this->personUuid($personId)) {
+                        throw new InvalidArgumentException('Medication identity or resource type does not match.');
+                    }
+                }
             }
             $canonical = $request?->detailsSyncedAt !== null;
             $request ??= $this->model->newInstance();
@@ -862,6 +882,12 @@ class MedicationRequestRepository extends BaseRepository
                     throw new InvalidArgumentException('The care-plan medication response belongs to another patient.');
                 }
                 $resource = (new MedicationRequestMapper())->fromEHealth($item);
+                // Keep local lifecycle values canonical while retaining untouched native status for signing.
+                $status = MedicationRequestStatus::resolve($resource['status']);
+                if ($status === null) {
+                    throw new InvalidArgumentException('The care-plan medication response returned an invalid status.');
+                }
+                $resource['status'] = $status->value;
                 $plan = collect($resource['basedOn'] ?? [])->first(fn (array $ref): bool => (new MedicationRequestMapper())->referenceType($ref) === 'care_plan');
                 if ($plan !== null && data_get($plan, 'identifier.value') !== $carePlan->uuid) {
                     throw new InvalidArgumentException('The medication basis belongs to another care plan.');

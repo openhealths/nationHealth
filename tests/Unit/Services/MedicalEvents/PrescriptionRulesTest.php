@@ -102,4 +102,27 @@ class PrescriptionRulesTest extends TestCase
         $this->expectException(ValidationException::class);
         PrescriptionRules::normalize(array_replace($form, ['inform_with' => 'method|OTP|+380000000000']), $this->drug());
     }
+
+    public function test_official_program_list_and_detail_enforce_the_same_period_and_notification_rules(): void
+    {
+        foreach (['medical_program_settings', 'settings'] as $shape) {
+            $program = [$shape => ['request_max_period_day' => 20, 'request_notification_disabled' => true]];
+            $form = array_replace($this->form(), ['inform_with' => '', 'phone_confirmed' => false]);
+            $normalized = PrescriptionRules::normalize($form, $this->drug(), $program);
+            $this->assertTrue($normalized['request_notification_disabled']);
+            $this->assertNull($normalized['inform_with']);
+            try {
+                PrescriptionRules::normalize(array_replace($form, ['duration' => 21, 'medication_qty' => 60]), $this->drug(), $program);
+                $this->fail('The native program period must apply to either documented response shape.');
+            } catch (ValidationException $exception) {
+                $this->assertSame(__('medication-requests.course_period_exceeded', ['max' => 20]), $exception->errors()['duration'][0]);
+            }
+        }
+    }
+
+    public function test_optional_program_has_no_period_rule_and_keeps_notifications_enabled(): void
+    {
+        $this->assertNull(PrescriptionRules::programSetting(null, 'request_max_period_day'));
+        $this->assertFalse(PrescriptionRules::programSetting(null, 'request_notification_disabled', false));
+    }
 }

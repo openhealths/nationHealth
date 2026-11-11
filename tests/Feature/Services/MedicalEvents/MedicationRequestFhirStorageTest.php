@@ -6,11 +6,12 @@ namespace Tests\Feature\Services\MedicalEvents;
 
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\Person\Person;
-use App\Repositories\MedicalEvents\MedicationRequestRepository;
+use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Tests\TestCase;
 
@@ -43,7 +44,7 @@ class MedicationRequestFhirStorageTest extends TestCase
         $native = json_decode(file_get_contents(base_path('tests/Fixtures/medication-request-detail.json')), true, flags: JSON_THROW_ON_ERROR);
         $person = Person::create(['uuid' => $native['person']['id'], 'birth_date' => '1990-01-01', 'gender' => 'MALE', 'patient_signed' => true, 'process_disclosure_data_consent' => true]);
 
-        return [$person, $native, app(MedicationRequestRepository::class)];
+        return [$person, $native, Repository::medicationRequest()];
     }
 
     public function test_signed_acknowledgement_survives_an_invalid_detail_and_retry_is_idempotent(): void
@@ -139,6 +140,63 @@ class MedicationRequestFhirStorageTest extends TestCase
         $this->assertEquals($this->storedProfile((new MedicationRequestMapper())->fromEHealth($native)), $repository->getResource($request->fresh()));
         $this->expectException(InvalidArgumentException::class);
         $repository->storeResource((new MedicationRequestMapper())->fromEHealth($native), $person->id, resourceType: MedicationRequestRequest::TYPE_PRESCRIPTION);
+    }
+
+    public function test_complete_native_request_can_reclassify_an_unsynced_external_legacy_cache_once(): void
+    {
+        [$person, , $repository] = $this->fixture();
+        $native = json_decode(file_get_contents(base_path('tests/Fixtures/medication-official-responses.json')), true, flags: JSON_THROW_ON_ERROR)['request_detail'];
+        $native['person']['id'] = $person->uuid;
+        $legacy = $repository->upsertFromEHealth(['id' => $native['id'], 'status' => 'active'], $person->id);
+        $this->assertNull($legacy->detailsSyncedAt);
+        $this->assertSame(MedicationRequestRequest::TYPE_PRESCRIPTION, $legacy->resourceType);
+        $request = $repository->importDetails($native, $person->id, MedicationRequestRequest::TYPE_REQUEST);
+        $repository->importDetails($native, $person->id, MedicationRequestRequest::TYPE_REQUEST);
+        $this->assertSame($legacy->id, $request->id);
+        $this->assertSame(MedicationRequestRequest::TYPE_REQUEST, $request->resourceType);
+        $this->assertNotNull($request->detailsSyncedAt);
+        $this->assertEquals($native, $request->ehealthPayload);
+        $this->assertSame(1, MedicationRequestRequest::whereUuid($native['id'])->count());
+        $this->assertCount(count($native['dosage_instruction']), $repository->getResource($request)['dosageInstruction']);
+    }
+
+    public function test_legacy_reclassification_rejects_local_synced_foreign_reverse_or_malformed_details_without_writes(): void
+    {
+        [$person, , $repository] = $this->fixture();
+        foreach (['local', 'synced', 'foreign', 'reverse', 'malformed', 'wrong-native-id'] as $case) {
+            $native = json_decode(file_get_contents(base_path('tests/Fixtures/medication-official-responses.json')), true, flags: JSON_THROW_ON_ERROR)['request_detail'];
+            $native['id'] = (string) Str::uuid();
+            $native['person']['id'] = $person->uuid;
+            $legacy = $repository->upsertFromEHealth(['id' => $native['id'], 'status' => 'active'], $person->id);
+            if ($case === 'local') {
+                $legacy->update(['source' => MedicationRequestRequest::SOURCE_LOCAL]);
+            } elseif ($case === 'synced') {
+                $legacy->update(['details_synced_at' => now()]);
+            } elseif ($case === 'foreign') {
+                $other = Person::create(['uuid' => (string) Str::uuid(), 'birth_date' => '1990-01-01', 'gender' => 'FEMALE']);
+                $legacy->update(['person_id' => $other->id]);
+            } elseif ($case === 'reverse') {
+                $legacy->update(['resource_type' => MedicationRequestRequest::TYPE_REQUEST]);
+            }
+            $resource = (new MedicationRequestMapper())->fromEHealth($native);
+            if ($case === 'malformed') {
+                unset($native['employee']);
+            } elseif ($case === 'wrong-native-id') {
+                $native['id'] = (string) Str::uuid();
+            }
+            $before = $legacy->fresh()->getAttributes();
+            $identifiers = DB::table('identifiers')->count();
+            $dosages = DB::table('dosage_instructions')->count();
+            try {
+                $repository->storeResource($resource, $person->id, resourceType: $case === 'reverse'
+                    ? MedicationRequestRequest::TYPE_PRESCRIPTION : MedicationRequestRequest::TYPE_REQUEST, native: $native);
+                $this->fail('Rejected medication reclassification was accepted: '.$case);
+            } catch (InvalidArgumentException|ValidationException) {
+                $this->assertEquals($before, $legacy->fresh()->getAttributes(), $case);
+                $this->assertSame($identifiers, DB::table('identifiers')->count(), $case);
+                $this->assertSame($dosages, DB::table('dosage_instructions')->count(), $case);
+            }
+        }
     }
 
     public function test_patient_mismatch_is_rejected_without_writing_any_clinical_data(): void
