@@ -6,7 +6,6 @@ namespace Tests\Feature\CarePlan;
 
 use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Classes\eHealth\EHealthResponse;
-use App\Enums\Person\ApprovalStatus;
 use App\Exceptions\EHealth\EHealthJobTimeoutException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\CarePlan\CarePlanApprovals;
@@ -156,9 +155,10 @@ class CarePlanRegistryQualityTest extends TestCase
     }
 
     #[DataProvider('cancellationResponses')]
-    public function test_recipient_can_revoke_without_care_plan_write_permission_and_sees_confirmed_result(int $statusCode): void
+    public function test_recipient_can_revoke_without_care_plan_write_permission_and_sees_confirmed_result(int $statusCode, ?string $legacyStatus): void
     {
         [$plan, $approval, $legalEntity] = $this->approvalContext(['care_plan:read', 'approval:cancel']);
+        $approval->update(['status' => $legacyStatus]);
         $api = Mockery::mock(ApprovalApi::class);
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn($statusCode === 201
@@ -177,14 +177,19 @@ class CarePlanRegistryQualityTest extends TestCase
             ->assertSee(__('care-plan.revoke_approval'))
             ->call('cancelApproval', $approval->uuid)->assertSee(__('care-plan.approval_cancelled'))
             ->assertDontSeeHtml('wire:click="cancelApproval')->assertDispatched('care-plan-approvals-changed');
-        $this->assertSame(ApprovalStatus::TERMINATED->value, $approval->fresh()->status);
+        $this->assertSame($legacyStatus, $approval->fresh()->status);
         $this->assertTrue($approval->fresh()->getAttribute('is_verified'));
         $this->assertFalse($approval->fresh()->expiresAt->isFuture());
     }
 
     public static function cancellationResponses(): array
     {
-        return ['synchronous' => [201], 'asynchronous' => [202]];
+        return [
+            'synchronous' => [201, null],
+            'asynchronous' => [202, null],
+            'synchronous legacy status' => [201, 'active'],
+            'asynchronous legacy status' => [202, 'active'],
+        ];
     }
 
     public function test_previously_expired_approval_is_not_displayed_as_active(): void
@@ -269,7 +274,7 @@ class CarePlanRegistryQualityTest extends TestCase
             'uuid' => (string) Str::uuid(), 'approvable_type' => $plan->getMorphClass(), 'approvable_id' => $plan->id,
             'granted_to_id' => $recipient->id, 'created_by_id' => $otherCreator->id,
             'granted_to_type' => 'employee',
-            'status' => 'active', 'is_verified' => true, 'access_level' => 'write', 'expires_at' => now()->addDay(),
+            'is_verified' => true, 'access_level' => 'write', 'expires_at' => now()->addDay(),
         ]);
         $service = Mockery::mock(CarePlanApprovalService::class)->makePartial();
         $service->shouldReceive('skipsPatientOtp')->andReturn(true);
