@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Livewire\ContractRequest;
 
 use App\Classes\eHealth\EHealth;
+use App\Contracts\SignatureProvider;
 use App\Enums\Contract\IdForm;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\Signature\SignatureException;
 use App\Livewire\Contract\Forms\ContractRequestSigningForm as SigningForm;
 use App\Models\Contracts\ContractRequest;
 use App\Models\LegalEntity;
@@ -112,9 +114,9 @@ class ContractRequestShow extends Component
             $dataToSign = $this->buildJsonDataToSign();
             $signedContent = signatureService()->signData(
                 $dataToSign,
-                $validated['password'],
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
+                $validated['password'],
                 Auth::user()->party->taxId
             );
 
@@ -131,6 +133,8 @@ class ContractRequestShow extends Component
             $this->showSignatureModal = false;
             $this->pendingAction = null;
             Session::flash('success', __('contracts.approve_success'));
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing contract request approval');
         } catch (\Throwable $exception) {
             $this->handleActionError($exception, 'approve');
         }
@@ -174,6 +178,8 @@ class ContractRequestShow extends Component
             $this->showSignatureModal = false;
             $this->pendingAction = null;
             Session::flash('success', __('contracts.sign_success'));
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing contract request');
         } catch (\Throwable $exception) {
             $this->handleActionError($exception, 'sign');
         }
@@ -183,7 +189,7 @@ class ContractRequestShow extends Component
      * Builds signed content for sign_msp: co-sign NHS content when available, else sign JSON.
      *
      * At NHS_SIGNED, eHealth usually returns partially signed PKCS7 via getSignedContent().
-     * That blob must be co-signed with {@see SignatureService::signBase64Payload()}.
+     * That blob must be co-signed with {@see SignatureProvider::signBase64Data()}.
      * If the endpoint is unavailable (404), falls back to signing fresh JSON from local data.
      *
      * @param  array<string, mixed>  $validated
@@ -199,11 +205,11 @@ class ContractRequestShow extends Component
             $base64Payload = $signedContentData['content'] ?? $signedContentData['signed_content'] ?? null;
 
             if (is_string($base64Payload) && $base64Payload !== '') {
-                return signatureService()->signBase64Payload(
+                return signatureService()->signBase64Data(
                     $base64Payload,
-                    $validated['password'],
                     $validated['knedp'],
                     $validated['keyContainerUpload'],
+                    $validated['password'],
                     Auth::user()->party->taxId
                 );
             }
@@ -221,9 +227,9 @@ class ContractRequestShow extends Component
 
         return signatureService()->signData(
             $this->buildJsonDataToSign(),
-            $validated['password'],
             $validated['knedp'],
             $validated['keyContainerUpload'],
+            $validated['password'],
             Auth::user()->party->taxId
         );
     }

@@ -15,7 +15,7 @@ use App\Models\User;
 use App\Services\Dictionary\Collections\BasicDictionaryCollection;
 use App\Services\Dictionary\DictionaryManager;
 use App\Classes\eHealth\Api\CarePlan as CarePlanLifecycleService;
-use App\Services\SignatureService;
+use App\Contracts\SignatureProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -118,7 +118,7 @@ class CarePlanConfiguredPeriodTest extends TestCase
             ]));
         });
         $payload = null;
-        $this->mock(SignatureService::class, function ($mock) use (&$payload): void {
+        $this->mock(SignatureProvider::class, function ($mock) use (&$payload): void {
             $mock->shouldReceive('getCertificateAuthorities')->andReturn([]);
             $mock->shouldReceive('signData')->once()->andReturnUsing(function (array $data) use (&$payload): string {
                 $payload = $data;

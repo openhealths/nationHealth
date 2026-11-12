@@ -15,6 +15,7 @@ use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\CarePlan\Forms\CarePlanForm;
 use App\Livewire\CarePlan\Forms\PatientSearchForm;
@@ -967,9 +968,9 @@ class CarePlanCreate extends BasePatientComponent
 
             $signedContent = signatureService()->signData(
                 $carePlanPayload,
-                $this->form->password,
                 $this->form->knedp,
                 $this->form->keyContainerUpload,
+                $this->form->password,
                 Auth::user()->party->taxId
             );
 
@@ -1048,6 +1049,10 @@ class CarePlanCreate extends BasePatientComponent
             }
         } catch (\App\Exceptions\MedicalEvents\ClinicalStorageException $exception) {
             Session::flash('error', $exception->getMessage());
+            $this->showSignatureModal = false;
+        } catch (SignatureException $exception) {
+            $this->carePlanUuid = $generatedUuid ?? $this->carePlanUuid;
+            $exception->handle('Error when signing care plan');
             $this->showSignatureModal = false;
         } catch (RuntimeException $exception) {
             $this->carePlanUuid = $generatedUuid ?? $this->carePlanUuid;

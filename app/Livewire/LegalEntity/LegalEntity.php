@@ -26,9 +26,6 @@ use App\Events\LegalEntityCreate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
-use App\Classes\Cipher\Api\CipherRequest;
-use App\Exceptions\Cipher\CipherException;
-use App\Exceptions\Cipher\CipherConnectionException;
 use Illuminate\Support\Facades\Cache;
 use App\Repositories\PhoneRepository;
 use Illuminate\Http\RedirectResponse;
@@ -304,21 +301,22 @@ abstract class LegalEntity extends Component
         Log::info('Legal Entity Success SOURCE DATA', $data);
 
         try {
-            $base64Data = new CipherRequest()->signData(
+            $base64Data = signatureService()->signData(
                 $data,
                 $this->legalEntityForm->knedp,
                 $this->legalEntityForm->keyContainerUpload,
                 $this->legalEntityForm->password,
                 $data['owner']['tax_id'],
                 $data['edrpou']
-            )->getBase64Data();
+            );
         } catch (Throwable $exception) {
+            // Signing fields are kept, so after a failed signature the KNEDP and key do not have to be chosen again
             $this->dispatchErrorMessage('Сайфер: ' . $exception->getMessage());
 
             throw new Exception();
-        } finally {
-            $this->legalEntityForm->resetSigningFields();
         }
+
+        $this->legalEntityForm->resetSigningFields();
 
         try {
             // Prepare data for API request

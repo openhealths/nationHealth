@@ -16,7 +16,7 @@ use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Models\Relations\Party;
 use App\Models\User;
-use App\Services\SignatureService;
+use App\Contracts\SignatureProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -136,12 +136,12 @@ trait CompositionTestFixtures
      */
     protected function fakeSignatureService(string $signed = 'base64-signed-payload'): void
     {
-        $signer = Mockery::mock(SignatureService::class);
+        $signer = Mockery::mock(SignatureProvider::class);
         $signer->shouldReceive('signData')->andReturn($signed);
         // The modal lists the certificate authorities while it renders.
         $signer->shouldReceive('getCertificateAuthorities')->andReturn([]);
 
-        $this->instance(SignatureService::class, $signer);
+        $this->instance(SignatureProvider::class, $signer);
     }
 
     /**

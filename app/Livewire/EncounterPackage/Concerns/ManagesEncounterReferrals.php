@@ -9,6 +9,7 @@ use App\Classes\eHealth\EHealth;
 use App\Enums\JobStatus;
 use App\Enums\MedicalProgram\Type as MedicalProgramType;
 use App\Enums\Person\EncounterStatus;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Concerns\SubmitsClinicalOperations;
 use App\Livewire\Referral\Forms\ServiceRequestForm;
@@ -534,9 +535,9 @@ trait ManagesEncounterReferrals
 
             $signedContent = signatureService()->signData(
                 $signPayload,
-                $validated['password'],
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
+                $validated['password'],
                 Auth::user()->party->taxId
             );
 
@@ -571,6 +572,10 @@ trait ManagesEncounterReferrals
             $exception->report();
             $this->encounterReferralWarningMessage = $exception->getFormattedMessage();
             Session::flash('error', $this->encounterReferralWarningMessage);
+            $this->showSignatureModal = false;
+            $this->actionType = null;
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing encounter referral');
             $this->showSignatureModal = false;
             $this->actionType = null;
         } catch (Throwable $exception) {

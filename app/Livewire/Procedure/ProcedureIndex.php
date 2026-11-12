@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\Procedure;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\JobStatus;
 use App\Enums\Person\ProcedureStatus;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\ProcedureSync;
@@ -365,23 +363,21 @@ class ProcedureIndex extends BasePatientComponent
         }
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 $signedPayload,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
-            $exception->handle(
-                'Error while signing procedure cancellation package',
-                __('procedures.messages.cancel_package_sign_error')
-            );
+        } catch (SignatureException $exception) {
+            // Signing fields are kept, so after a failed signature the KNEDP and key do not have to be chosen again
+            $exception->handle('Error while signing procedure cancellation package');
 
             return;
-        } finally {
-            $this->form->resetSigningFields();
         }
+
+        $this->form->resetSigningFields();
 
         $statusReason = FhirResource::make()
             ->coding('eHealth/procedure_status_reasons', $validated['statusReason'])
@@ -391,7 +387,7 @@ class ProcedureIndex extends BasePatientComponent
 
         try {
             EHealth::procedure()->cancel($this->uuid, $procedure->uuid, [
-                'signed_data' => $signedContent->getBase64Data(),
+                'signed_data' => $signedContent,
                 'signed_data_encoding' => 'base64',
             ]);
 

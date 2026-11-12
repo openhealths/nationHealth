@@ -13,7 +13,7 @@ use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
 use App\Models\User;
-use App\Services\SignatureService;
+use App\Contracts\SignatureProvider;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
@@ -173,10 +173,10 @@ class PharmacyDispenseTest extends TestCase
         $dispenseApi->shouldReceive('process')->once()->with($dispenseId, Mockery::type('array'))->andReturn($processResponse);
         $this->app->instance(MedicationDispenseApi::class, $dispenseApi);
 
-        $signature = Mockery::mock(SignatureService::class);
+        $signature = Mockery::mock(SignatureProvider::class);
         $signature->shouldReceive('signData')->once()->andReturn('signed-base64');
         $signature->shouldReceive('getCertificateAuthorities')->andReturn([]);
-        $this->instance(SignatureService::class, $signature);
+        $this->instance(SignatureProvider::class, $signature);
 
         Livewire::test(MedicationRequestIndex::class, ['legalEntity' => $this->pharmacy])
             ->set('requestNumber', '0000-70K0-6MTX-K8M8')

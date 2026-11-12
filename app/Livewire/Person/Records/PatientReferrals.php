@@ -10,6 +10,7 @@ use App\Core\BaseForm as Form;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\Signature\SignatureException;
 use App\Livewire\Concerns\SubmitsClinicalOperations;
 use App\Jobs\ServiceRequestSync;
 use App\Models\Declaration;
@@ -534,9 +535,9 @@ class PatientReferrals extends BasePatientComponent
             $payload = \App\Livewire\Referral\Forms\ServiceRequestForm::buildStatusContent($snapshot, $this->referralStatusReason, $letter, 'eHealth/service_request_recall_reasons');
             $signedContent = signatureService()->signData(
                 Arr::toSnakeCase($payload),
-                $validated['password'],
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
+                $validated['password'],
                 Auth::user()->party->taxId
             );
 
@@ -555,6 +556,9 @@ class PatientReferrals extends BasePatientComponent
             Session::flash('success', __('care-plan.referral_recall_success'));
         } catch (EHealthValidationException $exception) {
             Session::flash('error', $exception->getTranslatedMessage());
+            $this->showSignatureModal = false;
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing referral recall');
             $this->showSignatureModal = false;
         } catch (\Throwable $exception) {
             Log::error('PatientReferrals: failed to recall referral: '.$exception->getMessage());
@@ -594,9 +598,9 @@ class PatientReferrals extends BasePatientComponent
             $payload = \App\Livewire\Referral\Forms\ServiceRequestForm::buildStatusContent($snapshot, $this->referralStatusReason, trim($this->referralExplanatoryLetter), 'eHealth/service_request_cancel_reasons');
             $signedContent = signatureService()->signData(
                 Arr::toSnakeCase($payload),
-                $validated['password'],
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
+                $validated['password'],
                 Auth::user()->party->taxId
             );
 
@@ -614,6 +618,9 @@ class PatientReferrals extends BasePatientComponent
             Session::flash('success', __('care-plan.referral_cancel_success'));
         } catch (EHealthValidationException $exception) {
             Session::flash('error', $exception->getTranslatedMessage());
+            $this->showSignatureModal = false;
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing referral cancellation');
             $this->showSignatureModal = false;
         } catch (\Throwable $exception) {
             Log::error('PatientReferrals: failed to cancel referral: '.$exception->getMessage());
@@ -682,9 +689,9 @@ class PatientReferrals extends BasePatientComponent
 
             $signedContent = signatureService()->signData(
                 $signPayload,
-                $validated['password'],
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
+                $validated['password'],
                 Auth::user()->party->taxId
             );
 
@@ -718,6 +725,9 @@ class PatientReferrals extends BasePatientComponent
         } catch (EHealthValidationException $exception) {
             $exception->report();
             Session::flash('error', $exception->getFormattedMessage());
+            $this->showSignatureModal = false;
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing referral');
             $this->showSignatureModal = false;
         } catch (\Throwable $exception) {
             Log::error('PatientReferrals: failed to sign referral: '.$exception->getMessage());

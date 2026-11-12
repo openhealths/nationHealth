@@ -7,6 +7,7 @@ namespace Tests\Feature\MedicationRequest;
 use App\Classes\eHealth\Api\Patient\MedicationRequest as MedicationRequestApi;
 use App\Classes\eHealth\Api\Person as PersonApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Contracts\SignatureProvider;
 use App\Models\CarePlanActivity;
 use App\Models\Person\Person;
 use App\Models\Employee\Employee;
@@ -44,9 +45,9 @@ class MedicationRequestLifecycleTest extends TestCase
         DB::statement("SET LOCAL TIME ZONE 'UTC'");
         $this->travelTo(CarbonImmutable::parse('2026-10-29 23:30:00', (string) config('app.timezone')));
         $this->mockBasicDictionaries();
-        $signatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $signatureService = Mockery::mock(SignatureProvider::class);
         $signatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
-        $this->instance(\App\Services\SignatureService::class, $signatureService);
+        $this->instance(SignatureProvider::class, $signatureService);
 
         // 1. Create Patient
         $this->person = Person::create([
@@ -467,9 +468,9 @@ class MedicationRequestLifecycleTest extends TestCase
             });
         $this->instance(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class, $lifecycle);
 
-        // Mock SignatureService (KEP modal still fills form fields before signRejectPrescription).
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        // Mock the signature provider (KEP modal still fills form fields before signRejectPrescription).
+        $mockSignatureService = Mockery::mock(SignatureProvider::class);
+        $this->instance(SignatureProvider::class, $mockSignatureService);
         $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
         $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
 

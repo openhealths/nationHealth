@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Procedure;
 
 use App\Classes\eHealth\EHealth;
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Core\Arr;
 use App\Enums\Person\ProcedureStatus;
 use App\Enums\Status;
@@ -24,8 +23,7 @@ use App\Services\MedicalEvents\Fhir;
 use App\Traits\FormTrait;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\Signature\SignatureException;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -302,15 +300,15 @@ class ProcedureComponent extends Component
         $requestData = Arr::toSnakeCase($formattedData);
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 $requestData,
                 $validatedCipher['knedp'],
                 $validatedCipher['keyContainerUpload'],
                 $validatedCipher['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
-            $exception->handle('Error when signing procedure with Cipher');
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing procedure');
             Session::flash('error-modal', $exception->getMessage());
 
             return;
@@ -338,7 +336,7 @@ class ProcedureComponent extends Component
         }
 
         try {
-            $response = EHealth::procedure()->create($this->patientUuid, ['signed_data' => $signedContent->getBase64Data()]);
+            $response = EHealth::procedure()->create($this->patientUuid, ['signed_data' => $signedContent]);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when signing procedure');
             RemoteEHealthLinksProcessing::markSubmissionFailed($submission);

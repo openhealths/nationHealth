@@ -7,7 +7,7 @@ namespace Tests\Feature\Composition;
 use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionType;
 use App\Services\Dictionary\Dictionaries\BasicDictionary;
-use App\Services\SignatureService;
+use App\Contracts\SignatureProvider;
 use Illuminate\Support\Facades\Cache;
 use Mockery;
 
@@ -44,8 +44,8 @@ trait UsesCompositionDictionaries
         Cache::forever(BasicDictionary::KEY, $dictionaries);
         Cache::forever(BasicDictionary::KEY . ':fresh', true);
 
-        $signer = Mockery::mock(SignatureService::class);
+        $signer = Mockery::mock(SignatureProvider::class);
         $signer->shouldReceive('getCertificateAuthorities')->andReturn([]);
-        $this->app->instance(SignatureService::class, $signer);
+        $this->app->instance(SignatureProvider::class, $signer);
     }
 }

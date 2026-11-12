@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Specimen;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Specimen\Status;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Specimen\Forms\SpecimenForm;
@@ -236,24 +234,25 @@ abstract class SpecimenComponent extends Component
         );
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 Arr::toSnakeCase($fhirSpecimen),
                 $validatedCipher['knedp'],
                 $validatedCipher['keyContainerUpload'],
                 $validatedCipher['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
+        } catch (SignatureException $exception) {
+            // Signing fields are kept, so after a failed signature the KNEDP and key do not have to be chosen again
             $exception->handle('Error while signing specimen');
 
             return;
-        } finally {
-            $this->form->resetSigningFields();
         }
+
+        $this->form->resetSigningFields();
 
         try {
             $response = EHealth::specimen()->create($this->patientUuid, [
-                'signed_data' => $signedContent->getBase64Data(),
+                'signed_data' => $signedContent,
                 'signed_data_encoding' => 'base64'
             ]);
         } catch (EHealthException|EHealthConnectionException $exception) {

@@ -10,7 +10,7 @@ use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
 use App\Models\Preperson;
-use App\Services\SignatureService;
+use App\Contracts\SignatureProvider;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Http;
@@ -24,7 +24,7 @@ class EncounterReferralStateTest extends TestCase
     {
         parent::setUp();
         Http::preventStrayRequests();
-        $this->mock(SignatureService::class)->shouldReceive('getCertificateAuthorities')->andReturn([]);
+        $this->mock(SignatureProvider::class)->shouldReceive('getCertificateAuthorities')->andReturn([]);
     }
 
     public function test_referral_signature_renders_only_the_creation_handler(): void

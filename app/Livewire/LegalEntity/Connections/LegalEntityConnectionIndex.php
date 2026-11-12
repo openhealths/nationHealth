@@ -19,6 +19,7 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Locked;
 use App\Classes\eHealth\EHealth;
 use App\Repositories\Repository;
+use App\Exceptions\Signature\SignatureException;
 use Livewire\Attributes\Computed;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Bus;
@@ -162,11 +163,15 @@ class LegalEntityConnectionIndex extends LegalEntityConnectionComponent
         try {
             $signedData = signatureService()->signData(
                 $this->dataToSign,
-                $this->form->password,
                 $this->form->knedp,
                 $this->form->keyContainerUpload,
+                $this->form->password,
                 Auth::user()->party->tax_id
             );
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing connection data');
+
+            return;
         } catch (Throwable $err) {
             Log::error('Failed to sign connection data.', ['exception' => $err]);
             session()->flash('error', $err->getMessage());

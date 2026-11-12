@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\MedicationRequest;
 
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\Signature\SignatureException;
 use App\Models\LegalEntity;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use Exception;
@@ -149,9 +150,9 @@ class MedicationRequestForm extends Component
         try {
             $signedContent = signatureService()->signData(
                 $this->draftContent,
-                $this->form['password'],
                 $this->form['knedp'],
                 $this->form['keyContainerUpload'],
+                $this->form['password'],
                 (string) Auth::user()?->party?->taxId
             );
 
@@ -161,6 +162,10 @@ class MedicationRequestForm extends Component
             ]);
         } catch (EHealthValidationException $e) {
             $this->failWith($e->getFormattedMessage());
+
+            return;
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing medication request');
 
             return;
         } catch (Exception $e) {

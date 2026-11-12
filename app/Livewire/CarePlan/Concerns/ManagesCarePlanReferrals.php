@@ -10,6 +10,7 @@ use App\Core\Arr;
 use App\Enums\CarePlanStatus;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Livewire\Concerns\SubmitsClinicalOperations;
 use App\Livewire\Referral\Forms\ServiceRequestForm;
@@ -557,9 +558,9 @@ trait ManagesCarePlanReferrals
 
             $signedContent = signatureService()->signData(
                 $signPayload,
-                $this->form['password'],
                 $this->form['knedp'],
                 $this->form['keyContainerUpload'],
+                $this->form['password'],
                 Auth::user()->party->taxId
             );
 
@@ -617,6 +618,9 @@ trait ManagesCarePlanReferrals
             $translatedMsg = $e->getTranslatedMessage();
             Log::error('CarePlanShow: failed to sign referral validation: ' . $translatedMsg);
             $this->flashUserError($translatedMsg);
+            $this->showSignatureModal = false;
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing care plan referral');
             $this->showSignatureModal = false;
         } catch (Exception $e) {
             Log::error('CarePlanShow: failed to sign referral: ' . $e->getMessage());
@@ -688,9 +692,9 @@ trait ManagesCarePlanReferrals
 
             $signedContent = signatureService()->signData(
                 $payload,
-                $this->form['password'],
                 $this->form['knedp'],
                 $this->form['keyContainerUpload'],
+                $this->form['password'],
                 Auth::user()->party->taxId
             );
 
@@ -712,6 +716,9 @@ trait ManagesCarePlanReferrals
             $translatedMsg = $e->getTranslatedMessage();
             Log::error('CarePlanShow: failed to recall referral validation: '.$translatedMsg);
             Session::flash('error', $translatedMsg);
+            $this->showSignatureModal = false;
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing care plan referral recall');
             $this->showSignatureModal = false;
         } catch (Exception $e) {
             Log::error('CarePlanShow: failed to recall referral: '.$e->getMessage());
@@ -769,9 +776,9 @@ trait ManagesCarePlanReferrals
 
             $signedContent = signatureService()->signData(
                 $kind === 'service_request' ? $payload : Arr::toSnakeCase($payload),
-                $this->form['password'],
                 $this->form['knedp'],
                 $this->form['keyContainerUpload'],
+                $this->form['password'],
                 Auth::user()->party->taxId
             );
 
@@ -792,6 +799,9 @@ trait ManagesCarePlanReferrals
             $translatedMsg = $e->getTranslatedMessage();
             Log::error('CarePlanShow: failed to cancel referral validation: ' . $translatedMsg);
             Session::flash('error', $translatedMsg);
+            $this->showSignatureModal = false;
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing care plan referral cancellation');
             $this->showSignatureModal = false;
         } catch (Exception $e) {
             Log::error('CarePlanShow: failed to cancel referral: ' . $e->getMessage());

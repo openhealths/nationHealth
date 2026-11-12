@@ -12,6 +12,7 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
+use App\Exceptions\Signature\SignatureException;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\MedicalEvents\Sql\CompositionOperation;
 use App\Repositories\MedicalEvents\CompositionOperationRepository;
@@ -20,7 +21,6 @@ use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Enums\Composition\CompositionJobStatus;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\SignatureService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -634,11 +634,11 @@ trait DrivesCompositionWizard
         $this->authorize('sign', $composition);
 
         try {
-            $signedContent = app(SignatureService::class)->signData(
+            $signedContent = signatureService()->signData(
                 $this->compositionDetail,
-                $this->form->password,
                 $this->form->knedp,
                 $this->form->keyContainerUpload,
+                $this->form->password,
                 Auth::user()->party->taxId
             );
 
@@ -664,6 +664,8 @@ trait DrivesCompositionWizard
             $this->step = self::STEP_AWAITING_JOB;
 
             Session::flash('info', __('compositions.messages.signature_submitted'));
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing a medical conclusion');
         } catch (Throwable $exception) {
             Session::flash('error', $exception->getMessage());
 

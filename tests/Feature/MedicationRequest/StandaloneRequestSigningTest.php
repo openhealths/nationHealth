@@ -14,7 +14,7 @@ use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
-use App\Services\SignatureService;
+use App\Contracts\SignatureProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -42,7 +42,7 @@ class StandaloneRequestSigningTest extends TestCase
 
     protected LegalEntity $legalEntity;
 
-    protected SignatureService $signature;
+    protected SignatureProvider $signature;
 
     protected function migrateDatabases(): void
     {
@@ -110,11 +110,11 @@ class StandaloneRequestSigningTest extends TestCase
         $this->actingAs($this->user);
         $this->grantMedicalEventAbilities($this->user);
 
-        $this->signature = Mockery::mock(SignatureService::class);
+        $this->signature = Mockery::mock(SignatureProvider::class);
         $this->signature->shouldReceive('getCertificateAuthorities')->andReturn([
             ['id' => 'knedp-1', 'name' => 'Тестовий КНЕДП'],
         ]);
-        $this->app->instance(SignatureService::class, $this->signature);
+        $this->app->instance(SignatureProvider::class, $this->signature);
     }
 
     public function test_prescription_is_signed_with_the_kep_over_the_ehealth_draft_content(): void
@@ -136,7 +136,7 @@ class StandaloneRequestSigningTest extends TestCase
 
         $this->signature->shouldReceive('signData')
             ->once()
-            ->withArgs(static function (array $data, string $password, string $knedp, $keyFile, string $taxId) use ($draftContent): bool {
+            ->withArgs(static function (array $data, string $knedp, $keyFile, string $password, string $taxId) use ($draftContent): bool {
                 return $data === $draftContent
                     && $password === 'secret'
                     && $knedp === 'knedp-1'

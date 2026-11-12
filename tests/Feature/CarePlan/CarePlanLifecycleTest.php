@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\CarePlan;
 
 use App\Classes\eHealth\Api\Approval;
+use App\Contracts\SignatureProvider;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\Encounter;
@@ -162,7 +163,7 @@ class CarePlanLifecycleTest extends TestCase
         $response = Mockery::mock(\App\Classes\eHealth\EHealthResponse::class);
         $response->shouldReceive('getData', 'validate')->andReturn([]);
         $this->mock(\App\Classes\eHealth\Api\Person::class)->shouldReceive('getAuthMethods')->andReturn($response);
-        $signature = $this->mock(\App\Services\SignatureService::class);
+        $signature = $this->mock(SignatureProvider::class);
         $signature->shouldReceive('getCertificateAuthorities')->andReturn([]);
         $signature->shouldNotReceive('signData');
         $this->mock(\App\Classes\eHealth\Api\CarePlan::class)->shouldNotReceive('create');
@@ -198,7 +199,7 @@ class CarePlanLifecycleTest extends TestCase
         $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
         $mockJobApi->shouldReceive('withToken')->andReturnSelf();
         $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $mockSignatureService = Mockery::mock(SignatureProvider::class);
 
         // Bind mocks to container
         $this->instance(\App\Classes\eHealth\Api\CarePlan::class, $mockCarePlanApi);
@@ -206,7 +207,7 @@ class CarePlanLifecycleTest extends TestCase
         $this->instance(\App\Classes\eHealth\Api\Person::class, $mockPatientApi);
         $this->instance(\App\Classes\eHealth\Api\Job::class, $mockJobApi);
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $this->instance(SignatureProvider::class, $mockSignatureService);
 
         // Mock signature
         $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
@@ -609,12 +610,12 @@ class CarePlanLifecycleTest extends TestCase
         ]);
 
         $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $mockSignatureService = Mockery::mock(SignatureProvider::class);
         $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
         $mockJobApi->shouldReceive('withToken')->andReturnSelf();
 
         $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $this->instance(SignatureProvider::class, $mockSignatureService);
         $this->instance(\App\Classes\eHealth\Api\Job::class, $mockJobApi);
 
         $snapshot = \App\Core\Arr::toSnakeCase(Repository::carePlanActivity()->getResource($activity->id));
@@ -697,13 +698,13 @@ class CarePlanLifecycleTest extends TestCase
         $mockPatientApi = Mockery::mock(\App\Classes\eHealth\Api\Person::class);
         $mockJobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
         $mockJobApi->shouldReceive('withToken')->andReturnSelf();
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $mockSignatureService = Mockery::mock(SignatureProvider::class);
 
         $this->instance(\App\Classes\eHealth\Api\CarePlan::class, $mockCarePlanApi);
         $this->instance(\App\Classes\eHealth\Api\Approval::class, $mockApprovalApi);
         $this->instance(\App\Classes\eHealth\Api\Person::class, $mockPatientApi);
         $this->instance(\App\Classes\eHealth\Api\Job::class, $mockJobApi);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $this->instance(SignatureProvider::class, $mockSignatureService);
 
         $capturedPayload = null;
         $mockSignatureService->shouldReceive('signData')

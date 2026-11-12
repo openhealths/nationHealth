@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Cipher;
 
+use App\Exceptions\Signature\SignatureException;
 use Exception;
 
-abstract class CipherException extends Exception
+abstract class CipherException extends Exception implements SignatureException
 {
     /**
      * Log the exception and flash a user-facing error message.

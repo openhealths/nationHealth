@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Classes\Cipher\CipherSignatureProvider;
+use App\Contracts\SignatureProvider;
 use App\Jobs\ApprovalSync;
 use App\Jobs\ClinicalImpressionFullSync;
 use App\Jobs\ClinicalImpressionSync;
@@ -54,6 +56,8 @@ class AppServiceProvider extends ServiceProvider
             $this->app->register(IdeHelperServiceProvider::class);
             $this->app->register(DebugbarServiceProvider::class);
         }
+
+        $this->app->bind(SignatureProvider::class, CipherSignatureProvider::class);
 
         /*
          * Extend BatchRepository to use EHealthDatabaseBatchRepository to allow store LegalEntity's ID into job_batches table

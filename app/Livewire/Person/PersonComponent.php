@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Person\Status;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\Signature\SignatureException;
 use App\Livewire\Person\Forms\PersonForm as Form;
 use App\Models\Person\Person;
 use App\Models\Person\PersonRequest;
@@ -871,15 +869,15 @@ class PersonComponent extends Component
         $personRequestData['patient_signed'] = $this->form->patientSigned;
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 $personRequestData,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
-            $exception->handle('Error when signing data with Cipher');
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing data');
 
             return;
         }
@@ -887,7 +885,7 @@ class PersonComponent extends Component
         try {
             $signResponse = EHealth::personRequest()
                 ->withHeaders(['msp_drfo' => Auth::user()->party->taxId])
-                ->signed($this->form->person['id'], ['signed_content' => $signedContent->getBase64Data()]);
+                ->signed($this->form->person['id'], ['signed_content' => $signedContent]);
             $responseData = $signResponse->getData();
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when sign person request');

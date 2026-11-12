@@ -9,6 +9,7 @@ use App\Enums\CarePlanStatus;
 use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
@@ -199,9 +200,9 @@ class CarePlanUpdate extends CarePlanCreate
 
             $signedContent = signatureService()->signData(
                 $carePlanPayload,
-                $this->form->password,
                 $this->form->knedp,
                 $this->form->keyContainerUpload,
+                $this->form->password,
                 Auth::user()->party->taxId
             );
 
@@ -234,6 +235,9 @@ class CarePlanUpdate extends CarePlanCreate
             $this->showSignatureModal = false;
         } catch (\App\Exceptions\MedicalEvents\ClinicalStorageException $exception) {
             Session::flash('error', $exception->getMessage());
+            $this->showSignatureModal = false;
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing care plan');
             $this->showSignatureModal = false;
         } catch (\Throwable $exception) {
             Log::error('CarePlan: unexpected error: ' . $exception->getMessage(), [
