@@ -45,6 +45,10 @@ return [
         'ehealth' => [
             'driver' => 'ehealth',
             'provider' => 'ehealth_users'
+        ],
+        'api' => [
+            'driver' => 'passport',
+            'provider' => 'users'
         ]
     ],
 

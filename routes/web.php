@@ -78,6 +78,8 @@ use App\Models\HealthcareService;
 use App\Models\LegalEntity;
 use App\Models\License;
 use App\Models\MedicalEvents\Sql\Encounter;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Livewire\LegalEntity\Connections\LegalEntityConnectionShow;
 use App\Livewire\LegalEntity\Connections\LegalEntityConnectionIndex;
@@ -391,4 +393,11 @@ Route::get('/page-not-found', fn () => view('errors.404'))->name('url.page-not-f
  * This is final 404 handler for both authenticated and unauthenticated users,
  * or for routes that simply do not fit into any structured groups.
  */
-Route::fallback(fn () => redirect()->route('url.page-not-found'));
+Route::fallback(static function (Request $request): RedirectResponse {
+    // Unknown API URLs get a 404 response that the exception handler renders as JSON
+    if ($request->is('api/*')) {
+        abort(404);
+    }
+
+    return redirect()->route('url.page-not-found');
+});
