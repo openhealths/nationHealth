@@ -23,7 +23,7 @@ use App\Repositories\LegalEntityRepository;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use App\Services\MedicalEvents\EHealthJobResolver;
-use App\Services\SignatureService;
+use App\Contracts\SignatureProvider;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -83,9 +83,9 @@ class PatientDeviceRequestsTest extends TestCase
         $this->person->names()->forceCreate(['firstName' => 'Тарас', 'lastName' => 'Шевченко', 'language' => 'uk']);
         $this->actingAs($this->user);
         $this->grantMedicalEventAbilities($this->user);
-        $signature = Mockery::mock(SignatureService::class);
+        $signature = Mockery::mock(SignatureProvider::class);
         $signature->shouldReceive('getCertificateAuthorities')->andReturn([]);
-        $this->instance(SignatureService::class, $signature);
+        $this->instance(SignatureProvider::class, $signature);
     }
 
     private function grantPatientReadAccess(array $attributes = []): Approval
@@ -142,7 +142,7 @@ class PatientDeviceRequestsTest extends TestCase
         $service->shouldReceive('sync')->once();
         $service->shouldReceive('dictionary')->andReturn(['orthosis' => 'Ортез']);
         $this->instance(DeviceRequestLifecycleService::class, $service);
-        app(SignatureService::class)->shouldReceive('signData')->once()->andReturn('test-signature');
+        app(SignatureProvider::class)->shouldReceive('signData')->once()->andReturn('test-signature');
         $resolver = Mockery::mock(EHealthJobResolver::class);
         $resolver->shouldReceive('resolve')->once()->andReturn([]);
         $this->instance(EHealthJobResolver::class, $resolver);

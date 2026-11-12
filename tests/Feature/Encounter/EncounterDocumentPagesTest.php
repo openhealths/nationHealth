@@ -20,7 +20,7 @@ use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
-use App\Services\SignatureService;
+use App\Contracts\SignatureProvider;
 use App\Models\Person\Person;
 use App\Policies\EncounterPolicy;
 use Carbon\CarbonImmutable;
@@ -316,7 +316,7 @@ class EncounterDocumentPagesTest extends TestCase
         $this->assertSame('draft', $record->status);
         $this->assertSame($start, $record->startedAt->toIso8601String());
         $this->assertSame(1, ServiceRequestRequest::wherePersonId($person->id)->count());
-        app(SignatureService::class)->shouldNotHaveReceived('signData');
+        app(SignatureProvider::class)->shouldNotHaveReceived('signData');
         Http::assertNotSent(static fn ($request): bool => $request->method() === 'POST');
     }
 
@@ -579,7 +579,7 @@ class EncounterDocumentPagesTest extends TestCase
         $this->assertSame('Edited local draft', $record->note);
         $this->assertSame(1, \App\Models\MedicalEvents\Sql\ServiceRequestRequest::wherePersonId($person->id)->count());
         Http::assertNotSent(static fn ($request): bool => $request->method() === 'POST');
-        app(\App\Services\SignatureService::class)->shouldNotHaveReceived('signData');
+        app(SignatureProvider::class)->shouldNotHaveReceived('signData');
         $component->set('encounterReferralForm.program_id', '')
             ->call('validateEncounterReferral')->assertHasNoErrors()
             ->assertSet('encounterReferralRequestIdToSign', $uuid)->assertSet('showSignatureModal', true);
@@ -604,7 +604,7 @@ class EncounterDocumentPagesTest extends TestCase
         }
         $this->assertDatabaseCount('service_request_requests', 0);
         Http::assertNotSent(static fn ($request): bool => $request->method() === 'POST');
-        app(\App\Services\SignatureService::class)->shouldNotHaveReceived('signData');
+        app(SignatureProvider::class)->shouldNotHaveReceived('signData');
     }
 
     public static function invalidReferralPeriods(): array
@@ -730,7 +730,7 @@ class EncounterDocumentPagesTest extends TestCase
             ->assertSet('encounterReferralSubmission.status', \App\Enums\JobStatus::PENDING->value)
             ->assertRedirect(route('persons.encounters.referrals.edit', [$legalEntity, $person, $encounter, $record->id]));
 
-        app(\App\Services\SignatureService::class)->shouldHaveReceived('signData')
+        app(SignatureProvider::class)->shouldHaveReceived('signData')
             ->withArgs(static fn (array $payload): bool => $payload['id'] === $uuid && $payload['occurrence_period'] === $editedPeriod)
             ->once();
         $this->assertSame($editedPeriod, $repository->getResource($record->fresh())['occurrencePeriod']);
@@ -796,7 +796,7 @@ class EncounterDocumentPagesTest extends TestCase
         $component->call('sign')->assertHasErrors('form.'.$field)
             ->assertSet('showSignatureModal', true)->assertSet('actionType', 'sign_referral')
             ->assertSee($component->instance()->getErrorBag()->first('form.'.$field));
-        app(\App\Services\SignatureService::class)->shouldNotHaveReceived('signData');
+        app(SignatureProvider::class)->shouldNotHaveReceived('signData');
         Http::assertNotSent(static fn ($request): bool => $request->method() === 'POST');
     }
 
@@ -828,14 +828,14 @@ class EncounterDocumentPagesTest extends TestCase
         ['legalEntity' => $legalEntity, 'person' => $person] = $this->fixture();
         $encounter = $this->encounter($person);
         $this->fakeEHealth(['*' => Http::response($this->eHealthBody([]))]);
-        $signer = \Mockery::mock(\App\Services\SignatureService::class);
+        $signer = \Mockery::mock(SignatureProvider::class);
         $signer->shouldReceive('getCertificateAuthorities')->andReturn([]);
         $signer->shouldReceive('signData')->once()->andReturnUsing(function (): string {
             $this->travel(31)->minutes();
 
             return 'signed-but-expired';
         });
-        $this->instance(\App\Services\SignatureService::class, $signer);
+        $this->instance(SignatureProvider::class, $signer);
         $api = $this->mock(\App\Classes\eHealth\Api\Patient\ServiceRequest::class);
         $api->shouldNotReceive('createSigned');
         $component = Livewire::test(EncounterReferralCreate::class, compact('legalEntity', 'person', 'encounter') + ['preperson' => null])

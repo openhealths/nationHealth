@@ -7,6 +7,7 @@ namespace App\Livewire\Contract;
 use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\Signature\SignatureException;
 use App\Models\Contracts\ContractRequest;
 use App\Models\LegalEntity;
 use App\Repositories\Repository;
@@ -228,12 +229,16 @@ abstract class ContractComponent extends Component
         try {
             $signedContent = signatureService()->signData(
                 $payload,
-                $signingData['password'],
                 $signingData['knedp'],
                 $signingData['keyContainerUpload'],
+                $signingData['password'],
                 Auth::user()->party->taxId
             );
 
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing contract request');
+
+            return;
         } catch (\Exception $e) {
             Session::flash('error', 'Помилка накладання КЕП: ' . $e->getMessage());
 

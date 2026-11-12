@@ -17,7 +17,7 @@ use App\Enums\Employee\RequestStatus;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Database\Eloquent\Builder;
 use App\Models\Employee\EmployeeRequest;
-use App\Classes\Cipher\Api\CipherRequest;
+use App\Classes\Cipher\CipherSignatureProvider;
 use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -41,7 +41,7 @@ class VerifyPersonality extends Component
         $this->validate();
 
         try {
-            $response = new CipherRequest()->getPersonalData($this->knedp, $this->keyContainerUpload, $this->password);
+            $response = new CipherSignatureProvider()->getPersonalData($this->knedp, $this->keyContainerUpload, $this->password);
         } catch (CipherException|CipherConnectionException $exception) {
             $exception->handle('Error when loading KEP key', 'Сталася помилка під час завантаження ключа');
 

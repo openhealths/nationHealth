@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Preperson;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\MergeRequest\Status as MergeRequestStatus;
 use App\Enums\Preperson\Status;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Person\Forms\PersonForm as Form;
@@ -487,15 +485,15 @@ class PrepersonMerge extends Component
         $dataToSign['patient_signed'] = $this->patientSigned;
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 $dataToSign,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
-            $exception->handle('Error when signing merge request data with Cipher');
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing merge request data');
 
             return;
         }
@@ -504,7 +502,7 @@ class PrepersonMerge extends Component
             $response = EHealth::mergeRequest()
                 ->withHeaders(['msp_drfo' => Auth::user()->party->taxId])
                 ->sign($this->mergeRequest['uuid'], [
-                    'signed_content' => $signedContent->getBase64Data(),
+                    'signed_content' => $signedContent,
                     'signed_content_encoding' => 'base64'
                 ]);
         } catch (EHealthException|EHealthConnectionException $exception) {

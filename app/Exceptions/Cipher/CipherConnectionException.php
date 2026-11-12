@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Cipher;
 
+use App\Exceptions\Signature\SignatureException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 
-class CipherConnectionException extends ConnectionException
+class CipherConnectionException extends ConnectionException implements SignatureException
 {
     /**
      * Log the exception and flash a user-facing error message.

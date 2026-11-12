@@ -13,7 +13,7 @@ use App\Livewire\Person\Records\PatientPrescriptionRequests;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
 use App\Models\User;
-use App\Services\SignatureService;
+use App\Contracts\SignatureProvider;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Gate;
@@ -63,9 +63,9 @@ class DeviceRequestPatientUiTest extends TestCase
 
             return true;
         });
-        $signer = Mockery::mock(SignatureService::class);
+        $signer = Mockery::mock(SignatureProvider::class);
         $signer->shouldReceive('getCertificateAuthorities')->andReturn([]);
-        $this->instance(SignatureService::class, $signer);
+        $this->instance(SignatureProvider::class, $signer);
         $this->api = Mockery::mock(DeviceRequestApi::class);
         $this->api->shouldReceive('getBySearchParams')->andReturn($this->response([]))->byDefault();
         $this->instance(DeviceRequestApi::class, $this->api);

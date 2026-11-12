@@ -142,9 +142,9 @@ class MedicationDispenseLifecycleService
         $signPayload = is_array($entity) ? $entity : $createPayload['medication_dispense'];
         $signedContent = signatureService()->signData(
             $signPayload,
-            $form['password'],
             $form['knedp'],
-            $form['keyContainerUpload'] ?? null,
+            $form['keyContainerUpload'],
+            $form['password'],
             $employeeContext['signer_tax_id']
         );
 

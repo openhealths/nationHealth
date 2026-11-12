@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person\Records;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Person\VerificationSource;
 use App\Enums\Person\VerificationStatus;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\Signature\SignatureException;
 use App\Livewire\Person\Forms\PersonVerificationForm as Form;
 use App\Models\Relations\PersonVerificationDetail;
 use App\Repositories\Repository;
@@ -161,15 +159,15 @@ class PatientVerification extends BasePatientComponent
         ];
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 $dracsDeath,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
-            $exception->handle('Error when signing data with Cipher');
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing data');
 
             return;
         }
@@ -177,7 +175,7 @@ class PatientVerification extends BasePatientComponent
         try {
             $response = EHealth::person()->updateVerificationStatus(
                 $this->uuid,
-                ['signed_content' => $signedContent->getBase64Data()]
+                ['signed_content' => $signedContent]
             );
             $validatedResponse = $response->validate();
         } catch (EHealthException|EHealthConnectionException $exception) {

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Declaration;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Declaration\RequestStatus;
@@ -12,8 +11,7 @@ use App\Enums\Declaration\Status;
 use App\Enums\JobStatus;
 use App\Enums\Person\AuthenticationMethod;
 use App\Enums\User\Role;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
@@ -103,7 +101,7 @@ abstract class DeclarationComponent extends Component
     public array $uploadedDocuments = [];
 
     /**
-     * Data that we sign with Cipher and then send to EHealth
+     * Data that we sign and then send to EHealth
      *
      * @var array
      */
@@ -547,7 +545,7 @@ abstract class DeclarationComponent extends Component
     }
 
     /**
-     * Sign declaration request with Cipher and then send to EHealth.
+     * Sign declaration request and then send to EHealth.
      *
      * @return void
      */
@@ -598,15 +596,15 @@ abstract class DeclarationComponent extends Component
         }
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 $dataToSign,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
-            $exception->handle('Error when signing data with Cipher');
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing data');
 
             return;
         }
@@ -625,7 +623,7 @@ abstract class DeclarationComponent extends Component
         try {
             $response = EHealth::declarationRequest()->sign(
                 $declarationRequest->uuid,
-                ['signed_declaration_request' => $signedContent->getBase64Data()]
+                ['signed_declaration_request' => $signedContent]
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when signing declaration request');

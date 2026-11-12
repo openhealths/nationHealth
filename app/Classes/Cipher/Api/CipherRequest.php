@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace App\Classes\Cipher\Api;
 
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherEncodingException;
-use App\Exceptions\Cipher\CipherResponseException;
-use App\Exceptions\Cipher\CipherValidationException;
-use Carbon\Carbon;
-use Illuminate\Http\Client\Factory;
 use App\Classes\Cipher\CipherResponse;
+use App\Classes\Cipher\CipherSignatureProvider;
+use App\Exceptions\Cipher\CipherConnectionException;
+use App\Exceptions\Cipher\CipherResponseException;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Arr;
-use JsonException;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
+/**
+ * HTTP client of the Cipher API: one method per endpoint, no signing flow or business rules.
+ *
+ * @see CipherSignatureProvider for the signing flow
+ */
 class CipherRequest extends PendingRequest
 {
     /**
@@ -35,93 +35,6 @@ class CipherRequest extends PendingRequest
             ->timeout(self::TIMEOUT)
             ->acceptJson()
             ->asJson();
-    }
-
-    /**
-     * Used for sign data form forms.
-     * Extended docs with steps: https://docs.cipher.com.ua/spaces/CCSUOS/pages/8618379/%D0%92%D0%B8%D0%BA%D0%BE%D0%BD%D0%B0%D0%BD%D0%BD%D1%8F+%D1%82%D0%B8%D0%BF%D0%BE%D0%B2%D0%B8%D1%85+%D0%B7%D0%B0%D0%B4%D0%B0%D1%87#id-%D0%92%D0%B8%D0%BA%D0%BE%D0%BD%D0%B0%D0%BD%D0%BD%D1%8F%D1%82%D0%B8%D0%BF%D0%BE%D0%B2%D0%B8%D1%85%D0%B7%D0%B0%D0%B4%D0%B0%D1%87-%D0%A1%D1%82%D0%B2%D0%BE%D1%80%D0%B5%D0%BD%D0%BD%D1%8F%D0%95%D0%9F.1
-     *
-     * @param  array  $dataSignature
-     * @param  string  $knedp
-     * @param  TemporaryUploadedFile  $uploadedFile
-     * @param  string  $password
-     * @param  string  $taxId
-     * @param  string|null  $edrpou
-     * @return CipherResponse|PromiseInterface
-     * @throws CipherConnectionException|CipherResponseException|CipherValidationException|CipherEncodingException
-     */
-    public function signData(
-        array $dataSignature,
-        string $knedp,
-        TemporaryUploadedFile $uploadedFile,
-        string $password,
-        string $taxId,
-        ?string $edrpou = null
-    ): CipherResponse|PromiseInterface {
-        $base64File = $this->convertFileToBase64($uploadedFile);
-
-        $ticketUuid = $this->createSession()->getTicketUuid();
-
-        try {
-            $encodedSignature = json_encode($dataSignature, JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new CipherEncodingException(
-                'Failed to encode data signature: ' . $exception->getMessage(),
-                $exception->getCode(),
-                $exception
-            );
-        }
-
-        $this->loadSessionData($ticketUuid, base64_encode($encodedSignature));
-        $this->setSessionParameters($ticketUuid, $knedp);
-
-        $this->uploadKeyFile($ticketUuid, $base64File);
-
-        $this->verifyWithFileContainer($ticketUuid, $password, $taxId, $edrpou);
-
-        $this->initiateSignatureCreation($ticketUuid, $password);
-
-        $signedData = $this->getSignedData($ticketUuid);
-
-        $this->deleteSession($ticketUuid);
-
-        return $signedData;
-    }
-
-    /**
-     * Request to Cipher API to get personal data by provided key.
-     *
-     * @param  string  $knedp
-     * @param  TemporaryUploadedFile  $uploadedFile
-     * @param  string  $password
-     * @return CipherResponse|PromiseInterface|null
-     * @throws CipherConnectionException|CipherResponseException|CipherValidationException|CipherEncodingException
-     */
-    public function getPersonalData(
-        string $knedp,
-        TemporaryUploadedFile $uploadedFile,
-        string $password
-    ): null|CipherResponse|PromiseInterface {
-        $base64File = $this->convertFileToBase64($uploadedFile);
-
-        $ticketUuid = $this->createSession()->getTicketUuid();
-
-        try {
-            $encodedEmpty = json_encode([], JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new CipherEncodingException(
-                'Failed to encode empty payload: ' . $exception->getMessage(),
-                $exception->getCode(),
-                $exception
-            );
-        }
-
-        $this->loadSessionData($ticketUuid, base64_encode($encodedEmpty));
-        $this->setSessionParameters($ticketUuid, $knedp);
-
-        $this->uploadKeyFile($ticketUuid, $base64File);
-
-        return $this->verifyKeyContainer($ticketUuid, $password);
     }
 
     /**
@@ -156,7 +69,7 @@ class CipherRequest extends PendingRequest
      * @return CipherResponse|PromiseInterface
      * @throws CipherConnectionException|CipherResponseException
      */
-    protected function createSession(): CipherResponse|PromiseInterface
+    public function createSession(): CipherResponse|PromiseInterface
     {
         return $this->post('/ticket');
     }
@@ -165,13 +78,13 @@ class CipherRequest extends PendingRequest
      * Loading session data, which is data on which EP operations are performed.
      *
      * @param  string  $ticketUuid
-     * @param  string  $base64File
+     * @param  string  $base64Data
      * @return CipherResponse|PromiseInterface
      * @throws CipherConnectionException|CipherResponseException
      */
-    protected function loadSessionData(string $ticketUuid, string $base64File): CipherResponse|PromiseInterface
+    public function loadSessionData(string $ticketUuid, string $base64Data): CipherResponse|PromiseInterface
     {
-        return $this->post("/ticket/$ticketUuid/data", ['base64Data' => $base64File]);
+        return $this->post("/ticket/$ticketUuid/data", ['base64Data' => $base64Data]);
     }
 
     /**
@@ -182,7 +95,7 @@ class CipherRequest extends PendingRequest
      * @return CipherResponse|PromiseInterface
      * @throws CipherConnectionException|CipherResponseException
      */
-    protected function setSessionParameters(string $ticketUuid, string $knedpId): CipherResponse|PromiseInterface
+    public function setSessionParameters(string $ticketUuid, string $knedpId): CipherResponse|PromiseInterface
     {
         return $this->put("/ticket/$ticketUuid/option", [
             'caId' => $knedpId,
@@ -200,72 +113,9 @@ class CipherRequest extends PendingRequest
      * @return CipherResponse|PromiseInterface
      * @throws CipherConnectionException|CipherResponseException
      */
-    protected function uploadKeyFile(string $ticketUuid, string $base64File): CipherResponse|PromiseInterface
+    public function uploadKeyFile(string $ticketUuid, string $base64File): CipherResponse|PromiseInterface
     {
         return $this->put("/ticket/$ticketUuid/keyStore", ['base64Data' => $base64File]);
-    }
-
-    /**
-     * Check if some important data received from the forms are have the same value as in the DS FileContainer
-     *
-     * @param  $ticketUuid
-     * @param  $password
-     * @param  string  $taxId
-     * @param  string|null  $edrpou
-     * @return void
-     * @throws CipherConnectionException|CipherResponseException|CipherValidationException
-     */
-    protected function verifyWithFileContainer($ticketUuid, $password, string $taxId, ?string $edrpou = null): void
-    {
-        // Get needed data contains into the key
-        $response = $this->verifyKeyContainer($ticketUuid, $password)->response;
-
-        // If KEP key is not valid (ex. very old one)
-        if (!$response['signature']['canBeUsed']) {
-            throw new CipherValidationException(__('validation.custom.cipher.kepNotValid'), $response);
-        }
-
-        $keyData = Arr::get($response, 'signature.certificateInfo.extensionsCertificateInfo.value.personalData.value');
-
-        // Get value of 'edrpou' field for key's owner {string|null}
-        $inKeyEdrpou = $keyData['edrpou']['value'] ?? '';
-
-        // Get value of 'drfou' (IPN) field for key's owner {string|null}
-        $inKeyDrfou = $keyData['drfou']['value'] ?? '';
-
-        // Get last date when validity period is valid
-        $endDate = $response['signature']['certificateInfo']['notAfter']['value'];
-        $expirationDate = Carbon::parse($endDate);
-
-        if ($expirationDate <= Carbon::now()) {
-            throw new CipherValidationException(__('validation.custom.cipher.kepTimeExpired'), $response);
-        }
-
-        // Compare the provided taxId with the one in the key
-        if ($inKeyDrfou !== $taxId) {
-            throw new CipherValidationException(__('validation.custom.cipher.drfouDiffer'), $response);
-        }
-
-        /**
-         * If EDRPOU is provided, check the key's EDRPOU value. Empty value in the key might be associated with the FOP key,
-         * this will be determined later by the service provider response
-         */
-        if ($edrpou && !empty($inKeyEdrpou) && $inKeyEdrpou !== $edrpou) {
-            throw new CipherValidationException(__('validation.custom.cipher.edrpouDiffer'), $response);
-        }
-    }
-
-    /**
-     * Initiates the process of asynchronous EP creation for previously loaded data and the session key container.
-     *
-     * @param  string  $ticketUuid
-     * @param  string  $password
-     * @return CipherResponse|PromiseInterface
-     * @throws CipherConnectionException|CipherResponseException
-     */
-    protected function initiateSignatureCreation(string $ticketUuid, string $password): CipherResponse|PromiseInterface
-    {
-        return $this->post("/ticket/$ticketUuid/ds/creator", ['keyStorePassword' => $password]);
     }
 
     /**
@@ -276,9 +126,22 @@ class CipherRequest extends PendingRequest
      * @return CipherResponse|PromiseInterface
      * @throws CipherConnectionException|CipherResponseException
      */
-    protected function verifyKeyContainer(string $ticketUuid, string $password): CipherResponse|PromiseInterface
+    public function verifyKeyContainer(string $ticketUuid, string $password): CipherResponse|PromiseInterface
     {
         return $this->put("/ticket/$ticketUuid/keyStore/verifier", ['keyStorePassword' => $password]);
+    }
+
+    /**
+     * Initiates the process of asynchronous EP creation for previously loaded data and the session key container.
+     *
+     * @param  string  $ticketUuid
+     * @param  string  $password
+     * @return CipherResponse|PromiseInterface
+     * @throws CipherConnectionException|CipherResponseException
+     */
+    public function initiateSignatureCreation(string $ticketUuid, string $password): CipherResponse|PromiseInterface
+    {
+        return $this->post("/ticket/$ticketUuid/ds/creator", ['keyStorePassword' => $password]);
     }
 
     /**
@@ -288,7 +151,7 @@ class CipherRequest extends PendingRequest
      * @return CipherResponse|PromiseInterface
      * @throws CipherConnectionException|CipherResponseException
      */
-    protected function getSignedData(string $ticketUuid): CipherResponse|PromiseInterface
+    public function getSignedData(string $ticketUuid): CipherResponse|PromiseInterface
     {
         return $this->get("/ticket/$ticketUuid/ds/base64Data");
     }
@@ -300,7 +163,7 @@ class CipherRequest extends PendingRequest
      * @return CipherResponse|PromiseInterface
      * @throws CipherConnectionException|CipherResponseException
      */
-    protected function deleteSession(string $ticketUuid): CipherResponse|PromiseInterface
+    public function deleteSession(string $ticketUuid): CipherResponse|PromiseInterface
     {
         return $this->delete("/ticket/$ticketUuid");
     }
@@ -314,23 +177,5 @@ class CipherRequest extends PendingRequest
     public function getCertificateAuthority(): CipherResponse|PromiseInterface
     {
         return $this->get('/certificateAuthority/supported');
-    }
-
-    /**
-     * Read the key container straight from the temporary upload, so the private key is never copied to a web-accessible disk.
-     *
-     * @param  TemporaryUploadedFile  $keyContainerUpload
-     * @return string
-     * @throws CipherValidationException When the temporary upload is gone, e.g. cleaned up after a day
-     */
-    protected function convertFileToBase64(TemporaryUploadedFile $keyContainerUpload): string
-    {
-        $keyContainer = $keyContainerUpload->get();
-
-        if ($keyContainer === null || $keyContainer === '') {
-            throw new CipherValidationException(__('validation.custom.cipher.kep_file_missing'));
-        }
-
-        return base64_encode($keyContainer);
     }
 }

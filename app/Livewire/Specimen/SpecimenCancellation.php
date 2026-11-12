@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Specimen;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Specimen\Forms\SpecimenCancellationForm;
@@ -121,24 +119,25 @@ class SpecimenCancellation extends Component
         }
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 Fhir::specimen()->toCancellationPackage($response->getData(), $validated['cancellationReason']),
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
+        } catch (SignatureException $exception) {
+            // Signing fields are kept, so after a failed signature the KNEDP and key do not have to be chosen again
             $exception->handle('Error while signing specimen cancellation package');
 
             return;
-        } finally {
-            $this->form->resetSigningFields();
         }
+
+        $this->form->resetSigningFields();
 
         try {
             EHealth::specimen()->cancel($this->patientId, $this->specimenId, [
-                'signed_data' => $signedContent->getBase64Data(),
+                'signed_data' => $signedContent,
                 'signed_data_encoding' => 'base64'
             ]);
         } catch (EHealthException|EHealthConnectionException $exception) {

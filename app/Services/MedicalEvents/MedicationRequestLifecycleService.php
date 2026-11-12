@@ -23,6 +23,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use RuntimeException;
 use Throwable;
 
@@ -60,7 +61,11 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
      */
     private function requireLocalKep(array $formData): void
     {
-        if (trim((string) ($formData['password'] ?? '')) === '' || trim((string) ($formData['knedp'] ?? '')) === '') {
+        if (
+            trim((string) ($formData['password'] ?? '')) === ''
+            || trim((string) ($formData['knedp'] ?? '')) === ''
+            || !($formData['keyContainerUpload'] ?? null) instanceof TemporaryUploadedFile
+        ) {
             throw new InvalidArgumentException(__('care-plan.kep_signature_required'));
         }
 
@@ -296,9 +301,9 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
 
         $signedContent = signatureService()->signData(
             $this->buildSignPayload($contextModel, $requestRecord, $informWith),
-            $formData['password'],
             $formData['knedp'],
-            $formData['keyContainerUpload'] ?? null,
+            $formData['keyContainerUpload'],
+            $formData['password'],
             $this->resolveSignerTaxId($formData)
         );
 
@@ -395,9 +400,9 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
 
         $signedContent = signatureService()->signData(
             $this->buildRejectSignPayload($personUuid, $activeId, $statusReason, $formData),
-            $formData['password'],
             $formData['knedp'],
-            $formData['keyContainerUpload'] ?? null,
+            $formData['keyContainerUpload'],
+            $formData['password'],
             $signerTaxId
         );
 

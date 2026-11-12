@@ -7,6 +7,7 @@ namespace Tests\Feature\Referral;
 use App\Classes\eHealth\Api\Patient\ServiceRequest as ServiceRequestApi;
 use App\Classes\eHealth\Api\Patient\DeviceRequest as DeviceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Contracts\SignatureProvider;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
@@ -113,9 +114,9 @@ class ReferralLifecycleTest extends TestCase
             'eHealth/service_request_cancel_reasons' => ['entered-in-error' => 'Помилка'],
             'eHealth/service_request_recall_reasons' => ['synthetic-reason' => 'Причина'],
         ]);
-        $signature = Mockery::mock(\App\Services\SignatureService::class);
+        $signature = Mockery::mock(SignatureProvider::class);
         $signature->shouldReceive('getCertificateAuthorities')->andReturn([]);
-        $this->instance(\App\Services\SignatureService::class, $signature);
+        $this->instance(SignatureProvider::class, $signature);
 
         // 1. Create Patient
         $this->person = Person::create([
@@ -813,7 +814,7 @@ class ReferralLifecycleTest extends TestCase
         $this->mockReferralMissingInEHealth($api, $this->person->uuid, $draftUuid);
         $api->shouldNotReceive('createSigned');
         $this->instance(ServiceRequestApi::class, $api);
-        app(\App\Services\SignatureService::class)->shouldNotReceive('signData');
+        app(SignatureProvider::class)->shouldNotReceive('signData');
 
         $component = Livewire::test(CarePlanActivityShow::class, [
             'carePlan' => $this->serviceActivity->carePlan,
@@ -1037,9 +1038,9 @@ class ReferralLifecycleTest extends TestCase
         $mockServiceApi->shouldReceive('cancel')->once()->andReturn($cancelResponse);
         $this->instance(ServiceRequestApi::class, $mockServiceApi);
 
-        // Mock SignatureService
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        // Mock the signature provider
+        $mockSignatureService = Mockery::mock(SignatureProvider::class);
+        $this->instance(SignatureProvider::class, $mockSignatureService);
         $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
         $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
 
@@ -1104,8 +1105,8 @@ class ReferralLifecycleTest extends TestCase
         $mockServiceApi->shouldReceive('createSigned')->once()->andReturn($createResponse);
         $this->instance(ServiceRequestApi::class, $mockServiceApi);
 
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService = Mockery::mock(SignatureProvider::class);
+        $this->instance(SignatureProvider::class, $mockSignatureService);
         $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
         $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
 
@@ -1199,8 +1200,8 @@ class ReferralLifecycleTest extends TestCase
             ],
         ]));
 
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService = Mockery::mock(SignatureProvider::class);
+        $this->instance(SignatureProvider::class, $mockSignatureService);
         $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
         $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
 
@@ -1426,10 +1427,10 @@ class ReferralLifecycleTest extends TestCase
         $mockGuard->shouldReceive('assess')->andReturn(new \App\Dto\MedicalEvents\DeviceActivityReadinessAssessment([], []));
         $this->instance(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class, $mockGuard);
 
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
+        $mockSignatureService = Mockery::mock(SignatureProvider::class);
         $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
         $mockSignatureService->shouldReceive('getCertificateAuthorities')->andReturn([]);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $this->instance(SignatureProvider::class, $mockSignatureService);
 
         Livewire::test(CarePlanActivityShow::class, [
             'carePlan' => $carePlan,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Composition;
 
+use App\Contracts\SignatureProvider;
 use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
@@ -387,7 +388,7 @@ class CompositionCreateFlowTest extends TestCase
         Http::assertSent(static fn ($request): bool => str_contains($request->url(), '/sign')
             && $request->data() === ['data' => 'signed-composition']);
 
-        app(\App\Services\SignatureService::class)->shouldHaveReceived('signData')
+        app(SignatureProvider::class)->shouldHaveReceived('signData')
             ->withArgs(fn (array $payload): bool => $payload === $this->compositionPayload(
                 $compositionUuid,
                 $encounterUuid,

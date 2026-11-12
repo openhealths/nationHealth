@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\EncounterPackage;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Episode\Status as EpisodeStatus;
@@ -30,8 +29,7 @@ use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;
 use App\Traits\HandlesEncounterCancellation;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Database\Eloquent\Builder;
@@ -538,15 +536,15 @@ class EncounterPackageEdit extends EncounterPackageComponent
         unset($formattedData['encounter']['incoming_referral']['display_value']);
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 $formattedData,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
-            $exception->handle('Error when signing data with Cipher');
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing the encounter package');
             $this->showSignatureModal = false;
 
             return;
@@ -555,7 +553,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
         $this->showSignatureModal = false;
 
         try {
-            $this->submitPackage(Encounter::findOrFail($this->encounterId), $formattedData, $signedContent->getBase64Data());
+            $this->submitPackage(Encounter::findOrFail($this->encounterId), $formattedData, $signedContent);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while submitting encounter');
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Services\MedicalEvents;
 
+use App\Contracts\SignatureProvider;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
@@ -19,6 +20,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Mockery;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunClassInSeparateProcess;
@@ -209,8 +211,8 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             })
             ->andReturn(['id' => $requestRecord->uuid, 'status' => 'rejected']);
 
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService = Mockery::mock(SignatureProvider::class);
+        $this->instance(SignatureProvider::class, $mockSignatureService);
         $mockSignatureService->shouldReceive('signData')
             ->once()
             ->withArgs(function (array $signPayload) use ($activeMedicationRequest): bool {
@@ -228,6 +230,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             [
                 'password' => '12345678',
                 'knedp' => 'acsk_test',
+                'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
                 'signer_tax_id' => '9876543210',
             ],
             'WRONG_DOSAGE'
@@ -268,8 +271,8 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         $mockApi->shouldReceive('getById')->andThrow($forbidden);
         $mockApi->shouldNotReceive('rejectMedicationRequest');
 
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService = Mockery::mock(SignatureProvider::class);
+        $this->instance(SignatureProvider::class, $mockSignatureService);
         $mockSignatureService->shouldNotReceive('signData');
 
         $this->expectException(\RuntimeException::class);
@@ -281,6 +284,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             [
                 'password' => '12345678',
                 'knedp' => 'acsk_test',
+                'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
                 'signer_tax_id' => '9876543210',
             ],
             'WRONG_DOSAGE'
@@ -300,8 +304,8 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
         ]);
 
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService = Mockery::mock(SignatureProvider::class);
+        $this->instance(SignatureProvider::class, $mockSignatureService);
         $mockSignatureService->shouldNotReceive('signData');
 
         // An authenticated session must not be able to stand in for the missing form value.
@@ -316,6 +320,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             [
                 'password' => '12345678',
                 'knedp' => 'acsk_test',
+                'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
             ],
             'entered-in-error'
         );
@@ -726,8 +731,8 @@ class MedicationRequestLifecycleServiceTest extends TestCase
                 'request_number' => '9999000011112222',
             ]);
 
-        $mockSignatureService = Mockery::mock(\App\Services\SignatureService::class);
-        $this->instance(\App\Services\SignatureService::class, $mockSignatureService);
+        $mockSignatureService = Mockery::mock(SignatureProvider::class);
+        $this->instance(SignatureProvider::class, $mockSignatureService);
         $mockSignatureService->shouldReceive('signData')->once()->andReturn('kep-signed');
 
         $service = app(MedicationRequestLifecycleService::class);
@@ -737,6 +742,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             [
                 'password' => '12345678',
                 'knedp' => 'acsk_test',
+                'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
                 'signer_tax_id' => '9876543210',
                 'request_notification_disabled' => false,
                 'medication_unit' => 'шт.',
@@ -825,6 +831,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             [
                 'password' => '12345678',
                 'knedp' => 'acsk_test',
+                'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
                 'signer_tax_id' => '9876543210',
             ]
         );
@@ -842,13 +849,14 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'status' => 'new', 'medication_qty' => 1,
             ...$this->fhirBasedOnContextIds($otherActivity->uuid, $this->encounter->uuid),
         ]);
-        $signer = Mockery::mock(\App\Services\SignatureService::class);
+        $signer = Mockery::mock(SignatureProvider::class);
         $signer->shouldNotReceive('signData');
-        $this->instance(\App\Services\SignatureService::class, $signer);
+        $this->instance(SignatureProvider::class, $signer);
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('The medication activity is outside the signing context.');
         app(MedicationRequestLifecycleService::class)->signPrescription($this->carePlan, $request, [
             'password' => 'synthetic', 'knedp' => 'synthetic', 'signer_tax_id' => '9876543210',
+            'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
         ]);
     }
 }

@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\DiagnosticReport;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\JobStatus;
 use App\Enums\Person\DiagnosticReportStatus;
 use App\Enums\Person\ObservationStatus;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\DiagnosticReportSync;
@@ -381,23 +379,21 @@ class DiagnosticReportIndex extends BasePatientComponent
         }
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 $signedPayload,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
-            $exception->handle(
-                'Error while signing diagnostic report cancellation package',
-                __('diagnostic-reports.messages.cancel_package_sign_error')
-            );
+        } catch (SignatureException $exception) {
+            // Signing fields are kept, so after a failed signature the KNEDP and key do not have to be chosen again
+            $exception->handle('Error while signing diagnostic report cancellation package');
 
             return;
-        } finally {
-            $this->form->resetSigningFields();
         }
+
+        $this->form->resetSigningFields();
 
         $cancellationReason = FhirResource::make()
             ->coding('eHealth/cancellation_reasons', $validated['cancellationReason'])
@@ -407,7 +403,7 @@ class DiagnosticReportIndex extends BasePatientComponent
 
         try {
             EHealth::diagnosticReport()->cancel($this->uuid, [
-                'signed_data' => $signedContent->getBase64Data(),
+                'signed_data' => $signedContent,
                 'signed_data_encoding' => 'base64',
             ]);
 

@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Traits;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\EncounterPackage\Forms\EncounterCancellationForm;
@@ -260,27 +258,25 @@ trait HandlesEncounterCancellation
         }
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 $package,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
-            $exception->handle(
-                'Error while signing encounter cancellation package',
-                __('encounters.messages.cancel_package_sign_error')
-            );
+        } catch (SignatureException $exception) {
+            // Signing fields are kept, so after a failed signature the KNEDP and key do not have to be chosen again
+            $exception->handle('Error while signing encounter cancellation package');
 
             return;
-        } finally {
-            $this->form->resetSigningFields();
         }
+
+        $this->form->resetSigningFields();
 
         try {
             $response = EHealth::encounter()->cancel($this->patient()->uuid, [
-                'signed_data' => $signedContent->getBase64Data(),
+                'signed_data' => $signedContent,
                 'signed_data_encoding' => 'base64'
             ]);
         } catch (EHealthException|EHealthConnectionException $exception) {

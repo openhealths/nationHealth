@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Person\Traits;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Person\ConfidantPersonRelationshipRequestAction;
 use App\Enums\Person\ConfidantPersonRelationshipRequestStatus;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\Signature\SignatureException;
 use App\Models\ConfidantPersonRelationshipRequest;
 use App\Models\Person\Person;
 use App\Models\Relations\ConfidantPerson;
@@ -268,15 +266,15 @@ trait ManagesConfidantPersonRelationships
         }
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 $this->approvedData,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
-            $exception->handle('Error when signing data with Cipher');
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing data');
 
             return;
         }
@@ -285,7 +283,7 @@ trait ManagesConfidantPersonRelationships
             $response = EHealth::person()->signConfidantPersonRelationshipRequest(
                 $this->uuid,
                 $this->confidantPersonRelationshipRequestId,
-                ['signed_content' => $signedContent->getBase64Data()]
+                ['signed_content' => $signedContent]
             );
 
             // The signed request itself carries the action it was created with, so what to do with it is read

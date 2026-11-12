@@ -12,6 +12,7 @@ use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\Signature\SignatureException;
 use App\Livewire\Composition\Forms\CompositionCancellationForm;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\MedicalEvents\Sql\CompositionOperation;
@@ -19,7 +20,6 @@ use App\Repositories\MedicalEvents\CompositionOperationRepository;
 use App\Models\MergeRequest;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\SignatureService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -427,14 +427,11 @@ class PatientCompositions extends BasePatientComponent
         }
 
         try {
-            /** @var SignatureService $signer */
-            $signer = app(SignatureService::class);
-
-            $signedContent = $signer->signData(
+            $signedContent = signatureService()->signData(
                 $this->form->toCancellationPayload($composition->uuid, $composition->type),
-                $this->form->password,
                 $this->form->knedp,
                 $this->form->keyContainerUpload,
+                $this->form->password,
                 Auth::user()->party->taxId
             );
 
@@ -453,6 +450,8 @@ class PatientCompositions extends BasePatientComponent
 
             $this->closeCancellationModal();
             Session::flash('success', __('compositions.messages.cancellation_submitted'));
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing composition cancellation');
         } catch (Throwable $e) {
             Session::flash('error', $e->getMessage());
 

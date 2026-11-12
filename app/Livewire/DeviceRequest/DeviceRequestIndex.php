@@ -7,6 +7,7 @@ namespace App\Livewire\DeviceRequest;
 use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\Signature\SignatureException;
 use App\Livewire\DeviceRequest\Forms\DeviceRequestSearchForm;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
@@ -375,11 +376,13 @@ class DeviceRequestIndex extends Component
         try {
             $service = app(DeviceRequestLifecycleService::class);
             $content = $service->actionContent($this->person, $this->legalEntity, $this->selectedId, $this->action, $this->reason, $this->reasonText);
-            $signedData = signatureService()->signData($content, $this->form['password'], $this->form['knedp'], $this->form['keyContainerUpload'], (string) Auth::user()->party->taxId);
+            $signedData = signatureService()->signData($content, $this->form['knedp'], $this->form['keyContainerUpload'], $this->form['password'], (string) Auth::user()->party->taxId);
             $this->selected = $service->submitAction($this->person, $this->legalEntity, $this->selectedId, $this->action, $signedData);
             $this->action = '';
             Session::flash('success', __('device-requests.messages.status_changed'));
             $this->search(false);
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing device request action');
         } catch (Throwable $exception) {
             $this->error($exception);
         } finally {

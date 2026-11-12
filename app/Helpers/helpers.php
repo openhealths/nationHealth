@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Classes\eHealth\Services\SchemaService;
+use App\Contracts\SignatureProvider;
 use App\Services\Dictionary\DictionaryManager;
-use App\Services\SignatureService;
 use Carbon\CarbonImmutable;
 use App\Models\LegalEntity;
 
@@ -186,8 +186,13 @@ if (!function_exists('legalEntity')) {
 }
 
 if (!function_exists('signatureService')) {
-    function signatureService(): SignatureService
+    /**
+     * The configured qualified electronic signature provider.
+     *
+     * @return SignatureProvider
+     */
+    function signatureService(): SignatureProvider
     {
-        return app(SignatureService::class);
+        return app(SignatureProvider::class);
     }
 }

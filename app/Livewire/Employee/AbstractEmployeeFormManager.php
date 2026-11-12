@@ -166,7 +166,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->employeeRequestId = $this->employeeRequest->id;
 
             $requestToSign = $this->validateAndGetDraft();
-            $signedContent = $this->signDataWithCipher($requestToSign);
+            $signedContent = $this->signEmployeeRequest($requestToSign);
 
             $eHealthResponseAsArray = new EHealthEmployeeRequest()->create($signedContent);
 
@@ -742,9 +742,9 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     }
 
     /**
-     * Signs the data using SignatureService.
+     * Sign the employee request data with the signature provider.
      */
-    private function signDataWithCipher(EmployeeRequest $requestToSign): string
+    private function signEmployeeRequest(EmployeeRequest $requestToSign): string
     {
         $requestToSign->loadMissing('revision');
         $nestedDataForRevision = $requestToSign->revision->data;
@@ -752,9 +752,9 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
         return signatureService()->signData(
             $payloadToSign,
-            $this->form->password,
             $this->form->knedp,
             $this->form->keyContainerUpload,
+            $this->form->password,
             Auth::user()->party->tax_id
         );
     }

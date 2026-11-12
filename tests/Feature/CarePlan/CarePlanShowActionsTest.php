@@ -54,8 +54,8 @@ use App\Livewire\Person\Records\PatientApproval;
 use Illuminate\Support\Facades\Http;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Livewire\EncounterPackage\Forms\EncounterForm;
-use Illuminate\Http\UploadedFile;
-use App\Services\SignatureService;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use App\Contracts\SignatureProvider;
 use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
 use App\Enums\JobStatus;
 use App\Models\MedicalEvents\Sql\Episode;
@@ -727,7 +727,7 @@ class CarePlanShowActionsTest extends TestCase
         $component->form->shouldReceive('resetSigningFields')->once();
         $component->form->shouldReceive('validate')->andReturn([
             'password' => 'synthetic', 'knedp' => 'synthetic',
-            'keyContainerUpload' => UploadedFile::fake()->create('synthetic.jks'),
+            'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
         ]);
         $lifecycle = $this->mock(ReferralRequestLifecycleService::class);
         $lifecycle->shouldReceive('resolveEncounterEmployeeContext')->andReturn([
@@ -738,7 +738,7 @@ class CarePlanShowActionsTest extends TestCase
             'started_at' => now()->addMinutes(30)->toIso8601String(),
             'ended_at' => now()->addDay()->toIso8601String(),
         ]);
-        $this->mock(SignatureService::class)->shouldReceive('signData')->once()->andReturn('synthetic-signature');
+        $this->mock(SignatureProvider::class)->shouldReceive('signData')->once()->andReturn('synthetic-signature');
         $repository = $this->mock(ServiceRequestRequestRepository::class);
         $repository->shouldReceive('hasPendingSubmission')->once()->with(Mockery::on(static fn ($record): bool => $record->id === $request->id && $record->personId === $request->personId))->andReturn(false);
         $repository->shouldReceive('submissionState')->once()->with(Mockery::on(static fn ($record): bool => $record->id === $request->id && $record->personId === $request->personId))->andReturn([

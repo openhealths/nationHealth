@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\DiagnosticReport;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Person\DiagnosticReportStatus;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\RemoteEHealthLinksProcessing;
@@ -445,7 +443,7 @@ abstract class DiagnosticReportComponent extends Component
     }
 
     /**
-     * Validate, sign with Cipher, persist the report as a draft and submit it to eHealth, which accepts it later.
+     * Validate, sign, persist the report as a draft and submit it to eHealth, which accepts it later.
      *
      * @return void
      */
@@ -473,15 +471,15 @@ abstract class DiagnosticReportComponent extends Component
         $requestData = Arr::toSnakeCase($formattedData);
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 $requestData,
                 $validatedCipher['knedp'],
                 $validatedCipher['keyContainerUpload'],
                 $validatedCipher['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
-            $exception->handle('Error when signing diagnostic report with Cipher');
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing diagnostic report');
 
             return;
         }
@@ -507,7 +505,7 @@ abstract class DiagnosticReportComponent extends Component
         }
 
         try {
-            $response = EHealth::diagnosticReport()->create($this->patientUuid, ['signed_data' => $signedContent->getBase64Data()]);
+            $response = EHealth::diagnosticReport()->create($this->patientUuid, ['signed_data' => $signedContent]);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when signing diagnostic report');
             RemoteEHealthLinksProcessing::markSubmissionFailed($submission);

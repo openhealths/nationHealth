@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\EncounterPackage;
 
-use App\Classes\Cipher\Api\CipherRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Episode\Status;
 use App\Enums\Person\EncounterStatus;
-use App\Exceptions\Cipher\CipherConnectionException;
-use App\Exceptions\Cipher\CipherException;
+use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\EncounterPackage\Concerns\ManagesIncomingReferralSelection;
@@ -234,15 +232,15 @@ class EncounterPackageCreate extends EncounterPackageComponent
         unset($formattedData['encounter']['incoming_referral']['display_value'], $formattedData['episode']);
 
         try {
-            $signedContent = new CipherRequest()->signData(
+            $signedContent = signatureService()->signData(
                 $formattedData,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
-        } catch (CipherException|CipherConnectionException $exception) {
-            $exception->handle('Error when signing data with Cipher');
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing the encounter package');
             $this->showSignatureModal = false;
 
             // The draft and its episode are stored already, so signing is retried from the draft's edit page
@@ -260,7 +258,7 @@ class EncounterPackageCreate extends EncounterPackageComponent
         $this->showSignatureModal = false;
 
         try {
-            $this->submitPackage(Encounter::findOrFail($createdEncounterId), $formattedData, $signedContent->getBase64Data());
+            $this->submitPackage(Encounter::findOrFail($createdEncounterId), $formattedData, $signedContent);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while submitting encounter');
         } catch (Throwable $exception) {
