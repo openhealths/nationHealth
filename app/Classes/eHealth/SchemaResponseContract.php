@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth;
 
+use App\Classes\eHealth\EHealthResponse;
 use DateTimeImmutable;
 use Exception;
 use Illuminate\Support\Str;
@@ -14,21 +15,21 @@ use RuntimeException;
 /** Native response contracts extracted from the official MIS and Medical Events OpenAPI snapshots. */
 class SchemaResponseContract
 {
-    private static array $contracts = [];
+    protected static array $contracts = [];
 
-    public static function validate(EHealthResponse $response, string $operation, string $group = 'shared'): array
+    public function validate(EHealthResponse $response, string $operation, string $group = 'shared'): array
     {
-        $contracts = self::contracts($group);
+        $contracts = $this->contracts($group);
         $schema = $contracts['operations'][$operation]['data'] ?? throw new RuntimeException('Unknown eHealth response contract.');
         $envelope = $response->json();
         if (!is_array($envelope) || !array_key_exists('data', $envelope)) {
             throw ValidationException::withMessages(['data' => 'The eHealth response data is missing.']);
         }
 
-        $errors = self::errors($envelope['data'], $schema, 'data', $contracts['components']);
+        $errors = $this->errors($envelope['data'], $schema, 'data', $contracts['components']);
         foreach (['urgent'] as $field) {
             if (array_key_exists($field, $envelope) && isset($contracts['operations'][$operation][$field])) {
-                $errors += self::errors($envelope[$field], $contracts['operations'][$operation][$field], $field, $contracts['components']);
+                $errors += $this->errors($envelope[$field], $contracts['operations'][$operation][$field], $field, $contracts['components']);
             }
         }
         if (isset($contracts['operations'][$operation]['paging']) && !array_key_exists('paging', $envelope)) {
@@ -57,7 +58,7 @@ class SchemaResponseContract
                 'total_entries' => ['type' => 'integer', 'minimum' => 0],
                 'total_pages' => ['type' => 'integer', 'minimum' => 0],
             ]);
-            $errors += self::errors($paging, $pagingSchema, 'paging', $contracts['components']);
+            $errors += $this->errors($paging, $pagingSchema, 'paging', $contracts['components']);
         }
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
@@ -68,24 +69,24 @@ class SchemaResponseContract
     }
 
     /** Validate native data supplied by a validated job or an explicit persistence boundary. */
-    public static function validateOperationData(array $data, string $operation, string $group = 'shared'): array
+    public function validateOperationData(array $data, string $operation, string $group = 'shared'): array
     {
-        $contracts = self::contracts($group);
+        $contracts = $this->contracts($group);
         $schema = $contracts['operations'][$operation]['data'] ?? throw new RuntimeException('Unknown eHealth response contract.');
-        self::validateData($data, $schema, $contracts['components']);
+        $this->validateData($data, $schema, $contracts['components']);
 
         return $data;
     }
 
-    public static function validateData(mixed $value, array $schema, array $components = []): void
+    public function validateData(mixed $value, array $schema, array $components = []): void
     {
-        $errors = self::errors($value, $schema, 'data', $components);
+        $errors = $this->errors($value, $schema, 'data', $components);
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
     }
 
-    private static function contracts(string $group): array
+    private function contracts(string $group): array
     {
         if (!in_array($group, ['shared', 'medication'], true)) {
             throw new RuntimeException('Unknown eHealth response contract group.');
@@ -101,7 +102,7 @@ class SchemaResponseContract
         return self::$contracts[$group];
     }
 
-    private static function errors(mixed $value, array $schema, string $path, array $components): array
+    private function errors(mixed $value, array $schema, string $path, array $components): array
     {
         if ($value === null && ($schema['nullable'] ?? false)) {
             return [];
@@ -109,18 +110,18 @@ class SchemaResponseContract
         if (isset($schema['$ref'])) {
             $name = basename($schema['$ref']);
 
-            return self::errors($value, $components[$name] ?? throw new RuntimeException('Missing eHealth response schema.'), $path, $components);
+            return $this->errors($value, $components[$name] ?? throw new RuntimeException('Missing eHealth response schema.'), $path, $components);
         }
         $errors = [];
-        if (isset($schema['not']) && self::errors($value, $schema['not'], $path, $components) === []) {
+        if (isset($schema['not']) && $this->errors($value, $schema['not'], $path, $components) === []) {
             $errors[$path] = 'The eHealth response matches a forbidden field combination.';
         }
         foreach ($schema['allOf'] ?? [] as $part) {
-            $errors += self::errors($value, $part, $path, $components);
+            $errors += $this->errors($value, $part, $path, $components);
         }
         foreach (['oneOf', 'anyOf'] as $choice) {
             if (isset($schema[$choice])) {
-                $matches = count(array_filter($schema[$choice], static fn (array $part): bool => self::errors($value, $part, $path, $components) === []));
+                $matches = count(array_filter($schema[$choice], fn (array $part): bool => $this->errors($value, $part, $path, $components) === []));
                 if ($matches === 0 || ($choice === 'oneOf' && $matches !== 1)) {
                     $errors[$path] = 'The eHealth response does not match the documented field choice.';
                 }
@@ -151,7 +152,7 @@ class SchemaResponseContract
             }
             foreach ($schema['properties'] ?? [] as $key => $part) {
                 if (array_key_exists($key, $value)) {
-                    $errors += self::errors($value[$key], $part, $path.'.'.$key, $components);
+                    $errors += $this->errors($value[$key], $part, $path.'.'.$key, $components);
                 }
             }
             if (($schema['additionalProperties'] ?? true) === false && array_diff(array_keys($value), array_keys($schema['properties'] ?? [])) !== []) {
@@ -159,13 +160,13 @@ class SchemaResponseContract
             }
             if (is_array($schema['additionalProperties'] ?? null)) {
                 foreach (array_diff(array_keys($value), array_keys($schema['properties'] ?? [])) as $key) {
-                    $errors += self::errors($value[$key], $schema['additionalProperties'], $path.'.'.$key, $components);
+                    $errors += $this->errors($value[$key], $schema['additionalProperties'], $path.'.'.$key, $components);
                 }
             }
         }
         if (is_array($value) && $type === 'array') {
             foreach ($value as $index => $item) {
-                $errors += self::errors($item, $schema['items'] ?? [], $path.'.'.$index, $components);
+                $errors += $this->errors($item, $schema['items'] ?? [], $path.'.'.$index, $components);
             }
             foreach (['minItems' => 'minimum', 'maxItems' => 'maximum'] as $limit => $label) {
                 if (isset($schema[$limit]) && ($limit === 'minItems' ? count($value) < $schema[$limit] : count($value) > $schema[$limit])) {

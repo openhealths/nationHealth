@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
+use App\Console\Commands\BackfillCarePlanFhir;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 class CarePlanFhirPersistenceTest extends TestCase
@@ -127,9 +128,9 @@ class CarePlanFhirPersistenceTest extends TestCase
         $plan = Repository::carePlan()->storeResource($planResource, 1, 1);
         $repository = Repository::carePlanActivity();
         $activity = $repository->storeResource($resource, $plan);
-        $projected = $repository->presentForUi($activity);
+        $projected = $activity;
 
-        $repository->saveForm([
+        (new CarePlanWorkflowHarness())->saveActivityDraft([
             'quantity' => (string) $projected->quantity,
             'product_reference' => $projected->productReference,
             'program' => $projected->program,
@@ -157,7 +158,7 @@ class CarePlanFhirPersistenceTest extends TestCase
         $resource['period'] = ['start' => '2026-10-19T10:30:12Z', 'end' => '2026-10-20T11:30:13Z'];
         $plan = Repository::carePlan()->storeResource($resource, 1, 1);
         $repository = Repository::carePlanActivity();
-        $activity = $repository->saveForm(['kind' => 'service_request', 'status' => 'draft', 'scheduled_period_start' => '2026-10-19', 'scheduled_period_end' => '2026-10-20'], $plan);
+        $activity = (new CarePlanWorkflowHarness())->saveActivityDraft(['kind' => 'service_request', 'status' => 'draft', 'scheduled_period_start' => '2026-10-19', 'scheduled_period_end' => '2026-10-20'], $plan);
 
         $this->assertSame($resource['period'], $repository->getResource($activity->id)['detail']['scheduledPeriod']);
         $this->assertArrayNotHasKey('remainingQuantity', $repository->getResource($activity->id)['detail']);
@@ -203,7 +204,7 @@ class CarePlanFhirPersistenceTest extends TestCase
         $repository = Repository::carePlanActivity();
         $activity = $repository->storeResource($resource, $plan);
 
-        $repository->saveForm(['description' => 'Edited', 'scheduled_period_start' => '', 'scheduled_period_end' => ''], $plan, $activity->id);
+        (new CarePlanWorkflowHarness())->saveActivityDraft(['description' => 'Edited', 'scheduled_period_start' => '', 'scheduled_period_end' => ''], $plan, $activity->id);
 
         $actual = $repository->getResource($activity->id);
         $this->assertSame($resource['detail']['scheduledTiming'], $actual['detail']['scheduledTiming']);
@@ -219,7 +220,7 @@ class CarePlanFhirPersistenceTest extends TestCase
         DB::table('care_plans')->insert(['id' => 10, 'person_id' => 1, 'legal_entity_id' => 1, 'author_id' => 1, 'encounter_id' => 1, 'title' => 'Draft', 'status' => 'draft', 'period_start' => '2026-10-19']);
         $repository = Repository::carePlan();
 
-        $report = $repository->backfillResources(1, true);
+        $report = (new BackfillCarePlanFhir())->backfillResources(1, true);
 
         $this->assertSame([], $report['errors']);
         $this->assertSame($encounterUuid, data_get($repository->getResource(10), 'encounter.identifier.value'));
@@ -236,7 +237,7 @@ class CarePlanFhirPersistenceTest extends TestCase
         }
         Model::preventAccessingMissingAttributes();
         try {
-            $report = Repository::carePlan()->backfillResources(1);
+            $report = (new BackfillCarePlanFhir())->backfillResources(1);
             $this->assertSame([], $report['errors']);
             $this->assertNull(DB::table('care_plans')->where('id', 10)->value('details_synced_at'));
         } finally {
@@ -275,7 +276,7 @@ class CarePlanFhirPersistenceTest extends TestCase
         DB::table('care_plans')->insert(['id' => 10, 'person_id' => 1, 'legal_entity_id' => 1, 'uuid' => '8d08ce22-82dd-4ac4-bdb9-432fd5aad5dd', 'title' => 'Legacy', 'status' => 'active', 'period_start' => '2026-10-19']);
         $before = DB::table('care_plans')->find(10);
 
-        $report = Repository::carePlan()->backfillResources(1, true);
+        $report = (new BackfillCarePlanFhir())->backfillResources(1, true);
 
         $this->assertSame([['type' => 'carePlan', 'localId' => 10]], $report['needsRemoteSync']);
         $this->assertSame(0, $report['converted']);
@@ -288,15 +289,15 @@ class CarePlanFhirPersistenceTest extends TestCase
         DB::table('care_plans')->insert(['id' => 10, 'person_id' => 1, 'legal_entity_id' => 1, 'author_id' => 1, 'title' => 'Draft', 'status' => 'draft', 'period_start' => '2026-10-19', 'category' => 'TEST', 'terms_of_service' => 'OUTPATIENT']);
         $repository = Repository::carePlan();
 
-        $preview = $repository->backfillResources(1);
+        $preview = (new BackfillCarePlanFhir())->backfillResources(1);
 
         $this->assertSame([], $preview['errors']);
         $this->assertNull(DB::table('care_plans')->where('id', 10)->value('details_synced_at'));
         $this->assertNull(DB::table('care_plans')->where('id', 10)->value('uuid'));
-        $written = $repository->backfillResources(1, true);
+        $written = (new BackfillCarePlanFhir())->backfillResources(1, true);
         $resource = $repository->getResource(10);
         $counts = $this->primitiveCounts();
-        $again = $repository->backfillResources(1, true);
+        $again = (new BackfillCarePlanFhir())->backfillResources(1, true);
 
         $this->assertSame(1, $written['converted']);
         $this->assertSame(0, $again['converted']);
@@ -314,13 +315,13 @@ class CarePlanFhirPersistenceTest extends TestCase
         $plan = Repository::carePlan()->storeResource($planResource, 1, 1);
         $repo = Repository::carePlanActivity();
         $activity = $repo->storeResource($resource, $plan);
-        $repo->saveForm(['goal' => ['SYNTHETIC_A', 'SYNTHETIC_C'], 'reasonCode' => ['A00', 'C00']], $plan, $activity->id);
+        (new CarePlanWorkflowHarness())->saveActivityDraft(['goal' => ['SYNTHETIC_A', 'SYNTHETIC_C'], 'reasonCode' => ['A00', 'C00']], $plan, $activity->id);
         $actual = $repo->getResource($activity->id)['detail'];
         $this->assertSame($resource['detail']['goal'][0], $actual['goal'][0]);
         $this->assertSame('SYNTHETIC_C', $actual['goal'][1]['coding'][0]['code']);
         $this->assertSame($resource['detail']['reasonCode'][0], $actual['reasonCode'][0]);
         $this->assertSame('C00', $actual['reasonCode'][1]['coding'][0]['code']);
-        $repo->saveForm(['goal' => ['SYNTHETIC_A'], 'reasonCode' => []], $plan, $activity->id);
+        (new CarePlanWorkflowHarness())->saveActivityDraft(['goal' => ['SYNTHETIC_A'], 'reasonCode' => []], $plan, $activity->id);
         $actual = $repo->getResource($activity->id)['detail'];
         $this->assertSame([$resource['detail']['goal'][0]], $actual['goal']);
         $this->assertSame([], $actual['reasonCode']);
@@ -334,7 +335,7 @@ class CarePlanFhirPersistenceTest extends TestCase
         $plan = Repository::carePlan()->storeResource($planResource, 1, 1);
         $repo = Repository::carePlanActivity();
         $activity = $repo->storeResource($resource, $plan);
-        $repo->saveForm(['description' => 'Updated', 'statusReason' => 'TEST'], $plan, $activity->id);
+        (new CarePlanWorkflowHarness())->saveActivityDraft(['description' => 'Updated', 'statusReason' => 'TEST'], $plan, $activity->id);
         $this->assertSame($resource['detail']['statusReason'], $repo->getResource($activity->id)['detail']['statusReason']);
     }
     public function test_empty_kind_resolves_the_saved_concept_without_prior_eager_loading(): void

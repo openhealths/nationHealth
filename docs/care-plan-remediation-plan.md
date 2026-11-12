@@ -95,7 +95,7 @@ Issue: [#1196](https://github.com/openhealths/nationHealth/issues/1196).
 
 ## Основні файли
 
-`app/Livewire/CarePlan/Forms/CarePlanForm.php`, `CarePlanCreate.php`, `CarePlanUpdate.php`, `Concerns/CarePlanManager.php`, `Concerns/ManagesCarePlanActivities.php`, `CarePlanIndex.php`, `app/Services/MedicalEvents/Mappers/CarePlanMapper.php`, `app/Classes/eHealth/Api/CarePlan.php`, `app/Repositories/CarePlanRepository.php`, політики, відповідні Blade/переклади та тести.
+`app/Livewire/CarePlan/Forms/CarePlanForm.php`, `CarePlanCreate.php`, `CarePlanUpdate.php`, `CarePlanComponent.php`, `CarePlanComponent.php`, `CarePlanIndex.php`, instance-методи перетворення `CarePlanComponent.php`, `app/Classes/eHealth/Api/CarePlan.php`, `app/Repositories/CarePlanRepository.php`, політики, відповідні Blade/переклади та тести.
 
 Зміни спільного User/employee-коду — тільки якщо потрібні після звірки правил та узгодження з поточною роботою над пацієнтським модулем.
 

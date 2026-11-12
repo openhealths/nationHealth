@@ -40,6 +40,26 @@ C01 follows the literal approved TV39 3.10.4.5.1 restriction, including complete
 
 ## Verification and integration limits
 
+### Component + Form refactor, 2026-11-12
+
+CarePlan workflow traits, business services and mapper classes were removed. Their
+orchestration, payload and display transformations now belong to component instance
+methods; Forms own fields and validation, repositories own persistence and selection,
+models own predicates, and the existing API clients validate remote results.
+Protected models are restored from locked IDs on each Livewire request. Shared
+infrastructure used by other clinical modules is retained.
+
+CarePlan consent uses `is_verified` and a future `expires_at`, including CarePlan-only
+patient approvals. Legacy approval statuses are cleared by paired install/update
+data migrations. Pending work belongs to jobs and does not grant access. Revocation
+expires local access; complete synchronization reconciles missing grants. The new
+migrations have not been applied locally.
+
+Syntax/import/class-loading checks were performed during refactoring. Afterwards,
+the user stopped automated verification; the final edits have no new automated test,
+Pint/build or CI result. Manual review and testing are the next acceptance step.
+The results below are historical and do not certify the refactored source.
+
 Tests run against a guarded PostgreSQL test database and the source/bootstrap of this PR. The dedicated database is `tv39_1196`; tests that require `testing` use guarded transactions, and the FHIR persistence/period tests additionally create private transactional schemas. No migrations, workers, real SMS or KEP run against `mis_dev`.
 
 Final local verification on 2026-11-11: **583 tests / 2939 assertions PASS**. The broad CP/provider/mapper/registration run is 554 / 2649; the separately configured merge, patient registry, private persistence and period run is 29 / 290. Both retain one existing deprecation. Focused approval/actor/referral modal and malformed-response checks are included in those totals; the earlier overlapping focused run passed 118 / 447. JUnit files: `cp1197-broad-final.xml` and `cp1197-private-final.xml` under the ignored local evidence directory. Full-PR Pint covers 113 PHP files; all 9 changed Blade files compile and pass PHP syntax checks. Class-reference and repository-factory audits cover complete files, including existing lines. The only deliberately unresolved class is the negative regression asserting that the obsolete general ApprovalRepository does not exist.

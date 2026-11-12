@@ -23,7 +23,6 @@ use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use App\Traits\SynchronizesCarePlans;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -33,6 +32,10 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Mockery;
 use RuntimeException;
+use Tests\Feature\CarePlan\CarePlanProcessingHarness;
+use Tests\Feature\CarePlan\CarePlanSubmissionHarness;
+use Tests\Feature\CarePlan\CarePlanSynchronizationHarness;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 class CarePlanSyncTest extends TestCase
@@ -244,8 +247,8 @@ class CarePlanSyncTest extends TestCase
             $this->assertFalse($repository->deleteDraft($plan->id));
             try {
                 $record instanceof CarePlan
-                    ? $repository->saveForm(['title' => 'Changed while pending'], $person->id, $employee->legalEntityId, $record->id)
-                    : $activityRepository->saveForm(['description' => 'Changed while pending'], $plan, $record->id);
+                    ? (new CarePlanWorkflowHarness())->saveCarePlanDraft(['title' => 'Changed while pending'], $person->id, $employee->legalEntityId, $record->id)
+                    : (new CarePlanWorkflowHarness())->saveActivityDraft(['description' => 'Changed while pending'], $plan, $record->id);
                 $this->fail('A pending submission must prevent editing.');
             } catch (ValidationException $exception) {
                 $this->assertArrayHasKey('submission', $exception->errors());

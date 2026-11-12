@@ -19,7 +19,6 @@ use App\Models\Person\Person;
 use App\Models\Role;
 use App\Policies\ApprovalPolicy;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\CarePlanApprovalService;
 use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Services\MedicalEvents\PatientApprovalService;
 use GuzzleHttp\Psr7\Response;
@@ -245,7 +244,7 @@ class CarePlanReadAccessRecoveryTest extends TestCase
 
         foreach ($plans as $plan) {
             $this->assertSame($approval->id, Repository::approval()->carePlanApprovalForCancellation($plan, $approval->uuid)->id);
-            $this->assertSame([], Repository::approval()->localForCarePlan($plan));
+            $this->assertTrue(Repository::approval()->localForCarePlan($plan)->isEmpty());
         }
         $unrelated = $this->plan($context);
         try {
@@ -332,7 +331,7 @@ class CarePlanReadAccessRecoveryTest extends TestCase
         ['approval' => $approval, 'payload' => $payload] = $this->request($context, [$this->plan($context)]);
         Repository::approval()->sync($this->remote($approval, $payload), $context['person'], $approval);
         $plan = CarePlan::whereUuid($payload['resources'][0]['identifier']['value'])->firstOrFail();
-        $this->assertSame([$approval->uuid], array_column(Repository::approval()->localForCarePlan($plan), 'uuid'));
+        $this->assertSame([$approval->uuid], Repository::approval()->localForCarePlan($plan)->pluck('uuid')->all());
         try {
             app(MedicalRequestOwnership::class)->approvalForCarePlan($plan, $approval->uuid);
             $this->fail('Patient-owned consent must use PatientApproval for verification, not the plan write/OTP workflow.');
@@ -355,8 +354,9 @@ class CarePlanReadAccessRecoveryTest extends TestCase
         $context['user']->givePermissionToParent('approval:cancel');
         $plan = $this->plan($context);
         ['approval' => $approval, 'payload' => $payload] = $this->request($context, [$plan, $this->plan($context)]);
+        $plan->update(['terms_of_service' => 'INPATIENT']);
         Repository::approval()->sync($this->remote($approval, $payload), $context['person'], $approval);
-        $this->mock(CarePlanApprovalService::class)->makePartial()->shouldReceive('skipsPatientOtp')->andReturn(true);
+
         $service = $this->mock(PatientApprovalService::class)->makePartial();
         $service->shouldReceive('cancel')->once()->withArgs(fn (Approval $candidate): bool => $candidate->id === $approval->id && $candidate->approvable->is($context['person']));
 

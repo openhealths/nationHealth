@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Api\Patient;
 
 use App\Classes\eHealth\Api\Job;
+use App\Classes\eHealth\Api\Patient\PatientApiBase;
 use App\Classes\eHealth\Api\ServiceRequest as ServiceRequestExecutorApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\ServiceRequestErrorTranslator;
@@ -30,7 +31,7 @@ class ServiceRequest extends PatientApiBase
      */
     public function createSigned(string $patientId, array $payload): PromiseInterface|EHealthResponse
     {
-        $this->setValidator(self::validateSubmission(...));
+        $this->setValidator($this->validateSubmission(...));
 
         return $this->post(self::URL . "/{$patientId}/service_requests", $payload);
     }
@@ -40,7 +41,7 @@ class ServiceRequest extends PatientApiBase
      */
     public function cancel(string $patientId, string $id, array $payload): PromiseInterface|EHealthResponse
     {
-        $this->setValidator(self::validateSubmission(...));
+        $this->setValidator($this->validateSubmission(...));
 
         return $this->patch(self::URL . "/{$patientId}/service_requests/{$id}/actions/cancel", $payload);
     }
@@ -52,7 +53,7 @@ class ServiceRequest extends PatientApiBase
      */
     public function recall(string $patientId, string $id, array $payload): PromiseInterface|EHealthResponse
     {
-        $this->setValidator(self::validateSubmission(...));
+        $this->setValidator($this->validateSubmission(...));
 
         return $this->patch(self::URL . "/{$patientId}/service_requests/{$id}/actions/recall", $payload);
     }
@@ -101,7 +102,7 @@ class ServiceRequest extends PatientApiBase
      */
     public function prequalify(string $patientId, array $payload): PromiseInterface|EHealthResponse
     {
-        $this->setValidator(self::validateQualification(...));
+        $this->setValidator($this->validateQualification(...));
 
         return $this->post(self::URL . "/{$patientId}/service_requests/prequalify", $payload);
     }
@@ -120,8 +121,8 @@ class ServiceRequest extends PatientApiBase
             }
 
             return $response->getStatusCode() === 202
-                ? self::validateSubmission($response)
-                : self::validateResourceData($response->getData());
+                ? $this->validateSubmission($response)
+                : $this->validateResourceData($response->getData());
         });
 
         return $this->patch(self::URL . "/{$patientId}/service_requests/{$id}/actions/resend");
@@ -169,7 +170,7 @@ class ServiceRequest extends PatientApiBase
     protected function validateDetails(EHealthResponse $response, bool $preserveApiKeys = false): array
     {
         $native = $response->getData();
-        self::validateResourceData($native);
+        $this->validateResourceData($native);
 
         // Validation precedes both native-key signing snapshots and application projections.
         return $preserveApiKeys ? $native : $this->replaceEHealthPropNames($native);
@@ -193,7 +194,7 @@ class ServiceRequest extends PatientApiBase
             if (!is_array($item)) {
                 throw ValidationException::withMessages(['data' => 'Every Service Request must be an object.']);
             }
-            self::validateResourceData($item);
+            $this->validateResourceData($item);
             if ($requireIdentity) {
                 Validator::make($item, ['identity' => ['required', 'array'], 'identity.last_name' => ['present', 'nullable', 'string'], 'identity.first_name' => ['present', 'nullable', 'string'], 'identity.second_name' => ['present', 'nullable', 'string'], 'identity.gender' => ['required', 'string'], 'identity.age' => ['required', 'integer', 'min:0']])->validate();
             }
@@ -203,7 +204,7 @@ class ServiceRequest extends PatientApiBase
     }
 
     /** API-007-062-0001 and Qualify by ID return synchronous program results. */
-    public static function validateQualification(EHealthResponse $response): array
+    public function validateQualification(EHealthResponse $response): array
     {
         Validator::make($response->json(), ['data' => ['present', 'array', 'list']])->validate();
         $data = $response->getData();
@@ -222,7 +223,7 @@ class ServiceRequest extends PatientApiBase
         return $data;
     }
 
-    public static function validateSubmission(EHealthResponse $response): array
+    public function validateSubmission(EHealthResponse $response): array
     {
         $data = Job::validateSubmissionResponse($response);
         Validator::make($data, ['status' => ['required', 'string']])->validate();
@@ -231,7 +232,7 @@ class ServiceRequest extends PatientApiBase
     }
 
     /** Validate every native final resource before choosing the submitted record's result. */
-    public static function validateSubmissionResult(array $data): array
+    public function validateSubmissionResult(array $data): array
     {
         if ($data === []) {
             // A processed status-only acknowledgement confirms the submitted snapshot.
@@ -243,7 +244,7 @@ class ServiceRequest extends PatientApiBase
                 if (!is_array($item)) {
                     throw ValidationException::withMessages(['result' => 'Every Service Request result must be an object.']);
                 }
-                $results[] = self::validateSubmissionResult($item);
+                $results[] = $this->validateSubmissionResult($item);
             }
 
             return $results[0] ?? [];
@@ -254,7 +255,7 @@ class ServiceRequest extends PatientApiBase
                     throw ValidationException::withMessages(['result' => 'The Service Request result must be an object or a list.']);
                 }
 
-                return self::validateSubmissionResult($data[$key]);
+                return $this->validateSubmissionResult($data[$key]);
             }
         }
         $receiptKeys = ['id', 'status', 'job_id', 'status_code', 'links', 'eta'];
@@ -265,11 +266,11 @@ class ServiceRequest extends PatientApiBase
             return $data;
         }
 
-        return self::validateResourceData($data);
+        return $this->validateResourceData($data);
     }
 
     /** Medical Events 9.15.6 Service Request response contract, before any mapping. */
-    public static function validateResourceData(array $data): array
+    public function validateResourceData(array $data): array
     {
         $rules = [
             'id' => ['required', 'uuid'],
@@ -315,12 +316,12 @@ class ServiceRequest extends PatientApiBase
         }
         foreach (['code', 'subject', 'requester_employee', 'requester_legal_entity', 'used_by_employee', 'used_by_legal_entity', 'program', 'program_service', 'context', 'completed_with', 'performer', 'location_reference'] as $field) {
             $required = in_array($field, ['code', 'subject', 'requester_employee', 'requester_legal_entity', 'used_by_employee', 'used_by_legal_entity'], true);
-            $rules += self::referenceRules($field, $required, identifierRequired: in_array($field, ['program_service', 'completed_with', 'performer', 'location_reference'], true));
+            $rules += $this->referenceRules($field, $required, identifierRequired: in_array($field, ['program_service', 'completed_with', 'performer', 'location_reference'], true));
         }
         foreach (['reason_reference', 'supporting_info', 'permitted_resources', 'based_on', 'specimens', 'focus'] as $field) {
             $rules[$field] = [$field === 'reason_reference' ? 'present' : 'sometimes', 'array'];
             $rules[$field][] = 'list';
-            $rules += self::referenceRules($field.'.*', true, displayRequired: $field !== 'based_on');
+            $rules += $this->referenceRules($field.'.*', true, displayRequired: $field !== 'based_on');
         }
         foreach (['quantity', 'remaining_quantity'] as $field) {
             $rules[$field] = ['sometimes', 'array'];
@@ -337,7 +338,7 @@ class ServiceRequest extends PatientApiBase
                 $rules[$field.'.*.program_processing_status'] = ['required', 'string'];
             } else {
                 $reference = $field === 'used_by_employee_history' ? 'used_by_employee' : 'used_by_legal_entity';
-                $rules += self::referenceRules($field.'.*.'.$reference, true);
+                $rules += $this->referenceRules($field.'.*.'.$reference, true);
             }
         }
         Validator::make($data, $rules)->after(static function ($validator) use ($data): void {
@@ -349,7 +350,7 @@ class ServiceRequest extends PatientApiBase
         return $data;
     }
 
-    private static function referenceRules(string $field, bool $required, bool $displayRequired = true, bool $identifierRequired = false): array
+    private function referenceRules(string $field, bool $required, bool $displayRequired = true, bool $identifierRequired = false): array
     {
         return [
             $field => [$required ? 'required' : 'sometimes', 'array'],

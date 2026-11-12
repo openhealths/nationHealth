@@ -8,15 +8,17 @@ use App\Classes\eHealth\EHealth;
 use App\Enums\CarePlanCompletenessFilter;
 use App\Enums\CarePlanStatusFilter;
 use App\Jobs\CarePlanFullSync;
+use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\CarePlan;
+use App\Models\MedicalEvents\Sql\Encounter;
 use App\Repositories\Repository;
 use App\Services\Dictionary\DictionaryManager;
 use App\Traits\HandlesCarePlanSync;
 use App\Traits\SynchronizesCarePlans;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
-
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -74,7 +76,7 @@ class PatientCarePlans extends BasePatientComponent
      */
     public function loadCarePlans(): void
     {
-        $this->carePlans = Repository::carePlan()->patientListing($this->personId, [
+        $this->carePlans = $this->patientListing($this->personId, [
             'name' => $this->filterName,
             'status' => $this->filterStatus,
             'completeness' => $this->filterCompleteness,
@@ -178,7 +180,7 @@ class PatientCarePlans extends BasePatientComponent
     #[Computed]
     public function encounterChoices(): array
     {
-        return Repository::carePlan()->encounterChoices($this->personId);
+        return $this->carePlanEncounterChoices($this->personId);
     }
 
     #[Computed]
@@ -241,5 +243,45 @@ class PatientCarePlans extends BasePatientComponent
     public function render(): View
     {
         return view('livewire.person.records.care-plans');
+    }
+    public function patientListing(int $personId, array $filters, int $legalEntityId): array
+    {
+        return Repository::carePlan()->getByPersonId($personId, $filters, $legalEntityId)->map(fn (CarePlan $plan): array => [
+            'id' => $plan->id,
+            'title' => $plan->displayTitle(),
+            'status' => $plan->status,
+            'requiresFhirImport' => $plan->requiresFhirImport(),
+            'createdAt' => $plan->createdAt?->format(config('app.date_format')) ?? '-',
+            'periodStart' => $plan->periodStart?->format(config('app.date_format')) ?? '-',
+            'periodEnd' => $plan->periodEnd?->format(config('app.date_format')) ?? '-',
+            'authorName' => $plan->authorName,
+            'careProvisionConditions' => $plan->careProvisionConditions,
+            'medicalCondition' => $plan->medicalCondition,
+            'extendedDescription' => $plan->extendedDescription,
+            'additionalInfo' => $plan->additionalInfo,
+            'notes' => $plan->notes,
+            'ehealthId' => $plan->ehealthId,
+            'episodeUuid' => $plan->episodeUuid() ?? '-',
+        ])->all();
+    }
+    protected function carePlanEncounterChoices(int $personId, bool $forCreation = false): array
+    {
+        $choices = Repository::carePlan()->encounterChoices($personId, $forCreation);
+
+        return $choices['encounters']->map(function (Encounter $encounter) use ($choices): array {
+            $occurredAt = $encounter->period === null
+                ? $encounter->getRawOriginal('ehealth_inserted_at')
+                : $encounter->period->getRawOriginal('start');
+            $date = $occurredAt
+                ? Carbon::parse($occurredAt, 'UTC')->setTimezone(config('app.timezone'))->format('d.m.Y')
+                : '-';
+            $episodeName = $choices['episodeNames']->get($encounter->episode?->value);
+            $label = __('Взаємодія #').$encounter->id.' ('.$date.')';
+            if (filled($episodeName)) {
+                $label .= ' — '.$episodeName;
+            }
+
+            return ['uuid' => $encounter->uuid, 'label' => $label];
+        })->all();
     }
 }

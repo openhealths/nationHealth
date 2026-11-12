@@ -4,13 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan\Activity\Show;
 
-use App\Classes\eHealth\EHealth;
-
 use App\Enums\JobStatus;
 use App\Livewire\CarePlan\CarePlanComponent;
-use App\Livewire\CarePlan\Concerns\CarePlanManager;
-use App\Livewire\CarePlan\Concerns\ManagesCarePlanEPrescription;
-use App\Livewire\CarePlan\Concerns\ManagesCarePlanReferrals;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Repositories\Repository;
@@ -21,12 +16,11 @@ use Livewire\Attributes\Locked;
 
 class CarePlanActivityShow extends CarePlanComponent
 {
-    use CarePlanManager;
-    use ManagesCarePlanEPrescription;
-    use ManagesCarePlanReferrals;
 
     #[Locked]
-    public CarePlanActivity $activity;
+    public int $activityId = 0;
+
+    protected CarePlanActivity $activity;
 
     public string $activityProductLabel = '';
 
@@ -38,6 +32,7 @@ class CarePlanActivityShow extends CarePlanComponent
         $this->bootCarePlan($carePlan);
 
         $this->activity = $this->ownedActivity($activity->id);
+        $this->activityId = $this->activity->id;
         $this->refreshSubmissionStatus();
     }
 
@@ -100,6 +95,8 @@ class CarePlanActivityShow extends CarePlanComponent
     protected function renderCarePlan()
     {
         return view('livewire.care-plan.activity.show.care-plan-activity-show', [
+            'carePlan' => $this->carePlan,
+            'activity' => $this->activity,
             'activityReasonReferenceLabels' => $this->resolveActivityReasonReferenceLabels(),
         ]);
     }
@@ -162,5 +159,9 @@ class CarePlanActivityShow extends CarePlanComponent
         }
 
         return '';
+    }
+    public function updatedSelectedProgram(): void
+    {
+        $this->updateSelectedProgramParticipation();
     }
 }

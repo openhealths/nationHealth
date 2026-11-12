@@ -8,7 +8,7 @@
     onCloseClick="showMedicalDeviceFormDrawer = false"
 >
     <x-slot name="title">
-        @if (isset($activityForm['id']) && $activityForm['id'])
+        @if (isset($activityForm->id) && $activityForm->id)
             {{ __('care-plan.edit_medical_device_prescription') }}
         @else
             {{ __('care-plan.new_medical_device_prescription') }}
@@ -69,7 +69,7 @@
             <div class="mb-4 grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div class="form-group group">
                     <label class="label" for="device_program_edit"> {{ __('care-plan.program') }} </label>
-                    @if (!empty($activityForm['id']))
+                    @if (!empty($activityForm->id))
                         <select id="device_program_edit" class="input-select peer" wire:model.live="selectedProgram">
                             <option value="">{{ __('care-plan.without_medical_program') }}</option>
                             @foreach (($dictionaries['medical_programs_device'] ?? $dictionaries['medical_programs'] ?? []) as $id => $name)
@@ -80,7 +80,7 @@
                         <input
                             type="text"
                             class="input cursor-not-allowed bg-gray-50 dark:bg-gray-700"
-                            value="{{ !empty($activityForm['program']) ? ($dictionaries['medical_programs_device'][$activityForm['program']] ?? $dictionaries['medical_programs'][$activityForm['program']] ?? $activityForm['program']) : __('care-plan.without_medical_program') }}"
+                            value="{{ !empty($activityForm->program) ? ($dictionaries['medical_programs_device'][$activityForm->program] ?? $dictionaries['medical_programs'][$activityForm->program] ?? $activityForm->program) : __('care-plan.without_medical_program') }}"
                             disabled
                         />
                     @endif
@@ -97,19 +97,19 @@
                                     ?? '')
                                 : '';
                             if ($deviceDisplayName === '') {
-                                $deviceDisplayName = !empty($activityForm['product_reference'])
+                                $deviceDisplayName = !empty($activityForm->product_reference)
                                     ? __('care-plan.device_name_unavailable')
-                                    : ($activityForm['product_codeable_concept'] ?? '');
+                                    : ($activityForm->product_codeable_concept ?? '');
                             }
                         @endphp
                         <input
                             type="text"
-                            class="input bg-gray-50 dark:bg-gray-700 {{ empty($activityForm['id']) ? 'cursor-not-allowed' : 'pr-12' }} font-medium text-gray-900 dark:text-white w-full"
+                            class="input bg-gray-50 dark:bg-gray-700 {{ empty($activityForm->id) ? 'cursor-not-allowed' : 'pr-12' }} font-medium text-gray-900 dark:text-white w-full"
                             value="{{ $deviceDisplayName }}"
                             placeholder="{{ __('care-plan.select_device') }}"
                             disabled
                         />
-                        @if (!empty($activityForm['id']))
+                        @if (!empty($activityForm->id))
                             <button
                                 type="button"
                                 class="absolute top-1/2 right-2 -translate-y-1/2 text-sm whitespace-nowrap text-blue-600 hover:text-blue-800"
@@ -120,9 +120,9 @@
                             </button>
                         @endif
                     </div>
-                    @if (!empty($activityForm['product_reference']))
+                    @if (!empty($activityForm->product_reference))
                         <p class="mt-1 text-xs break-all text-gray-500 dark:text-gray-400">
-                            {{ __('care-plan.uuid') }}: {{ $activityForm['product_reference'] }}
+                            {{ __('care-plan.uuid') }}: {{ $activityForm->product_reference }}
                         </p>
                     @endif
                     <input type="hidden" wire:model="activityForm.product_reference" />
@@ -134,7 +134,7 @@
                 <div class="form-group group">
                     <label for="device_quantity" class="label"> {{ __('care-plan.quantity') }} </label>
                     <div class="flex gap-2">
-                        @if(filled($activityForm['program'] ?? null))
+                        @if(filled($activityForm->program ?? null))
                             <select id="device_quantity" class="input-select peer w-full" wire:model="activityForm.quantity">
                                 <option value="">{{ __('forms.select') }}</option>
                                 @foreach($this->deviceQuantityOptions as $quantity)
@@ -151,7 +151,7 @@
                     @error('activityForm.quantity')<p class="text-error">{{ $message }}</p>@enderror
                 </div>
                 <div class="form-group group">
-                    <label class="label"> {{ __('care-plan.start_date') }}: @if(filled($activityForm['program'] ?? null))<span class="text-red-500">*</span>@endif </label>
+                    <label class="label"> {{ __('care-plan.start_date') }}: @if(filled($activityForm->program ?? null))<span class="text-red-500">*</span>@endif </label>
                     <div class="datepicker-wrapper">
                         <input
                             type="text"
@@ -196,7 +196,7 @@
                     </div>
                 </div>
                 <div class="form-group group">
-                    <label class="label"> {{ __('care-plan.end_date') }}: @if(filled($activityForm['program'] ?? null))<span class="text-red-500">*</span>@endif </label>
+                    <label class="label"> {{ __('care-plan.end_date') }}: @if(filled($activityForm->program ?? null))<span class="text-red-500">*</span>@endif </label>
                     <div class="datepicker-wrapper">
                         <input
                             type="text"

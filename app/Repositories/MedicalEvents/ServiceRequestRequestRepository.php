@@ -26,7 +26,9 @@ use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
+use App\Repositories\MedicalEvents\BaseRepository;
 use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
+use App\Repositories\MedicalEvents\MedicalEventsRequestStatuses;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use App\Services\Dictionary\ServiceSearch;
@@ -46,7 +48,7 @@ class ServiceRequestRequestRepository extends BaseRepository
 {
     use ResolvesRequestFhirRefs;
 
-    private ?ServiceRequestRegistryMapper $registryMapper = null;
+    protected ?ServiceRequestRegistryMapper $registryMapper = null;
 
     public function __construct(ServiceRequestRequest $model)
     {
@@ -1221,7 +1223,7 @@ class ServiceRequestRequestRepository extends BaseRepository
             if ($processed) {
                 $record = $link->linkable;
                 $data = $jobData['response_data'] ?? ($jobData['result'] ?? ($jobData['data'] ?? []));
-                $data = ServiceRequestApi::validateSubmissionResult($data);
+                $data = (new ServiceRequestApi())->validateSubmissionResult($data);
                 $data = (new ServiceRequestMapper())->normalize($data);
                 if (isset($data['id']) && $data['id'] !== $record->uuid) {
                     throw new InvalidArgumentException('The processed Service Request does not match the submitted record.');

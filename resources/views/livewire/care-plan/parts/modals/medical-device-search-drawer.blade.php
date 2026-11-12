@@ -11,7 +11,7 @@
     <x-slot name="title">{{ __('care-plan.medical_device_search') }}</x-slot>
 
     @php
-        $deviceProgramId = $selectedProgram ?: ($activityForm['program'] ?? '');
+        $deviceProgramId = $selectedProgram ?: ($activityForm->program ?? '');
         $deviceProgramName = $deviceProgramId !== ''
             ? ($dictionaries['medical_programs_device'][$deviceProgramId] ?? $dictionaries['medical_programs'][$deviceProgramId] ?? $deviceProgramId)
             : '';

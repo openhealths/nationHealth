@@ -7,13 +7,11 @@ namespace Tests\Feature\CarePlan;
 use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
 use App\Classes\eHealth\Api\CarePlanActivity as ActivityApi;
 use App\Core\Arr;
-use App\Livewire\CarePlan\Concerns\ManagesCarePlanActivities;
-use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
-use App\Livewire\CarePlan\Forms\CarePlanForm;
-use App\Services\MedicalEvents\Mappers\CarePlanMapper;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\CarePlanResourceHarness;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 class CarePlanTv39ContractTest extends TestCase
@@ -125,12 +123,12 @@ class CarePlanTv39ContractTest extends TestCase
         $resource['basedOn'] = $resource['partOf'] = $resource['encounter'];
         $resource['basedOn']['identifier']['type']['coding'][0]['code'] = 'care_plan';
         $resource['partOf']['identifier']['type']['coding'][0]['code'] = 'care_plan';
-        $mapper = new CarePlanMapper();
+        $mapper = new CarePlanResourceHarness();
         $form = $mapper->fromFhir($resource);
         $this->assertSame($resource['encounter']['identifier']['value'], $form['basedOn']);
         $mapped = $mapper->toFhir($form, ['resource' => $resource]);
         $this->assertSame($resource['basedOn']['identifier']['value'], $mapped['basedOn']['identifier']['value']);
-        $content = CarePlanForm::buildCreateContent($mapped);
+        $content = (new CarePlanWorkflowHarness())->buildCreateCarePlanContent($mapped);
         $this->assertSame($resource['basedOn']['identifier']['value'], $content['based_on']['identifier']['value']);
         $cleared = $mapper->toFhir(array_replace($form, ['basedOn' => null, 'partOf' => '']), ['resource' => $resource]);
         $this->assertArrayNotHasKey('basedOn', $cleared);
@@ -149,14 +147,14 @@ class CarePlanTv39ContractTest extends TestCase
         $resource['detail']['kind'] = 'service_request';
         $resource['detail']['quantity']['value'] = $quantity;
         $this->expectException(ValidationException::class);
-        CarePlanActivityForm::buildCreateContent($resource);
+        (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($resource);
     }
 
     public function test_medication_requires_program_and_quantity_at_signing(): void
     {
         $resource = Arr::toCamelCase($this->fixture('activity'));
         $this->expectException(ValidationException::class);
-        CarePlanActivityForm::buildCreateContent($resource);
+        (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($resource);
     }
 
     public function test_service_without_program_has_optional_period_and_accepts_integer_quantity(): void
@@ -165,7 +163,7 @@ class CarePlanTv39ContractTest extends TestCase
         $resource['detail']['kind'] = 'service_request';
         $resource['detail']['quantity']['value'] = 2;
         unset($resource['detail']['scheduledPeriod']);
-        $content = CarePlanActivityForm::buildCreateContent($resource);
+        $content = (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($resource);
         $this->assertSame(2, $content['detail']['quantity']['value']);
         $this->assertArrayNotHasKey('scheduled_period', $content['detail']);
     }
@@ -177,17 +175,17 @@ class CarePlanTv39ContractTest extends TestCase
         $resource['detail']['quantity']['value'] = 2;
         unset($resource['detail']['scheduledPeriod']['end']);
         $this->expectException(ValidationException::class);
-        CarePlanActivityForm::buildCreateContent($resource);
+        (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($resource);
     }
 
     private function activityGuardHarness(array $catalog = [], ?array $program = null): object
     {
-        return new class ($catalog, $program)
+        return new class ($catalog, $program) extends CarePlanWorkflowHarness
         {
-            use ManagesCarePlanActivities;
 
             public function __construct(private array $catalog, private ?array $program)
             {
+                parent::__construct();
             }
 
             protected function fetchAllDeviceDefinitions(array $filters): array
@@ -252,9 +250,9 @@ class CarePlanTv39ContractTest extends TestCase
 
     public function test_device_options_include_all_pack_sizes_and_inclusive_day_cap(): void
     {
-        $this->assertSame([2, 3, 4, 6], CarePlanActivityForm::deviceQuantityOptions([2, 3, 2, 0], 3, '2026-11-11', '2026-11-12'));
-        $this->assertSame([2, 3], CarePlanActivityForm::deviceQuantityOptions([2, 3], 3, '2026-11-11', '2026-11-11'));
-        $this->assertSame([], CarePlanActivityForm::deviceQuantityOptions([2], 3, '2026-11-12', '2026-11-11'));
-        $this->assertSame([], CarePlanActivityForm::deviceQuantityOptions([2], 3, 'bad date', '2026-11-11'));
+        $this->assertSame([2, 3, 4, 6], (new CarePlanWorkflowHarness())->buildDeviceQuantityOptions([2, 3, 2, 0], 3, '2026-11-11', '2026-11-12'));
+        $this->assertSame([2, 3], (new CarePlanWorkflowHarness())->buildDeviceQuantityOptions([2, 3], 3, '2026-11-11', '2026-11-11'));
+        $this->assertSame([], (new CarePlanWorkflowHarness())->buildDeviceQuantityOptions([2], 3, '2026-11-12', '2026-11-11'));
+        $this->assertSame([], (new CarePlanWorkflowHarness())->buildDeviceQuantityOptions([2], 3, 'bad date', '2026-11-11'));
     }
 }

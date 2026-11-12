@@ -6,7 +6,6 @@ namespace App\Services\MedicalEvents;
 
 use App\Classes\eHealth\EHealth;
 use App\Enums\JobStatus;
-use App\Enums\Person\ApprovalStatus;
 use App\Enums\Person\AuthenticationMethod;
 use App\Enums\Specimen\Status as SpecimenStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -32,6 +31,7 @@ use App\Models\Person\Person;
 use App\Models\Relations\AuthenticationMethod as AuthenticationMethodModel;
 use App\Models\User;
 use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\EHealthJobResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -77,7 +77,7 @@ class PatientApprovalService
         'device' => ['active', 'inactive'],
     ];
 
-    private ?array $resourceTypeNames = null;
+    protected ?array $resourceTypeNames = null;
 
     public function resourceRelations(string $type): array
     {
@@ -560,8 +560,7 @@ class PatientApprovalService
             $data = $this->details($person, $approvalId);
 
             if (($data['is_verified'] ?? false) !== true
-                || (isset($data['status']) && ApprovalStatus::resolve($data['status'])?->isGranted() !== true)
-                || (isset($data['expires_at']) && !CarbonImmutable::parse($data['expires_at'])->isFuture())) {
+                || (empty($data['expires_at']) || !CarbonImmutable::parse($data['expires_at'])->isFuture())) {
                 throw $exception;
             }
 
@@ -602,8 +601,7 @@ class PatientApprovalService
         $data = $this->details($person, $approvalId);
 
         if (($data['is_verified'] ?? false) !== true
-            || (isset($data['status']) && ApprovalStatus::resolve($data['status'])?->isGranted() !== true)
-            || (isset($data['expires_at']) && !CarbonImmutable::parse($data['expires_at'])->isFuture())) {
+            || (empty($data['expires_at']) || !CarbonImmutable::parse($data['expires_at'])->isFuture())) {
             throw new RuntimeException('eHealth has not confirmed an active approval.');
         }
 

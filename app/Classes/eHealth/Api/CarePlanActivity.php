@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
+use App\Classes\eHealth\Api\Job;
 use App\Classes\eHealth\EHealthRequest as Request;
-
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -15,6 +15,7 @@ use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class CarePlanActivity extends Request
 {
@@ -147,6 +148,35 @@ class CarePlanActivity extends Request
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error('Care Plan Activity response validation failed', ['fields' => $validator->errors()->keys()]);
             throw new ValidationException($validator);
+        }
+    }
+    public function assertRegisteredInEHealth(?string $personUuid, ?string $carePlanUuid, ?string $activityUuid): void
+    {
+
+        if (!$personUuid || !$carePlanUuid || !$activityUuid) {
+            throw new RuntimeException(__('care-plan.activity_ehealth_missing_identifiers'));
+        }
+
+        try {
+            $response = $this->getDetails($personUuid, $carePlanUuid, $activityUuid);
+            if (!$response->successful()) {
+                throw new RuntimeException(__('care-plan.activity_not_in_ehealth'));
+            }
+
+            // An HTTP 200 alone cannot confirm registration of the requested activity.
+            $activityData = $response->validate();
+            if (($activityData['id'] ?? null) !== $activityUuid
+                || data_get($activityData, 'carePlan.identifier.value') !== $carePlanUuid) {
+                throw new RuntimeException(__('care-plan.activity_not_in_ehealth'));
+            }
+        } catch (EHealthResponseException $exception) {
+            Log::warning('Care plan activity registration could not be confirmed', [
+                'activity_uuid' => $activityUuid,
+                'care_plan_uuid' => $carePlanUuid,
+                'message' => $exception->getMessage(),
+            ]);
+
+            throw new RuntimeException(__('care-plan.activity_not_in_ehealth'));
         }
     }
 }

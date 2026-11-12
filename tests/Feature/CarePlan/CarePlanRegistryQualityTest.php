@@ -17,7 +17,6 @@ use App\Models\CarePlanActivity;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Repositories\Repository;
-use App\Services\MedicalEvents\CarePlanApprovalService;
 use App\Services\MedicalEvents\EHealthJobResolver;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Http;
@@ -138,7 +137,7 @@ class CarePlanRegistryQualityTest extends TestCase
         $resource['title'] = $resource['id'];
         $resource['requisition'] = '4321-8765-2109-6543';
         $plan = $repository->storeResource($resource, $person->id, $legalEntity->id);
-        $displayTitles = array_column($repository->patientListing($person->id, ['completeness' => 'all'], $legalEntity->id), 'title');
+        $displayTitles = array_column((new PatientCarePlans())->patientListing($person->id, ['completeness' => 'all'], $legalEntity->id), 'title');
         $expected = [
             __('care-plan.care_plan_with_number', ['number' => '1234-5678-9012-3456']),
             __('care-plan.care_plan_with_number', ['number' => '4321-8765-2109-6543']),
@@ -178,7 +177,7 @@ class CarePlanRegistryQualityTest extends TestCase
             ->assertSee(__('care-plan.revoke_approval'))
             ->call('cancelApproval', $approval->uuid)->assertSee(__('care-plan.approval_cancelled'))
             ->assertDontSeeHtml('wire:click="cancelApproval')->assertDispatched('care-plan-approvals-changed');
-        $this->assertSame($legacyStatus, $approval->fresh()->status);
+        $this->assertNull($approval->fresh()->status);
         $this->assertTrue($approval->fresh()->getAttribute('is_verified'));
         $this->assertFalse($approval->fresh()->expiresAt->isFuture());
     }
@@ -298,9 +297,7 @@ class CarePlanRegistryQualityTest extends TestCase
             'granted_to_type' => 'employee', 'status' => ApprovalStatus::ACTIVE->value,
             'is_verified' => true, 'access_level' => 'write', 'expires_at' => now()->addDay(),
         ]);
-        $service = Mockery::mock(CarePlanApprovalService::class)->makePartial();
-        $service->shouldReceive('skipsPatientOtp')->andReturn(true);
-        $this->instance(CarePlanApprovalService::class, $service);
+        $plan->update(['terms_of_service' => 'INPATIENT']);
 
         return [$plan, $approval, $legalEntity];
     }

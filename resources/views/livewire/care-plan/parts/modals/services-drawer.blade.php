@@ -7,7 +7,7 @@
     onCloseClick="showServiceDrawer = false"
 >
     <x-slot name="title">
-        @if (isset($activityForm['id']) && $activityForm['id'])
+        @if (isset($activityForm->id) && $activityForm->id)
             {{ __('care-plan.edit_service_prescription') }}
         @else
             {{ __('care-plan.new_service_prescription') }}

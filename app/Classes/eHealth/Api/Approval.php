@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
+use App\Classes\eHealth\Api\Job;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\ValidationRuleBuilder;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use Carbon\CarbonImmutable;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class Approval extends Request
 {
@@ -260,7 +264,7 @@ class Approval extends Request
 
     private function validatePatientResource(EHealthResponse $response, bool $withCreator): array
     {
-        $data = self::validateResourceData($response->json() ?? []);
+        $data = $this->validateResourceData($response->json() ?? []);
         $rules = [
             'granted_resources' => ['present', 'array', 'list'],
             'granted_resource_types' => ['present', 'array', 'list'],
@@ -320,11 +324,11 @@ class Approval extends Request
             'id' => ['required_without:is_verified', 'uuid'],
         ])->validate();
 
-        return self::validateResourceData($body, complete: false);
+        return $this->validateResourceData($body, complete: false);
     }
 
     /** Unwrap documented job envelopes and validate the approval before consumers can persist it. */
-    public static function validateResourceData(array $data, bool $complete = true): array
+    public function validateResourceData(array $data, bool $complete = true): array
     {
         $urgent = null;
         for ($depth = 0; $depth < 6; $depth++) {
@@ -375,7 +379,7 @@ class Approval extends Request
         return Validator::make($data, $rules)->validate();
     }
 
-    public static function errorMessage(Response $response): ?string
+    public function errorMessage(Response $response): ?string
     {
         $data = Validator::make($response->json() ?? [], [
             'error' => ['nullable', 'array'],
@@ -385,4 +389,67 @@ class Approval extends Request
         return data_get($data, 'error.message');
     }
 
+    public function verifyConfirmed(string $patientUuid, string $approvalId, ?int $code, ?string $bearerToken = null): EHealthResponse
+    {
+        $api = $this;
+        if ($bearerToken !== null) {
+            $api->withToken($bearerToken);
+        }
+        try {
+            $response = $this->requireSuccessfulResponse($api->verify($patientUuid, $approvalId, $code === null ? [] : ['code' => $code]));
+        } catch (EHealthResponseException $exception) {
+            if ($exception->response->status() !== 409 || $this->errorMessage($exception->response) !== 'Approval is already verified') {
+                throw $exception;
+            }
+            // The remote PATCH can succeed before local persistence fails. Reconcile this exact approval.
+            $response = $this->requireSuccessfulResponse($api->getApprovalDetails($patientUuid, $approvalId));
+            $confirmed = $response->validate();
+            if (($confirmed['id'] ?? null) !== $approvalId || !$this->approvalIsGranted($confirmed)) {
+                throw $exception;
+            }
+        }
+        try {
+            $data = $response->validate();
+        } catch (ValidationException $exception) {
+            if ($code === null) {
+                throw $exception;
+            }
+            // The code may already be consumed. Re-read this approval instead of sending the code again.
+            $confirmedResponse = $this->requireSuccessfulResponse($api->getApprovalDetails($patientUuid, $approvalId));
+            $data = $confirmedResponse->validate();
+            if (($data['id'] ?? null) !== $approvalId || !$this->approvalIsGranted($data)) {
+                throw $exception;
+            }
+            $response = $confirmedResponse;
+        }
+        if (array_key_exists('is_verified', $data) && $data['is_verified'] !== true) {
+            throw new RuntimeException(__('care-plan.approval_verify_error'));
+        }
+        // A successful PATCH may contain only an acknowledgement. Read the verified flag and expiry before granting access.
+        if ($data === [] || !isset($data['id'], $data['is_verified'], $data['expires_at'])) {
+            $response = $this->requireSuccessfulResponse($api->getApprovalDetails($patientUuid, $approvalId));
+            $data = $response->validate();
+        }
+        if (($data['id'] ?? null) !== $approvalId || !$this->approvalIsGranted($data)) {
+            throw new RuntimeException(__('care-plan.approval_verify_error'));
+        }
+
+        return $response;
+    }
+
+    private function approvalIsGranted(array $data): bool
+    {
+        return ($data['is_verified'] ?? false) === true
+            && !empty($data['expires_at'])
+            && CarbonImmutable::parse($data['expires_at'])->isFuture();
+    }
+
+    protected function requireSuccessfulResponse(EHealthResponse $response): EHealthResponse
+    {
+        if (!$response->successful()) {
+            throw new EHealthResponseException($response);
+        }
+
+        return $response;
+    }
 }

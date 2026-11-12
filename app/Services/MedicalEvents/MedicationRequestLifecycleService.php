@@ -21,7 +21,10 @@ use App\Models\Person\Person;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use App\Services\Dictionary\MedicationProgramPicker;
+use App\Services\MedicalEvents\ActivityRemainingQuantityGuard;
 use App\Services\MedicalEvents\Concerns\ResolvesEmployeeContext;
+use App\Services\MedicalEvents\EHealthRequestLifecycleService;
+use App\Services\MedicalEvents\InformWith;
 use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use Carbon\Carbon;
 use Exception;
@@ -261,7 +264,7 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
             throw ValidationException::withMessages(['program_id' => __('medication-programs.unavailable')]);
         }
         $drug = $this->findPrescribingDrug((string) ($form['medication_id'] ?? ''), $programId);
-        $form = PrescriptionRules::normalize($form, $drug, $program ?? [], $planDailyDose);
+        $form = (new PrescriptionRules())->normalize($form, $drug, $program ?? [], $planDailyDose);
         // Keep the resolved native program in the durable draft and Activity identity checks.
         $form['program_id'] = $programId;
         if (!$form['request_notification_disabled']) {
@@ -601,7 +604,7 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
         if ($programId !== null && $program === null) {
             throw new InvalidArgumentException(__('medication-programs.unavailable'));
         }
-        $disabled = filter_var(PrescriptionRules::programSetting($program, 'request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
+        $disabled = filter_var((new PrescriptionRules())->programSetting($program, 'request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
         if (strtoupper($detail['status']) !== 'ACTIVE' || $disabled) {
             throw new InvalidArgumentException(__('medication-requests.sms_unavailable'));
         }

@@ -7,7 +7,6 @@ namespace Tests\Feature\CarePlan;
 use App\Classes\eHealth\Api\Person as ApiPerson;
 use App\Livewire\CarePlan\CarePlanApprovals;
 use App\Livewire\CarePlan\CarePlanShow;
-use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
 use App\Livewire\Components\XMessage;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
@@ -26,7 +25,6 @@ use App\Models\User;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use App\Services\Dictionary\Dictionaries\BasicDictionary;
-use App\Services\MedicalEvents\CarePlanActivityValidationService;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Request;
@@ -40,6 +38,8 @@ use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\Feature\Composition\CompositionTestFixtures;
+use Tests\Support\CarePlanShowHarness;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 class CarePlanBusinessRulesTest extends TestCase
@@ -171,7 +171,7 @@ class CarePlanBusinessRulesTest extends TestCase
 
     public function test_registered_referral_modals_use_referral_permissions_after_the_plan_closes(): void
     {
-        $activity = Repository::carePlanActivity()->saveForm($this->draftData(), $this->plan);
+        $activity = (new CarePlanWorkflowHarness())->saveActivityDraft($this->draftData(), $this->plan);
         $request = $this->confirmedReferral($activity);
         $this->plan->update(['status' => 'completed']);
         $this->useRegisteredReferralPermissions(['service_request:recall', 'service_request:cancel']);
@@ -180,8 +180,8 @@ class CarePlanBusinessRulesTest extends TestCase
 
         foreach (['recall_referral', 'cancel_referral'] as $action) {
             $this->assertTrue($this->user->can($action === 'recall_referral' ? 'recall' : 'cancel', $request));
-            $component = new CarePlanShow();
-            $component->carePlan = $this->plan->fresh();
+            $component = new CarePlanShowHarness();
+            $component->setCarePlan($this->plan->fresh());
             $component->openSignatureModal($action, null, $request->uuid);
             $this->assertTrue($component->showSignatureModal);
             $this->assertSame($action, $component->actionType);
@@ -194,13 +194,13 @@ class CarePlanBusinessRulesTest extends TestCase
 
     public function test_registered_referral_modal_denial_is_visible_before_changing_form_state(): void
     {
-        $activity = Repository::carePlanActivity()->saveForm($this->draftData(), $this->plan);
+        $activity = (new CarePlanWorkflowHarness())->saveActivityDraft($this->draftData(), $this->plan);
         $request = $this->confirmedReferral($activity);
         $this->useRegisteredReferralPermissions([]);
         Queue::fake();
 
-        $component = new CarePlanShow();
-        $component->carePlan = $this->plan;
+        $component = new CarePlanShowHarness();
+        $component->setCarePlan($this->plan);
         $component->statusReason = 'existing-reason';
         $component->referralExplanatoryLetter = 'Existing letter';
         $component->openSignatureModal('recall_referral', null, $request->uuid);
@@ -217,15 +217,15 @@ class CarePlanBusinessRulesTest extends TestCase
 
     public function test_registered_referral_modal_rejects_another_patients_record(): void
     {
-        $activity = Repository::carePlanActivity()->saveForm($this->draftData(), $this->plan);
+        $activity = (new CarePlanWorkflowHarness())->saveActivityDraft($this->draftData(), $this->plan);
         $request = $this->confirmedReferral($activity);
         $other = Person::create(['uuid' => (string) Str::uuid(), 'birth_date' => '1990-01-01', 'gender' => 'MALE']);
         $request->update(['person_id' => $other->id]);
         $this->useRegisteredReferralPermissions(['service_request:recall']);
         Queue::fake();
 
-        $component = new CarePlanShow();
-        $component->carePlan = $this->plan;
+        $component = new CarePlanShowHarness();
+        $component->setCarePlan($this->plan);
         $component->openSignatureModal('recall_referral', null, $request->uuid);
         $this->assertFalse($component->showSignatureModal);
         $this->assertSame('', $component->actionType);
@@ -284,7 +284,7 @@ class CarePlanBusinessRulesTest extends TestCase
     {
         $repository = Repository::carePlanActivity();
         for ($i = 0; $i < 5; $i++) {
-            $activity = $repository->saveForm($this->draftData(), $this->plan);
+            $activity = (new CarePlanWorkflowHarness())->saveActivityDraft($this->draftData(), $this->plan);
             if ($i < 2) {
                 // Historical terminal records still consume one created activity each.
                 $activity->update(['status' => $i === 0 ? 'cancelled' : 'completed']);
@@ -292,7 +292,7 @@ class CarePlanBusinessRulesTest extends TestCase
         }
         $this->assertSame(['limit' => 5, 'created' => 5, 'confirmedReferrals' => 0, 'remaining' => 0], $repository->serviceCreationCapacity($this->plan, $this->serviceUuid));
         try {
-            $repository->saveForm($this->draftData(), $this->plan);
+            (new CarePlanWorkflowHarness())->saveActivityDraft($this->draftData(), $this->plan);
             $this->fail('The sixth activity must not be persisted.');
         } catch (ValidationException $exception) {
             $this->assertArrayHasKey('activityForm.product_reference', $exception->errors());
@@ -304,14 +304,14 @@ class CarePlanBusinessRulesTest extends TestCase
     public function test_each_distinct_confirmed_referral_on_the_same_activity_adds_one_slot_and_sync_is_idempotent(): void
     {
         $repository = Repository::carePlanActivity();
-        $activity = $repository->saveForm($this->draftData(), $this->plan);
+        $activity = (new CarePlanWorkflowHarness())->saveActivityDraft($this->draftData(), $this->plan);
         $first = $this->confirmedReferral($activity);
         $this->confirmedReferral($activity, $first->uuid);
         $this->confirmedReferral($activity);
         $this->assertSame(2, $repository->serviceCreationCapacity($this->plan, $this->serviceUuid)['confirmedReferrals']);
         $this->assertSame(7, $repository->serviceCreationCapacity($this->plan, $this->serviceUuid)['limit']);
         for ($i = 1; $i < 7; $i++) {
-            $repository->saveForm($this->draftData(), $this->plan);
+            (new CarePlanWorkflowHarness())->saveActivityDraft($this->draftData(), $this->plan);
         }
         $this->assertSame(0, $repository->serviceCreationCapacity($this->plan, $this->serviceUuid)['remaining']);
         $first->update(['status' => 'recalled', 'clinical_status' => 'recalled']);
@@ -321,7 +321,7 @@ class CarePlanBusinessRulesTest extends TestCase
     public function test_local_or_unconfirmed_referrals_and_other_services_or_plans_add_no_slot(): void
     {
         $repository = Repository::carePlanActivity();
-        $activity = $repository->saveForm($this->draftData(), $this->plan);
+        $activity = (new CarePlanWorkflowHarness())->saveActivityDraft($this->draftData(), $this->plan);
         foreach (['draft', 'pending', 'processing', 'failed'] as $status) {
             $request = $this->confirmedReferral($activity);
             $request->forceFill(['status' => $status, 'clinical_status' => $status])->save();
@@ -330,34 +330,33 @@ class CarePlanBusinessRulesTest extends TestCase
         $local->update(['details_synced_at' => null]);
         $this->confirmedReferral($activity, serviceUuid: (string) Str::uuid());
         $otherPlan = $this->createFhirCarePlan(['person_id' => $this->person->id, 'author_id' => $this->employee->id, 'legal_entity_id' => $this->legalEntity->id]);
-        $otherActivity = $repository->saveForm($this->draftData(), $otherPlan);
+        $otherActivity = (new CarePlanWorkflowHarness())->saveActivityDraft($this->draftData(), $otherPlan);
         $this->confirmedReferral($otherActivity);
         $this->assertSame(0, $repository->serviceCreationCapacity($this->plan, $this->serviceUuid)['confirmedReferrals']);
     }
 
     public function test_minutes_require_exact_officio_speciality_and_the_encounter_author_and_survive_signed_payload_conversion(): void
     {
-        $validator = app(CarePlanActivityValidationService::class);
-        $this->assertFalse($validator->allowsServiceMinutes($this->plan));
+        $this->assertFalse($this->plan->allowsServiceMinutes());
         $speciality = $this->employee->specialities()->create(['speciality' => 'PHYSICAL_MEDICINE_AND_REHABILITATION', 'speciality_officio' => true,
             'level' => 'SPECIALIST', 'attestation_name' => 'Synthetic certificate', 'attestation_date' => today()->toDateString(), 'certificate_number' => 'TEST-BA01']);
-        $this->assertTrue($validator->allowsServiceMinutes($this->plan));
+        $this->assertTrue($this->plan->allowsServiceMinutes());
         $repository = Repository::carePlanActivity();
-        $activity = $repository->saveForm($this->draftData('MINUTE'), $this->plan);
-        $payload = CarePlanActivityForm::buildCreateContent($repository->getResource($activity));
+        $activity = (new CarePlanWorkflowHarness())->saveActivityDraft($this->draftData('MINUTE'), $this->plan);
+        $payload = (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($repository->getResource($activity));
         $this->assertSame(['value' => 45, 'system' => 'SERVICE_UNIT', 'code' => 'MINUTE'], $payload['detail']['quantity']);
         $speciality->update(['speciality_officio' => false]);
-        $this->assertFalse($validator->allowsServiceMinutes($this->plan));
+        $this->assertFalse($this->plan->allowsServiceMinutes());
         $speciality->update(['speciality_officio' => true, 'speciality' => 'PHYSICAL_THERAPY']);
-        $this->assertFalse($validator->allowsServiceMinutes($this->plan));
+        $this->assertFalse($this->plan->allowsServiceMinutes());
         $speciality->update(['speciality' => 'PHYSICAL_MEDICINE_AND_REHABILITATION']);
         $speciality->update(['valid_to_date' => today()->subDay()->toDateString()]);
-        $this->assertFalse($validator->allowsServiceMinutes($this->plan));
+        $this->assertFalse($this->plan->allowsServiceMinutes());
         $speciality->update(['valid_to_date' => null]);
         $this->encounter->update(['performer_id' => Identifier::create(['value' => (string) Str::uuid()])->id]);
-        $this->assertFalse($validator->allowsServiceMinutes($this->plan));
+        $this->assertFalse($this->plan->allowsServiceMinutes());
         $this->expectException(ValidationException::class);
-        $validator->assertServiceUnit($this->plan, 'MINUTE');
+        (new CarePlanWorkflowHarness())->activityForm->assertServiceUnit($this->plan, 'MINUTE');
     }
 
     public function test_forged_minutes_are_visible_and_never_persisted_for_an_ineligible_author(): void
@@ -379,7 +378,7 @@ class CarePlanBusinessRulesTest extends TestCase
     {
         $repository = Repository::carePlan();
         $activityRepository = Repository::carePlanActivity();
-        $activity = $activityRepository->saveForm($this->draftData(), $this->plan);
+        $activity = (new CarePlanWorkflowHarness())->saveActivityDraft($this->draftData(), $this->plan);
         $resource = $activityRepository->getResource($activity);
         $resource['detail']['status'] = 'scheduled';
         $resource['detail']['remainingQuantity'] = ['value' => 0, 'system' => 'SERVICE_UNIT', 'code' => 'PIECE', 'unit' => 'шт.'];
@@ -403,7 +402,7 @@ class CarePlanBusinessRulesTest extends TestCase
         $data = $this->draftData();
         unset($data['scheduled_period_end']);
         try {
-            Repository::carePlanActivity()->saveForm($data, $this->plan);
+            (new CarePlanWorkflowHarness())->saveActivityDraft($data, $this->plan);
             $this->fail('A service without a bounded period must not be saved.');
         } catch (ValidationException $exception) {
             $this->assertArrayHasKey('activityForm.scheduled_period_end', $exception->errors());
@@ -415,7 +414,7 @@ class CarePlanBusinessRulesTest extends TestCase
     public function test_other_encounter_and_activity_authors_do_not_hide_a_plan_with_write_approval(): void
     {
         $repository = Repository::carePlanActivity();
-        $activity = $repository->saveForm($this->draftData(), $this->plan);
+        $activity = (new CarePlanWorkflowHarness())->saveActivityDraft($this->draftData(), $this->plan);
         $resource = $repository->getResource($activity);
         $resource['detail']['status'] = 'scheduled';
         $resource['author'][0]['identifier']['value'] = (string) Str::uuid();

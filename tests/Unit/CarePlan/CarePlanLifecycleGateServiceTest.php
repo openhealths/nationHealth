@@ -16,17 +16,18 @@ use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
-use App\Services\MedicalEvents\CarePlanLifecycleGateService;
+use App\Repositories\Repository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 class CarePlanLifecycleGateServiceTest extends TestCase
 {
     use DatabaseTransactions;
 
-    private CarePlanLifecycleGateService $service;
+    private CarePlanWorkflowHarness $service;
 
     private Employee $employee;
 
@@ -36,7 +37,7 @@ class CarePlanLifecycleGateServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->service = new CarePlanLifecycleGateService();
+        $this->service = new CarePlanWorkflowHarness();
 
         $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
             ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
@@ -136,10 +137,10 @@ class CarePlanLifecycleGateServiceTest extends TestCase
             'source' => MedicationRequestRequest::SOURCE_LOCAL,
         ]);
 
-        $open = $this->service->findOpenDocumentsForActivity($activity);
+        $open = Repository::carePlanActivity()->findOpenDocumentsForActivity($activity);
 
         $this->assertCount(4, $open);
-        $this->assertTrue($this->service->hasOpenDocumentsForActivity($activity));
+        $this->assertTrue(Repository::carePlanActivity()->hasOpenDocumentsForActivity($activity));
 
         $cancelReason = $this->service->activityStatusChangeBlockReason($activity, 'cancel_activity');
         $completeReason = $this->service->activityStatusChangeBlockReason($activity, 'complete_activity');
@@ -174,7 +175,7 @@ class CarePlanLifecycleGateServiceTest extends TestCase
             ]);
         }
 
-        $this->assertSame([], $this->service->findOpenDocumentsForActivity($activity));
+        $this->assertSame([], Repository::carePlanActivity()->findOpenDocumentsForActivity($activity));
         $this->assertNull($this->service->activityStatusChangeBlockReason($activity, 'cancel_activity'));
     }
 
@@ -247,8 +248,8 @@ class CarePlanLifecycleGateServiceTest extends TestCase
         $this->assertNotNull($reason);
         $this->assertStringContainsString('Неможливо завершити план лікування', $reason);
         $this->assertStringContainsString('Синхронізувати з ЕСОЗ', $reason);
-        $this->assertFalse($this->service->isFinalActivityStatus('processed'));
-        $this->assertFalse($this->service->isFinalActivityStatus('in_progress'));
+        $this->assertFalse(Repository::carePlanActivity()->isFinalActivityStatus('processed'));
+        $this->assertFalse(Repository::carePlanActivity()->isFinalActivityStatus('in_progress'));
     }
 
     public function test_blocks_plan_complete_when_the_only_activity_is_processed_job_status(): void

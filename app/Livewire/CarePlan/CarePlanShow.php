@@ -5,25 +5,15 @@ declare(strict_types=1);
 namespace App\Livewire\CarePlan;
 
 use App\Enums\JobStatus;
-
-use App\Livewire\CarePlan\Concerns\CarePlanManager;
-use App\Livewire\CarePlan\Concerns\ManagesCarePlanActivities;
-use App\Livewire\CarePlan\Concerns\ManagesCarePlanEPrescription;
-
-use App\Livewire\CarePlan\Concerns\ManagesCarePlanReferrals;
+use App\Livewire\CarePlan\CarePlanComponent;
 use App\Models\CarePlan;
 use App\Repositories\Repository;
-use App\Services\MedicalEvents\CarePlanApprovalService;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 
 class CarePlanShow extends CarePlanComponent
 {
-    use CarePlanManager;
-    use ManagesCarePlanActivities;
-    use ManagesCarePlanEPrescription;
-    use ManagesCarePlanReferrals;
 
     #[Locked]
     public array $remotePlanDetails = [];
@@ -52,7 +42,7 @@ class CarePlanShow extends CarePlanComponent
             $this->editActivity((int) $editActivityId);
         }
 
-        $this->activityForm['scheduled_period_end'] = now()->addDays(10)->format('d.m.Y');
+        $this->activityForm->scheduled_period_end = now()->addDays(10)->format('d.m.Y');
     }
 
     #[On('submission-processed')]
@@ -81,6 +71,7 @@ class CarePlanShow extends CarePlanComponent
     protected function renderCarePlan()
     {
         return view('livewire.care-plan.care-plan-show', [
+            'carePlan' => $this->carePlan,
             'addressConditions' => Repository::carePlan()->addressConditions($this->carePlan),
         ]);
     }
@@ -101,10 +92,10 @@ class CarePlanShow extends CarePlanComponent
         if (in_array($this->inpatientApprovalStatus, ['queued', 'pending', 'failed'], true) && $this->hasGrantedApprovalForCurrentDoctor) {
             $this->inpatientApprovalStatus = 'granted';
         } elseif ($this->inpatientApprovalStatus === 'pending' && !empty($progress['linkId'])) {
-            $result = app(CarePlanApprovalService::class)->resolveAsyncJob($progress['linkId']);
-            if ($result->isGranted()) {
+            $result = $this->resolveCarePlanApprovalJob($progress['linkId']);
+            if (($result['outcome']->value === 'granted')) {
                 $this->inpatientApprovalStatus = 'granted';
-            } elseif ($result->isFailed()) {
+            } elseif (($result['outcome']->value === 'failed')) {
                 $this->inpatientApprovalStatus = 'failed';
             }
         }

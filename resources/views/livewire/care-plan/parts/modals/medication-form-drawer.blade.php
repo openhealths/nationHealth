@@ -8,7 +8,7 @@
     onCloseClick="showMedicationFormDrawer = false"
 >
     <x-slot name="title">
-        @if (isset($activityForm['id']) && $activityForm['id'])
+        @if (isset($activityForm->id) && $activityForm->id)
             {{ __('care-plan.edit_medication_prescription') }}
         @else
             {{ __('care-plan.new_medication_prescription') }}
@@ -57,7 +57,7 @@
             <div class="mb-4 grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div class="form-group group">
                     <label class="label" for="medication_program_edit"> {{ __('care-plan.program') }} </label>
-                    @if (!empty($activityForm['id']))
+                    @if (!empty($activityForm->id))
                         <select
                             id="medication_program_edit"
                             class="input-select peer"
@@ -72,7 +72,7 @@
                         <input
                             type="text"
                             class="input cursor-not-allowed bg-gray-50 dark:bg-gray-700"
-                            value="{{ !empty($activityForm['program']) ? ($dictionaries['medical_programs'][$activityForm['program']] ?? $activityForm['program']) : __('care-plan.prescription_medication') }}"
+                            value="{{ !empty($activityForm->program) ? ($dictionaries['medical_programs'][$activityForm->program] ?? $activityForm->program) : __('care-plan.prescription_medication') }}"
                             disabled
                         />
                     @endif
@@ -82,12 +82,12 @@
                     <div class="relative">
                         <input
                             type="text"
-                            class="input bg-gray-50 dark:bg-gray-700 {{ empty($activityForm['id']) ? 'cursor-not-allowed' : 'pr-12' }} font-medium text-gray-900 dark:text-white w-full"
+                            class="input bg-gray-50 dark:bg-gray-700 {{ empty($activityForm->id) ? 'cursor-not-allowed' : 'pr-12' }} font-medium text-gray-900 dark:text-white w-full"
                             value="{{ !empty($selectedProduct) ? ($selectedProduct['name'] ?? '') : '' }}"
                             placeholder="{{ __('care-plan.select_medication') }}"
                             disabled
                         />
-                        @if (!empty($activityForm['id']))
+                        @if (!empty($activityForm->id))
                             <button
                                 type="button"
                                 class="absolute top-1/2 right-2 -translate-y-1/2 text-sm whitespace-nowrap text-blue-600 hover:text-blue-800"
@@ -115,7 +115,7 @@
                         />
                         <select class="input-select peer w-20" wire:model="activityForm.quantity_system">
                             <option value="MEDICATION_UNIT">
-                                {{ match($activityForm['quantity_code'] ?? '') { 'PIECE' => 'шт.', 'ML' => 'мл', 'MG' => 'мг', 'G' => 'г', '' => __('care-plan.ml'), default => $activityForm['quantity_code'] } }}
+                                {{ match($activityForm->quantity_code ?? '') { 'PIECE' => 'шт.', 'ML' => 'мл', 'MG' => 'мг', 'G' => 'г', '' => __('care-plan.ml'), default => $activityForm->quantity_code } }}
                             </option>
                         </select>
                     </div>
@@ -159,8 +159,8 @@
                             wire:model="activityForm.daily_amount"
                         />
                         <select class="input-select peer w-20" disabled>
-                            <option selected value="{{ $activityForm['daily_amount_code'] ?? 'PIECE' }}">
-                                {{ match($activityForm['daily_amount_code'] ?? 'PIECE') { 'PIECE' => 'шт.', 'ML' => 'мл', 'MG' => 'мг', 'G' => 'г', default => $activityForm['daily_amount_code'] ?? 'шт.' } }}
+                            <option selected value="{{ $activityForm->daily_amount_code ?? 'PIECE' }}">
+                                {{ match($activityForm->daily_amount_code ?? 'PIECE') { 'PIECE' => 'шт.', 'ML' => 'мл', 'MG' => 'мг', 'G' => 'г', default => $activityForm->daily_amount_code ?? 'шт.' } }}
                             </option>
                         </select>
                     </div>

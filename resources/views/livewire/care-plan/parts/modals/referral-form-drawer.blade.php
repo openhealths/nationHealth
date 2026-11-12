@@ -1,3 +1,5 @@
+@use('Illuminate\Support\Facades\Lang')
+
 {{-- Outgoing Referral Form Drawer Overlay --}}
 <div
     x-show="showReferralDrawer"
@@ -30,7 +32,7 @@
 >
     <h3 class="modal-header">
         {{
-            ($referralForm['kind'] ?? '') === 'device_request'
+            ($referralForm->kind ?? '') === 'device_request'
             ? __('care-plan.issue_device_eprescription_drawer_title')
             : __('care-plan.issue_referral_drawer_title')
         }}
@@ -65,12 +67,12 @@
                 <div class="mb-4 grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div class="form-group group">
                         <label class="label">
-                            {{ ($referralForm['kind'] ?? '') === 'device_request' ? 'Медичний виріб (код)' : 'Послуга / Виріб (код)' }}
+                            {{ ($referralForm->kind ?? '') === 'device_request' ? 'Медичний виріб (код)' : 'Послуга / Виріб (код)' }}
                         </label>
                         <input
                             type="text"
                             class="input cursor-not-allowed bg-gray-50 font-medium text-gray-900 dark:bg-gray-700 dark:text-white"
-                            value="{{ $referralForm['code_label'] ?? $referralForm['code'] }}"
+                            value="{{ $referralForm->code_label ?? $referralForm->code }}"
                             disabled
                         />
                     </div>
@@ -80,7 +82,7 @@
                             type="text"
                             class="input cursor-not-allowed bg-gray-50 dark:bg-gray-700"
                             value="{{
-                                ($referralForm['kind'] ?? '') === 'service_request'
+                                ($referralForm->kind ?? '') === 'service_request'
                                 ? __('care-plan.document_type_service_referral')
                                 : __('care-plan.document_type_device_eprescription')
                             }}"
@@ -146,7 +148,7 @@
                                 од.
                             </span>
                         </div>
-                        @if (($referralForm['kind'] ?? '') === 'device_request' && ($referralDevicePackageQty ?? 0) > 0)
+                        @if (($referralForm->kind ?? '') === 'device_request' && ($referralDevicePackageQty ?? 0) > 0)
                             <p class="mt-1 text-xs text-gray-500">
                                 {{ __('care-plan.device_quantity_packaging', ['count' => $referralDevicePackageQty]) }}
                             </p>
@@ -154,7 +156,7 @@
                     </div>
                 </div>
 
-                @if ($referralForm['kind'] === 'service_request')
+                @if ($referralForm->kind === 'service_request')
                     <div class="mb-4 grid grid-cols-1 gap-6 md:grid-cols-2">
                         <div class="form-group group">
                             <label class="label">Категорія направлення*</label>
@@ -170,7 +172,7 @@
                             <input
                                 type="text"
                                 class="input cursor-not-allowed bg-gray-50 dark:bg-gray-700"
-                                value="{{ $referralForm['category_label'] ?? $referralForm['category'] }}"
+                                value="{{ $referralForm->category_label ?? $referralForm->category }}"
                                 disabled
                             />
                             @endif
@@ -278,14 +280,14 @@
                     </div>
                 @endif
 
-                @if (!empty($referralForm['reason_reference']))
+                @if (!empty($referralForm->reason_reference))
                     <div class="form-group group mb-4">
                         <label class="label">{{ __('care-plan.referral_reason_reference') }}</label>
                         <div class="space-y-1 rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-700/50">
-                            @foreach ($referralForm['reason_reference'] as $info)
+                            @foreach ($referralForm->reason_reference as $info)
                                 @php
                                     $reasonTypeKey = 'care-plan.reason_reference_types.' . strtolower((string) ($info['type'] ?? ''));
-                                    $reasonTypeLabel = \Illuminate\Support\Facades\Lang::has($reasonTypeKey)
+                                    $reasonTypeLabel = Lang::has($reasonTypeKey)
                                         ? __($reasonTypeKey)
                                         : ($info['type'] ?? '');
                                 @endphp
@@ -298,14 +300,14 @@
                     </div>
                 @endif
 
-                @if (!empty($referralForm['supporting_info']))
+                @if (!empty($referralForm->supporting_info))
                     <div class="form-group group mb-4">
                         <label class="label">{{ __('care-plan.referral_supporting_info') }}</label>
                         <div class="space-y-1 rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-700/50">
-                            @foreach ($referralForm['supporting_info'] as $info)
+                            @foreach ($referralForm->supporting_info as $info)
                                 @php
                                     $supportTypeKey = 'care-plan.reason_reference_types.' . strtolower((string) ($info['type'] ?? ''));
-                                    $supportTypeLabel = \Illuminate\Support\Facades\Lang::has($supportTypeKey)
+                                    $supportTypeLabel = Lang::has($supportTypeKey)
                                         ? __($supportTypeKey)
                                         : ($info['type'] ?? '');
                                 @endphp
@@ -323,7 +325,7 @@
                 <button type="button" class="button-minor" @click="showReferralDrawer = false">
                     {{ __('forms.cancel') }}
                 </button>
-                @if (($referralForm['kind'] ?? '') === 'service_request')
+                @if (($referralForm->kind ?? '') === 'service_request')
                     <button
                         type="button"
                         class="button-primary"
@@ -343,7 +345,7 @@
                     @if ($referralWarningMessage) disabled class="button-primary cursor-not-allowed opacity-50" @endif
                 >
                     {{
-                        ($referralForm['kind'] ?? '') === 'device_request'
+                        ($referralForm->kind ?? '') === 'device_request'
                         ? __('care-plan.submit_device_eprescription')
                         : __('forms.save_and_sign')
                     }}

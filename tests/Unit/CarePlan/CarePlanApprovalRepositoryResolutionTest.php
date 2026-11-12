@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Unit\CarePlan;
 
 use App\Repositories\ApprovalRepository as ApprovalRepositoryRef;
-
 use App\Repositories\MedicalEvents\ApprovalRepository;
 use App\Repositories\MedicalEvents\Repository;
 use Tests\TestCase;
@@ -39,7 +38,7 @@ class CarePlanApprovalRepositoryResolutionTest extends TestCase
     {
         $sources = [
             'CarePlanShow' => file_get_contents(app_path('Livewire/CarePlan/CarePlanShow.php')),
-            'CarePlanManager' => file_get_contents(app_path('Livewire/CarePlan/Concerns/CarePlanManager.php')),
+            'CarePlanComponent' => file_get_contents(app_path('Livewire/CarePlan/CarePlanComponent.php')),
         ];
 
         foreach ($sources as $name => $source) {
@@ -51,10 +50,9 @@ class CarePlanApprovalRepositoryResolutionTest extends TestCase
             );
         }
 
-        // The call lives in whichever of the two holds the sync action; CarePlanShow uses the
-        // CarePlanManager trait, so requiring it in both files only pins where the code sits.
+        // The base component owns orchestration and reaches persistence through the repository factory.
         $this->assertStringContainsString(
-            'app(CarePlanApprovalService::class)->syncForCarePlan($this->carePlan)',
+            '$this->syncCarePlanApprovals($this->carePlan)',
             implode("\n", $sources)
         );
     }

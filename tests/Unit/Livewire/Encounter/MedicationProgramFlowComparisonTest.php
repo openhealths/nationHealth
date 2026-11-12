@@ -8,25 +8,27 @@ use App\Classes\eHealth\Api\Drug;
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\Person\EncounterStatus;
 use App\Enums\User\Role;
+use App\Livewire\CarePlan\CarePlanComponent;
+use App\Livewire\EncounterPackage\Concerns\ManagesEncounterEPrescription;
+use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\User;
-use App\Models\LegalEntity;
-use App\Services\MedicalEvents\MedicationRequestLifecycleService;
-use Illuminate\Support\Collection;
-use Illuminate\Support\ViewErrorBag;
-use DOMDocument;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
-use App\Livewire\CarePlan\CarePlanComponent;
-use App\Livewire\CarePlan\Concerns\ManagesCarePlanActivities;
-use App\Livewire\EncounterPackage\Concerns\ManagesEncounterEPrescription;
 use App\Services\Dictionary\DictionaryManager;
+use App\Services\MedicalEvents\MedicationRequestLifecycleService;
+use DOMDocument;
+use DOMXPath;
 use GuzzleHttp\Psr7\Response;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\ViewErrorBag;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Mockery;
 use RuntimeException;
 use Tests\TestCase;
+use Tests\Unit\Livewire\Encounter\CarePlanMedicationProgramHarness;
+use Tests\Unit\Livewire\Encounter\EncounterMedicationProgramHarness;
 
 class MedicationProgramFlowComparisonTest extends TestCase
 {
@@ -256,7 +258,7 @@ class MedicationProgramFlowComparisonTest extends TestCase
         }
         $this->assertNotNull($search);
         $this->assertFalse($search->hasAttribute('disabled'));
-        $searchButtons = (new \DOMXPath($document))->query("//button[@*[name()='wire:click' and .='searchEncounterEPrescriptionMedications']]");
+        $searchButtons = (new DOMXPath($document))->query("//button[@*[name()='wire:click' and .='searchEncounterEPrescriptionMedications']]");
         $this->assertCount(1, $searchButtons);
         $this->assertFalse($searchButtons->item(0)->hasAttribute('disabled'));
         $this->assertNotNull($program);
@@ -306,7 +308,6 @@ class MedicationProgramFlowComparisonTest extends TestCase
 
 class CarePlanMedicationProgramHarness extends CarePlanComponent
 {
-    use ManagesCarePlanActivities;
 
     public function filterProgramsForTest(Collection $programs): Collection
     {

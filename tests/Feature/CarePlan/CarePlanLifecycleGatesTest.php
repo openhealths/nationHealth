@@ -14,11 +14,9 @@ use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
-
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\User;
-use App\Services\MedicalEvents\CarePlanLifecycleGateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +24,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\Concerns\CreatesFhirCarePlans;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 class CarePlanLifecycleGatesTest extends TestCase
@@ -157,7 +156,7 @@ class CarePlanLifecycleGatesTest extends TestCase
         // The block is flashed to the user; Livewire ages flash data at the end of its request,
         // so the reason itself is asserted at its source.
         $this->assertNotNull(
-            app(CarePlanLifecycleGateService::class)
+            app(CarePlanWorkflowHarness::class)
                 ->activityStatusChangeBlockReason($activity->fresh(), 'cancel_activity')
         );
     }
@@ -210,7 +209,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             ->assertSet('showSignatureModal', false);
 
         $this->assertNotNull(
-            app(CarePlanLifecycleGateService::class)
+            app(CarePlanWorkflowHarness::class)
                 ->activityStatusChangeBlockReason($activity->fresh(), 'complete_activity')
         );
     }
@@ -246,7 +245,7 @@ class CarePlanLifecycleGatesTest extends TestCase
             ->assertNotDispatched('flashMessage');
 
         $this->assertNotNull(
-            app(CarePlanLifecycleGateService::class)->planCancelBlockReason($carePlan->fresh('activities'))
+            app(CarePlanWorkflowHarness::class)->planCancelBlockReason($carePlan->fresh('activities'))
         );
     }
 

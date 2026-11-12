@@ -9,8 +9,12 @@ use App\Enums\Composition\CompositionType;
 use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
+use App\Models\EmployeeRole;
 use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
+use App\Models\LegalEntity;
+use App\Models\LegalEntityType;
+use App\Models\Permission;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\Role as ModelsRole;
@@ -53,7 +57,7 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Track if email verification was already sent
      */
-    private static array $emailVerificationSent = [];
+    protected static array $emailVerificationSent = [];
 
     /**
      * Request-scoped cache for allowedRoles keyed by "teamId:guard".

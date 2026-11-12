@@ -7,10 +7,10 @@ namespace Tests\Unit\Repositories;
 use App\Classes\eHealth\Api\CarePlanActivity as ActivityApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
-use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
 use App\Services\MedicalEvents\Mappers\DeviceRequestMapper;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 /** Contract scenarios retained after moving payload construction out of repositories. */
@@ -21,7 +21,7 @@ class CarePlanActivityRepositoryTest extends TestCase
         $resource = $this->fixture();
         $resource['detail']['kind'] = 'device_request';
         $resource['detail']['quantity']['value'] = 1;
-        $payload = CarePlanActivityForm::buildCreateContent($resource);
+        $payload = (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($resource);
         $this->assertIsInt($payload['detail']['quantity']['value']);
         $this->assertSame(1, $payload['detail']['quantity']['value']);
     }
@@ -31,7 +31,7 @@ class CarePlanActivityRepositoryTest extends TestCase
         $resource = $this->fixture();
         $resource['detail']['productCodeableConcept'] = ['coding' => [['system' => 'synthetic/classification', 'code' => 'TEST']]];
         $this->expectException(ValidationException::class);
-        CarePlanActivityForm::buildCreateContent($resource);
+        (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($resource);
     }
 
     public function test_build_device_prequalify_payload_includes_occurrence_period(): void
@@ -51,14 +51,14 @@ class CarePlanActivityRepositoryTest extends TestCase
     {
         $resource = $this->fixture();
         $resource['detail']['scheduledPeriod']['start'] = '2026-06-25T16:33:00.123456Z';
-        $payload = CarePlanActivityForm::buildCreateContent($resource);
+        $payload = (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($resource);
         $this->assertSame('2026-06-25T16:33:00.123456Z', $payload['detail']['scheduled_period']['start']);
     }
 
     public function test_payload_author_comes_from_the_activity_not_the_current_session(): void
     {
         $resource = $this->fixture();
-        $payload = CarePlanActivityForm::buildCreateContent($resource);
+        $payload = (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($resource);
         $this->assertSame($resource['author'][0]['identifier']['value'], $payload['author'][0]['identifier']['value']);
         $this->assertCount(2, $payload['author']);
     }
@@ -68,14 +68,14 @@ class CarePlanActivityRepositoryTest extends TestCase
         $resource = $this->fixture();
         $resource['author'] = [];
         $this->expectException(ValidationException::class);
-        CarePlanActivityForm::buildCreateContent($resource);
+        (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($resource);
     }
 
     public function test_create_content_excludes_server_fields_and_preserves_false(): void
     {
         $resource = $this->fixture();
         $resource['insertedAt'] = '2026-06-25T18:14:41.040000Z';
-        $payload = CarePlanActivityForm::buildCreateContent($resource);
+        $payload = (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($resource);
         $this->assertArrayNotHasKey('inserted_at', $payload);
         $this->assertArrayNotHasKey('remaining_quantity', $payload['detail']);
         $this->assertArrayNotHasKey('outcome_reference', $payload);
@@ -87,7 +87,7 @@ class CarePlanActivityRepositoryTest extends TestCase
         $base = Arr::toSnakeCase($this->fixture());
         $base['remote_extension'] = ['false' => false, 'zero' => 0, 'empty' => []];
         $reason = ['coding' => [['system' => 'eHealth/care_plan_activity_cancel_reasons', 'code' => 'TEST']]];
-        $signed = CarePlanActivityForm::buildCancelContent($base, $reason);
+        $signed = (new CarePlanWorkflowHarness())->buildCancelCarePlanActivityContent($base, $reason);
         $this->assertSame($reason, $signed['detail']['status_reason']);
         unset($signed['detail']['status_reason']);
         $this->assertSame($base, $signed);
@@ -113,7 +113,7 @@ class CarePlanActivityRepositoryTest extends TestCase
         $base = Arr::toSnakeCase($this->fixture());
         $base['author'] = $base['author'][0];
         $reason = ['coding' => [['system' => 'eHealth/care_plan_activity_cancel_reasons', 'code' => 'TEST']]];
-        $signed = CarePlanActivityForm::buildCancelContent($base, $reason);
+        $signed = (new CarePlanWorkflowHarness())->buildCancelCarePlanActivityContent($base, $reason);
         $this->assertFalse(array_is_list($signed['author']));
         $this->assertSame($base['author'], $signed['author']);
     }

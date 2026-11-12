@@ -10,7 +10,6 @@ use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
 use App\Livewire\CarePlan\CarePlanShow;
-use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
 use App\Models\CarePlanActivity;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
@@ -20,7 +19,6 @@ use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\User;
-
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
@@ -32,6 +30,7 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
 use Tests\Concerns\CreatesFhirCarePlans;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 class CarePlanActivityValidationsTest extends TestCase
@@ -415,7 +414,7 @@ class CarePlanActivityValidationsTest extends TestCase
             ->assertSee('UUID: '.$deviceUuid);
 
         $resource = Repository::carePlanActivity()->getResource($activity->id);
-        $payload = CarePlanActivityForm::buildCreateContent($resource);
+        $payload = (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($resource);
         $decoded = json_decode(json_encode($payload, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), true, flags: JSON_THROW_ON_ERROR);
         $this->assertSame(1, $decoded['detail']['quantity']['value']);
         $this->assertSame($deviceUuid, $decoded['detail']['product_reference']['identifier']['value']);

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
-use App\Livewire\CarePlan\Concerns\HandlesCarePlanApprovalSms;
+use App\Livewire\CarePlan\CarePlanApprovals;
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
 use App\Repositories\MedicalEvents\ApprovalRepository;
@@ -13,10 +13,10 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Livewire\Component;
 use Livewire\Livewire;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Feature\CarePlan\CarePlanSmsPollingHarness;
 use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\TestCase;
 
@@ -50,7 +50,7 @@ class CarePlanSmsPollingTest extends TestCase
         $this->instance(ApprovalRepository::class, $repository);
         Http::preventStrayRequests();
         Bus::fake();
-        $component = Livewire::test(CarePlanSmsPollingHarness::class, ['carePlanId' => $plan->id, 'approvalId' => $approvalId])
+        $component = Livewire::test(CarePlanSmsPollingHarness::class, ['legalEntity' => $legalEntity, 'carePlan' => $plan, 'approvalId' => $approvalId])
             ->call('checkSmsResendStatus')->assertSet('smsResendLinkId', 17)->assertSet('isSmsResending', true);
         if (!$allowed) {
             $component->assertSee(__('care-plan.approval_access_denied'));
@@ -65,16 +65,11 @@ class CarePlanSmsPollingTest extends TestCase
     }
 }
 
-class CarePlanSmsPollingHarness extends Component
+class CarePlanSmsPollingHarness extends CarePlanApprovals
 {
-    use HandlesCarePlanApprovalSms;
-
-    public int $carePlanId = 0;
-    public ?string $approvalId = null;
-
-    public function mount(int $carePlanId, string $approvalId): void
+    public function mount(LegalEntity $legalEntity, CarePlan $carePlan, ?string $actingEmployeeUuid = null, ?string $approvalId = null): void
     {
-        $this->carePlanId = $carePlanId;
+        $this->carePlanId = $carePlan->id;
         $this->approvalId = $approvalId;
         $this->smsResendLinkId = 17;
         $this->isSmsResending = true;

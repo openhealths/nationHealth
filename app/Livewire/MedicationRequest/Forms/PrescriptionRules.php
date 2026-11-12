@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 /** TV39 prescribing rules shared by the two forms and checked again before submission. */
 class PrescriptionRules
 {
-    public static function normalize(array $form, array $drug, array $program = [], ?float $planDailyDose = null): array
+    public function normalize(array $form, array $drug, array $program = [], ?float $planDailyDose = null): array
     {
         Validator::make($form, [
             'medication_qty' => ['required', 'numeric', 'gt:0'],
@@ -29,17 +29,17 @@ class PrescriptionRules
         $duration = (int) $form['duration'];
         $qty = (float) $form['medication_qty'];
         $errors = [];
-        $maxPeriod = self::programSetting($program, 'request_max_period_day');
+        $maxPeriod = $this->programSetting($program, 'request_max_period_day');
         if ($maxPeriod !== null && (!is_numeric($maxPeriod) || (int) $maxPeriod < 1 || $duration > (int) $maxPeriod)) {
             $errors['duration'] = __('medication-requests.course_period_exceeded', ['max' => $maxPeriod]);
         }
-        if (!self::isAllowedQuantity($qty, $drug)) {
+        if (!$this->isAllowedQuantity($qty, $drug)) {
             $errors['medication_qty'] = __('medication-requests.quantity_not_allowed');
         }
         if ($qty + 0.000001 < $daily * $duration) {
             $errors['medication_qty'] = __('medication-requests.quantity_course_minimum', ['quantity' => $daily * $duration]);
         }
-        $maximumDaily = self::positiveNumber($drug['max_daily_dosage'] ?? null);
+        $maximumDaily = $this->positiveNumber($drug['max_daily_dosage'] ?? null);
         if ($maximumDaily !== null && $daily > $maximumDaily) {
             $errors['max_dose_per_period'] = __('care-plan.eprescription_max_daily_dosage_exceeded', [
                 'name' => $drug['name'] ?? '', 'max' => $maximumDaily, 'unit' => $mapper->medicationUnit($drug),
@@ -48,12 +48,12 @@ class PrescriptionRules
         if ($administration > $daily) {
             $errors['max_dose_per_administration'] = __('medication-requests.administration_exceeds_daily');
         }
-        $recommended = self::positiveNumber($drug['daily_dosage'] ?? null);
+        $recommended = $this->positiveNumber($drug['daily_dosage'] ?? null);
         $requiresConfirmation = ($recommended !== null && $daily > $recommended) || ($planDailyDose !== null && $planDailyDose > 0 && $daily > $planDailyDose);
         if ($requiresConfirmation && !filter_var($form['dose_warning_confirmed'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $errors['dose_warning_confirmed'] = __('care-plan.eprescription_daily_dose_warning', ['name' => $drug['name'] ?? '']);
         }
-        $disabled = filter_var(self::programSetting($program, 'request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
+        $disabled = filter_var($this->programSetting($program, 'request_notification_disabled', false), FILTER_VALIDATE_BOOLEAN);
         if (!$disabled) {
             if (trim((string) ($form['inform_with'] ?? '')) === '') {
                 $errors['inform_with'] = __('encounters.eprescription.select_authentication');
@@ -62,7 +62,7 @@ class PrescriptionRules
             }
         }
         $container = (string) ($form['container_dosage'] ?? '');
-        if ($container !== '' && !in_array($container, array_column(self::containers($drug), 'value'), true)) {
+        if ($container !== '' && !in_array($container, array_column($this->containers($drug), 'value'), true)) {
             $errors['container_dosage'] = __('medication-requests.container_not_allowed');
         }
         if ($errors !== []) {
@@ -83,20 +83,20 @@ class PrescriptionRules
         return $form;
     }
 
-    public static function isAllowedQuantity(float $qty, array $drug): bool
+    public function isAllowedQuantity(float $qty, array $drug): bool
     {
         if (!is_finite($qty) || $qty <= 0) {
             return false;
         }
         $packages = $drug['packages'] ?? [];
         if ($packages === []) {
-            $max = self::positiveNumber($drug['max_request_dosage'] ?? null);
+            $max = $this->positiveNumber($drug['max_request_dosage'] ?? null);
 
             return $max === null || $qty <= $max;
         }
         foreach ($packages as $package) {
-            $step = self::positiveNumber($package['package_min_qty'] ?? ($package['min_qty'] ?? ($package['package_qty'] ?? ($package['medication_qty'] ?? null))));
-            $max = self::positiveNumber($package['max_request_dosage'] ?? ($drug['max_request_dosage'] ?? null));
+            $step = $this->positiveNumber($package['package_min_qty'] ?? ($package['min_qty'] ?? ($package['package_qty'] ?? ($package['medication_qty'] ?? null))));
+            $max = $this->positiveNumber($package['max_request_dosage'] ?? ($drug['max_request_dosage'] ?? null));
             if (($max === null || $qty <= $max) && ($step === null || ($qty + 0.000001 >= $step && abs($qty / $step - round($qty / $step)) < 0.000001))) {
                 return true;
             }
@@ -106,7 +106,7 @@ class PrescriptionRules
     }
 
     /** General MIS list uses medical_program_settings; the program detail uses settings. */
-    public static function programSetting(?array $program, string $key, mixed $default = null): mixed
+    public function programSetting(?array $program, string $key, mixed $default = null): mixed
     {
         if ($program === null) {
             return $default;
@@ -116,12 +116,12 @@ class PrescriptionRules
     }
 
     /** All permitted quantities within the supplied course/activity boundary, with no ten-item truncation. */
-    public static function quantities(array $drug, ?float $remaining = null): array
+    public function quantities(array $drug, ?float $remaining = null): array
     {
         $values = [];
         foreach ($drug['packages'] ?? [] as $package) {
-            $step = self::positiveNumber($package['package_min_qty'] ?? ($package['min_qty'] ?? ($package['package_qty'] ?? ($package['medication_qty'] ?? null))));
-            $max = self::positiveNumber($package['max_request_dosage'] ?? ($drug['max_request_dosage'] ?? null));
+            $step = $this->positiveNumber($package['package_min_qty'] ?? ($package['min_qty'] ?? ($package['package_qty'] ?? ($package['medication_qty'] ?? null))));
+            $max = $this->positiveNumber($package['max_request_dosage'] ?? ($drug['max_request_dosage'] ?? null));
             if ($remaining !== null) {
                 $max = $max === null ? $remaining : min($max, $remaining);
             }
@@ -139,12 +139,12 @@ class PrescriptionRules
         return array_values($values);
     }
 
-    public static function containers(array $drug): array
+    public function containers(array $drug): array
     {
         $choices = [];
         foreach ($drug['packages'] ?? [] as $package) {
             $dosage = $package['container_dosage'] ?? [];
-            $amount = self::positiveNumber($dosage['numerator_value'] ?? ($dosage['value'] ?? null));
+            $amount = $this->positiveNumber($dosage['numerator_value'] ?? ($dosage['value'] ?? null));
             $unit = $dosage['numerator_unit'] ?? null;
             if ($amount !== null && is_string($unit) && $unit !== '') {
                 $value = $amount.'|'.$unit.'|'.$unit;
@@ -155,7 +155,7 @@ class PrescriptionRules
         return array_values($choices);
     }
 
-    private static function positiveNumber(mixed $value): ?float
+    private function positiveNumber(mixed $value): ?float
     {
         return is_numeric($value) && is_finite((float) $value) && (float) $value > 0 ? (float) $value : null;
     }

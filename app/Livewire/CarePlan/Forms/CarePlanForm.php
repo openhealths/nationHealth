@@ -4,11 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan\Forms;
 
-use App\Core\Arr;
-
-use Carbon\CarbonImmutable;
-
-use Illuminate\Support\Facades\Validator;
 use Livewire\Form;
 
 class CarePlanForm extends Form
@@ -68,23 +63,16 @@ class CarePlanForm extends Form
      */
     public function rulesForSigning(): array
     {
-        return array_merge($this->rules(), [
+        return array_merge($this->rules(), $this->signatureRules());
+    }
+
+    public function signatureRules(): array
+    {
+        return [
             'knedp' => 'required|string',
             'keyContainerUpload' => 'required|file|max:1024',
             'password' => 'required|string',
-        ]);
-    }
-
-    public function periodStartIsoDate(): string
-    {
-        return CarbonImmutable::createFromFormat('!'.config('app.date_format'), $this->periodStart)->format('Y-m-d');
-    }
-
-    public function periodEndIsoDate(): ?string
-    {
-        return $this->periodEnd !== ''
-            ? CarbonImmutable::createFromFormat('!'.config('app.date_format'), $this->periodEnd)->format('Y-m-d')
-            : null;
+        ];
     }
 
     /**
@@ -122,49 +110,4 @@ class CarePlanForm extends Form
         ];
     }
 
-    public static function buildCreateContent(array $resource): array
-    {
-        Validator::make($resource, [
-            'id' => ['required', 'uuid'], 'title' => ['required', 'string'],
-            'category.coding' => ['required', 'array', 'min:1'],
-            'period.start' => ['required', 'date'],
-            'encounter.identifier.value' => ['required', 'uuid'],
-            'author.identifier.value' => ['required', 'uuid'],
-            'addresses' => ['required', 'array', 'min:1'],
-            'termsOfService.coding' => ['required', 'array', 'min:1'],
-            'basedOn' => ['nullable', 'array'],
-            'basedOn.identifier.value' => ['required_with:basedOn', 'uuid'],
-            'partOf' => ['nullable', 'array'],
-            'partOf.identifier.value' => ['required_with:partOf', 'uuid'],
-        ])->validate();
-        $content = array_intersect_key($resource, array_flip(['id', 'category', 'title', 'description', 'period', 'supportingInfo', 'note', 'encounter', 'addresses', 'author', 'contributor', 'termsOfService', 'informWith', 'basedOn', 'partOf']));
-        $content['intent'] = 'order';
-        $content['status'] = 'new';
-
-        return self::resourcePayload($content);
-    }
-
-    public static function buildCancelContent(array $snapshot, array $statusReason): array
-    {
-        Validator::make($snapshot, ['id' => ['required', 'uuid']])->validate();
-        unset($snapshot['activities']);
-        $snapshot['status_reason'] = $statusReason;
-
-        return $snapshot;
-    }
-
-    private static function resourcePayload(array $data): array
-    {
-        $result = [];
-        foreach (Arr::toSnakeCase($data) as $key => $value) {
-            if (is_array($value)) {
-                $value = self::resourcePayload($value);
-            }
-            if ($value !== null && $value !== '' && $value !== []) {
-                $result[$key] = $value;
-            }
-        }
-
-        return array_is_list($data) ? array_values($result) : $result;
-    }
 }

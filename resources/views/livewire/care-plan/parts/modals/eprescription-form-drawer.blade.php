@@ -162,7 +162,7 @@
                                     class="block w-full rounded-l-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 @error('ePrescriptionForm.max_dose_per_administration') border-red-500 scroll-to-error @enderror"
                                 />
                                 <span class="inline-flex items-center rounded-r-md border border-l-0 border-gray-300 bg-gray-200 px-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400">
-                                    {{ $ePrescriptionForm['medication_unit'] ?? 'од.' }}
+                                    {{ $ePrescriptionForm->medication_unit ?? 'од.' }}
                                 </span>
                             </div>
                             @error ('ePrescriptionForm.max_dose_per_administration')
@@ -180,7 +180,7 @@
                                     class="block w-full rounded-l-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 @error('ePrescriptionForm.max_dose_per_period') border-red-500 scroll-to-error @enderror"
                                 />
                                 <span class="inline-flex items-center rounded-r-md border border-l-0 border-gray-300 bg-gray-200 px-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400">
-                                    {{ $ePrescriptionForm['medication_unit'] ?? 'од.' }}
+                                    {{ $ePrescriptionForm->medication_unit ?? 'од.' }}
                                 </span>
                             </div>
                             @error ('ePrescriptionForm.max_dose_per_period')
@@ -213,7 +213,7 @@
                                     />
                                 @endif
                                 <span class="inline-flex items-center rounded-r-md border border-l-0 border-gray-300 bg-gray-200 px-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400">
-                                    {{ $ePrescriptionForm['medication_unit'] ?? 'од.' }}
+                                    {{ $ePrescriptionForm->medication_unit ?? 'од.' }}
                                 </span>
                             </div>
                             @error ('ePrescriptionForm.medication_qty')
@@ -275,7 +275,7 @@
                                     {{
                                         $ePrescriptionRemainingQtyWarningMessage !== ''
                                         ? $ePrescriptionRemainingQtyWarningMessage
-                                        : ($ePrescriptionRemainingQty . ' ' . ($ePrescriptionForm['medication_unit'] ?? ''))
+                                        : ($ePrescriptionRemainingQty . ' ' . ($ePrescriptionForm->medication_unit ?? ''))
                                     }}
                                 </div>
                             @endif
@@ -337,7 +337,7 @@
                             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Діє до</label>
                             <input
                                 type="date"
-                                value="{{ $ePrescriptionForm['ended_at'] ?? '' }}"
+                                value="{{ $ePrescriptionForm->ended_at ?? '' }}"
                                 disabled
                                 class="block w-full rounded-lg border border-gray-300 bg-gray-100 p-2.5 text-sm text-gray-500 dark:border-gray-500 dark:bg-gray-600"
                             />

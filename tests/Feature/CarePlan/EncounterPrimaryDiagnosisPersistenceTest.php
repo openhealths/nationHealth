@@ -8,7 +8,6 @@ use App\Enums\Person\ConditionClinicalStatus;
 use App\Enums\Person\ConditionVerificationStatus;
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
-
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\EncounterDiagnose;
@@ -22,6 +21,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Support\CarePlanCreateHarness;
 use Tests\TestCase;
 
 class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
@@ -123,7 +123,7 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
             ]);
         }
 
-        $choices = Repository::carePlan()->encounterChoices((int) $encounter->person_id);
+        $choices = (new CarePlanCreateHarness())->carePlanEncounterChoices((int) $encounter->person_id);
 
         $this->assertCount(1, $choices);
         $this->assertSame($encounter->uuid, $choices[0]['uuid']);
@@ -143,7 +143,7 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
         Model::preventAccessingMissingAttributes();
 
         try {
-            $choices = Repository::carePlan()->encounterChoices((int) $encounter->person_id);
+            $choices = (new CarePlanCreateHarness())->carePlanEncounterChoices((int) $encounter->person_id);
             $labels = array_column($choices, 'label', 'uuid');
 
             $this->assertCount(2, $choices);
@@ -187,7 +187,7 @@ class EncounterPrimaryDiagnosisPersistenceTest extends TestCase
         DB::flushQueryLog();
 
         try {
-            $choices = Repository::carePlan()->encounterChoices((int) $encounter->person_id);
+            $choices = (new CarePlanCreateHarness())->carePlanEncounterChoices((int) $encounter->person_id);
             $queryCount = count(DB::getQueryLog());
             $labels = array_column($choices, 'label', 'uuid');
 

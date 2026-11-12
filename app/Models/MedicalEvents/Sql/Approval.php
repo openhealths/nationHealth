@@ -9,6 +9,11 @@ use App\Models\CarePlan;
 use App\Models\EhealthLink;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\ApprovalGrantedResource;
+use App\Models\MedicalEvents\Sql\ApprovalGrantedResourceType;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
+use App\Models\MedicalEvents\Sql\Identifier;
+use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Models\User;
@@ -244,7 +249,7 @@ class Approval extends Model
         LegalEntity $legalEntity
     ): Builder {
         return $query->whereMorphedTo('approvable', $patient)
-            ->active()
+            ->when($resourceType === CarePlan::RESOURCE_TYPE, static fn (Builder $consent): Builder => $consent->verifiedUnexpired(), static fn (Builder $consent): Builder => $consent->active())
             ->whereHas(
                 'grantedResourceTypes.codeableConcept.coding',
                 static fn (Builder $coding): Builder => $coding->whereCode($resourceType)
@@ -268,7 +273,7 @@ class Approval extends Model
     protected function resourceAccessGrantedTo(Builder $query, User $user, Model $resource, LegalEntity $legalEntity): Builder
     {
         return $query->whereMorphedTo('approvable', $resource)
-            ->active()
+            ->when($resource instanceof CarePlan, static fn (Builder $consent): Builder => $consent->verifiedUnexpired(), static fn (Builder $consent): Builder => $consent->active())
             ->grantedToEmployeesOrLegalEntity($user, $legalEntity);
     }
 
@@ -306,7 +311,7 @@ class Approval extends Model
     protected function carePlanAccessGrantedTo(Builder $query, User $user, LegalEntity $legalEntity): Builder
     {
         return $query->whereApprovableType(CarePlan::class)
-            ->isVerified()->whereFuture('expires_at')
+            ->verifiedUnexpired()
             ->whereAccessLevel('read')
             ->grantedToEmployees($user, $legalEntity);
     }
@@ -438,5 +443,45 @@ class Approval extends Model
             'name' => $uuid,
             'description' => __('approval.recipient_types.'.(in_array($this->grantedToType, ['employee', 'legal_entity'], true) ? $this->grantedToType : 'unknown')),
         ];
+    }
+    /** Whether this consent belongs exclusively to Care Plans, including a pending patient request. */
+    public function isCarePlanConsent(): bool
+    {
+        if ($this->approvableType === CarePlan::class) {
+            return true;
+        }
+        if ($this->approvableType !== Person::class) {
+            return false;
+        }
+        $this->loadMissing(['grantedResourceIdentifiers.type.coding', 'grantedResourceTypes.codeableConcept.coding', 'ehealthLinks.job']);
+        $resources = $this->grantedResourceIdentifiers;
+        $types = $this->grantedResourceTypes;
+        $onlyResources = $resources->every(static fn (Identifier $identifier): bool => $identifier->type->first()?->coding->contains('code', CarePlan::RESOURCE_TYPE) === true);
+        $onlyTypes = $types->every(static fn (ApprovalGrantedResourceType $type): bool => $type->codeableConcept?->coding->contains('code', CarePlan::RESOURCE_TYPE) === true);
+        if ($resources->isNotEmpty() || $types->isNotEmpty()) {
+            return $onlyResources && $onlyTypes;
+        }
+        if ($this->getAttribute('is_verified')) {
+            return false;
+        }
+        foreach ($this->ehealthLinks->sortByDesc('id') as $link) {
+            $requested = data_get($link->job?->request_data, 'resources');
+            if (is_array($requested) && $requested !== []) {
+                return collect($requested)->every(static fn (array $resource): bool => data_get($resource, 'identifier.type.coding.0.code') === CarePlan::RESOURCE_TYPE);
+            }
+        }
+
+        return false;
+    }
+
+    public function hasVerifiedAccess(): bool
+    {
+        return $this->getAttribute('is_verified') && $this->expiresAt?->isFuture() === true;
+    }
+
+    #[Scope]
+    protected function verifiedUnexpired(Builder $query): Builder
+    {
+        return $query->isVerified()->whereFuture('expires_at');
     }
 }

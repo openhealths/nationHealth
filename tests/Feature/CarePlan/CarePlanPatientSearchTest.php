@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Tests\Feature\CarePlan;
 
 use App\Models\Person\Person;
-
-use App\Repositories\Repository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\CarePlanCreateHarness;
 use Tests\TestCase;
 
 class CarePlanPatientSearchTest extends TestCase
@@ -34,7 +33,7 @@ class CarePlanPatientSearchTest extends TestCase
         $person = $this->patient('2001-02-23');
         $this->patient('2001-02-24');
 
-        $results = Repository::carePlan()->searchPatients($firstName, $lastName, '2001-02-23');
+        $results = (new CarePlanCreateHarness())->searchPatients($firstName, $lastName, '2001-02-23');
 
         $this->assertCount(1, $results);
         $this->assertSame($person->id, $results[0]['id']);
@@ -46,7 +45,7 @@ class CarePlanPatientSearchTest extends TestCase
     {
         $this->patient('2001-02-23');
 
-        $this->assertSame([], Repository::carePlan()->searchPatients('якийсь', 'пацієнт', '2001-02-24'));
+        $this->assertSame([], (new CarePlanCreateHarness())->searchPatients('якийсь', 'пацієнт', '2001-02-24'));
     }
 
     private function patient(string $birthDate): Person

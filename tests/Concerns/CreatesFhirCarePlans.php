@@ -8,8 +8,8 @@ use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
 use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Division;
-use App\Models\Employee\Employee;
 use App\Models\EmployeeRole;
+use App\Models\Employee\Employee;
 use App\Models\HealthcareService;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Identifier;
@@ -18,6 +18,7 @@ use App\Models\Role as RoleModel;
 use App\Repositories\Repository;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Str;
+use Tests\Support\CarePlanWorkflowHarness;
 
 /** Explicit normalized fixtures for tests that previously inserted retired flat columns. */
 trait CreatesFhirCarePlans
@@ -72,7 +73,7 @@ trait CreatesFhirCarePlans
             }
         }
 
-        $plan = Repository::carePlan()->create(array_replace([
+        $plan = (new CarePlanWorkflowHarness())->createCarePlanDraft(array_replace([
             'uuid' => (string) Str::uuid(), 'status' => 'draft', 'category' => 'TEST',
             'title' => 'Synthetic fixture', 'terms_of_service' => 'OUTPATIENT',
             'period_start' => now()->toDateString(),
@@ -147,7 +148,7 @@ trait CreatesFhirCarePlans
             }
         }
 
-        return Repository::carePlanActivity()->create(array_replace([
+        return (new CarePlanWorkflowHarness())->createActivityDraft(array_replace([
             'uuid' => (string) Str::uuid(), 'status' => 'draft', 'kind' => 'service_request',
         ], $attributes));
     }

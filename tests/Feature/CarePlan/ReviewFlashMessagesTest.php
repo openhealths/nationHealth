@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CarePlan;
 
+use App\Livewire\CarePlan\CarePlanComponent;
 use App\Livewire\CarePlan\CarePlanUpdate;
 use App\Livewire\Components\FlashMessage;
 use App\Livewire\Components\XMessage;
@@ -16,6 +17,9 @@ use Illuminate\Support\Facades\Session;
 use Livewire\Component;
 use Livewire\Livewire;
 use Mockery;
+use ReflectionProperty;
+use Tests\Feature\CarePlan\ReviewCarePlanDeleteHarness;
+use Tests\Feature\CarePlan\ReviewFlashHarness;
 use Tests\TestCase;
 
 class ReviewFlashMessagesTest extends TestCase
@@ -101,7 +105,7 @@ class ReviewFlashMessagesTest extends TestCase
             $user->shouldReceive('cannot')->once()->with('update', $plan)->andReturn(false);
             Auth::shouldReceive('user')->once()->andReturn($user);
             $component = new ReviewCarePlanDeleteHarness();
-            $component->carePlan = $plan;
+            (new ReflectionProperty(CarePlanComponent::class, 'carePlan'))->setValue($component, $plan);
             $component->personId = 1;
 
             $this->instance(CarePlanRepository::class, $repository);

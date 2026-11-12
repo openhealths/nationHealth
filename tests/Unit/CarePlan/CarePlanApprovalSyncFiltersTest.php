@@ -8,7 +8,6 @@ use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\Status;
 use App\Enums\User\Role;
-
 use App\Models\CarePlan;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
@@ -19,7 +18,6 @@ use App\Models\Relations\Party;
 use App\Models\User;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
-use App\Services\MedicalEvents\CarePlanApprovalService;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +26,7 @@ use Illuminate\Support\Str;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 /**
@@ -69,7 +68,7 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
             ->andReturn($response);
         $this->instance(ApprovalApi::class, $api);
 
-        app(CarePlanApprovalService::class)->syncForCarePlan($carePlan->fresh(['person']));
+        app(CarePlanWorkflowHarness::class)->syncCarePlanApprovals($carePlan->fresh(['person']));
     }
 
     public function test_sync_approvals_passes_get_approvals_resource_filters(): void
@@ -111,8 +110,8 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
 
         MedicalEventsRepository::approval()->syncApprovals($plan, 'care_plan');
 
-        $this->assertSame('inactive', $approval->fresh()->status);
         $this->assertSame($verified, $approval->fresh()->getAttribute('is_verified'));
+        $this->assertNull($approval->fresh()->status);
         $this->assertSame($verified, Repository::carePlan()->hasGrantedApproval($plan->fresh(), $employeeUuid));
     }
 
@@ -154,8 +153,8 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
 
         MedicalEventsRepository::approval()->syncApprovals($plan, 'care_plan');
 
-        $this->assertSame('active', $first->fresh()->status);
-        $this->assertSame('active', $second->fresh()->status);
+        $this->assertNull($first->fresh()->status);
+        $this->assertNull($second->fresh()->status);
         $this->assertFalse($stale->fresh()->expiresAt->isFuture());
     }
 
@@ -222,7 +221,7 @@ class CarePlanApprovalSyncFiltersTest extends TestCase
     {
         $plan = $this->makeCarePlan();
         $employee = $plan->author;
-        $payload = app(CarePlanApprovalService::class)->buildCreatePayload($plan, $employee->uuid, 'read');
+        $payload = app(CarePlanWorkflowHarness::class)->buildCarePlanApprovalPayload($plan, $employee->uuid, 'read');
         $payload['created_by'] = $payload['granted_to'];
         $payload['authorize_with'] = null;
 

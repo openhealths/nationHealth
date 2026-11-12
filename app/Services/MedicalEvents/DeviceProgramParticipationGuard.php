@@ -96,8 +96,7 @@ class DeviceProgramParticipationGuard
         }
 
         if (is_array($programPayload)) {
-            $tosBlock = app(CarePlanActivityValidationService::class)
-                ->providingConditionsBlockReason($carePlan, $programPayload);
+            $tosBlock = $carePlan->providingConditionsBlockReason($programPayload);
             if ($tosBlock !== null) {
                 $blockingIssues[] = $tosBlock;
             }

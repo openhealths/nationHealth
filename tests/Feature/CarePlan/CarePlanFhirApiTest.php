@@ -5,15 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\CarePlan;
 
 use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
-
 use App\Classes\eHealth\Api\CarePlanActivity as ActivityApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
 use App\Core\EHealthJob;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Jobs\CarePlanFullSync;
-use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
-use App\Livewire\CarePlan\Forms\CarePlanForm;
 use App\Livewire\Concerns\ReadsClinicalSnapshots;
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
@@ -26,6 +23,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Mockery;
 use RuntimeException;
+use Tests\Feature\CarePlan\CarePlanFhirSynchronizationHarness;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 class CarePlanFhirApiTest extends TestCase
@@ -42,7 +41,7 @@ class CarePlanFhirApiTest extends TestCase
         $plan = $this->fixture('plan');
         $plan['status'] = 'draft';
         $plan['requisition'] = 'server-number';
-        $actual = CarePlanForm::buildCreateContent($plan);
+        $actual = (new CarePlanWorkflowHarness())->buildCreateCarePlanContent($plan);
 
         $this->assertSame('new', $actual['status']);
         $this->assertSame('order', $actual['intent']);
@@ -55,7 +54,7 @@ class CarePlanFhirApiTest extends TestCase
     public function test_activity_create_keeps_false_and_fractional_numbers_but_not_remote_remainder(): void
     {
         $activity = $this->fixture('activity');
-        $actual = CarePlanActivityForm::buildCreateContent($activity);
+        $actual = (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($activity);
 
         $this->assertSame(1.2345, $actual['detail']['quantity']['value']);
         $this->assertFalse($actual['detail']['do_not_perform']);
@@ -71,7 +70,7 @@ class CarePlanFhirApiTest extends TestCase
         $activity['detail']['kind'] = 'device_request';
         $activity['detail']['quantity'] = ['value' => 1.0, 'system' => 'device_unit', 'code' => 'piece'];
         $activity['detail']['dailyAmount']['value'] = 0.5;
-        $actual = CarePlanActivityForm::buildCreateContent($activity);
+        $actual = (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($activity);
         $decoded = json_decode(json_encode($actual, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), true, flags: JSON_THROW_ON_ERROR);
 
         $this->assertSame(1, $decoded['detail']['quantity']['value']);
@@ -85,7 +84,7 @@ class CarePlanFhirApiTest extends TestCase
         $activity['detail']['kind'] = 'device_request';
         $activity['detail']['quantity']['value'] = 1.5;
         try {
-            CarePlanActivityForm::buildCreateContent($activity);
+            (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($activity);
             $this->fail('Fractional device quantities must not be truncated.');
         } catch (ValidationException $exception) {
             $this->assertArrayHasKey('quantity.value', $exception->errors());
@@ -98,7 +97,7 @@ class CarePlanFhirApiTest extends TestCase
         $snapshot['inserted_at'] = '2026-10-19T10:20:30.123Z';
         $snapshot['remote_extension'] = ['false' => false, 'zero' => 0, 'empty' => []];
         $reason = ['coding' => [['system' => 'eHealth/care_plan_activity_cancel_reasons', 'code' => 'TEST']]];
-        $actual = CarePlanActivityForm::buildCancelContent($snapshot, $reason);
+        $actual = (new CarePlanWorkflowHarness())->buildCancelCarePlanActivityContent($snapshot, $reason);
         $this->assertSame($reason, $actual['detail']['status_reason']);
         unset($actual['detail']['status_reason']);
         $this->assertSame($snapshot, $actual);
@@ -106,7 +105,7 @@ class CarePlanFhirApiTest extends TestCase
 
         $plan = Arr::toSnakeCase($this->fixture('plan'));
         $plan['activities'] = [$snapshot];
-        $actualPlan = CarePlanForm::buildCancelContent($plan, $reason);
+        $actualPlan = (new CarePlanWorkflowHarness())->buildCancelCarePlanContent($plan, $reason);
         unset($plan['activities']);
         $plan['status_reason'] = $reason;
         $this->assertSame($plan, $actualPlan);
@@ -117,7 +116,7 @@ class CarePlanFhirApiTest extends TestCase
         $reason = ['coding' => [['system' => 'eHealth/care_plan_activity_complete_reasons', 'code' => 'TEST']]];
         $outcomes = [['coding' => [['system' => 'eHealth/care_plan_activity_outcomes', 'code' => 'TEST']]]];
 
-        $this->assertSame(['detail' => ['status_reason' => $reason], 'outcome_codeable_concept' => $outcomes], CarePlanActivityForm::buildCompleteContent($reason, $outcomes));
+        $this->assertSame(['detail' => ['status_reason' => $reason], 'outcome_codeable_concept' => $outcomes], (new CarePlanWorkflowHarness())->buildCompleteCarePlanActivityContent($reason, $outcomes));
     }
 
     public function test_signed_content_is_submitted_unchanged_without_polling_the_job(): void

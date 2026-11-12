@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\MedicalEvents;
 
+use App\Services\MedicalEvents\EncounterPackageBuilder;
+use App\Services\MedicalEvents\EncounterPackageLoader;
 use App\Services\MedicalEvents\Mappers\ApprovalMapper;
-use App\Services\MedicalEvents\Mappers\CarePlanActivityMapper;
-use App\Services\MedicalEvents\Mappers\CarePlanMapper;
 use App\Services\MedicalEvents\Mappers\ClinicalImpressionMapper;
 use App\Services\MedicalEvents\Mappers\ConditionMapper;
 use App\Services\MedicalEvents\Mappers\DetectedIssueMapper;
@@ -26,15 +26,6 @@ use App\Services\MedicalEvents\Mappers\SpecimenMapper;
 
 class Fhir
 {
-    public static function carePlan(): CarePlanMapper
-    {
-        return app(CarePlanMapper::class);
-    }
-
-    public static function carePlanActivity(): CarePlanActivityMapper
-    {
-        return app(CarePlanActivityMapper::class);
-    }
 
     public static function clinicalImpression(): ClinicalImpressionMapper
     {

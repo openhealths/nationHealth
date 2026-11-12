@@ -21,9 +21,8 @@ use App\Models\CarePlan;
 use App\Models\CarePlanActivity;
 use App\Models\Declaration;
 use App\Models\EhealthLink;
-use App\Models\Employee\Employee;
 use App\Models\EmployeeRole;
-use App\Models\Icd10;
+use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
@@ -32,11 +31,10 @@ use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Observation;
 use App\Models\Person\Person;
 use App\Models\User;
+use App\Repositories\CarePlanActivityRepository;
 use App\Repositories\MedicalEvents\BaseRepository as MedicalEventsBaseRepository;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
-use App\Services\Dictionary\Collections\BasicDictionaryCollection;
-use App\Services\MedicalEvents\Fhir;
-use App\Services\MedicalEvents\FhirResource;
+use App\Repositories\Repository;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -45,12 +43,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
-use Ramsey\Uuid\Uuid;
-use Throwable;
 
 class CarePlanRepository extends MedicalEventsBaseRepository
 {
@@ -66,48 +61,9 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         return [...self::FHIR_RELATIONS, 'person.names', 'author.party', 'encounter.episode', 'encounter.diagnoses.condition.type.coding', 'approvals.grantedTo.type.coding', ...array_map(static fn (string $relation): string => 'activities.'.$relation, CarePlanActivityRepository::FHIR_RELATIONS), 'activities.author.party'];
     }
 
-    public function formContext(array $form, ?int $localId = null): array
+    public function saveDraft(array $resource, int $personId, int $legalEntityId, ?int $localId = null): CarePlan
     {
-        unset($form['keyContainerUpload'], $form['key_container_upload'], $form['password'], $form['knedp'], $form['keyContainerFileName']);
-        $data = Arr::toCamelCase($form);
-        $resource = $localId === null ? [] : $this->getResource($localId);
-        $authorUuid = $data['author'] ?? null;
-        if (isset($data['authorId'])) {
-            $authorUuid = Employee::whereKey($data['authorId'])->value('uuid');
-        }
-        $encounterUuid = $data['encounter'] ?? null;
-        if (isset($data['encounterId'])) {
-            $encounterUuid = Encounter::whereKey($data['encounterId'])->value('uuid');
-        }
-        $data['uuid'] = $data['uuid'] ?? ($resource['id'] ?? Uuid::uuid1()->toString());
-        if ($authorUuid !== null) {
-            $data['author'] = $authorUuid;
-        }
-        if ($encounterUuid !== null) {
-            $data['encounter'] = $encounterUuid;
-        }
-        if (isset($data['supportingInfo']['episodes'])) {
-            $data['episodes'] = $data['supportingInfo']['episodes'];
-            $data['medicalRecords'] = $data['supportingInfo']['medicalRecords'] ?? [];
-            unset($data['supportingInfo']);
-        }
-        foreach ($data['medicalRecords'] ?? [] as $index => $reference) {
-            if (isset($reference['identifier'])) {
-                continue;
-            }
-            $type = $reference['type'] ?? null;
-            if (!in_array($type, ['procedure', 'diagnostic_report'], true) || !isset($reference['uuid'])) {
-                throw new InvalidArgumentException('A medical record requires its resource type and UUID.');
-            }
-            $data['medicalRecords'][$index] = FhirResource::make()->coding('eHealth/resources', $type)->toIdentifier($reference['uuid']);
-        }
-
-        return ['data' => $data, 'context' => ['resource' => $resource, 'timezone' => config('app.timezone'), 'dateFormat' => config('app.date_format')]];
-    }
-
-    public function saveForm(array $form, int $personId, int $legalEntityId, ?int $localId = null): CarePlan
-    {
-        return $this->storageTransaction(function () use ($form, $personId, $legalEntityId, $localId): CarePlan {
+        return $this->storageTransaction(function () use ($resource, $personId, $legalEntityId, $localId): CarePlan {
             if ($localId !== null) {
                 $record = CarePlan::whereKey($localId)->lockForUpdate()->firstOrFail();
                 if ($this->hasPendingSubmission($record)) {
@@ -115,51 +71,8 @@ class CarePlanRepository extends MedicalEventsBaseRepository
                 }
             }
 
-            $input = $this->formContext($form, $localId);
-            $resource = Fhir::carePlan()->toFhir($input['data'], $input['context']);
-
-            return $this->present($this->storeResource($resource, $personId, $legalEntityId, $localId));
+            return $this->storeResource($resource, $personId, $legalEntityId, $localId);
         });
-    }
-
-    /** Compatibility projection for the existing UI; the historical columns are not written. */
-    private function present(CarePlan $plan, bool $forListing = false): CarePlan
-    {
-        if ($plan->detailsSyncedAt === null) {
-            return $plan;
-        }
-        $resource = $this->getResource($plan);
-        $form = Fhir::carePlan()->fromFhir($resource, ['timezone' => config('app.timezone')]);
-        $plan->forceFill([
-            'category' => $form['category'], 'termsOfService' => $form['termsOfService'],
-            'context' => $resource['context'] ?? null,
-            'periodStart' => data_get($resource, 'period.start'), 'periodEnd' => data_get($resource, 'period.end'),
-            'informWith' => $form['informWith'] ?? null,
-            'supportingInfo' => ['episodes' => $this->resolveEpisodeLabels($form['episodes'], $plan->personId), 'medical_records' => $form['medicalRecords']],
-        ]);
-        $plan->syncOriginal();
-        if (!$forListing && $plan->relationLoaded('activities')) {
-            $repository = Repository::carePlanActivity();
-            $plan->setRelation('activities', $plan->activities->map(fn ($activity) => $repository->presentForUi($activity)));
-        }
-
-        return $plan;
-    }
-
-    /** Display data only: keep the canonical supporting references unchanged. */
-    public function resolveEpisodeLabels(array $references, int $personId): array
-    {
-        $episodes = Episode::wherePersonId($personId)
-            ->whereIn('uuid', array_column($references, 'uuid'))->with('period')->get()->keyBy('uuid');
-
-        return array_map(static function (array $reference) use ($episodes): array {
-            $episode = $episodes->get($reference['uuid']);
-
-            return array_replace($reference, [
-                'name' => $episode?->name ?: $reference['uuid'],
-                'date' => $episode?->period?->start ? CarbonImmutable::parse($episode->period->start)->format(config('app.date_format')) : '—',
-            ]);
-        }, $references);
     }
 
     public function addressConditions(CarePlan $plan): Collection
@@ -222,99 +135,6 @@ class CarePlanRepository extends MedicalEventsBaseRepository
 
             return $plan->unsetRelations();
         });
-    }
-
-    /** Registered legacy resources require a full remote sync, not a guess from lossy columns. */
-    public function backfillResources(int $legalEntityId, bool $write = false): array
-    {
-        $report = ['plans' => 0, 'activities' => 0, 'converted' => 0, 'needsRemoteSync' => [], 'errors' => []];
-        CarePlan::whereLegalEntityId($legalEntityId)->with('activities')->chunkById(100, function ($plans) use (&$report): void {
-            foreach ($plans as $plan) {
-                $report['plans']++;
-                $report['activities'] += $plan->activities->count();
-                if (CarePlanActivity::whereCarePlanId($plan->id)->whereNotNull('uuid')->select('uuid')->groupBy('uuid')->havingRaw('COUNT(*) > 1')->exists()) {
-                    $report['errors'][] = ['type' => 'duplicateActivity', 'localId' => $plan->id, 'reason' => 'Duplicate activity UUIDs must be reconciled before schema migration.'];
-                }
-                if ($plan->detailsSyncedAt === null && $plan->uuid !== null && $plan->status !== CarePlanStatus::DRAFT->value) {
-                    $report['needsRemoteSync'][] = ['type' => 'carePlan', 'localId' => $plan->id];
-                    continue;
-                }
-                try {
-                    if ($plan->detailsSyncedAt === null) {
-                        $this->legacyDraftResource($plan);
-                    }
-                    foreach ($plan->activities as $activity) {
-                        if ($activity->detailsSyncedAt !== null) {
-                            continue;
-                        }
-                        if ($activity->uuid !== null && $activity->status !== 'draft') {
-                            $report['needsRemoteSync'][] = ['type' => 'activity', 'localId' => $activity->id];
-                        } else {
-                            Repository::carePlanActivity()->legacyDraftResource($activity, $plan);
-                        }
-                    }
-                } catch (Throwable $exception) {
-                    $report['errors'][] = ['type' => 'carePlan', 'localId' => $plan->id, 'reason' => $exception->getMessage()];
-                }
-            }
-        });
-        if (CarePlan::whereLegalEntityId($legalEntityId)->whereNotNull('uuid')->select('person_id', 'uuid')->groupBy('person_id', 'uuid')->havingRaw('COUNT(*) > 1')->exists()) {
-            $report['errors'][] = ['type' => 'duplicateCarePlan', 'reason' => 'Duplicate resource UUIDs must be reconciled before schema migration.'];
-        }
-        if (!$write || $report['errors'] !== [] || $report['needsRemoteSync'] !== []) {
-            return $report;
-        }
-        CarePlan::whereLegalEntityId($legalEntityId)->chunkById(100, function ($plans) use (&$report, $legalEntityId): void {
-            foreach ($plans as $plan) {
-                $this->storageTransaction(function () use ($plan, $legalEntityId, &$report): void {
-                    $plan = CarePlan::whereKey($plan->id)->lockForUpdate()->firstOrFail();
-                    if ($plan->detailsSyncedAt === null) {
-                        $plan = $this->storeResource($this->legacyDraftResource($plan), $plan->personId, $legalEntityId, $plan->id);
-                        $report['converted']++;
-                    }
-                    $repository = Repository::carePlanActivity();
-                    foreach ($plan->activities()->get() as $activity) {
-                        if ($activity->detailsSyncedAt === null) {
-                            $repository->storeResource($repository->legacyDraftResource($activity, $plan), $plan, $activity->id);
-                            $report['converted']++;
-                        }
-                    }
-                });
-            }
-        });
-
-        return $report;
-    }
-
-    private function legacyDraftResource(CarePlan $plan): array
-    {
-        $plan->loadMissing(['author', 'encounter', 'effectivePeriod', 'categoryConcept.coding', 'basedOn.type.coding', 'partOf.type.coding', 'encounterIdentifier.type.coding', 'supportingInfoReferences.type.coding']);
-        $data = Arr::toCamelCase($plan->getAttributes());
-        $data['uuid'] = $plan->uuid ?? Uuid::uuid1()->toString();
-        $data['category'] = $plan->categoryConcept ? MedicalEventsRepository::codeableConcept()->toResource($plan->categoryConcept) : $plan->category;
-        $data['author'] = $plan->author?->uuid;
-        if (!$data['author']) {
-            throw new InvalidArgumentException('Draft author cannot be resolved.');
-        }
-        $data['addresses'] = $plan->addresses ?? [];
-        $data['basedOn'] = MedicalEventsRepository::identifier()->toReference($plan->basedOn);
-        $data['partOf'] = MedicalEventsRepository::identifier()->toReference($plan->partOf);
-        $data['supportingInfo'] = $plan->supportingInfoReferences->map(fn ($reference): array => MedicalEventsRepository::identifier()->toReference($reference))->all();
-        if ($data['supportingInfo'] === [] && !empty($plan->supportingInfo)) {
-            throw new InvalidArgumentException('Legacy supporting info requires explicit reconciliation.');
-        }
-        if ($plan->encounterIdentifier) {
-            $data['encounter'] = MedicalEventsRepository::identifier()->toReference($plan->encounterIdentifier);
-        } elseif ($plan->encounter?->uuid) {
-            $data['encounter'] = $plan->encounter->uuid;
-        } elseif ($plan->encounterId !== null) {
-            throw new InvalidArgumentException('Draft encounter cannot be resolved.');
-        }
-        if ($plan->effectivePeriod) {
-            $data['period'] = MedicalEventsRepository::period()->toResource($plan->effectivePeriod);
-        }
-
-        return Fhir::carePlan()->toFhir($data, ['timezone' => config('app.timezone')]);
     }
 
     public function assertFhirStorageReady(bool $beforeSubmission = false): void
@@ -416,7 +236,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         return CarePlan::whereLegalEntityId($legalEntityId)
             ->with($this->uiRelations())
             ->tap(fn ($query) => $this->orderForDisplay($query))
-            ->get()->map(fn (CarePlan $plan): CarePlan => $this->present($plan, forListing: true));
+            ->get();
     }
 
     public function getByPersonId(int $personId, array $filters = [], ?int $legalEntityId = null): Collection
@@ -461,14 +281,14 @@ class CarePlanRepository extends MedicalEventsBaseRepository
             $query->whereRaw('CAST(encounter_id AS '.$castType.') LIKE ?', ['%'.$filters['encounter_id'].'%']);
         }
 
-        return $this->orderForDisplay($query)->get()->map(fn (CarePlan $plan): CarePlan => $this->present($plan, forListing: true));
+        return $this->orderForDisplay($query)->get();
     }
 
     public function findById(int $id): ?CarePlan
     {
         $plan = CarePlan::with($this->uiRelations())->find($id);
 
-        return $plan ? $this->present($plan) : null;
+        return $plan;
     }
 
     public function submissionForDisplay(int $id): array
@@ -485,28 +305,6 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         ];
     }
 
-    /** Persist display values in Livewire without rehydrating Eloquent records on each poll. */
-    public function patientListing(int $personId, array $filters, int $legalEntityId): array
-    {
-        return $this->getByPersonId($personId, $filters, $legalEntityId)->map(fn (CarePlan $plan): array => [
-            'id' => $plan->id,
-            'title' => $plan->displayTitle(),
-            'status' => $plan->status,
-            'requiresFhirImport' => $plan->requiresFhirImport(),
-            'createdAt' => $plan->createdAt?->format(config('app.date_format')) ?? '-',
-            'periodStart' => $plan->periodStart?->format(config('app.date_format')) ?? '-',
-            'periodEnd' => $plan->periodEnd?->format(config('app.date_format')) ?? '-',
-            'authorName' => $plan->authorName,
-            'careProvisionConditions' => $plan->careProvisionConditions,
-            'medicalCondition' => $plan->medicalCondition,
-            'extendedDescription' => $plan->extendedDescription,
-            'additionalInfo' => $plan->additionalInfo,
-            'notes' => $plan->notes,
-            'ehealthId' => $plan->ehealthId,
-            'episodeUuid' => $this->episodeUuid($plan) ?? '-',
-        ])->all();
-    }
-
     public function findByUuid(string $uuid, ?int $legalEntityId = null, ?int $personId = null): ?CarePlan
     {
         $query = CarePlan::with($this->uiRelations())->whereUuid($uuid);
@@ -518,19 +316,17 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         }
         $plan = $query->first();
 
-        return $plan ? $this->present($plan) : null;
+        return $plan;
     }
 
-    public function create(array $data): CarePlan
+    public function create(array $resource, int $personId, int $legalEntityId): CarePlan
     {
-        $input = Arr::toCamelCase($data);
-
-        return $this->saveForm($input, (int) $input['personId'], (int) $input['legalEntityId']);
+        return $this->saveDraft($resource, $personId, $legalEntityId);
     }
 
     public function update(CarePlan $carePlan, array $data): bool
     {
-        $this->saveForm($data, $carePlan->personId, $carePlan->legalEntityId, $carePlan->id);
+        $this->saveDraft($data, $carePlan->personId, $carePlan->legalEntityId, $carePlan->id);
 
         return true;
     }
@@ -545,60 +341,15 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         return $this->update($carePlan, $data);
     }
 
-    public function resolveEHealthPeriodBounds(CarePlan $carePlan): array
-    {
-        $period = $this->getResource($carePlan->id)['period'] ?? [];
 
-        return ['start' => isset($period['start']) ? CarbonImmutable::parse($period['start'], 'UTC') : null, 'end' => isset($period['end']) ? CarbonImmutable::parse($period['end'], 'UTC') : null];
-    }
 
     public function availableGrounds(int $personId): array
     {
-        // Fetch patient conditions for outcomeReference selection
-        $conditions = Condition::wherePersonId($personId)->with('code.coding')->get();
-        $icdDescriptions = Icd10::whereIn('code', $conditions->pluck('code.coding')->flatten()->where('system', 'eHealth/ICD10_AM/condition_codes')->pluck('code'))->pluck('description', 'code');
-        $icpcDescriptions = collect();
-        if ($conditions->pluck('code.coding')->flatten()->contains('system', 'eHealth/ICPC2/condition_codes')) {
-            try {
-                $icpcDictionary = dictionary()->basics()->firstWhere('name', 'eHealth/ICPC2/condition_codes');
-                $icpcDescriptions = (new BasicDictionaryCollection($icpcDictionary['values'] ?? []))->asCodeDescription();
-            } catch (InvalidArgumentException $exception) {
-                Log::warning('Care plan diagnosis labels unavailable', ['exceptionType' => $exception::class]);
-            }
-        }
-        $conditions = $conditions->map(function ($condition) use ($icdDescriptions, $icpcDescriptions): array {
-            $coding = $condition->code?->coding?->first();
-            $description = match ($coding?->system) {
-                'eHealth/ICD10_AM/condition_codes' => $icdDescriptions[$coding->code] ?? null,
-                'eHealth/ICPC2/condition_codes' => $icpcDescriptions[$coding->code] ?? null,
-                default => null,
-            };
-
-            return [
-                'uuid' => $condition->uuid,
-                'name' => $description ?: $condition->code?->text ?: $coding?->code ?: __('care-plan.ground_name_unavailable'),
-                'date' => $condition->onsetDate ? Carbon::parse($condition->onsetDate)->format('d.m.Y') : '-',
-            ];
-        })->toArray();
-
-        // Fetch patient diagnostic reports for justifications (grounds)
-        $reports = DiagnosticReport::wherePersonId($personId)
-            ->with('code')
-            ->get()->map(fn ($dr) => [
-                'uuid' => $dr->uuid,
-                'name' => $dr->code?->displayValue ?: $dr->code?->value ?: 'Diagnostic Report',
-                'date' => $dr->issued ? Carbon::parse($dr->issued)->format('d.m.Y') : '-',
-            ])->toArray();
-
-        // Fetch patient observations for justifications (grounds)
-        $observations = Observation::wherePersonId($personId)
-            ->with('code.coding')->get()->map(fn ($obs) => [
-                'uuid' => $obs->uuid,
-                'name' => $obs->code?->text ?: 'Observation',
-                'date' => $obs->issued ? Carbon::parse($obs->issued)->format('d.m.Y') : '-',
-            ])->toArray();
-
-        return compact('conditions', 'reports', 'observations');
+        return [
+            'conditions' => Condition::wherePersonId($personId)->with('code.coding')->get(),
+            'reports' => DiagnosticReport::wherePersonId($personId)->with('code')->get(),
+            'observations' => Observation::wherePersonId($personId)->with('code.coding')->get(),
+        ];
     }
 
     public function deleteDraft(int $id): bool
@@ -703,10 +454,9 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         return Episode::with('period')->whereUuid($uuid)->first();
     }
 
-    public function activeEpisodes(Person $person): array
+    public function activeEpisodes(Person $person): Collection
     {
-        return Episode::forPatient($person)->whereStatus('active')->with('period')->get()
-            ->map(fn ($episode): array => ['uuid' => $episode->uuid, 'name' => $episode->name, 'date' => $episode->period?->start ? Carbon::parse($episode->period->start)->format('d.m.Y') : ''])->all();
+        return Episode::forPatient($person)->whereStatus('active')->with('period')->get();
     }
 
     public function findCondition(string $uuid, ?int $personId = null): ?Condition
@@ -733,7 +483,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
     {
         $person = Person::find($personId);
         if ($person === null) {
-            return [];
+            return ['encounters' => collect(), 'episodeNames' => collect()];
         }
 
         $legalEntityUuid = legalEntity()?->uuid;
@@ -769,21 +519,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         $episodeNames = $episodeUuids === [] ? collect() : $person->filterRecordsWithMerged(Episode::query())
             ->whereIn('uuid', $episodeUuids)->pluck('name', 'uuid');
 
-        return $encounters->map(function (Encounter $encounter) use ($episodeNames): array {
-            $occurredAt = $encounter->period === null
-                ? $encounter->getRawOriginal('ehealth_inserted_at')
-                : $encounter->period->getRawOriginal('start');
-            $date = $occurredAt
-                ? Carbon::parse($occurredAt, 'UTC')->setTimezone(config('app.timezone'))->format('d.m.Y')
-                : '-';
-            $episodeName = $episodeNames->get($encounter->episode?->value);
-            $label = __('Взаємодія #').$encounter->id.' ('.$date.')';
-            if (filled($episodeName)) {
-                $label .= ' — '.$episodeName;
-            }
-
-            return ['uuid' => $encounter->uuid, 'label' => $label];
-        })->all();
+        return compact('encounters', 'episodeNames');
     }
 
     private function mergedEncounterIsEligible(Encounter $encounter, Person $person): bool
@@ -797,10 +533,10 @@ class CarePlanRepository extends MedicalEventsBaseRepository
                 ->exists();
     }
 
-    public function doctors(int $legalEntityId): array
+    public function doctors(int $legalEntityId): Collection
     {
         return Employee::whereLegalEntityId($legalEntityId)->whereIn('employee_type', [Role::DOCTOR, Role::SPECIALIST, Role::MED_COORDINATOR])->whereStatus(Status::APPROVED)->whereIsActive(true)->with('party')->get()
-            ->filter(fn ($employee): bool => $employee->party !== null)->map(fn ($employee): array => ['uuid' => $employee->uuid, 'name' => ($employee->party->fullName ?? 'Unknown').' ('.($employee->position ?? '').')'])->values()->all();
+            ->filter(fn ($employee): bool => $employee->party !== null);
     }
 
     /**
@@ -1005,7 +741,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         $encounter->loadMissing(['period', 'episode', 'diagnoses.condition']);
     }
 
-    public function searchPatients(string $firstName, string $lastName, string $birthDate): array
+    public function searchPatients(string $firstName, string $lastName, string $birthDate): Collection
     {
         $firstName = trim($firstName);
         $lastName = trim($lastName);
@@ -1022,17 +758,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
                 });
             })
             ->with('names') // Eager load names so fullName works!
-            ->get(['id', 'uuid', 'birth_date'])
-            ->map(fn (Person $person) => [
-                'id' => $person->id,
-                'uuid' => $person->uuid,
-                'name' => trim(($person->primary_name?->last_name . ' ' . $person->primary_name?->first_name . ' ' . $person->primary_name?->second_name) ?? ''),
-                'birthDate' => $person->birth_date
-                    ? Carbon::parse($person->birth_date)->format(config('app.date_format'))
-                    : '-',
-            ])
-            ->values()
-            ->toArray();
+            ->get(['id', 'uuid', 'birth_date']);
     }
 
     /**
@@ -1090,7 +816,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
             }
         }
 
-        return $this->orderForDisplay($query)->get()->map(fn (CarePlan $plan): CarePlan => $this->present($plan, forListing: true));
+        return $this->orderForDisplay($query)->get();
     }
 
     private function filterStatus(Builder $query, string $status): void
@@ -1169,78 +895,14 @@ class CarePlanRepository extends MedicalEventsBaseRepository
             && $approval->expiresAt !== null && $approval->expiresAt->isFuture());
     }
 
-    public function displayedDetails(CarePlan $plan, array $dictionaries): array
-    {
-        $resource = $this->getResource($plan);
-        $conceptLabel = static function (?array $concept, string $dictionary) use ($dictionaries): string {
-            $labels = collect($concept['coding'] ?? [])->map(
-                fn (array $coding): ?string =>
-                $dictionaries[$dictionary][$coding['code'] ?? ''] ?? ($coding['display'] ?? null)
-            )->filter()->unique()->all();
-
-            return implode(', ', $labels) ?: ($concept['text'] ?? '—');
-        };
-        $formatDate = static function (?string $date): string {
-            if (!$date) {
-                return __('care-plan.no_end_date');
-            }
-            $format = config('app.date_format').(str_contains($date, 'T') ? ' H:i' : '');
-
-            return CarbonImmutable::parse($date, 'UTC')->setTimezone(config('app.timezone'))->format($format);
-        };
-        $encounterUuid = data_get($resource, 'encounter.identifier.value');
-        $encounter = $encounterUuid ? $this->findEncounter($encounterUuid, $plan->personId) : null;
-        $references = collect($resource['supportingInfo'] ?? []);
-        $episodeUuids = $references->pluck('identifier.value')->filter()->all();
-        $episodes = Episode::wherePersonId($plan->personId)->whereIn('uuid', $episodeUuids)->pluck('name', 'uuid');
-        $diagnoses = [];
-        $conditions = $this->addressConditions($plan);
-        $diagnosisCodes = collect($resource['addresses'] ?? [])->flatMap(function (array $address) use ($conditions): array {
-            $condition = $conditions->get(data_get($address, 'reference.identifier.value'));
-
-            return $condition?->code ? MedicalEventsRepository::codeableConcept()->toResource($condition->code)['coding'] ?? [] : ($address['coding'] ?? []);
-        })
-            ->where('system', 'eHealth/ICD10_AM/condition_codes')->pluck('code')->all();
-        $diagnosisNames = Icd10::whereIn('code', $diagnosisCodes)->pluck('description', 'code');
-        foreach ($resource['addresses'] ?? [] as $address) {
-            $condition = $conditions->get(data_get($address, 'reference.identifier.value'));
-            $concept = $condition?->code ? MedicalEventsRepository::codeableConcept()->toResource($condition->code) : $address;
-            foreach ($concept['coding'] ?? [] as $coding) {
-                $code = $coding['code'] ?? '';
-                $name = $diagnosisNames[$code] ?? ($dictionaries['icpc2_codes'][$code] ?? ($coding['display'] ?? ($concept['text'] ?? '')));
-                $diagnoses[] = trim($code.($name && $name !== $code ? ' — '.$name : ''));
-            }
-        }
-
-        return [
-            'requisition' => $resource['requisition'] ?? '—',
-            'status' => CarePlanStatus::labelFor($resource['status'] ?? null),
-            'category' => $conceptLabel($resource['category'] ?? null, 'care_plan_categories'),
-            'title' => $resource['title'] ?? '—',
-            'period' => $formatDate(data_get($resource, 'period.start')).' — '.$formatDate(data_get($resource, 'period.end')),
-            'encounter' => $encounter ? __('care-plan.encounter').' №'.$encounter->id : __('care-plan.reference_unavailable'),
-            'supporting_info' => $references->map(fn (array $reference): string => $episodes->get(data_get($reference, 'identifier.value')) ?: $reference['displayValue'] ?? __('care-plan.reference_unavailable'))->all(),
-            'addresses' => array_values(array_unique($diagnoses)),
-            'based_on' => (data_get($resource, 'basedOn.displayValue') ?? data_get($resource, 'basedOn.identifier.value')) ?? '—',
-            'part_of' => (data_get($resource, 'partOf.displayValue') ?? data_get($resource, 'partOf.identifier.value')) ?? '—',
-            'description' => $resource['description'] ?? '—',
-            'status_reason' => $conceptLabel($resource['statusReason'] ?? null, match (CarePlanStatus::fromStored($resource['status'] ?? null)) {
-                CarePlanStatus::COMPLETED => 'care_plan_complete_reasons',
-                default => 'care_plan_cancel_reasons',
-            }),
-            'note' => $resource['note'] ?? '—',
-        ];
-    }
-
     public function removeApproval(CarePlan $plan, string $uuid): void
     {
         $plan->approvals()->whereUuid($uuid)->delete();
     }
 
-    public function approvalEmployees(int $legalEntityId): array
+    public function approvalEmployees(int $legalEntityId): Collection
     {
-        return Employee::whereLegalEntityId($legalEntityId)->whereStatus('APPROVED')->whereIsActive(true)->whereIn('employee_type', [Role::DOCTOR->value, Role::SPECIALIST->value, Role::MED_COORDINATOR->value])->with('party')->get()
-            ->map(fn ($employee): array => ['uuid' => $employee->uuid, 'label' => trim($employee->fullName).' ('.$employee->positionLabel().')'])->all();
+        return Employee::whereLegalEntityId($legalEntityId)->whereStatus('APPROVED')->whereIsActive(true)->whereIn('employee_type', [Role::DOCTOR->value, Role::SPECIALIST->value, Role::MED_COORDINATOR->value])->with('party')->get();
     }
 
     public function assertApprovalCreationReady(CarePlan $plan): void
@@ -1410,4 +1072,5 @@ class CarePlanRepository extends MedicalEventsBaseRepository
             return true;
         });
     }
+
 }

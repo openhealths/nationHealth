@@ -6,8 +6,8 @@ namespace Tests\Feature;
 
 use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthValidationException;
-use App\Livewire\CarePlan\Forms\CarePlanActivityForm;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 class CarePlanActivityPayloadTest extends TestCase
@@ -25,7 +25,7 @@ class CarePlanActivityPayloadTest extends TestCase
                 'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'medical_program']]],
             ],
         ];
-        $payload = CarePlanActivityForm::buildCreateContent($resource);
+        $payload = (new CarePlanWorkflowHarness())->buildCreateCarePlanActivityContent($resource);
 
         $this->assertEquals(5, $payload['detail']['daily_amount']['value']);
         $this->assertEquals('MEDICATION_UNIT', $payload['detail']['daily_amount']['system']);

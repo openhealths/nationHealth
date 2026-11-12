@@ -8,7 +8,6 @@ use App\Classes\eHealth\Api\Approval as ApprovalApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Livewire\CarePlan\CarePlanApprovals;
 use App\Models\MedicalEvents\Sql\Identifier;
-use App\Services\MedicalEvents\CarePlanApprovalService;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Http;
@@ -44,7 +43,6 @@ class CarePlanRevokeApprovalTest extends TestCase
             'uuid' => (string) Str::uuid(), 'granted_to_id' => $identifier->id, 'created_by_id' => $identifier->id,
             'granted_to_type' => 'employee', 'status' => 'active', 'is_verified' => true, 'expires_at' => now()->addDay(),
         ]);
-        $this->partialMock(CarePlanApprovalService::class)->shouldReceive('skipsPatientOtp')->andReturn(true);
 
         return $context + compact('plan', 'approval');
     }

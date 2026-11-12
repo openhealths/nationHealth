@@ -4,109 +4,113 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan\Forms;
 
-use App\Core\Arr;
-use App\Enums\CarePlanActivityKind;
-use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Validator;
+use App\Models\CarePlan;
 use Illuminate\Validation\ValidationException;
 use Livewire\Form;
 
 class CarePlanActivityForm extends Form
 {
-    public static function buildCreateContent(array $resource): array
+    public string|int|float|null $daily_amount = '';
+    public string|null $daily_amount_code = '';
+    public string|null $daily_amount_system = '';
+    public string|null $description = '';
+    public string|null $goal = '';
+    public string|int|null $id = null;
+    public string|null $kind = 'service_request';
+    public string|null $product_codeable_concept = '';
+    public string|null $product_reference = '';
+    public string|null $product_reference_type = '';
+    public string|null $program = '';
+    public string|int|float|null $quantity = '';
+    public string|null $quantity_code = '';
+    public string|null $quantity_system = '';
+    public string|null $reason_code = '';
+    public string|null $reason_reference = '';
+    public string|null $scheduled_period_end = '';
+    public string|null $scheduled_period_start = '';
+
+    public function assertServiceUnit(CarePlan $carePlan, string $code): void
     {
-        Validator::make($resource, [
-            'id' => ['required', 'uuid'], 'author' => ['required', 'array', 'min:1'],
-            'author.*.identifier.value' => ['required', 'uuid'],
-            'carePlan.identifier.value' => ['required', 'uuid'],
-            'detail.kind' => ['required', 'in:'.implode(',', array_column(CarePlanActivityKind::cases(), 'value'))],
-        ])->validate();
-        $detail = $resource['detail'];
-        $kind = CarePlanActivityKind::from($detail['kind']);
-        $requiresProgram = $kind === CarePlanActivityKind::MEDICATION_REQUEST;
+        if ($code === 'MINUTE' && !$carePlan->allowsServiceMinutes()) {
+            throw ValidationException::withMessages(['activityForm.quantity_code' => __('care-plan.service_minutes_unavailable')]);
+        }
+    }
+
+    public function assertServicePeriod(CarePlan $carePlan, array $detail): void
+    {
+        if ($carePlan->termsOfServiceCode() !== 'OUTPATIENT') {
+            return;
+        }
+        $errors = [];
+        foreach (['start', 'end'] as $boundary) {
+            if (!filled(data_get($detail, 'scheduledPeriod.'.$boundary))) {
+                $errors['activityForm.scheduled_period_'.$boundary] = __('care-plan.service_activity_period_required');
+            }
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    public function rulesForDraft(bool $usesAlternativeSchedule, string $termsOfService, array $allowedCodeTypes): array
+    {
+        $programId = $this->program;
+        $periodRule = !empty($programId) && !$usesAlternativeSchedule ? 'required|date_format:'.config('app.date_format') : 'nullable|date_format:'.config('app.date_format');
+
         $rules = [
-            'program' => [$requiresProgram ? 'required' : 'sometimes', 'array'],
-            'program.identifier.value' => ['required_with:program', 'uuid'],
-            'quantity.value' => [isset($detail['program']) || $kind === CarePlanActivityKind::SERVICE_REQUEST ? 'required' : 'sometimes', $kind === CarePlanActivityKind::MEDICATION_REQUEST ? 'numeric' : 'integer', 'gt:0'],
-            'scheduledPeriod' => [isset($detail['program']) && !isset($detail['scheduledTiming']) && !isset($detail['scheduledString']) ? 'required' : 'sometimes', 'array'],
-            'scheduledPeriod.start' => ['required_with:scheduledPeriod', 'date'],
-            'scheduledPeriod.end' => ['required_with:scheduledPeriod', 'date', 'after_or_equal:scheduledPeriod.start'],
+            'kind' => 'required|string',
+            'scheduled_period_start' => $periodRule,
+            'scheduled_period_end' => $periodRule,
+            'quantity' => 'nullable|numeric',
+            'quantity_system' => 'nullable|string',
+            'quantity_code' => 'nullable|string',
+            'daily_amount' => 'nullable|numeric',
+            'daily_amount_system' => 'nullable|string',
+            'daily_amount_code' => 'nullable|string',
+            'description' => 'nullable|string',
+            'product_reference' => 'nullable|string',
+            'program' => 'nullable|string',
+            'reason_code' => 'nullable|string',
+            'goal' => 'nullable|string',
         ];
-        Validator::make($detail, $rules, [], ['quantity.value' => __('care-plan.ehealth_fields.quantity_value')])->validate();
-        if ($kind !== CarePlanActivityKind::MEDICATION_REQUEST && isset($detail['quantity']['value'])) {
-            $detail['quantity']['value'] = (int) $detail['quantity']['value'];
-        }
-        if (isset($detail['productReference']) === isset($detail['productCodeableConcept'])) {
-            throw ValidationException::withMessages(['product' => 'Exactly one product variant is required.']);
-        }
-        $content = array_intersect_key($resource, array_flip(['id', 'author', 'carePlan']));
-        $content['detail'] = array_intersect_key($detail, array_flip(['kind', 'productReference', 'productCodeableConcept', 'reasonCode', 'reasonReference', 'goal', 'quantity', 'location', 'performer', 'dailyAmount', 'scheduledPeriod', 'scheduledTiming', 'scheduledString', 'description', 'program', 'doNotPerform']));
-        $content['detail']['status'] = 'scheduled';
 
-        return self::resourcePayload($content);
-    }
+        $kindLower = strtolower((string) $this->kind);
+        if (str_contains($kindLower, 'device')) {
+            $rules['quantity'] = !empty($programId) ? 'required|integer|min:1' : 'nullable|integer|min:1';
+            $rules['product_reference'] = 'nullable|uuid|required_without:product_codeable_concept';
 
-    /** TV39 options are multiples of any packaging for the device type within the inclusive period cap. */
-    public static function deviceQuantityOptions(array $packagingCounts, int $maxDailyCount, string $start, string $end): array
-    {
-        if ($start === '' || $end === '' || $maxDailyCount < 1) {
-            return [];
-        }
-        if (!Validator::make(['start' => $start, 'end' => $end], ['start' => ['required', 'date'], 'end' => ['required', 'date']])->passes()) {
-            return [];
-        }
-        $periodStart = CarbonImmutable::parse($start)->startOfDay();
-        $periodEnd = CarbonImmutable::parse($end)->startOfDay();
-        if ($periodEnd->lessThan($periodStart)) {
-            return [];
-        }
-        $limit = $maxDailyCount * ((int) $periodStart->diffInDays($periodEnd) + 1);
-        $options = [];
-        foreach (array_unique($packagingCounts) as $count) {
-            $count = (int) $count;
-            if ($count < 1) {
-                continue;
-            }
-            for ($quantity = $count; $quantity <= $limit; $quantity += $count) {
-                $options[$quantity] = $quantity;
-            }
-        }
-        ksort($options);
+            $requiresClassificationOnly = in_array('CLASSIFICATION_TYPE', $allowedCodeTypes, true)
+                && !in_array('DEVICE_DEFINITION', $allowedCodeTypes, true);
 
-        return array_values($options);
-    }
-
-    public static function buildCancelContent(array $snapshot, array $reason): array
-    {
-        Validator::make($snapshot, ['id' => ['required', 'uuid'], 'detail' => ['required', 'array']])->validate();
-        $snapshot['detail']['status_reason'] = $reason;
-
-        return $snapshot;
-    }
-
-    public static function buildCompleteContent(array $reason, array $outcomes): array
-    {
-        Validator::make(['reason' => $reason, 'outcomes' => $outcomes], [
-            'reason.coding' => ['required', 'array', 'min:1'],
-            'outcomes' => ['required', 'array', 'min:1'],
-            'outcomes.*.coding' => ['required', 'array', 'min:1'],
-        ])->validate();
-
-        return ['detail' => ['status_reason' => $reason], 'outcome_codeable_concept' => $outcomes];
-    }
-
-    private static function resourcePayload(array $data): array
-    {
-        $result = [];
-        foreach (Arr::toSnakeCase($data) as $key => $value) {
-            if (is_array($value)) {
-                $value = self::resourcePayload($value);
-            }
-            if ($value !== null && $value !== '' && $value !== []) {
-                $result[$key] = $value;
+            if ($requiresClassificationOnly) {
+                $rules['product_codeable_concept'] = 'required|string';
+                $rules['product_reference'] = 'prohibited';
+            } else {
+                $rules['product_codeable_concept'] = 'nullable|string|required_without:product_reference';
             }
         }
 
-        return array_is_list($data) ? array_values($result) : $result;
+        if (str_contains($kindLower, 'medication')) {
+            $rules['program'] = 'required|uuid';
+            $rules['quantity'] = 'required|numeric|gt:0';
+            $rules['daily_amount'] = 'required|numeric|min:0.01';
+            $rules['quantity_code'] = 'required|string';
+        }
+
+        if (str_contains($kindLower, 'service')) {
+            $rules['quantity'] = 'required|integer|gt:0';
+            $rules['quantity_code'] = 'required_with:quantity|in:PIECE,MINUTE';
+            if ($termsOfService === 'OUTPATIENT') {
+                $rules['scheduled_period_start'] = 'required|date_format:' . config('app.date_format');
+                $rules['scheduled_period_end'] = 'required|date_format:' . config('app.date_format');
+            }
+        }
+
+        return $rules;
+    }
+
+    protected function validationAttributes(): array
+    {
+        return __('validation.attributes.activityForm');
     }
 }

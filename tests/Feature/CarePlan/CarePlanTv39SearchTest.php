@@ -10,8 +10,6 @@ use App\Enums\CarePlanCompletenessFilter;
 use App\Enums\CarePlanStatus;
 use App\Livewire\CarePlan\CarePlanComponent;
 use App\Livewire\CarePlan\CarePlanIndex;
-use App\Livewire\CarePlan\Concerns\CarePlanManager;
-use App\Livewire\CarePlan\Concerns\ManagesCarePlanActivities;
 use App\Livewire\Person\Records\PatientCarePlans;
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
@@ -21,6 +19,7 @@ use App\Repositories\CarePlanRepository;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Mockery;
+use ReflectionProperty;
 use Tests\TestCase;
 
 class CarePlanTv39SearchTest extends TestCase
@@ -139,8 +138,6 @@ class CarePlanTv39SearchTest extends TestCase
     {
         return new class extends CarePlanComponent
         {
-            use CarePlanManager;
-            use ManagesCarePlanActivities;
 
             protected function renderCarePlan(): string
             {
@@ -173,7 +170,7 @@ class CarePlanTv39SearchTest extends TestCase
         $activityRepository = Mockery::mock(CarePlanActivityRepository::class);
         $activityRepository->shouldNotReceive('saveForm');
         $component = $this->mutationComponent();
-        $component->carePlan = $plan;
+        (new ReflectionProperty(CarePlanComponent::class, 'carePlan'))->setValue($component, $plan);
         $this->instance(CarePlanActivityRepository::class, $activityRepository);
         $component->saveActivity();
         $this->assertSame(__('care-plan.prescribing_patient_access_required'), session('error'));
@@ -191,7 +188,7 @@ class CarePlanTv39SearchTest extends TestCase
         $user->shouldReceive('cannot')->once()->with('manageActivities', $plan)->andReturn(false);
         Auth::shouldReceive('user')->once()->andReturn($user);
         $component = $this->mutationComponent();
-        $component->carePlan = $plan;
+        (new ReflectionProperty(CarePlanComponent::class, 'carePlan'))->setValue($component, $plan);
         $this->assertTrue($component->permitted());
     }
 
@@ -204,7 +201,7 @@ class CarePlanTv39SearchTest extends TestCase
         $repository->shouldReceive('submissionState')->once()->with($plan)->andReturn([]);
         $repository->shouldNotReceive('getResource');
         $component = $this->mutationComponent();
-        $component->carePlan = $plan;
+        (new ReflectionProperty(CarePlanComponent::class, 'carePlan'))->setValue($component, $plan);
         $component->showSignatureModal = true;
         $component->signDraft($repository);
         $this->assertTrue($component->showSignatureModal);

@@ -12,16 +12,18 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Livewire;
 use Mockery;
+use ReflectionProperty;
 use Tests\TestCase;
+use Tests\Unit\Livewire\CarePlan\ActivityFeedbackHarness;
 
 class ActivityFeedbackTest extends TestCase
 {
     public function test_ground_labels_resolve_by_resource_type_and_keep_unknown_references(): void
     {
         $component = new ActivityFeedbackHarness();
-        $component->activity = new CarePlanActivity(['reason_reference' => [
+        (new ReflectionProperty(CarePlanActivityShow::class, 'activity'))->setValue($component, new CarePlanActivity(['reason_reference' => [
             'Condition/condition-id', 'Observation/condition-id', 'DiagnosticReport/report-id', 'Condition/missing-id',
-        ]]);
+        ]]));
         $component->availableConditions = [['uuid' => 'condition-id', 'name' => 'Назва діагнозу']];
         $component->availableReports = [['uuid' => 'report-id', 'name' => 'Назва звіту']];
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\MedicalEvents;
+namespace App\Enums;
 
 enum CarePlanApprovalCreateOutcome: string
 {

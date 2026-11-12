@@ -103,7 +103,7 @@ class NativeClinicalFixtures
             $body['urgent'] = $urgent;
         }
 
-        return new EHealthResponse(new Response(200, ['Content-Type' => 'application/json'], json_encode($body, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION)), static fn (EHealthResponse $response): array => SchemaResponseContract::validate($response, $operation));
+        return new EHealthResponse(new Response(200, ['Content-Type' => 'application/json'], json_encode($body, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION)), static fn (EHealthResponse $response): array => (new SchemaResponseContract())->validate($response, $operation));
     }
 
     public static function definitionResponse(array $data, ?array $paging = null): EHealthResponse

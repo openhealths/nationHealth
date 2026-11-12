@@ -8,7 +8,6 @@ use App\Enums\CarePlanStatus;
 use App\Models\CarePlan;
 use App\Models\User;
 use App\Repositories\Repository;
-use App\Services\MedicalEvents\CarePlanApprovalService;
 use Illuminate\Auth\Access\Response;
 
 class CarePlanPolicy
@@ -74,7 +73,7 @@ class CarePlanPolicy
             return Response::deny(__('care-plan.prescribing_patient_access_required'));
         }
         $repository = Repository::carePlan();
-        if (app(CarePlanApprovalService::class)->skipsPatientOtp($carePlan, $legalEntity)
+        if ($carePlan->skipsPatientOtp($legalEntity)
             || $repository->hasGrantedApproval($carePlan, $employee->uuid)) {
             return Response::allow();
         }

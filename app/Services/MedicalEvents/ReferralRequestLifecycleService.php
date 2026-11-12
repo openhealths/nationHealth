@@ -25,8 +25,13 @@ use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\Dictionary\ServiceSearch;
+use App\Services\MedicalEvents\ActivityRemainingQuantityGuard;
 use App\Services\MedicalEvents\Concerns\ResolvesEmployeeContext;
+use App\Services\MedicalEvents\DeviceRequestLifecycleService;
+use App\Services\MedicalEvents\EHealthRequestLifecycleService;
+use App\Services\MedicalEvents\Fhir;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
+use App\Services\MedicalEvents\MedicalRequestOwnership;
 use Carbon\Carbon;
 use DateTimeInterface;
 use Illuminate\Support\Facades\Auth;
@@ -101,8 +106,8 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
                 $repository = $resolvedKind === 'service_request' ? Repository::serviceRequest() : Repository::deviceRequest();
 
                 return $resolvedKind === 'service_request'
-                    ? $repository->sumIssuedQuantityByActivity((string) $activity->uuid, ActivityRemainingQuantityGuard::occupyingStatusesExcluded(), $existingDraft?->uuid)
-                    : $repository->sumIssuedQuantityByActivity((string) $activity->uuid, ActivityRemainingQuantityGuard::occupyingStatusesExcluded());
+                    ? $repository->sumIssuedQuantityByActivity((string) $activity->uuid, (new ActivityRemainingQuantityGuard())->occupyingStatusesExcluded(), $existingDraft?->uuid)
+                    : $repository->sumIssuedQuantityByActivity((string) $activity->uuid, (new ActivityRemainingQuantityGuard())->occupyingStatusesExcluded());
             }
         );
 

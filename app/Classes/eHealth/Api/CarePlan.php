@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
+use App\Classes\eHealth\Api\Job;
 use App\Classes\eHealth\EHealthRequest as Request;
-
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthConnectionException;

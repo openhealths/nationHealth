@@ -1,5 +1,4 @@
 @use('Carbon\Carbon')
-@use('Carbon\CarbonImmutable')
 @use('App\Enums\Person\AuthenticationMethod')
 
 <div
@@ -32,31 +31,22 @@
                 <thead class="index-table-thead">
                     <tr>
                         <th class="index-table-th">{{ __('care-plan.granted_to') }}</th>
-                        <th class="index-table-th">{{ __('forms.status.label') }}</th>
+                        <th class="index-table-th">{{ __('care-plan.approval_confirmation') }}</th>
                         <th class="index-table-th">{{ __('forms.date') }}</th>
+                        <th class="index-table-th">{{ __('care-plan.approval_expires_at') }}</th>
                         <th class="index-table-th text-right">{{ __('forms.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @php
-                        // Recheck expiry on render: Livewire can retain rows loaded before their access expired.
-                        $visibleApprovals = collect($approvals)->filter(function (array $approval): bool {
-                            $expiresAt = $approval['expiresAt'] ?? ($approval['expires_at'] ?? null);
-
-                            return $expiresAt !== null
-                                ? CarbonImmutable::parse($expiresAt)->isFuture()
-                                : (($approval['requestPending'] ?? false) && !($approval['isVerified'] ?? ($approval['is_verified'] ?? false)));
-                        });
-                    @endphp
                     @forelse ($visibleApprovals as $approval)
                         <tr class="index-table-tr">
                             <td class="index-table-td">
                                 <div class="flex flex-col">
                                     <span class="font-medium text-gray-900 dark:text-white">
-                                        {{ $approval['grantedToDetails']['name'] ?? ($approval['granted_to_details']['name'] ?? '-') }}
+                                        {{ $approval['granted_to_details']['name'] ?? '-' }}
                                     </span>
                                     <span class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ $approval['grantedToDetails']['description'] ?? ($approval['granted_to_details']['description'] ?? '') }}
+                                        {{ $approval['granted_to_details']['description'] ?? '' }}
                                         @if ($approval['sharedCarePlanApproval'] ?? false)
                                             {{ __('care-plan.shared_approval') }}
                                         @endif
@@ -65,14 +55,17 @@
                             </td>
                             <td class="index-table-td">
                                 @php
-                                    $isVerified = $approval['isVerified'] ?? ($approval['is_verified'] ?? false);
+                                    $isVerified = $approval['is_verified'] ?? false;
                                 @endphp
                                 <span class="badge {{ $isVerified ? 'badge-green' : 'badge-yellow' }}">
-                                    {{ __($isVerified ? 'care-plan.approval_status.active' : 'care-plan.approval_status.pending') }}
+                                    {{ __($isVerified ? 'care-plan.approval_confirmed' : 'care-plan.approval_unconfirmed') }}
                                 </span>
                             </td>
                             <td class="index-table-td">
-                                {{ isset($approval['createdAt']) || isset($approval['created_at']) ? Carbon::parse($approval['createdAt'] ?? $approval['created_at'])->format('d.m.Y H:i') : '-' }}
+                                {{ !empty($approval['created_at']) ? Carbon::parse($approval['created_at'])->format('d.m.Y H:i') : '-' }}
+                            </td>
+                            <td class="index-table-td">
+                                {{ !empty($approval['expires_at']) ? Carbon::parse($approval['expires_at'])->format('d.m.Y H:i') : '-' }}
                             </td>
                             <td class="index-table-td-actions text-right">
                                 @if ($approval['requestPending'] ?? false)
@@ -113,9 +106,9 @@
                                                 type="button"
                                                 wire:click="recreateApproval('{{ $approval['uuid'] }}')"
                                                 class="button-secondary px-3 py-1 text-xs text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                                                title="Перестворити запит, якщо старий завис або СМС не приходить"
+                                                title="{{ __('care-plan.recreate_approval_hint') }}"
                                             >
-                                                {{ __('care-plan.recreate_approval') ?? 'Запросити новий' }}
+                                                {{ __('care-plan.recreate_approval') }}
                                             </button>
                                             <button
                                                 type="button"
@@ -131,7 +124,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="index-table-td !py-6 text-center text-gray-400">
+                            <td colspan="5" class="index-table-td !py-6 text-center text-gray-400">
                                 {{ __('care-plan.no_approvals_found') }}
                             </td>
                         </tr>

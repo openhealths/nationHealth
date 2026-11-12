@@ -10,8 +10,8 @@ use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Models\CarePlan;
 use App\Models\Division;
-use App\Models\Employee\Employee;
 use App\Models\EmployeeRole;
+use App\Models\Employee\Employee;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
@@ -23,7 +23,6 @@ use App\Models\Relations\Party;
 use App\Models\Role as RoleModel;
 use App\Models\User;
 use App\Repositories\CarePlanRepository;
-use App\Repositories\Repository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -31,6 +30,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Mockery;
 use Ramsey\Uuid\Uuid;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 class UserGetCarePlanWriterEmployeeTest extends TestCase
@@ -271,21 +271,21 @@ class UserGetCarePlanWriterEmployeeTest extends TestCase
     {
         $person = Person::create(['uuid' => (string) Str::uuid(), 'gender' => 'FEMALE', 'birth_date' => '1990-01-01', 'status' => 'ACTIVE']);
         $author = $this->createEmployee('P1', 'DOCTOR');
-        $plan = Repository::carePlan()->saveForm([
+        $plan = (new CarePlanWorkflowHarness())->saveCarePlanDraft([
             'title' => 'Synthetic plan', 'status' => 'draft', 'category' => 'TEST',
             'termsOfService' => 'OUTPATIENT', 'author' => $author->uuid,
             'periodStart' => '2026-11-11', 'periodEnd' => '2026-11-12',
         ], $person->id, $this->legalEntity->id);
         $this->assertSame(1, Uuid::fromString($plan->uuid)->getFields()->getVersion());
-        $reopened = Repository::carePlan()->saveForm(['title' => 'Changed title'], $person->id, $this->legalEntity->id, $plan->id);
+        $reopened = (new CarePlanWorkflowHarness())->saveCarePlanDraft(['title' => 'Changed title'], $person->id, $this->legalEntity->id, $plan->id);
         $this->assertSame($plan->uuid, $reopened->uuid);
-        $activity = Repository::carePlanActivity()->saveForm([
+        $activity = (new CarePlanWorkflowHarness())->saveActivityDraft([
             'kind' => 'service_request', 'status' => 'draft', 'authorId' => $author->id,
             'productReference' => (string) Str::uuid(), 'quantity' => 2,
             'scheduledPeriodStart' => '2026-11-11', 'scheduledPeriodEnd' => '2026-11-12',
         ], $plan);
         $this->assertSame(1, Uuid::fromString($activity->uuid)->getFields()->getVersion());
-        $updated = Repository::carePlanActivity()->saveForm(['quantity' => 3], $plan, $activity->id);
+        $updated = (new CarePlanWorkflowHarness())->saveActivityDraft(['quantity' => 3], $plan, $activity->id);
         $this->assertSame($activity->uuid, $updated->uuid);
     }
 

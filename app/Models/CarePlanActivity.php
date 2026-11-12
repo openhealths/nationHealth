@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 use App\Contracts\SubmittedToEHealth;
+use App\Models\CarePlan;
+use App\Models\EhealthLink;
 use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Identifier;
-use App\Models\MedicalEvents\Sql\Quantity;
 use App\Models\MedicalEvents\Sql\Period;
+use App\Models\MedicalEvents\Sql\Quantity;
+use Carbon\CarbonImmutable;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class CarePlanActivity extends Model implements SubmittedToEHealth
@@ -232,4 +235,118 @@ class CarePlanActivity extends Model implements SubmittedToEHealth
     {
         return $this->morphMany(EhealthLink::class, 'linkable');
     }
+    public function getProductReferenceAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? $value : $this->productReferenceIdentifier?->value;
+    }
+
+    public function getProductReferenceTypeAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? $value : $this->productReferenceIdentifier?->type->first()?->coding->first()?->code;
+    }
+
+    public function getProductCodeableConceptAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? $value : $this->productConcept?->coding->first()?->code;
+    }
+
+    public function getProgramAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? $value : $this->programIdentifier?->value;
+    }
+
+    public function getReasonCodeAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? $value : $this->reasonConcepts->first()?->coding->first()?->code;
+    }
+
+    public function getStatusReasonAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? $value : $this->statusReasonConcept?->coding->first()?->code;
+    }
+
+    public function getScheduledPeriodStartAttribute(?string $value): ?CarbonImmutable
+    {
+        $date = $this->detailsSyncedAt === null ? $value : $this->scheduledPeriod?->start;
+
+        return filled($date) ? CarbonImmutable::parse($date)->startOfDay() : null;
+    }
+
+    public function getScheduledPeriodEndAttribute(?string $value): ?CarbonImmutable
+    {
+        $date = $this->detailsSyncedAt === null ? $value : $this->scheduledPeriod?->end;
+
+        return filled($date) ? CarbonImmutable::parse($date)->startOfDay() : null;
+    }
+
+    public function getQuantityAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? ($value === null ? null : (float) $value) : ($this->quantityQuantity?->value === null ? null : (float) $this->quantityQuantity?->value);
+    }
+
+    public function getQuantitySystemAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? $value : $this->quantityQuantity?->system;
+    }
+
+    public function getQuantityCodeAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? $value : $this->quantityQuantity?->code;
+    }
+
+    public function getDailyAmountAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? ($value === null ? null : (float) $value) : ($this->dailyAmountQuantity?->value === null ? null : (float) $this->dailyAmountQuantity?->value);
+    }
+
+    public function getDailyAmountSystemAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? $value : $this->dailyAmountQuantity?->system;
+    }
+
+    public function getDailyAmountCodeAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? $value : $this->dailyAmountQuantity?->code;
+    }
+
+    public function getRemainingQuantityAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? ($value === null ? null : (float) $value) : ($this->remainingQuantityQuantity?->value === null ? null : (float) $this->remainingQuantityQuantity?->value);
+    }
+
+    public function getRemainingQuantitySystemAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? $value : $this->remainingQuantityQuantity?->system;
+    }
+
+    public function getRemainingQuantityCodeAttribute(mixed $value): mixed
+    {
+        return $this->detailsSyncedAt === null ? $value : $this->remainingQuantityQuantity?->code;
+    }
+
+    public function getGoalAttribute(mixed $value): array
+    {
+        return $this->detailsSyncedAt === null
+            ? (is_array($value) ? $value : ($value ? $this->fromJson($value) : []))
+            : $this->goalConcepts->map(fn ($concept): string => $concept->coding->first()->code)->all();
+    }
+
+    public function getReasonReferenceAttribute(mixed $value): array
+    {
+        if ($this->detailsSyncedAt === null) {
+            return is_array($value) ? $value : ($value ? $this->fromJson($value) : []);
+        }
+
+        return $this->reasonReferences->map(static function ($reference): string {
+            $type = match ($reference->type->first()?->coding->first()?->code) {
+                'condition' => 'Condition',
+                'observation' => 'Observation',
+                'diagnostic_report' => 'DiagnosticReport',
+                default => $reference->type->first()?->coding->first()?->code,
+            };
+
+            return $type.'/'.$reference->value;
+        })->all();
+    }
+
 }

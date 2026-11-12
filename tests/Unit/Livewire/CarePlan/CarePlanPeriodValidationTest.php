@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Livewire\CarePlan;
 
+use App\Livewire\CarePlan\CarePlanCreate;
 use App\Livewire\CarePlan\Forms\CarePlanForm;
-
-use App\Services\MedicalEvents\Fhir;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\CarePlanResourceHarness;
 use Tests\TestCase;
 
 class CarePlanPeriodValidationTest extends TestCase
@@ -52,14 +52,14 @@ class CarePlanPeriodValidationTest extends TestCase
         config(['app.date_format' => $format]);
         $form = $this->form($start, $end);
         $form->validate();
-        $this->assertSame('2026-11-10', $form->periodStartIsoDate());
-        $this->assertSame('2026-11-11', $form->periodEndIsoDate());
+        $this->assertSame('2026-11-10', $this->carePlanComponent($form)->periodStartIsoDate());
+        $this->assertSame('2026-11-11', $this->carePlanComponent($form)->periodEndIsoDate());
         $rules = array_intersect_key($form->rulesForSigning(), array_flip(['periodStart', 'periodEnd']));
         $this->assertTrue(Validator::make($form->toArray(), $rules)->passes());
 
-        $payload = Fhir::carePlan()->toFhir(array_replace($form->toArray(), [
+        $payload = (new CarePlanResourceHarness())->toFhir(array_replace($form->toArray(), [
             'uuid' => '11111111-1111-4111-8111-111111111111',
-            'periodStart' => $form->periodStartIsoDate(), 'periodEnd' => $form->periodEndIsoDate(),
+            'periodStart' => $this->carePlanComponent($form)->periodStartIsoDate(), 'periodEnd' => $this->carePlanComponent($form)->periodEndIsoDate(),
         ]), ['timezone' => config('app.timezone')]);
         $this->assertSame('2026-11-10', CarbonImmutable::parse($payload['period']['start'])->setTimezone(config('app.timezone'))->toDateString());
         $this->assertSame('2026-11-11', CarbonImmutable::parse($payload['period']['end'])->setTimezone(config('app.timezone'))->toDateString());
@@ -87,7 +87,7 @@ class CarePlanPeriodValidationTest extends TestCase
         foreach ([$start, ''] as $end) {
             $form = $this->form($start, $end);
             $form->validate();
-            $this->assertSame($end === '' ? null : '2026-11-10', $form->periodEndIsoDate());
+            $this->assertSame($end === '' ? null : '2026-11-10', $this->carePlanComponent($form)->periodEndIsoDate());
         }
     }
 
@@ -124,5 +124,12 @@ class CarePlanPeriodValidationTest extends TestCase
         $form->periodEnd = $end;
 
         return $form;
+    }
+    private function carePlanComponent(CarePlanForm $form): CarePlanCreate
+    {
+        $component = new CarePlanCreate();
+        $component->form = $form;
+
+        return $component;
     }
 }

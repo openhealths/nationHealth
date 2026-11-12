@@ -5,10 +5,6 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\MedicalEvents;
 
 use App\Classes\eHealth\Api\CarePlanActivity as CarePlanActivityApi;
-use App\Models\CarePlan;
-use App\Models\CarePlanActivity;
-use App\Models\Person\Person;
-use App\Services\MedicalEvents\CarePlanActivityEHealthGuard;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -70,12 +66,7 @@ class CarePlanActivityRegistrationBoundaryTest extends TestCase
 
     private function assertRegistered(): void
     {
-        $plan = new CarePlan(['uuid' => self::PLAN]);
-        $person = new Person();
-        $person->uuid = self::REFERENCE_UUID;
-        $plan->setRelation('person', $person);
-        $guard = new CarePlanActivityEHealthGuard();
-        $guard->assertRegisteredInEHealth($plan, new CarePlanActivity(['uuid' => self::ACTIVITY]));
+        app(CarePlanActivityApi::class)->assertRegisteredInEHealth(self::REFERENCE_UUID, self::PLAN, self::ACTIVITY);
     }
 
     private function fakeActivity(array $activity): void

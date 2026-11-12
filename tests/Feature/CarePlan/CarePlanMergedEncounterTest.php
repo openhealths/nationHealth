@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\Feature\Composition\CompositionTestFixtures;
+use Tests\Support\CarePlanCreateHarness;
 use Tests\TestCase;
 
 class CarePlanMergedEncounterTest extends TestCase
@@ -48,7 +49,7 @@ class CarePlanMergedEncounterTest extends TestCase
         Http::preventStrayRequests();
 
         $repository = Repository::carePlan();
-        $choices = $repository->encounterChoices($person->id);
+        $choices = (new CarePlanCreateHarness())->carePlanEncounterChoices($person->id);
         $this->assertSame([$encounter->uuid], array_column($choices, 'uuid'));
         $this->assertStringContainsString('Попередній епізод', $choices[0]['label']);
         $this->assertSame($encounter->id, $repository->findEncounter($encounter->uuid, $person->id)?->id);
@@ -65,7 +66,7 @@ class CarePlanMergedEncounterTest extends TestCase
         Http::assertNothingSent();
 
         $merge->update(['status' => MergedPersonStatus::DECLINED]);
-        $this->assertSame([], $repository->encounterChoices($person->id));
+        $this->assertSame([], (new CarePlanCreateHarness())->carePlanEncounterChoices($person->id));
         $this->assertNull($repository->findEncounter($encounter->uuid, $person->id));
         $this->assertNull($repository->findCondition($condition->uuid, $person->id));
     }
@@ -79,7 +80,7 @@ class CarePlanMergedEncounterTest extends TestCase
         Http::preventStrayRequests();
         $before = [$encounter->fresh()->getAttributes(), $condition->fresh()->getAttributes(), CarePlan::count(), Approval::count()];
 
-        $this->assertSame([], Repository::carePlan()->encounterChoices($person->id));
+        $this->assertSame([], (new CarePlanCreateHarness())->carePlanEncounterChoices($person->id));
         $this->assertNull(Repository::carePlan()->findEncounter($encounter->uuid, $person->id));
         $this->assertNull(Repository::carePlan()->findCondition($condition->uuid, $person->id));
         $this->assertSame([], Repository::carePlan()->encounterData($encounter->uuid, $person->id)['addresses']);
@@ -87,9 +88,9 @@ class CarePlanMergedEncounterTest extends TestCase
         Http::assertNothingSent();
 
         $approval = $this->grantPatientAccess($person, $employee);
-        $this->assertCount(1, Repository::carePlan()->encounterChoices($person->id));
+        $this->assertCount(1, (new CarePlanCreateHarness())->carePlanEncounterChoices($person->id));
         $approval->update(['expires_at' => now()->subMinute()]);
-        $this->assertSame([], Repository::carePlan()->encounterChoices($person->id));
+        $this->assertSame([], (new CarePlanCreateHarness())->carePlanEncounterChoices($person->id));
         $this->assertNull(Repository::carePlan()->findEncounter($encounter->uuid, $person->id));
     }
 
@@ -108,7 +109,7 @@ class CarePlanMergedEncounterTest extends TestCase
         Episode::whereUuid($closed->episode->value)->update(['status' => 'closed']);
         [$own] = $this->encounter($person);
 
-        $this->assertEqualsCanonicalizing([$eligible->uuid, $own->uuid], array_column(Repository::carePlan()->encounterChoices($person->id), 'uuid'));
+        $this->assertEqualsCanonicalizing([$eligible->uuid, $own->uuid], array_column((new CarePlanCreateHarness())->carePlanEncounterChoices($person->id), 'uuid'));
         foreach ([$unmerged, $foreign, $unfinished, $closed] as $rejected) {
             $this->assertNull(Repository::carePlan()->findEncounter($rejected->uuid, $person->id));
         }
@@ -126,7 +127,7 @@ class CarePlanMergedEncounterTest extends TestCase
         $this->grantPatientAccess($person, $employee);
         [$encounter] = $this->encounter($previous);
 
-        $this->assertSame([$encounter->uuid], array_column(Repository::carePlan()->encounterChoices($person->id), 'uuid'));
+        $this->assertSame([$encounter->uuid], array_column((new CarePlanCreateHarness())->carePlanEncounterChoices($person->id), 'uuid'));
         $this->assertSame($encounter->id, Repository::carePlan()->findEncounter($encounter->uuid, $person->id)?->id);
     }
 
@@ -139,7 +140,7 @@ class CarePlanMergedEncounterTest extends TestCase
         [$encounter, $condition] = $this->encounter($preperson);
         Http::preventStrayRequests();
 
-        $this->assertSame([], Repository::carePlan()->encounterChoices($person->id));
+        $this->assertSame([], (new CarePlanCreateHarness())->carePlanEncounterChoices($person->id));
         $this->assertNull(Repository::carePlan()->findEncounter($encounter->uuid, $person->id));
         $this->assertNull(Repository::carePlan()->findCondition($condition->uuid, $person->id));
         Http::assertNothingSent();

@@ -16,7 +16,9 @@ use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Medications\MedicationRequestRequest;
 use App\Models\Person\Person;
+use App\Repositories\MedicalEvents\BaseRepository;
 use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
+use App\Repositories\MedicalEvents\MedicalEventsRequestStatuses;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use App\Services\MedicalEvents\ActivityRemainingQuantityGuard;
@@ -127,7 +129,7 @@ class MedicationRequestRepository extends BaseRepository
                     if (!$legacyRequestImport) {
                         throw new InvalidArgumentException('Medication identity or resource type does not match.');
                     }
-                    SchemaResponseContract::validateOperationData($native, 'request_detail', 'medication');
+                    (new SchemaResponseContract())->validateOperationData($native, 'request_detail', 'medication');
                     if ($native['id'] !== $resource['id'] || $native['person']['id'] !== $this->personUuid($personId)) {
                         throw new InvalidArgumentException('Medication identity or resource type does not match.');
                     }
@@ -697,7 +699,7 @@ class MedicationRequestRepository extends BaseRepository
     {
         return (float) $this->quantityRecords($activityUuid)
             ->when($exceptUuid, fn ($query) => $query->where('uuid', '!=', $exceptUuid))
-            ->whereNotIn('status', ActivityRemainingQuantityGuard::occupyingStatusesExcluded())
+            ->whereNotIn('status', (new ActivityRemainingQuantityGuard())->occupyingStatusesExcluded())
             ->sum('medication_qty');
     }
 

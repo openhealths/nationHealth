@@ -10,11 +10,10 @@ use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Exceptions\MedicalEvents\ClinicalStorageException;
-use App\Livewire\CarePlan\Forms\CarePlanForm;
+use App\Livewire\CarePlan\CarePlanCreate;
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
 use App\Repositories\Repository;
-use App\Services\MedicalEvents\Fhir;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -28,12 +27,16 @@ class CarePlanUpdate extends CarePlanCreate
     use WithFileUploads;
 
     #[Locked]
-    public CarePlan $carePlan;
+    public int $carePlanId = 0;
 
-    public function hydrate(): void
+    protected CarePlan $carePlan;
+
+    public function boot(): void
     {
-        abort_unless(Auth::user()->can('view', $this->carePlan), 404);
-        $this->carePlan = Repository::carePlan()->findById($this->carePlan->id);
+        if ($this->carePlanId !== 0) {
+            $this->carePlan = Repository::carePlan()->findById($this->carePlanId);
+            abort_if(Auth::user()->cannot('view', $this->carePlan), 404);
+        }
     }
 
     public function mount(LegalEntity $legalEntity, $personId = null, $encounter = null, $carePlan = null): void
@@ -43,6 +46,7 @@ class CarePlanUpdate extends CarePlanCreate
         $carePlan = $repository->findById($bound instanceof CarePlan ? $bound->id : (int) $bound);
         abort_if($carePlan === null, 404);
         $this->carePlan = $carePlan;
+        $this->carePlanId = $carePlan->id;
         abort_if(Auth::user()->cannot('view', $this->carePlan) || Auth::user()->cannot('manage', $this->carePlan), 404);
         if ($repository->hasPendingSubmission($this->carePlan) || CarePlanStatus::fromStored($this->carePlan->status) !== CarePlanStatus::DRAFT) {
             Session::flash('info', __('care-plan.cannot_edit_non_draft'));
@@ -66,13 +70,13 @@ class CarePlanUpdate extends CarePlanCreate
 
         parent::mount($legalEntity, $this->carePlan->personId);
         $resource = $repository->getResource($this->carePlan->id);
-        $fields = Fhir::carePlan()->fromFhir($resource, ['timezone' => config('app.timezone'), 'dateFormat' => config('app.date_format')]);
+        $fields = $this->carePlanFieldsFromResource($resource, ['timezone' => config('app.timezone'), 'dateFormat' => config('app.date_format')]);
         foreach ($fields as $field => $value) {
             if (property_exists($this->form, $field)) {
                 $this->form->{$field} = $value ?? '';
             }
         }
-        $this->form->episodes = $repository->resolveEpisodeLabels($this->form->episodes, $this->personId);
+        $this->form->episodes = $this->resolveEpisodeLabels($this->form->episodes, $this->personId);
         $this->carePlanUuid = $resource['id'];
         $this->patientUuid = $this->carePlan->person->uuid;
         $this->form->patient = $this->carePlan->person->fullName ?? '';
@@ -121,10 +125,10 @@ class CarePlanUpdate extends CarePlanCreate
                 'context' => $this->form->context ?: null,
                 'title' => $this->form->title,
                 'terms_of_service' => $this->form->termsOfService ?: null,
-                'period_start' => $this->form->periodStartIsoDate(),
+                'period_start' => $this->periodStartIsoDate(),
                 'period_start_time' => $this->form->periodStartTime,
                 'period_end_time' => $this->form->periodEndTime,
-                'period_end' => $this->form->periodEndIsoDate(),
+                'period_end' => $this->periodEndIsoDate(),
                 'encounter_id' => $encounterData['id'],
                 'addresses' => $encounterData['addresses'],
                 'supporting_info' => [
@@ -206,13 +210,13 @@ class CarePlanUpdate extends CarePlanCreate
 
         try {
             $repository->assertFhirStorageReady(beforeSubmission: true);
-            $mapping = $repository->formContext(array_replace($this->form->toArray(), [
+            $mapping = $this->carePlanFormContext(array_replace($this->form->toArray(), [
                 'uuid' => $this->carePlanUuid,
                 'author' => $author?->uuid,
                 'addresses' => $encounterData['addresses'],
             ]), $this->carePlan->id);
-            $carePlanResource = Fhir::carePlan()->toFhir($mapping['data'], $mapping['context']);
-            $carePlanPayload = CarePlanForm::buildCreateContent($carePlanResource);
+            $carePlanResource = $this->carePlanResourceFromFields($mapping['data'], $mapping['context']);
+            $carePlanPayload = $this->buildCreateCarePlanContent($carePlanResource);
 
             $signedContent = signatureService()->signData(
                 $carePlanPayload,
@@ -266,6 +270,6 @@ class CarePlanUpdate extends CarePlanCreate
     public function render()
     {
         // Reuse the same view as Create
-        return view('livewire.care-plan.care-plan-create');
+        return view('livewire.care-plan.care-plan-create', ['carePlan' => $this->carePlan]);
     }
 }

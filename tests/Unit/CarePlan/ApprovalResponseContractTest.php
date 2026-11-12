@@ -6,14 +6,12 @@ namespace Tests\Unit\CarePlan;
 
 use App\Classes\eHealth\Api\Approval;
 use App\Classes\eHealth\Api\Person;
-
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\Person\AuthenticationMethod;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Models\CarePlan;
 use App\Models\MedicalEvents\Sql\Approval as ApprovalModel;
 use App\Models\Person\Person as Patient;
-use App\Services\MedicalEvents\CarePlanApprovalService;
 use App\Services\MedicalEvents\PatientApprovalService;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +19,7 @@ use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionMethod;
 use RuntimeException;
+use Tests\Support\CarePlanWorkflowHarness;
 use Tests\TestCase;
 
 class ApprovalResponseContractTest extends TestCase
@@ -33,7 +32,7 @@ class ApprovalResponseContractTest extends TestCase
         $this->instance(Approval::class, $api);
 
         $this->expectException(EHealthResponseException::class);
-        app(CarePlanApprovalService::class)->confirmWithoutOtp('patient', 'approval');
+        app(CarePlanWorkflowHarness::class)->confirmCarePlanApprovalWithoutOtp('patient', 'approval');
     }
 
     public function test_cancellation_propagates_an_esoz_error_without_updating_the_approval(): void
@@ -151,7 +150,7 @@ class ApprovalResponseContractTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(__('care-plan.approval_verify_error'));
-        app(CarePlanApprovalService::class)->verify('patient', 'approval', 1234);
+        app(CarePlanWorkflowHarness::class)->verifyCarePlanApproval('patient', 'approval', 1234);
     }
 
     public static function invalidConsentFields(): array
@@ -203,7 +202,7 @@ class ApprovalResponseContractTest extends TestCase
         }
 
         $this->expectException(ValidationException::class);
-        Approval::validateResourceData($data);
+        (new Approval())->validateResourceData($data);
     }
 
     public function test_expired_approval_does_not_offer_patient_confirmation(): void
@@ -220,7 +219,7 @@ class ApprovalResponseContractTest extends TestCase
         $this->mock(Person::class)->shouldNotReceive('getAuthMethods');
 
         $this->expectException(RuntimeException::class);
-        app(CarePlanApprovalService::class)->pendingConfirmation('patient', $id);
+        app(CarePlanWorkflowHarness::class)->pendingCarePlanApprovalConfirmation('patient', $id);
     }
 
     public static function confirmationMethods(): array
@@ -238,7 +237,7 @@ class ApprovalResponseContractTest extends TestCase
     public function test_pending_approval_uses_the_actual_confirmation_method(array $method, bool $requiresOtp): void
     {
         $id = '11111111-1111-4111-8111-111111111111';
-        $validated = Approval::validateResourceData([
+        $validated = (new Approval())->validateResourceData([
             'id' => $id,
             'expires_at' => now()->addDay()->toIso8601String(), 'is_verified' => false,
             'authentication_method_current' => $method,
@@ -250,13 +249,13 @@ class ApprovalResponseContractTest extends TestCase
         $api->shouldReceive('getApprovalDetails')->once()->with('patient', $id)->andReturn($response);
         $this->instance(Approval::class, $api);
 
-        $result = app(CarePlanApprovalService::class)->pendingConfirmation('patient', $id);
+        $result = app(CarePlanWorkflowHarness::class)->pendingCarePlanApprovalConfirmation('patient', $id);
 
-        $this->assertTrue($result->requiresConfirmation());
-        $this->assertFalse($result->isGranted());
-        $this->assertSame($requiresOtp, $result->requiresOtp());
+        $this->assertTrue(in_array($result['outcome']->value, ['otp_required', 'offline_required'], true));
+        $this->assertFalse(($result['outcome']->value === 'granted'));
+        $this->assertSame($requiresOtp, ($result['outcome']->value === 'otp_required'));
         $this->assertSame($method, $validated['authentication_method_current']);
-        $this->assertSame($requiresOtp ? '+38093*****85' : null, AuthenticationMethod::confirmationPhone($result->authMethod));
+        $this->assertSame($requiresOtp ? '+38093*****85' : null, AuthenticationMethod::confirmationPhone($result['authMethod']));
     }
 
     public function test_care_plan_reuses_the_patient_approval_representative_sms_response(): void
@@ -271,10 +270,10 @@ class ApprovalResponseContractTest extends TestCase
         $this->mock(Approval::class)->shouldReceive('getApprovalDetails')->once()->with('patient', $id)->andReturn($response);
         $this->mock(Person::class)->shouldNotReceive('getAuthMethods');
 
-        $result = app(CarePlanApprovalService::class)->pendingConfirmation('patient', $id);
+        $result = app(CarePlanWorkflowHarness::class)->pendingCarePlanApprovalConfirmation('patient', $id);
 
-        $this->assertTrue($result->requiresOtp());
-        $this->assertSame('+38093*****85', AuthenticationMethod::confirmationPhone($result->authMethod));
+        $this->assertTrue(($result['outcome']->value === 'otp_required'));
+        $this->assertSame('+38093*****85', AuthenticationMethod::confirmationPhone($result['authMethod']));
     }
 
     public function test_representative_method_is_resolved_from_the_exact_registered_method(): void
@@ -295,10 +294,10 @@ class ApprovalResponseContractTest extends TestCase
         ]);
         $this->mock(Person::class)->shouldReceive('getAuthMethods')->once()->with('patient')->andReturn($registry);
 
-        $result = app(CarePlanApprovalService::class)->pendingConfirmation('patient', $id, $authId);
+        $result = app(CarePlanWorkflowHarness::class)->pendingCarePlanApprovalConfirmation('patient', $id, $authId);
 
-        $this->assertTrue($result->requiresOtp());
-        $this->assertSame('+38093*****85', AuthenticationMethod::confirmationPhone($result->authMethod));
+        $this->assertTrue(($result['outcome']->value === 'otp_required'));
+        $this->assertSame('+38093*****85', AuthenticationMethod::confirmationPhone($result['authMethod']));
     }
 
     public function test_representative_without_reference_uses_the_representatives_registered_method(): void
@@ -320,10 +319,10 @@ class ApprovalResponseContractTest extends TestCase
         $api->shouldReceive('getAuthMethods')->once()->with('patient')->andReturn($registry);
         $api->shouldReceive('getAuthMethods')->once()->with('representative')->andReturn($representative);
 
-        $result = app(CarePlanApprovalService::class)->pendingConfirmation('patient', $id, $authId);
+        $result = app(CarePlanWorkflowHarness::class)->pendingCarePlanApprovalConfirmation('patient', $id, $authId);
 
-        $this->assertTrue($result->requiresConfirmation());
-        $this->assertFalse($result->requiresOtp());
+        $this->assertTrue(in_array($result['outcome']->value, ['otp_required', 'offline_required'], true));
+        $this->assertFalse(($result['outcome']->value === 'otp_required'));
     }
 
     public function test_pending_approval_without_current_method_resolves_offline_from_authorize_with(): void
@@ -343,11 +342,11 @@ class ApprovalResponseContractTest extends TestCase
         ]);
         $this->mock(Person::class)->shouldReceive('getAuthMethods')->once()->with('patient')->andReturn($registry);
 
-        $result = app(CarePlanApprovalService::class)->pendingConfirmation('patient', $id, $authId);
+        $result = app(CarePlanWorkflowHarness::class)->pendingCarePlanApprovalConfirmation('patient', $id, $authId);
 
-        $this->assertTrue($result->requiresConfirmation());
-        $this->assertFalse($result->requiresOtp());
-        $this->assertSame(AuthenticationMethod::OFFLINE, AuthenticationMethod::confirmationMethod($result->authMethod));
+        $this->assertTrue(in_array($result['outcome']->value, ['otp_required', 'offline_required'], true));
+        $this->assertFalse(($result['outcome']->value === 'otp_required'));
+        $this->assertSame(AuthenticationMethod::OFFLINE, AuthenticationMethod::confirmationMethod($result['authMethod']));
     }
 
     public function test_unknown_representative_method_cannot_be_treated_as_document_confirmation(): void
@@ -362,7 +361,7 @@ class ApprovalResponseContractTest extends TestCase
         $this->mock(Approval::class)->shouldReceive('getApprovalDetails')->once()->andReturn($response);
 
         $this->expectException(RuntimeException::class);
-        app(CarePlanApprovalService::class)->pendingConfirmation('patient', '11111111-1111-4111-8111-111111111111');
+        app(CarePlanWorkflowHarness::class)->pendingCarePlanApprovalConfirmation('patient', '11111111-1111-4111-8111-111111111111');
     }
 
     public function test_person_validation_and_mapping_preserve_the_representative_confirmation_method(): void

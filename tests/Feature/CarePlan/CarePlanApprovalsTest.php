@@ -19,8 +19,6 @@ use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\User;
 use App\Services\Dictionary\Dictionaries\BasicDictionary;
-
-use App\Services\MedicalEvents\CarePlanApprovalService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -398,8 +396,7 @@ class CarePlanApprovalsTest extends TestCase
         $this->assertTrue(Gate::forUser($user)->denies('view', $carePlan));
         $this->assertSame(
             'read',
-            app(CarePlanApprovalService::class)
-                ->resolveAccessLevel($carePlan, $activeLegalEntity)
+            $carePlan->resolveAccessLevel($activeLegalEntity)
         );
     }
 
@@ -480,11 +477,6 @@ class CarePlanApprovalsTest extends TestCase
             'is_verified' => $verified,
             'expires_at' => $expired ? now()->subSecond() : now()->addDay(),
         ]);
-
-        $approvalService = Mockery::mock(CarePlanApprovalService::class)->makePartial();
-        $approvalService->shouldReceive('syncForCarePlan')->andReturnNull();
-        $approvalService->shouldReceive('skipsPatientOtp')->andReturn(true);
-        $this->instance(CarePlanApprovalService::class, $approvalService);
 
         $mockPatientApi = Mockery::mock(ApiPerson::class);
         $this->instance(ApiPerson::class, $mockPatientApi);

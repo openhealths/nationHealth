@@ -24,7 +24,7 @@ class ActivityRemainingQuantityGuard
      *
      * @return list<string>
      */
-    public static function occupyingStatusesExcluded(): array
+    public function occupyingStatusesExcluded(): array
     {
         return array_values(array_filter(
             MedicalEventsRequestStatuses::EXCLUDED_FROM_ISSUED_SUM,

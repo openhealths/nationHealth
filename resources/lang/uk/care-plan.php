@@ -627,6 +627,12 @@ return [
         'processing' => 'В обробці',
     ],
 
+    'approval_confirmation' => 'Підтвердження',
+    'approval_confirmed' => 'Підтверджено',
+    'approval_unconfirmed' => 'Очікує підтвердження',
+    'approval_expires_at' => 'Діє до',
+    'recreate_approval_hint' => 'Запросити новий дозвіл, якщо попередній запит завис або СМС не надходить',
+
     'approval_status' => [
         'new' => 'Очікує підтвердження',
         'pending' => 'Очікує підтвердження',
