@@ -14,17 +14,20 @@ use App\Jobs\CompositionAsyncProcessing;
 use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Models\CarePlan;
 use App\Models\EhealthLink;
+use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\MedicalEvents\Sql\CompositionOperation;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Lang;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Reactive;
 use Livewire\Component;
+use Throwable;
 
 class SubmissionStatus extends Component
 {
@@ -97,6 +100,12 @@ class SubmissionStatus extends Component
         if ($compositionOperationId !== null) {
             $this->compositionOperationId = $compositionOperationId;
             $operation = $this->compositionOperation();
+            if (Auth::user()->cannot('readOperation', [Composition::class, $operation])) {
+                $this->statusLabel = $recordStatusLabel;
+                Session::flash('error', __('compositions.errors.view_not_allowed'));
+
+                return;
+            }
             $this->jobId = $operation->remoteJobId;
             $this->statusLabel = CompositionJobStatus::from($operation->status)->label();
             $this->editUrl = null;
@@ -133,7 +142,19 @@ class SubmissionStatus extends Component
         }
         if ($this->compositionOperationId !== null) {
             $operation = $this->compositionOperation();
-            (new CompositionAsyncProcessing($operation, legalEntity()))->dispatchProcessing();
+            if (Auth::user()->cannot('readOperation', [Composition::class, $operation])) {
+                Session::flash('error', __('compositions.errors.view_not_allowed'));
+
+                return;
+            }
+            try {
+                if (!(new CompositionAsyncProcessing($operation, legalEntity()))->dispatchProcessing()) {
+                    Session::flash('error', __('compositions.errors.job_status_unavailable'));
+                }
+            } catch (Throwable $exception) {
+                Session::flash('error', __('compositions.errors.async_processing_failed'));
+                Log::error('Could not queue the existing medical conclusion result', ['exceptionType' => $exception::class]);
+            }
             $this->statusLabel = CompositionJobStatus::from($operation->status)->label();
             $this->job = [
                 'id' => $operation->remoteJobId,

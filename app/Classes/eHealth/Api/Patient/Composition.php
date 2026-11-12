@@ -136,7 +136,7 @@ class Composition extends PatientApiBase
      */
     public function search(array $query = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateMany(...));
+        $this->setValidator(fn (EHealthResponse $response): array => $this->validateMany($response, $query));
 
         return $this->get(self::URL . '/searchComposition', $query);
     }
@@ -146,9 +146,14 @@ class Composition extends PatientApiBase
     {
         $items = [];
         $seen = [];
-        $limit = 100;
+        $limit = Validator::make(['limit' => $query['limit'] ?? 100], [
+            'limit' => ['required', 'integer', 'min:1'],
+        ])->validate()['limit'];
         for ($offset = 0; ; $offset += $limit) {
             $page = $this->search(array_replace($query, compact('offset', 'limit')))->validate();
+            if (count($page) > $limit) {
+                throw ValidationException::withMessages(['data' => __('compositions.errors.invalid_response')]);
+            }
             foreach ($page as $item) {
                 $uuid = data_get($item, 'identifier.value');
                 if (isset($seen[$uuid])) {
@@ -286,7 +291,7 @@ class Composition extends PatientApiBase
         return $data;
     }
 
-    protected function validateMany(EHealthResponse $response): array
+    protected function validateMany(EHealthResponse $response, array $query = []): array
     {
         $this->validateContract($response->getData(), 'search');
         $items = Validator::make(['items' => $response->getData()], [
@@ -307,6 +312,26 @@ class Composition extends PatientApiBase
         }
 
         $validator->validate();
+
+        foreach ($items as $item) {
+            // Native summaries may omit subject/focus; the search URL supplies that scope.
+            // When an identifier is present, it must still agree with the requested filter.
+            foreach ([
+                'subject' => 'subject.value',
+                'focus' => 'section.focus.value',
+                'type' => 'type.coding.0.code',
+                'encounter' => 'encounter.value',
+                'episodeOfCare' => 'episodeOfCare.value',
+            ] as $filter => $path) {
+                if (filled($query[$filter] ?? null) && data_get($item, $path) !== null) {
+                    $this->assertDocumentContext($item, [$path => $query[$filter]]);
+                }
+            }
+            if (filled($query['status'] ?? null)
+                && str_replace('-', '_', strtoupper($item['status'])) !== str_replace('-', '_', strtoupper($query['status']))) {
+                throw ValidationException::withMessages(['status' => __('compositions.errors.invalid_response')]);
+            }
+        }
 
         return $items;
     }

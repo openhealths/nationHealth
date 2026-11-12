@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Composition\Forms;
 
 use App\Core\BaseForm;
+use Illuminate\Validation\Rule;
 
 /**
  * Marking a Composition (МВН / МВТН) as entered in error.
@@ -27,11 +28,11 @@ class CompositionCancellationForm extends BaseForm
     public function cancellationRules(array $allowedReasons = []): array
     {
         return [
-            'reason' => array_filter([
+            'reason' => [
                 'required',
                 'string',
-                $allowedReasons === [] ? null : 'in:' . implode(',', array_keys($allowedReasons)),
-            ]),
+                Rule::in(array_keys($allowedReasons)),
+            ],
             'reasonText' => ['required', 'string', 'min:1', 'max:2000'],
         ];
     }

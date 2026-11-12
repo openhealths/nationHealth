@@ -9,6 +9,7 @@ use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
 use App\Enums\Composition\TreatmentViolation;
+use App\Exceptions\MedicalEvents\CompositionGuardException;
 use App\Jobs\CompositionAsyncProcessing;
 use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\MedicalEvents\Sql\Composition;
@@ -16,6 +17,7 @@ use App\Models\MedicalEvents\Sql\CompositionOperation;
 use App\Repositories\MedicalEvents\Repository;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 
 /** Shared validated document reads, queue dispatch and display transformations for conclusions. */
 abstract class CompositionComponent extends BasePatientComponent
@@ -80,6 +82,23 @@ abstract class CompositionComponent extends BasePatientComponent
         )->validate();
     }
 
+    /** Recheck action policies against fresh validated state without persisting a refused action. */
+    protected function currentCompositionSnapshot(Composition $composition): Composition
+    {
+        if (!$composition->hasReadContext) {
+            throw new CompositionGuardException(__('compositions.errors.missing_read_context'));
+        }
+        if (Auth::user()->cannot('view', $composition)) {
+            throw new CompositionGuardException(__('compositions.errors.view_not_allowed'));
+        }
+        $details = $this->fetchComposition($composition);
+        $snapshot = clone $composition;
+        $snapshot->status = $this->compositionStatus($details['status']);
+        $snapshot->date = $details['date'];
+
+        return $snapshot;
+    }
+
     protected function syncIntegration(Composition $composition): array
     {
         $items = $this->fetchIntegration($composition);
@@ -89,9 +108,9 @@ abstract class CompositionComponent extends BasePatientComponent
     }
 
     /** Queue dispatch belongs to the component that accepted the validated remote request. */
-    protected function queueCompositionOperation(CompositionOperation $operation): void
+    protected function queueCompositionOperation(CompositionOperation $operation): bool
     {
-        (new CompositionAsyncProcessing($operation, legalEntity()))->dispatchProcessing();
+        return (new CompositionAsyncProcessing($operation, legalEntity()))->dispatchProcessing();
     }
 
     public function compositionStatus(?string $status): ?CompositionStatus

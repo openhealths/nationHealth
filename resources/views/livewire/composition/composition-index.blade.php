@@ -1,4 +1,5 @@
 @use('App\Models\MedicalEvents\Sql\Composition')
+@use('App\Models\MedicalEvents\Sql\CompositionIntegration')
 
 {{-- Both ids are forwarded: the layout switches its whole navigation between the person
      and preperson route families based on which one is set. --}}
@@ -116,6 +117,26 @@
             </div>
 
             <div class="space-y-4">
+                @foreach ($this->pendingOperations as $operation)
+                    <div wire:key="composition-operation-{{ $operation->id }}">
+                        <p>
+                            {{ __('compositions.async.pending') }} {{ $operation->composition?->title ?: $operation->remoteJobId }}
+                        </p>
+                        @if ($operation->error)
+                            <p>
+                                {{ $operation->error }}
+                            </p>
+                        @endif
+                        <button
+                            type="button"
+                            wire:click="retryAsyncJob('{{ $operation->remoteJobId }}')"
+                            wire:loading.attr="disabled"
+                            class="button-primary-outline"
+                        >
+                            {{ __('compositions.async.retry_read') }}
+                        </button>
+                    </div>
+                @endforeach
                 @if ($focusSearchResults !== null)
                     @include('livewire.composition.focus-search-results')
                 @else
@@ -350,6 +371,13 @@
         <x-slot name="title">{{ __('compositions.erln_resend.title') }}</x-slot>
 
         <x-slot name="content">
+            @foreach ($integrationData ?? [] as $integration)
+                @if ($integration['component'] === CompositionIntegration::ERLN_COMPONENT && $integration['type'] === CompositionIntegration::ERLN_CREATION && ($integration['integrationStatus'] ?? null) === CompositionIntegration::ERROR_STATUS)
+                    <p>
+                        {{ __('compositions.erln_resend.error_message') }}: {{ $integration['statusMessage'] ?? __('compositions.errors.erln_resend_not_error') }}
+                    </p>
+                @endif
+            @endforeach
             <p>{{ __('compositions.erln_resend.confirm_message') }}</p>
         </x-slot>
 

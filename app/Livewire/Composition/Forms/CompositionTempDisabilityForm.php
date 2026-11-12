@@ -62,7 +62,7 @@ class CompositionTempDisabilityForm extends BaseForm
     /** Previous conclusion this one refines or replaces (TV 3.8.2.5.2, 3.8.2.12). */
     public ?string $relatesToTargetUuid = null;
 
-    /** Relation type: 'appends' for continuation, 'replaces' for refinement. */
+    /** Continuation-prefill hint or explicit refinement; eHealth determines native appends itself. */
     public ?string $relatesToCode = null;
 
     /**
@@ -101,11 +101,12 @@ class CompositionTempDisabilityForm extends BaseForm
             'isIntoxicated' => ['boolean'],
             'isForeignTreatment' => ['boolean'],
             'isForceRenew' => ['boolean'],
-            'treatmentViolation' => array_filter([
+            'treatmentViolation' => [
                 'nullable',
+                'required_with:treatmentViolationDate',
                 'string',
-                $allowedTreatmentViolations === [] ? null : Rule::in($allowedTreatmentViolations),
-            ]),
+                Rule::in($allowedTreatmentViolations),
+            ],
 
             // TV 3.8.2.5.3 ties the violation date to the incapacity period it falls in;
             // eHealth rule 1172 also rejects dates after "now".
@@ -116,8 +117,8 @@ class CompositionTempDisabilityForm extends BaseForm
                 'after_or_equal:eventPeriodStart',
                 'before_or_equal:'.now()->format(config('app.date_format')),
             ],
-            'relatesToTargetUuid' => ['nullable', 'uuid'],
-            'relatesToCode' => ['nullable', Rule::enum(CompositionRelation::class)],
+            'relatesToTargetUuid' => ['nullable', 'required_with:relatesToCode', 'uuid'],
+            'relatesToCode' => ['nullable', 'required_with:relatesToTargetUuid', Rule::enum(CompositionRelation::class)],
         ];
     }
 

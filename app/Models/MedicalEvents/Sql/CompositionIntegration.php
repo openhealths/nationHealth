@@ -9,6 +9,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CompositionIntegration extends Model
 {
+    public const string ERLN_COMPONENT = 'ERLN';
+
+    public const string ERLN_CREATION = 'CREATE_ERLN_RECORD';
+
+    public const string ERROR_STATUS = 'ERROR';
+
     protected $fillable = [
         'component', 'type', 'integration_status', 'task_status',
         'record_number', 'status_message', 'ehealth_updated_at',

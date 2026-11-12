@@ -7,6 +7,8 @@ namespace App\Policies;
 use App\Enums\Composition\CompositionType;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Composition;
+use App\Models\MedicalEvents\Sql\CompositionIntegration;
+use App\Models\MedicalEvents\Sql\CompositionOperation;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
@@ -24,11 +26,6 @@ use Illuminate\Auth\Access\Response;
  */
 class CompositionPolicy
 {
-    /**
-     * Value of COMPOSITION_PROCESSING_STATUS that marks a failed integration.
-     */
-    private const string ERLN_STATUS_ERROR = 'ERROR';
-
     public function viewAny(User $user): Response
     {
         return $user->can('composition:search') && $this->inConclusionIssuingEntity()
@@ -43,6 +40,14 @@ class CompositionPolicy
         }
 
         return Response::allow();
+    }
+
+    /** A result reread does not require the pre-write status to still hold after remote completion. */
+    public function readOperation(User $user, CompositionOperation $operation): Response
+    {
+        return $user->can('composition:read') && $this->inConclusionIssuingEntity()
+            ? Response::allow()
+            : Response::denyAsNotFound();
     }
 
     /**
@@ -146,7 +151,7 @@ class CompositionPolicy
     /**
      * Retry ERLN registration for a temporary disability conclusion (TV 3.8.2.14.1).
      */
-    public function resendErln(User $user, Composition $composition): Response
+    public function resendErln(User $user, Composition $composition, ?array $integration = null): Response
     {
         // Retrying is a PATCH on an existing conclusion, so it is gated by the write
         // scope rather than by the one that allows a brand new conclusion to be issued.
@@ -162,7 +167,14 @@ class CompositionPolicy
             return Response::deny(__('compositions.errors.erln_resend_not_final'));
         }
 
-        return $composition->erlnStatus === self::ERLN_STATUS_ERROR
+        // Only the ERLN creation result grants a retry; an error in another integration does not.
+        $status = $integration === null ? $composition->erlnStatus : data_get(
+            collect($integration)->first(static fn (array $item): bool =>
+                $item['component'] === CompositionIntegration::ERLN_COMPONENT && $item['type'] === CompositionIntegration::ERLN_CREATION),
+            'integrationStatus'
+        );
+
+        return $status === CompositionIntegration::ERROR_STATUS
             ? Response::allow()
             : Response::deny(__('compositions.errors.erln_resend_not_error'));
     }

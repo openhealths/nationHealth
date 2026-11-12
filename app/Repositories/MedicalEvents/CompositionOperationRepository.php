@@ -63,6 +63,11 @@ class CompositionOperationRepository extends BaseRepository
         return CompositionOperation::forPatient($patient)->pending()->with(['job', 'composition'])->get();
     }
 
+    public function trackedForPatient(Person|Preperson $patient, array $ids): Collection
+    {
+        return CompositionOperation::forPatient($patient)->whereIn('id', $ids)->with(['job', 'composition'])->get();
+    }
+
     public function findForStatus(int $id, User $user): CompositionOperation
     {
         $operation = CompositionOperation::with(['job', 'composition'])->findOrFail($id);
@@ -71,14 +76,26 @@ class CompositionOperationRepository extends BaseRepository
         return $operation;
     }
 
-    public function hasPendingForComposition(Composition $composition): bool
+    public function hasPendingForComposition(Composition $composition, ?CompositionAsyncOperation $operation = null): bool
     {
-        return CompositionOperation::whereCompositionId($composition->id)->pending()->exists();
+        return CompositionOperation::whereCompositionId($composition->id)->pending()
+            ->when($operation !== null, fn ($query) => $query->whereOperation($operation->value))->exists();
+    }
+
+    public function pendingCreationForContext(Person|Preperson $patient, string $encounterUuid, CompositionType $type, string $authorUuid): ?CompositionOperation
+    {
+        return CompositionOperation::forPatient($patient)->pending()
+            ->whereOperation(CompositionAsyncOperation::CREATE->value)
+            ->whereEncounterUuid($encounterUuid)
+            ->whereCompositionType($type->value)
+            ->whereAuthorUuid($authorUuid)
+            ->with(['job', 'composition'])->first();
     }
 
     public function findForWizard(Person|Preperson $patient, string $jobId, CompositionType $type, User $user): ?CompositionOperation
     {
         $operation = CompositionOperation::whereRemoteJobId($jobId)->whereCompositionType($type->value)
+            ->whereIn('operation', [CompositionAsyncOperation::CREATE->value, CompositionAsyncOperation::SIGN->value])
             ->whereIn('author_uuid', $user->getCompositionAuthorEmployees($type)->pluck('uuid'))->with(['job', 'composition'])->first();
         if ($operation === null) {
             return null;

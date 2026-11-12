@@ -9,6 +9,7 @@ use App\Enums\Composition\CompositionAsyncOperation;
 use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionConfiguration;
 use App\Enums\Composition\CompositionJobStatus;
+use App\Enums\Composition\CompositionRelation;
 use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
 use App\Enums\Person\EncounterStatus;
@@ -30,6 +31,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
@@ -38,6 +40,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -161,6 +164,7 @@ abstract class CompositionCreateComponent extends CompositionComponent
             $params = array_filter(['managing_organization_id' => legalEntity()?->uuid]);
             $params['page'] = 1;
             $encounters = [];
+            $seen = [];
             do {
                 $response = EHealth::encounter()->getBySearchParams($subjectUuid, $params);
                 $page = $response->validate();
@@ -170,6 +174,13 @@ abstract class CompositionCreateComponent extends CompositionComponent
                 }
                 if ($page === [] && $response->isNotLast()) {
                     throw ValidationException::withMessages(['encounters' => __('compositions.errors.invalid_response')]);
+                }
+                foreach ($page as $encounter) {
+                    $uuid = data_get($encounter, 'uuid');
+                    if (!is_string($uuid) || isset($seen[$uuid])) {
+                        throw ValidationException::withMessages(['encounters' => __('compositions.errors.invalid_response')]);
+                    }
+                    $seen[$uuid] = true;
                 }
                 // Read every remote page before filtering: the author's encounter may be on the last one.
                 $encounters = array_merge($encounters, $page);
@@ -486,9 +497,7 @@ abstract class CompositionCreateComponent extends CompositionComponent
             $query['type'] = CompositionType::NEWBORN->value;
         }
         foreach (EHealth::composition()->searchAll($query) as $item) {
-            if (data_get($item, 'subject.value') !== $uuid) {
-                throw ValidationException::withMessages(['data' => __('compositions.errors.invalid_response')]);
-            }
+            // Native summaries may omit subject; the validated search is scoped by its subject query.
             if (data_get($item, 'identifier.value') !== $except
                 && $this->compositionStatus($item['status']) !== CompositionStatus::ENTERED_IN_ERROR) {
                 throw new CompositionGuardException(__('compositions.errors.preperson_duplicate'));
@@ -749,7 +758,26 @@ abstract class CompositionCreateComponent extends CompositionComponent
             return;
         }
 
+        $lock = Cache::lock('composition-create:'.legalEntity()->id.':'.$this->encounterSubjectUuid().':'.$this->form->encounterUuid.':'.$this->conclusionType()->value.':'.$authorUuid, 600);
+        if (!$lock->get()) {
+            Session::flash('info', __('compositions.async.pending'));
+
+            return;
+        }
+
         try {
+            // Another tab may already have accepted this request while this wizard was open.
+            $pending = MedicalEventsRepository::compositionOperation()->pendingCreationForContext(
+                $this->storagePatient(), $this->form->encounterUuid, $this->conclusionType(), $authorUuid
+            );
+            if ($pending !== null) {
+                $this->asyncJobId = $pending->remoteJobId;
+                $this->resumeAsyncSubmission();
+                Session::flash('info', __('compositions.async.pending'));
+
+                return;
+            }
+
             // Do not log the payload: it is the patient's medical record.
             $job = EHealth::composition()->create($this->buildCompositionPayload($authorUuid))->validate();
 
@@ -763,12 +791,14 @@ abstract class CompositionCreateComponent extends CompositionComponent
                     'selectedEncounter' => $this->selectedEncounter,
                 ],
             ]);
-            $this->queueCompositionOperation($operation);
             $this->asyncJobId = $job['id'];
-            $this->asyncJobStatus = (string) ($job['status'] ?? CompositionJobStatus::PENDING->value);
+            $this->asyncJobStatus = $operation->status;
             $this->asyncJobErrors = [];
             $this->showSignatureModal = false;
             $this->step = self::STEP_AWAITING_JOB;
+            if (!$this->queueCompositionOperation($operation)) {
+                Session::flash('error', __('compositions.errors.job_status_unavailable'));
+            }
         } catch (EHealthResponseException $exception) {
             $details = $exception->getDetails();
             $errText = data_get($details, 'error.message')
@@ -788,6 +818,8 @@ abstract class CompositionCreateComponent extends CompositionComponent
             Session::flash('error', __('clinical-storage.write_failed'));
 
             Log::error('Failed to submit a medical conclusion', ['exceptionType' => $exception::class, 'sourceFile' => $exception->getFile(), 'sourceLine' => $exception->getLine()]);
+        } finally {
+            $lock->release();
         }
     }
 
@@ -828,10 +860,15 @@ abstract class CompositionCreateComponent extends CompositionComponent
         if ($operation === null) {
             return;
         }
+        if (Auth::user()->cannot('readOperation', [Composition::class, $operation])) {
+            Session::flash('error', __('compositions.errors.view_not_allowed'));
+
+            return;
+        }
         $previousStep = $this->step;
-        $this->asyncJobStatus = $operation->status === CompositionJobStatus::PENDING->value
-            ? ($operation->job->response_data['status'] ?? $operation->status)
-            : $operation->status;
+        // Remote DONE may precede the validated document, especially during signing.
+        // Only the worker's confirmed local completion can advance the wizard.
+        $this->asyncJobStatus = $operation->status;
         $this->asyncJobErrors = $operation->job->response_data['errors'] ?? [];
         if ($this->asyncJobStatus === CompositionJobStatus::FAILED->value) {
             $this->asyncJobErrors = $this->asyncJobErrors ?: [__('compositions.errors.async_job_failed')];
@@ -865,18 +902,27 @@ abstract class CompositionCreateComponent extends CompositionComponent
 
     public function retryAsyncJob(): void
     {
-        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
-            Session::flash('error', __('compositions.errors.create_not_allowed'));
-
-            return;
-        }
         $operation = $this->currentOperation();
         if ($operation === null || $operation->status !== CompositionJobStatus::PENDING->value) {
             return;
         }
-        $this->queueCompositionOperation($operation);
-        $this->asyncJobErrors = [];
-        $this->asyncJobStatus = CompositionJobStatus::PENDING->value;
+        if (Auth::user()->cannot('readOperation', [Composition::class, $operation])) {
+            Session::flash('error', __('compositions.errors.view_not_allowed'));
+
+            return;
+        }
+        try {
+            if (!$this->queueCompositionOperation($operation)) {
+                Session::flash('error', __('compositions.errors.job_status_unavailable'));
+
+                return;
+            }
+            $this->asyncJobErrors = [];
+            $this->asyncJobStatus = CompositionJobStatus::PENDING->value;
+        } catch (Throwable $exception) {
+            Session::flash('error', __('compositions.errors.async_processing_failed'));
+            Log::error('Could not queue the existing medical conclusion result', ['exceptionType' => $exception::class]);
+        }
     }
 
     protected function resumeAsyncSubmission(): bool
@@ -886,6 +932,11 @@ abstract class CompositionCreateComponent extends CompositionComponent
         }
         $operation = MedicalEventsRepository::compositionOperation()->findForWizard($this->patient(), $this->asyncJobId, $this->conclusionType(), Auth::user());
         abort_unless($operation !== null, 404);
+        if (Auth::user()->cannot('readOperation', [Composition::class, $operation])) {
+            Session::flash('error', __('compositions.errors.view_not_allowed'));
+
+            return true;
+        }
         $formData = $operation->job->request_data['form'] ?? [];
         $this->form->fill(Arr::except($formData, ['password', 'knedp', 'keyContainerUpload']));
         $this->form->encounterUuid = $operation->encounterUuid;
@@ -907,39 +958,33 @@ abstract class CompositionCreateComponent extends CompositionComponent
 
     public function loadCompositionDetail(): bool
     {
-        if (!$this->compositionUuid || !$this->episodeUuid) {
+        $composition = $this->compositionUuid === null
+            ? null
+            : MedicalEventsRepository::composition()->findForPatient($this->storagePatient(), $this->compositionUuid);
+        if ($composition === null || !$composition->hasReadContext) {
             $this->asyncJobErrors = [__('compositions.errors.missing_read_context')];
+
+            return false;
+        }
+        if (Auth::user()->cannot('view', $composition)) {
+            Session::flash('error', __('compositions.errors.view_not_allowed'));
 
             return false;
         }
 
         try {
-            $details = EHealth::composition()->getById(
-                $this->encounterSubjectUuid(),
-                $this->compositionUuid,
-                $this->episodeUuid,
-                $this->form->encounterUuid
-            )->validate();
-
-            EHealth::composition()->assertDocumentContext($details, [
-                'identifier.value' => $this->compositionUuid,
-                'subject.value' => $this->encounterSubjectUuid(),
-                'encounter.value' => $this->form->encounterUuid,
-                'author.value' => $this->authorEmployeeUuid(),
-                'type.coding.0.code' => $this->conclusionType()->value,
-            ]);
-            $this->compositionDetail = $details;
-
+            $details = $this->fetchComposition($composition);
             $composition = MedicalEventsRepository::composition()->store(
-                $this->compositionDetail,
+                $details,
                 $this->storagePatient(),
-                $this->episodeUuid
+                $composition->episodeOfCareUuid
             );
+            $this->compositionDetail = $details;
 
             if ($composition !== null) {
                 try {
                     $this->integrationData = $this->syncIntegration($composition);
-                } catch (EHealthConnectionException | EHealthException) {
+                } catch (EHealthConnectionException | EHealthException | ValidationException) {
                     $this->integrationData = $composition->integrationDetails();
                 }
             }
@@ -948,6 +993,11 @@ abstract class CompositionCreateComponent extends CompositionComponent
             Log::warning('Could not read the created medical conclusion', [
                 'exception' => $exception::class,
             ]);
+
+            return false;
+        } catch (Throwable $exception) {
+            Session::flash('error', __('clinical-storage.write_failed'));
+            Log::error('Could not store the created medical conclusion', ['exceptionType' => $exception::class]);
 
             return false;
         }
@@ -961,17 +1011,27 @@ abstract class CompositionCreateComponent extends CompositionComponent
 
     public function loadPrintForm(): void
     {
-        if (!$this->compositionUuid || !$this->episodeUuid) {
+        $composition = $this->compositionUuid === null
+            ? null
+            : MedicalEventsRepository::composition()->findForPatient($this->storagePatient(), $this->compositionUuid);
+        if ($composition === null || !$composition->hasReadContext) {
+            Session::flash('error', __('compositions.errors.missing_read_context'));
+
+            return;
+        }
+        if (Auth::user()->cannot('view', $composition)) {
+            Session::flash('error', __('compositions.errors.view_not_allowed'));
+
             return;
         }
 
         try {
-            $templateId = $this->conclusionType()->printTemplateId();
+            $templateId = $composition->type->printTemplateId();
             $response = EHealth::composition()->getPrintForm(
-                $this->encounterSubjectUuid(),
-                $this->compositionUuid,
-                $this->episodeUuid,
-                $this->form->encounterUuid,
+                $composition->patientUuid,
+                $composition->uuid,
+                $composition->episodeOfCareUuid,
+                $composition->encounterUuid,
                 $templateId
             );
 
@@ -997,6 +1057,19 @@ abstract class CompositionCreateComponent extends CompositionComponent
 
     public function openSigningModal(): void
     {
+        $composition = $this->compositionUuid === null
+            ? null
+            : MedicalEventsRepository::composition()->findForPatient($this->storagePatient(), $this->compositionUuid);
+        if ($composition === null || Auth::user()->cannot('sign', $composition)) {
+            Session::flash('error', __('compositions.errors.sign_not_allowed'));
+
+            return;
+        }
+        if (MedicalEventsRepository::compositionOperation()->hasPendingForComposition($composition)) {
+            Session::flash('info', __('compositions.async.pending'));
+
+            return;
+        }
         $this->form->resetSigningFields();
         $this->showSignatureModal = true;
     }
@@ -1005,7 +1078,7 @@ abstract class CompositionCreateComponent extends CompositionComponent
     {
         $composition = $this->compositionUuid === null
             ? null
-            : MedicalEventsRepository::composition()->findByUuid($this->compositionUuid);
+            : MedicalEventsRepository::composition()->findForPatient($this->storagePatient(), $this->compositionUuid);
 
         if (!$composition) {
             Session::flash('error', __('compositions.errors.not_found'));
@@ -1019,40 +1092,67 @@ abstract class CompositionCreateComponent extends CompositionComponent
             return;
         }
 
-        if (MedicalEventsRepository::compositionOperation()->hasPendingForComposition($composition)) {
-            $this->showSignatureModal = false;
-            Session::flash('info', __('compositions.messages.signature_submitted'));
+        $lock = Cache::lock('composition-write:'.$composition->uuid, 600);
+        if (!$lock->get()) {
+            Session::flash('info', __('compositions.async.pending'));
 
             return;
         }
 
+        $chainLocks = [];
         try {
-            $this->form->validate($this->form->signingRules());
-        } catch (ValidationException $exception) {
-            $this->setErrorBag($exception->validator->getMessageBag());
+            // Serialize signing with cancellation/retry and resume accepted work instead of sending twice.
+            if (MedicalEventsRepository::compositionOperation()->hasPendingForComposition($composition)) {
+                Session::flash('info', __('compositions.async.pending'));
 
-            return;
-        }
+                return;
+            }
+            try {
+                $this->form->validate($this->form->signingRules());
+            } catch (ValidationException $exception) {
+                $this->setErrorBag($exception->validator->getMessageBag());
 
-        if (!$this->loadCompositionDetail()) {
-            return;
-        }
-        $composition->refresh();
-        if (Auth::user()->cannot('sign', $composition)) {
-            Session::flash('error', __('compositions.errors.sign_not_allowed'));
+                return;
+            }
+            if (!$this->loadCompositionDetail()) {
+                return;
+            }
+            $composition->refresh();
+            if (Auth::user()->cannot('sign', $composition)) {
+                Session::flash('error', __('compositions.errors.sign_not_allowed'));
 
-            return;
-        }
+                return;
+            }
+            $relations = $this->compositionDetail['relatesTo'] ?? [];
+            $relations = array_is_list($relations) ? $relations : [$relations];
+            $targets = collect($relations)->filter(static fn (array $relation): bool =>
+                $relation['code'] === CompositionRelation::REPLACES->value)
+                ->pluck('targetIdentifier.value')->unique()->sort()->values();
+            foreach ($targets as $targetUuid) {
+                $chainLock = Cache::lock('composition-chain:'.$targetUuid, 600);
+                if (!$chainLock->get()) {
+                    Session::flash('info', __('compositions.async.pending'));
 
-        try {
+                    return;
+                }
+                $chainLocks[] = $chainLock;
+            }
             $this->assertConfiguredSigningAllowed();
-            $signedContent = app(SignatureService::class)->signData(
-                $this->compositionDetail,
-                $this->form->password,
-                $this->form->knedp,
-                $this->form->keyContainerUpload,
-                Auth::user()->party->taxId
-            );
+            try {
+                $signedContent = app(SignatureService::class)->signData(
+                    $this->compositionDetail,
+                    $this->form->password,
+                    $this->form->knedp,
+                    $this->form->keyContainerUpload,
+                    Auth::user()->party->taxId
+                );
+            } catch (RuntimeException $exception) {
+                // Cipher validation must leave the same signing form available for correction.
+                $this->addError('form.guard', $exception->getMessage());
+                Session::flash('error', $exception->getMessage());
+
+                return;
+            }
 
             $job = EHealth::composition()->sign($composition->uuid, ['data' => $signedContent])->validate();
 
@@ -1067,27 +1167,38 @@ abstract class CompositionCreateComponent extends CompositionComponent
                     'selectedEncounter' => $this->selectedEncounter,
                 ],
             ]);
-            $this->queueCompositionOperation($operation);
-
             $this->showSignatureModal = false;
             $this->form->resetSigningFields();
             $this->asyncJobId = $job['id'];
-            $this->asyncJobStatus = (string) ($job['status'] ?? CompositionJobStatus::PENDING->value);
+            $this->asyncJobStatus = $operation->status;
             $this->asyncJobErrors = [];
             $this->step = self::STEP_AWAITING_JOB;
+
+            if (!$this->queueCompositionOperation($operation)) {
+                Session::flash('error', __('compositions.errors.job_status_unavailable'));
+
+                return;
+            }
 
             Session::flash('info', __('compositions.messages.signature_submitted'));
         } catch (CompositionGuardException $exception) {
             $this->reportGuardFailure($exception);
         } catch (ValidationException $exception) {
             Session::flash('error', __('compositions.errors.invalid_response'));
+        } catch (EHealthConnectionException | EHealthException $exception) {
+            $exception->handle('Failed to sign a medical conclusion');
         } catch (Throwable $exception) {
-            Session::flash('error', $exception->getMessage());
+            Session::flash('error', __($this->step === self::STEP_AWAITING_JOB
+                ? 'compositions.errors.async_processing_failed' : 'clinical-storage.write_failed'));
 
             Log::error('Failed to sign a medical conclusion', [
-                'composition' => $this->compositionUuid,
-                'error' => $exception->getMessage(),
+                'exceptionType' => $exception::class,
             ]);
+        } finally {
+            foreach ($chainLocks as $chainLock) {
+                $chainLock->release();
+            }
+            $lock->release();
         }
     }
 

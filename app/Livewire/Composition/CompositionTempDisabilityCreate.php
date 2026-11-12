@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Composition;
 
 use App\Classes\eHealth\EHealth;
+use App\Enums\Composition\CompositionAsyncOperation;
 use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionConfiguration;
 use App\Enums\Composition\CompositionPregnancyPeriodMode;
@@ -131,7 +132,7 @@ class CompositionTempDisabilityCreate extends CompositionCreateComponent
      * Validity periods allowed for a pregnancy conclusion (TV 3.8.2.5.4).
      *
      * A new pregnancy conclusion and a continuation use different configuration
-     * variables, so the list is filtered by whether this conclusion replaces another.
+     * variables. Refinement and a forced new case select their own applicable sets.
      *
      * @return array<int, string>
      */
@@ -158,7 +159,8 @@ class CompositionTempDisabilityCreate extends CompositionCreateComponent
      */
     private function pregnancyPeriodMode(): CompositionPregnancyPeriodMode
     {
-        if (blank($this->form->relatesToTargetUuid)) {
+        if (blank($this->form->relatesToTargetUuid)
+            || ($this->form->relatesToCode === CompositionRelation::APPENDS->value && $this->form->isForceRenew)) {
             return CompositionPregnancyPeriodMode::NEW;
         }
 
@@ -334,6 +336,9 @@ class CompositionTempDisabilityCreate extends CompositionCreateComponent
      */
     protected function assertSubmissionAllowed(): void
     {
+        if ($this->form->subjectUuid !== $this->uuid || $this->form->isUnidentified !== ($this->patient() instanceof Preperson)) {
+            throw new CompositionGuardException(__('compositions.errors.participant_context_mismatch'));
+        }
         $category = $this->selectedCategory();
 
         // Focus is the incapacitated caregiver, while the encounter and storage still belong to the ill subject.
@@ -383,18 +388,44 @@ class CompositionTempDisabilityCreate extends CompositionCreateComponent
      *
      * @throws CompositionGuardException
      */
-    private function assertRelatedConclusionUsable(string $previousUuid, bool $isContinuation): Composition
+    private function assertRelatedConclusionUsable(string $previousUuid, bool $isContinuation, ?array $document = null): Composition
     {
         $previous = MedicalEventsRepository::composition()->findByUuid($previousUuid);
 
         if (!$previous?->isTempDisability) {
             throw new CompositionGuardException(__('compositions.errors.related_not_found'));
         }
+        if (Auth::user()->cannot('view', $previous)) {
+            throw new CompositionGuardException(__('compositions.errors.view_not_allowed'));
+        }
+
+        // Signing uses the stored remote draft, not mutable fields left in the browser form.
+        $current = $document === null ? [
+            'category' => $this->form->category,
+            'subject' => $this->form->subjectUuid,
+            'focus' => $this->form->sectionFocusUuid,
+            'start' => $this->form->eventPeriodStart,
+            'end' => $this->form->eventPeriodEnd,
+            'forceRenew' => $this->form->isForceRenew,
+        ] : [
+            'category' => data_get($document, 'category.coding.0.code'),
+            'subject' => data_get($document, 'subject.value'),
+            'focus' => data_get($document, 'section.focus.value'),
+            'start' => data_get($document, 'event.0.period.start'),
+            'end' => data_get($document, 'event.0.period.end'),
+            'forceRenew' => (bool) $this->compositionExtensions($document)->get('IS_FORCE_RENEW', false),
+        ];
 
         $authorUuid = $this->authorEmployeeUuid();
 
-        if ($authorUuid === null || $previous->authorUuid !== $authorUuid) {
+        if (!$isContinuation && ($authorUuid === null || $previous->authorUuid !== $authorUuid)) {
             throw new CompositionGuardException(__('compositions.errors.related_not_author'));
+        }
+        if ($isContinuation && $previous->patientUuid !== $current['subject']) {
+            throw new CompositionGuardException(__('compositions.errors.related_other_patient'));
+        }
+        if (!$isContinuation && !$this->mayClarify($previous)) {
+            throw new CompositionGuardException(__('compositions.errors.related_not_clarifiable'));
         }
 
         $fresh = $this->fetchComposition($previous);
@@ -415,47 +446,39 @@ class CompositionTempDisabilityCreate extends CompositionCreateComponent
 
         $previousCategory = (string) data_get($fresh, 'category.coding.0.code');
 
-        if ($previousCategory !== $this->form->category) {
+        if ($previousCategory !== $current['category']) {
             throw new CompositionGuardException(__('compositions.errors.related_category_mismatch'));
         }
 
         if ($isContinuation) {
-            // A continuation stays with the same patient and must start after the case it
-            // extends; a clarification deliberately crosses from a preperson to the
-            // identified person, so the subject is allowed to differ there.
-            if (data_get($fresh, 'subject.value') !== $this->form->subjectUuid) {
+            // A continuation stays with the same participants; refinement may cross
+            // from a signed merged preperson record to its identified person.
+            if (data_get($fresh, 'subject.value') !== $current['subject']) {
                 throw new CompositionGuardException(__('compositions.errors.related_other_patient'));
             }
-            if (data_get($fresh, 'section.focus.value') !== $this->form->sectionFocusUuid) {
+            if (data_get($fresh, 'section.focus.value') !== $current['focus']) {
                 throw new CompositionGuardException(__('compositions.errors.care_focus_required'));
             }
 
             $previousEnd = data_get($fresh, 'event.0.period.end');
 
             if ($category = CompositionCategory::tryFrom($previousCategory)) {
-                if ($category === CompositionCategory::PREGNANCY) {
+                if ($category === CompositionCategory::PREGNANCY && !$current['forceRenew']) {
                     $relation = data_get($fresh, 'relatesTo.code') ?? data_get($fresh, 'relatesTo.0.code');
                     if ($relation === CompositionRelation::APPENDS->value || !is_string($previousEnd)
-                        || !CarbonImmutable::parse($this->form->eventPeriodStart)->startOfDay()
+                        || !CarbonImmutable::parse($current['start'])->startOfDay()
                             ->equalTo(CarbonImmutable::parse($previousEnd)->startOfDay()->addDay())) {
                         throw new CompositionGuardException(__('compositions.errors.related_period_overlap'));
                     }
                 }
             }
 
-            if ($previousEnd !== null
-                && CarbonImmutable::parse($this->form->eventPeriodStart)
-                    ->lessThanOrEqualTo(CarbonImmutable::parse($previousEnd)->startOfDay())) {
-                throw new CompositionGuardException(__('compositions.errors.related_period_overlap'));
-            }
-            if (!$this->form->isForceRenew && CompositionConfiguration::TOTAL_SPAN_ENABLED->enabled()) {
-                $this->assertContinuationTotalSpanAllowed($previous, $fresh);
+            // Ordinary continuations may overlap; eHealth determines the incapacity case and appends links.
+            if (!$current['forceRenew'] && CompositionConfiguration::TOTAL_SPAN_ENABLED->enabled()) {
+                $this->assertContinuationTotalSpanAllowed($previous, $fresh, $current);
             }
         } else {
-            if (!$this->mayClarify($previous)) {
-                throw new CompositionGuardException(__('compositions.errors.related_not_clarifiable'));
-            }
-            $this->assertLastConclusionInChain($previous);
+            $this->assertLastConclusionInChain($previous, data_get($document, 'identifier.value'));
         }
 
         return $previous;
@@ -465,54 +488,60 @@ class CompositionTempDisabilityCreate extends CompositionCreateComponent
     {
         $relations = $document['relatesTo'] ?? [];
         $relations = array_is_list($relations) ? $relations : [$relations];
-        $replacement = collect($relations)->firstWhere('code', CompositionRelation::REPLACES->value);
-        if ($replacement === null) {
-            return;
+        foreach ($relations as $relation) {
+            if ($relation['code'] !== CompositionRelation::REPLACES->value) {
+                continue;
+            }
+            // Explicit refinement rechecks the signed identification pair immediately before KEP.
+            // Native appends links belong to eHealth's case determination, not a user-selected target.
+            $this->assertRelatedConclusionUsable(
+                data_get($relation, 'targetIdentifier.value'),
+                false,
+                $document
+            );
         }
-        $previous = MedicalEventsRepository::composition()->findByUuid(data_get($replacement, 'targetIdentifier.value'));
-        // TV39 3.8.2.12.1 requires the signed identification pair immediately before KEP as well as at creation.
-        if ($previous === null || !$this->mayClarify($previous)) {
-            throw new CompositionGuardException(__('compositions.errors.related_not_clarifiable'));
-        }
-        $this->assertLastConclusionInChain($previous, data_get($document, 'identifier.value'));
     }
 
     private function assertLastConclusionInChain(Composition $previous, ?string $except = null): void
     {
-        // Search every page: an unsynchronized later conclusion must prevent refinement of an earlier link.
-        foreach (EHealth::composition()->searchAll(['subject' => $previous->patientUuid, 'type' => CompositionType::TEMP_DISABILITY->value]) as $item) {
-            $uuid = data_get($item, 'identifier.value');
-            if ($uuid === $previous->uuid || $uuid === $except) {
-                continue;
-            }
-            $episode = data_get($item, 'episodeOfCare.value');
-            $encounter = data_get($item, 'encounter.value');
-            if (!is_string($episode) || !is_string($encounter)) {
-                throw new CompositionGuardException(__('compositions.errors.related_unreadable'));
-            }
-            $details = EHealth::composition()->getById($previous->patientUuid, $uuid, $episode, $encounter)->validate();
-            EHealth::composition()->assertDocumentContext($details, [
-                'identifier.value' => $uuid, 'subject.value' => $previous->patientUuid,
-                'encounter.value' => $encounter, 'type.coding.0.code' => CompositionType::TEMP_DISABILITY->value,
-            ]);
-            if ($this->compositionStatus($details['status']) !== CompositionStatus::FINAL) {
-                continue;
-            }
-            $relations = $details['relatesTo'] ?? [];
-            $relations = array_is_list($relations) ? $relations : [$relations];
-            foreach ($relations as $relation) {
-                if (in_array($relation['code'], [CompositionRelation::APPENDS->value, CompositionRelation::REPLACES->value], true)
-                    && data_get($relation, 'targetIdentifier.value') === $previous->uuid) {
-                    throw new CompositionGuardException(__('compositions.errors.related_not_last'));
+        // A replacement after identification belongs to the new person, so search both subjects.
+        $subjects = array_unique([$previous->patientUuid, $this->patient()->uuid]);
+        foreach ($subjects as $subjectUuid) {
+            foreach (EHealth::composition()->searchAll(['subject' => $subjectUuid, 'type' => CompositionType::TEMP_DISABILITY->value]) as $item) {
+                $uuid = data_get($item, 'identifier.value');
+                if ($uuid === $previous->uuid || $uuid === $except) {
+                    continue;
+                }
+                $episode = data_get($item, 'episodeOfCare.value');
+                $encounter = data_get($item, 'encounter.value');
+                if (!is_string($episode) || !is_string($encounter)) {
+                    throw new CompositionGuardException(__('compositions.errors.related_unreadable'));
+                }
+                $details = $this->fetchCompositionDetails($subjectUuid, $uuid, $episode, $encounter, [
+                    'type.coding.0.code' => CompositionType::TEMP_DISABILITY->value,
+                ]);
+                $local = MedicalEventsRepository::composition()->findByUuid($uuid);
+                $pendingSignature = $this->compositionStatus($details['status']) === CompositionStatus::PRELIMINARY
+                    && $local !== null && MedicalEventsRepository::compositionOperation()->hasPendingForComposition($local, CompositionAsyncOperation::SIGN);
+                if ($this->compositionStatus($details['status']) !== CompositionStatus::FINAL && !$pendingSignature) {
+                    continue;
+                }
+                $relations = $details['relatesTo'] ?? [];
+                $relations = array_is_list($relations) ? $relations : [$relations];
+                foreach ($relations as $relation) {
+                    if (in_array($relation['code'], [CompositionRelation::APPENDS->value, CompositionRelation::REPLACES->value], true)
+                        && data_get($relation, 'targetIdentifier.value') === $previous->uuid) {
+                        throw new CompositionGuardException(__('compositions.errors.related_not_last'));
+                    }
                 }
             }
         }
     }
 
-    private function assertContinuationTotalSpanAllowed(Composition $previous, array $fresh): void
+    private function assertContinuationTotalSpanAllowed(Composition $previous, array $fresh, array $current): void
     {
         $seen = [];
-        $oldestStart = CarbonImmutable::parse(data_get($fresh, 'event.0.period.start'))->startOfDay();
+        $oldestStart = CarbonImmutable::parse($current['start'])->startOfDay();
         while (true) {
             if (in_array($previous->uuid, $seen, true)) {
                 throw new CompositionGuardException(__('compositions.errors.related_unreadable'));
@@ -530,18 +559,20 @@ class CompositionTempDisabilityCreate extends CompositionCreateComponent
             if ($previous === null) {
                 throw new CompositionGuardException(__('compositions.errors.related_unreadable'));
             }
+            if (Auth::user()->cannot('view', $previous)) {
+                throw new CompositionGuardException(__('compositions.errors.view_not_allowed'));
+            }
             $fresh = $this->fetchComposition($previous);
             if ($this->compositionStatus($fresh['status'] ?? null) !== CompositionStatus::FINAL
-                || data_get($fresh, 'category.coding.0.code') !== $this->form->category
-                || data_get($fresh, 'subject.value') !== $this->form->subjectUuid
-                || data_get($fresh, 'section.focus.value') !== $this->form->sectionFocusUuid
-                || data_get($fresh, 'author.value') !== $this->authorEmployeeUuid()) {
+                || data_get($fresh, 'category.coding.0.code') !== $current['category']
+                || data_get($fresh, 'subject.value') !== $current['subject']
+                || data_get($fresh, 'section.focus.value') !== $current['focus']) {
                 throw new CompositionGuardException(__('compositions.errors.related_unreadable'));
             }
         }
         // The case limit includes every earlier extension, rather than only this draft's own period.
-        $end = CarbonImmutable::parse($this->form->eventPeriodEnd)->startOfDay();
-        if ((int) $oldestStart->diffInDays($end) + 1 > CompositionConfiguration::TOTAL_SPAN->days($this->form->category)) {
+        $end = CarbonImmutable::parse($current['end'])->startOfDay();
+        if ((int) $oldestStart->diffInDays($end) + 1 > CompositionConfiguration::TOTAL_SPAN->days($current['category'])) {
             throw new CompositionGuardException(__('compositions.errors.period_too_long'));
         }
     }
@@ -577,8 +608,10 @@ class CompositionTempDisabilityCreate extends CompositionCreateComponent
 
         $previous = MedicalEventsRepository::composition()->findByUuid($previousUuid);
 
-        if (!$previous?->isTempDisability
-            || !$this->mayClarify($previous) || !in_array($previous->authorUuid, Auth::user()->getCompositionEmployeeUuids(), true)) {
+        if (!$previous?->isTempDisability || Auth::user()->cannot('view', $previous)
+            || ($this->continueFrom && $previous->patientUuid !== $this->uuid)
+            || (!$this->continueFrom && (!$this->mayClarify($previous)
+                || !in_array($previous->authorUuid, Auth::user()->getCompositionEmployeeUuids(), true)))) {
             Session::flash('error', __('compositions.errors.related_not_found'));
 
             return;
@@ -656,9 +689,11 @@ class CompositionTempDisabilityCreate extends CompositionCreateComponent
 
         $payload['extension'] = $extensions;
 
-        if (!empty($this->form->relatesToTargetUuid)) {
+        // Create Composition accepts an explicit replacement. eHealth adds appends itself when
+        // determining the incapacity case; a continuation target is only a form-prefill context.
+        if (!empty($this->form->relatesToTargetUuid) && $this->form->relatesToCode === CompositionRelation::REPLACES->value) {
             $payload['relatesTo'] = [
-                'code' => $this->form->relatesToCode ?? CompositionRelation::REPLACES->value,
+                'code' => CompositionRelation::REPLACES->value,
                 'targetIdentifier' => $this->resourceIdentifier('composition', $this->form->relatesToTargetUuid),
             ];
         }
@@ -669,7 +704,7 @@ class CompositionTempDisabilityCreate extends CompositionCreateComponent
     protected function allowedPregnancyDays(): array
     {
         $parameter = CompositionConfiguration::from($this->pregnancyPeriodMode()->configurationName());
-        // Read the exact mode's validated EMAL value; a continuation never uses the new-case periods.
+        // Read the exact mode's validated EMAL value, including a forced new pregnancy case.
         $days = collect($parameter->value())->flatten()->filter(static fn (mixed $value): bool => is_int($value) && $value > 0)
             ->unique()->sort()->values()->all();
         if ($days === []) {
