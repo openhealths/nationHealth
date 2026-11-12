@@ -10,6 +10,18 @@ import uk from '../../node_modules/flowbite-datepicker/js/i18n/locales/uk.js';
 
 // Date input mask DD.MM.YYYY
 const dateMaskInputs = new WeakSet();
+const datepickerKeydownInputs = new WeakSet();
+
+function guardDatepickerKeydown(el) {
+    if (datepickerKeydownInputs.has(el)) return;
+    datepickerKeydownInputs.add(el);
+
+    el.addEventListener('keydown', (event) => {
+        if (typeof event.key !== 'string') {
+            event.stopImmediatePropagation();
+        }
+    }, { capture: true });
+}
 
 function attachDateMask(el) {
     el.setAttribute('data-date-mask', 'true');
@@ -201,8 +213,9 @@ function initializeDateInputs() {
         inputs.forEach((datepickerEl) => {
             // A mask must be bound even if the picker has already been initialized.
             attachDateMask(datepickerEl);
+            guardDatepickerKeydown(datepickerEl);
 
-            if (datepickerEl._datepicker_initialized && datepickerEl.datepicker?.picker) {
+            if (datepickerEl.datepicker?.picker) {
                 // Livewire can remove the popup while preserving its input and instance.
                 const datepicker = datepickerEl.datepicker;
                 if (!datepicker.picker.element.isConnected) {
