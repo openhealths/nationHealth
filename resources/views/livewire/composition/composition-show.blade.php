@@ -1,3 +1,4 @@
+@use('Illuminate\Support\Str')
 {{--
     Detail of a medical conclusion, as returned by getComposition.
 
@@ -8,25 +9,11 @@
 --}}
 @php
     $detail = $compositionDetail ?? [];
-    $status = \App\Enums\Composition\CompositionStatus::fromEHealth(data_get($detail, 'status'));
-    $type = \App\Enums\Composition\CompositionType::tryFrom((string) data_get($detail, 'type.coding.0.code'));
-    $category = \App\Enums\Composition\CompositionCategory::tryFrom((string) data_get($detail, 'category.coding.0.code'));
-
-    $extensions = collect(data_get($detail, 'extension', []))
-        ->filter(static fn ($extension) => is_array($extension) && isset($extension['valueCode']))
-        ->mapWithKeys(static function (array $extension) {
-            $value = $extension['valueUuid']
-                ?? $extension['valueDate']
-                ?? $extension['valueString']
-                ?? $extension['valueBoolean']
-                ?? null;
-
-            return [$extension['valueCode'] => $value];
-        });
-
-    $formatDate = static fn (?string $value) => $value
-        ? \Carbon\CarbonImmutable::parse($value)->format(config('app.date_format'))
-        : '-';
+    $display = $this->compositionDisplay($detail);
+    $status = $display['status'];
+    $type = $display['type'];
+    $category = $display['category'];
+    $extensions = $display['extensions'];
 @endphp
 
 <x-dialog-modal maxWidth="3xl" id="modal-composition-detail" wire:model.live="showDetailModal">
@@ -58,7 +45,7 @@
             <div class="min-w-0">
                 <div class="record-inner-label text-[10px] uppercase">{{ __('compositions.detail.date') }}</div>
                 <div class="record-inner-value text-[14px] font-semibold break-words">
-                    {{ $formatDate(data_get($detail, 'date')) }}
+                    {{ $this->compositionDate(data_get($detail, 'date')) }}
                 </div>
             </div>
 
@@ -77,14 +64,14 @@
             <div class="min-w-0">
                 <div class="record-inner-label text-[10px] uppercase">{{ __('compositions.detail.period_start') }}</div>
                 <div class="record-inner-value text-[14px] font-semibold break-words">
-                    {{ $formatDate(data_get($detail, 'event.0.period.start') ?? data_get($detail, 'event.period.start')) }}
+                    {{ $this->compositionDate(data_get($detail, 'event.0.period.start') ?? data_get($detail, 'event.period.start')) }}
                 </div>
             </div>
 
             <div class="min-w-0">
                 <div class="record-inner-label text-[10px] uppercase">{{ __('compositions.detail.period_end') }}</div>
                 <div class="record-inner-value text-[14px] font-semibold break-words">
-                    {{ $formatDate(data_get($detail, 'event.0.period.end') ?? data_get($detail, 'event.period.end')) }}
+                    {{ $this->compositionDate(data_get($detail, 'event.0.period.end') ?? data_get($detail, 'event.period.end')) }}
                 </div>
             </div>
 
@@ -119,7 +106,7 @@
                         {{ __('compositions.detail.newborn_birth_date') }}
                     </div>
                     <div class="record-inner-value text-[14px] font-semibold break-words">
-                        {{ $formatDate($extensions->get('NEWBORN_BIRTH_DATE')) }}
+                        {{ $this->compositionDate($extensions->get('NEWBORN_BIRTH_DATE')) }}
                     </div>
                 </div>
             @endif
@@ -139,7 +126,7 @@
                 @if ($extensions->has($flag) && is_bool($extensions->get($flag)))
                     <div class="min-w-0">
                         <div class="record-inner-label text-[10px] uppercase">
-                            {{ __('compositions.detail.flags.' . \Illuminate\Support\Str::lower($flag)) }}
+                            {{ __('compositions.detail.flags.' . Str::lower($flag)) }}
                         </div>
                         <div class="record-inner-value text-[14px] font-semibold break-words">
                             {{ __($extensions->get($flag) ? 'forms.yes' : 'forms.no') }}
@@ -154,9 +141,9 @@
                         {{ __('compositions.detail.treatment_violation') }}
                     </div>
                     <div class="record-inner-value text-[14px] font-semibold break-words">
-                        {{ \App\Enums\Composition\TreatmentViolation::label((string) $extensions->get('TREATMENT_VIOLATION')) }}
+                        {{ $this->treatmentViolationLabel((string) $extensions->get('TREATMENT_VIOLATION')) }}
                         @if ($extensions->has('TREATMENT_VIOLATION_DATE'))
-                            ({{ $formatDate($extensions->get('TREATMENT_VIOLATION_DATE')) }})
+                            ({{ $this->compositionDate($extensions->get('TREATMENT_VIOLATION_DATE')) }})
                         @endif
                     </div>
                 </div>

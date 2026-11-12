@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
+use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionExtension;
 use App\Enums\Composition\CompositionStatus;
+use App\Enums\Composition\CompositionType;
 use App\Enums\MergeRequest\Status as MergeRequestStatus;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
 use App\Models\MedicalEvents\Sql\Composition;
@@ -15,11 +17,12 @@ use App\Models\MergeRequest;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Models\User;
+use App\Repositories\MedicalEvents\BaseRepository;
+use App\Repositories\MedicalEvents\Repository;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 class CompositionRepository extends BaseRepository
@@ -43,6 +46,36 @@ class CompositionRepository extends BaseRepository
             ->with(self::READ_RELATIONS)->whereUuid($uuid)->first();
     }
 
+    public function findByUuid(string $uuid): ?Composition
+    {
+        return $this->model->newQuery()->whereUuid($uuid)->first();
+    }
+
+    public function hasActiveBirthConclusion(string $subjectUuid): bool
+    {
+        return $this->model->newQuery()->whereHas('subject', static fn (Builder $subject): Builder => $subject->whereValue($subjectUuid))
+            ->ofType(CompositionType::NEWBORN)->excludingErrors()->exists();
+    }
+
+    /** The registry displays the newest signed sickness conclusion of each merged unidentified record. */
+    public function clarifiableUnidentifiedForPatient(Person|Preperson $patient): Collection
+    {
+        if ($patient instanceof Preperson) {
+            return collect();
+        }
+        $mergedPrepersonIds = MergeRequest::query()->whereMasterPersonId($patient->id)
+            ->whereIn('status', [MergeRequestStatus::APPROVED->value, MergeRequestStatus::SIGNED->value])
+            ->pluck('merge_person_id');
+        if ($mergedPrepersonIds->isEmpty()) {
+            return collect();
+        }
+
+        return $this->model->newQuery()->whereIn('preperson_id', $mergedPrepersonIds)
+            ->ofType(CompositionType::TEMP_DISABILITY)
+            ->whereHas('categoryConcept.coding', static fn (Builder $coding): Builder => $coding->where('code', CompositionCategory::SICKNESS->value))
+            ->signed()->orderByDesc('date')->get()->unique('preperson_id')->values();
+    }
+
     public function hasSignedIdentification(Person $patient, int $prepersonId): bool
     {
         return MergeRequest::whereMasterPersonId($patient->id)
@@ -61,16 +94,6 @@ class CompositionRepository extends BaseRepository
         return $this->model->newQuery()->forPatient($patient)->forEncounter($encounter->uuid)
             ->with(self::READ_RELATIONS)->recentlyUpdatedFirst()->get()
             ->filter(static fn (Composition $composition): bool => $user->can('view', $composition))->values();
-    }
-
-    /** Native schema validity does not prove that the document belongs to the requested operation. */
-    public function assertDocumentContext(array $details, array $expected): void
-    {
-        foreach ($expected as $path => $value) {
-            if (data_get($details, $path) !== $value) {
-                throw ValidationException::withMessages([$path => __('compositions.errors.invalid_response')]);
-            }
-        }
     }
 
     public function paginateForPatient(Person|Preperson $patient, array $filters, int $perPage): LengthAwarePaginator
@@ -129,7 +152,7 @@ class CompositionRepository extends BaseRepository
             foreach (['status', 'title', 'date'] as $field) {
                 if (array_key_exists($field, $details)) {
                     $attributes[$field] = $field === 'status'
-                        ? CompositionStatus::fromEHealth($details[$field])->value
+                        ? CompositionStatus::from(str_replace('-', '_', strtoupper($details[$field])))->value
                         : $details[$field];
                 }
             }
@@ -244,5 +267,15 @@ class CompositionRepository extends BaseRepository
         $existing = $existingId === null ? null : Identifier::find($existingId);
 
         return Repository::identifier()->update($existing ?? Repository::identifier()->store($value), ['identifier' => $reference])->id;
+    }
+
+    /** All remote summaries and details must be validated before this atomic import starts. */
+    public function storeMany(array $documents, Person|Preperson $patient): void
+    {
+        $this->storageTransaction(function () use ($documents, $patient): void {
+            foreach ($documents as [$details, $episodeUuid]) {
+                $this->store($details, $patient, $episodeUuid);
+            }
+        });
     }
 }

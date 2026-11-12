@@ -31,7 +31,7 @@ The distinction between required configuration and optional filters is deliberat
 - A missing category in an explicitly optional diagnosis/document/gender restriction, or a documented null restriction, is unrestricted. The sparse disability doctor-speciality map follows the same absent-category behavior; this is an inference from its documented map shape, tested separately from mapped allowed/refused and disabled cases. A missing/invalid entire environment mirror is an unavailable configuration and blocks submission. Those cases are not interchangeable.
 - `IS_FOREIGN_TREATMENT` skips the documented single-period/start-window checks; `IS_FORCE_RENEW` skips the documented case-length checks. Neither bypasses identity, policy, required payload or native response validation.
 
-`DrivesCompositionWizard` enforces the selected current employee contract and own finished encounter, configured period/category/extensions, author/custodian, separate subject and incapacitated focus, native authentication metadata and fresh native encounter diagnoses. A fresh validated `GET /api/persons/{id}/authentication_methods` response is required once per distinct identified subject/focus at preflight. API-010-051-0002 checks `status=active` and `is_active=true` before 200, so relying on that successful read is an inference from its documented business precondition. A valid empty method list attests eligibility, not an existing method, and no person status field is invented or persisted. Read errors and malformed bodies block creation before POST/storage/queue effects. Preperson status is checked from its actual local field. Care categories retain the child/patient as `subject` and select the caregiver as `section.focus`; they do not reassign the patient record. Pregnancy offers every configured initial/continuation duration.
+`CompositionCreateComponent` enforces the selected current employee contract and own finished encounter, configured period/category/extensions, author/custodian, separate subject and incapacitated focus, native authentication metadata and fresh native encounter diagnoses. A fresh validated `GET /api/persons/{id}/authentication_methods` response is required once per distinct identified subject/focus at preflight. API-010-051-0002 checks `status=active` and `is_active=true` before 200, so relying on that successful read is an inference from its documented business precondition. A valid empty method list attests eligibility, not an existing method, and no person status field is invented or persisted. Read errors and malformed bodies block creation before POST/storage/queue effects. Preperson status is checked from its actual local field. Care categories retain the child/patient as `subject` and select the caregiver as `section.focus`; they do not reassign the patient record. Pregnancy offers every configured initial/continuation duration.
 
 ## Native responses and asynchronous results
 
@@ -48,8 +48,8 @@ Continuation rereads the previous FINAL document, requires the same author/categ
 | Requirement | Implementation / evidence |
 | --- | --- |
 | 3.8.1.1, 3.8.2.1 | Existing `CompositionPolicy` role/entity pair plus current linked, started author selection in `User`; policy and workflow tests include SMD specialist, PMD doctor, unavailable roles and assistant authoring/sign/cancel denial. |
-| 3.8.1.5.1–3.8.1.5.2.1, 3.8.2.5.1–3.8.2.5.3 | Own encounter, required payload/context and dynamic preflight in `DrivesCompositionWizard`, newborn identity in `CompositionCreate`, subject/focus care flow in `CompositionTempDisabilityCreate`. |
-| 3.8.2.5.4 | `CompositionPregnancyPeriodMode`, configuration-driven choices and native `PREGNANCY` overlay; valid duration, next-day continuation, gap and repeated continuation tests. |
+| 3.8.1.5.1–3.8.1.5.2.1, 3.8.2.5.1–3.8.2.5.3 | Own encounter, required payload/context and dynamic preflight in `CompositionCreateComponent`, newborn identity in `CompositionCreate`, subject/focus care flow in `CompositionTempDisabilityCreate`. |
+| 3.8.2.5.4 | `CompositionPregnancyPeriodMode` identifies the configuration key; `CompositionTempDisabilityCreate` builds choices and checks periods against the validated mirror. Existing test sources cover valid duration, next-day continuation, gap and repeated continuation. |
 | 3.8.1.7, 3.8.2.9 | Fresh full native read before `SignatureService::signData`; deadline/category and visible signing-field denial tests. |
 | 3.8.2.12–3.8.2.12.1 | Exact SIGNED merge pair, fresh previous FINAL document and last-link search before refinement/KEP; unsigned/foreign pair and unsynchronized later-link negative tests. |
 | 3.8.2.15.1 | Existing author/FINAL cancellation policy and configured cancellation-day guard; async cancellation remains unconfirmed until expected native status is read. |
@@ -76,3 +76,24 @@ SMD (`OUTPATIENT` + `SPECIALIST`) may create both types when scopes, current emp
 - Actual PREPROD EMAL values and provider read availability, real KEP/SMS, shared merge initiation, information-certificate acceptance and combined encounter/navigation transitions require operator/user verification. This draft must not claim complete live U02/U04 or TV39 acceptance.
 
 Automated Composition checks use the guarded `tv39_1204` database. The separate PatientRegistry UAT uses a disposable PostgreSQL `testing` database with schema-only fixtures and an exact-host bootstrap guard. No `mis_dev` migrations, seeding or mutations and no real KEP/SMS were performed. Tests drive the worker logic explicitly; no live queue worker was started. Final counts, commit SHA and PR are recorded in the local handoff rather than guessed here.
+
+## Component + Form refactor — 2026-11-12
+
+The conclusion module follows the team-lead agreement recorded on November 12, 2026:
+
+| Responsibility | Owner |
+| --- | --- |
+| Shared validated detail/integration reads, queue dispatch and display transformations | `CompositionComponent`, inherited by the registry and creation components |
+| Encounter/authentication steps, preflight, pending/retry/resume, print and signing | `CompositionCreateComponent` |
+| Birth/disability payload construction and type-specific guards | `CompositionCreate` / `CompositionTempDisabilityCreate` instance methods |
+| Fields, defaults, validation rules and filling/resetting state | Existing Form classes |
+| Cancellation payload and configured timeout | `PatientCompositions` instance methods |
+| Native response schemas, identity checks and complete EMAL mirror validation | Existing `app/Classes/eHealth/Api/Patient/Composition.php` client |
+| Async status polling, validated reread and expected resource-state confirmation | Existing `CompositionAsyncProcessing` job |
+| Local selection, atomic batch import, operation snapshots and persistence | Existing repository factories and repositories |
+
+The three module workflow/payload traits and the new static `SchemaResponseContract` class were removed after migrating their callers. No replacement business service, mapper, workflow trait or custom production static method is introduced. The existing signature infrastructure and framework/repository entry points remain in use.
+
+The wire action names, Form field shape, query parameters, policy guards, KEP modal error handling and session-flash feedback are retained. A remote `DONE` still requires a readable matching document in the expected state before the operation becomes complete. Catalog validation returns native rows; the catalog's JSON settings do not become an alternative source for the legacy EMAL mirror.
+
+**Verification status:** the user explicitly retained the full verification pause on November 12, 2026. Existing test sources were adapted to the component/job ownership changes, but no tests, PHP lint, Pint, frontend build, browser UAT or CI checks were run for this refactor. Earlier validation evidence above belongs to the pre-refactor implementation and does not establish this refactor's correctness. The live acceptance and deployment-configuration items remain open.

@@ -8,6 +8,7 @@ use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
 use App\Enums\User\Role;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
+use App\Jobs\CompositionAsyncProcessing;
 use App\Livewire\Composition\CompositionCreate;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
@@ -23,6 +24,9 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use ReflectionMethod;
+use ReflectionProperty;
+use Tests\Feature\Composition\CompositionTestFixtures;
+use Tests\Feature\Composition\RefreshCompositionDatabase;
 use Tests\TestCase;
 
 /**
@@ -296,10 +300,10 @@ class CompositionCreateNewbornTest extends TestCase
         ]);
         $operation = CompositionOperation::whereRemoteJobId($component->get('asyncJobId'))->firstOrFail();
         $this->assertNull(Composition::whereUuid($compositionUuid)->first());
-        $this->assertTrue(Repository::compositionOperation()->processResult(
-            $operation,
-            ['status' => 'DONE', 'compositionUuid' => $compositionUuid],
-            'synthetic-token',
+        $processing = new CompositionAsyncProcessing($operation, legalEntity());
+        (new ReflectionProperty($processing, 'token'))->setValue($processing, 'synthetic-token');
+        $this->assertTrue((new ReflectionMethod($processing, 'processResult'))->invoke(
+            $processing, ['status' => 'DONE', 'compositionUuid' => $compositionUuid]
         ));
         $component->call('pollAsyncJob')->assertSet('step', CompositionCreate::STEP_REVIEW)
             ->assertSee(__('compositions.create_newborn.created'))

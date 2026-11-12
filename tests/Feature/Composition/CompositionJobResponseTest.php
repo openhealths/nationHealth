@@ -8,6 +8,7 @@ use App\Classes\eHealth\Api\Patient\Composition as CompositionApi;
 use App\Classes\eHealth\EHealth;
 use App\Models\MedicalEvents\Sql\Composition;
 use Illuminate\Support\Facades\Http;
+use Tests\Feature\Composition\RefreshCompositionDatabase;
 use Tests\TestCase;
 
 class CompositionJobResponseTest extends TestCase

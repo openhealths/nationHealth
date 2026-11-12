@@ -25,6 +25,8 @@ use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Feature\Composition\CompositionTestFixtures;
+use Tests\Feature\Composition\RefreshCompositionDatabase;
 use Tests\TestCase;
 
 /**

@@ -10,6 +10,7 @@ use App\Services\Dictionary\Dictionaries\BasicDictionary;
 use App\Services\SignatureService;
 use Illuminate\Support\Facades\Cache;
 use Mockery;
+use Tests\Feature\Composition\UsesTv39CompositionConfiguration;
 
 trait UsesCompositionDictionaries
 {

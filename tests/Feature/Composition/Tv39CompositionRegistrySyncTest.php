@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Composition;
 
-use App\Livewire\Composition\Concerns\InteractsWithCompositions;
+use App\Livewire\Composition\CompositionComponent;
 use App\Livewire\Person\Records\PatientCompositions;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Coding;
@@ -20,6 +20,8 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Feature\Composition\CompositionTestFixtures;
+use Tests\Feature\Composition\RefreshCompositionDatabase;
 use Tests\TestCase;
 
 class Tv39CompositionRegistrySyncTest extends TestCase
@@ -231,10 +233,8 @@ class Tv39CompositionRegistrySyncTest extends TestCase
         unset($summary['type']);
         $summary['subject'] = $document['subject'];
         $record = Repository::composition()->store($summary, $person);
-        $reader = new class
+        $reader = new class extends CompositionComponent
         {
-            use InteractsWithCompositions;
-
             public function read(Composition $record): array
             {
                 return $this->fetchComposition($record);

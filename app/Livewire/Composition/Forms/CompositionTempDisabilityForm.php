@@ -8,14 +8,11 @@ use App\Core\BaseForm;
 use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionRelation;
 use App\Enums\Composition\CompositionType;
-use App\Livewire\Composition\Forms\Concerns\BuildsCompositionPayload;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\Rule;
 
 class CompositionTempDisabilityForm extends BaseForm
 {
-    use BuildsCompositionPayload;
-
     /** Fixed — this form only ever produces a МВТН. */
     public string $type = CompositionType::TEMP_DISABILITY->value;
 
@@ -82,7 +79,7 @@ class CompositionTempDisabilityForm extends BaseForm
                 Rule::in($allowedCategories === []
                     ? array_map(
                         static fn (CompositionCategory $category) => $category->value,
-                        CompositionCategory::forType(CompositionType::TEMP_DISABILITY)
+                        CompositionType::TEMP_DISABILITY->categories()
                     )
                     : array_keys($allowedCategories)),
             ],
@@ -91,7 +88,7 @@ class CompositionTempDisabilityForm extends BaseForm
             'sectionFocusUuid' => ['required', 'uuid'],
             'isFocusUnidentified' => ['boolean'],
 
-            // UI uses the application date format; toPayload preserves the calendar date.
+            // UI uses the application date format; the component payload preserves the calendar date.
             'eventPeriodStart' => ['required', 'date_format:'.config('app.date_format')],
             'eventPeriodEnd' => [
                 'required',
@@ -130,67 +127,6 @@ class CompositionTempDisabilityForm extends BaseForm
     }
 
     /**
-     * Build the unsigned createComposition request.
-     *
-     * @return array<string, mixed>
-     */
-    public function toPayload(string $authorEmployeeUuid): array
-    {
-        $subjectResource = $this->isUnidentified ? 'preperson' : 'person';
-
-        $payload = $this->base([
-            'type' => CompositionType::TEMP_DISABILITY,
-            'category' => $this->category,
-            'subjectUuid' => $this->subjectUuid,
-            'subjectResource' => $subjectResource,
-            'encounterUuid' => $this->encounterUuid,
-            'authorEmployeeUuid' => $authorEmployeeUuid,
-            'focusUuid' => $this->sectionFocusUuid,
-            'focusResource' => $this->isFocusUnidentified ? 'preperson' : 'person',
-            'periodStart' => $this->startOfDay($this->eventPeriodStart),
-            'periodEnd' => $this->endOfDay($this->eventPeriodEnd),
-        ]);
-
-        $extensions = $this->informWith($this->informWithUuid ?? null);
-
-        foreach ([
-            'IS_ACCIDENT' => $this->isAccident ?? false,
-            'IS_INTOXICATED' => $this->isIntoxicated ?? false,
-            'IS_FOREIGN_TREATMENT' => $this->isForeignTreatment ?? false,
-            'IS_FORCE_RENEW' => $this->isForceRenew ?? false,
-        ] as $code => $isSet) {
-            if ($isSet) {
-                $extensions[] = ['valueCode' => $code, 'valueBoolean' => true];
-            }
-        }
-
-        if (!empty($this->treatmentViolation)) {
-            $extensions[] = [
-                'valueCode' => 'TREATMENT_VIOLATION',
-                'valueString' => $this->treatmentViolation,
-            ];
-
-            if (!empty($this->treatmentViolationDate)) {
-                $extensions[] = [
-                    'valueCode' => 'TREATMENT_VIOLATION_DATE',
-                    'valueDate' => $this->date($this->treatmentViolationDate),
-                ];
-            }
-        }
-
-        $payload['extension'] = $extensions;
-
-        if (!empty($this->relatesToTargetUuid)) {
-            $payload['relatesTo'] = [
-                'code' => $this->relatesToCode ?? CompositionRelation::REPLACES->value,
-                'targetIdentifier' => $this->resourceIdentifier('composition', $this->relatesToTargetUuid),
-            ];
-        }
-
-        return $payload;
-    }
-
-    /**
      * Carry period and flags over from the conclusion being refined (TV 3.8.2.13).
      *
      * Reads a stored getComposition response, where the period lives inside the `event`
@@ -216,11 +152,7 @@ class CompositionTempDisabilityForm extends BaseForm
         $extensions = collect(data_get($previous, 'extension', []))
             ->filter(static fn ($extension) => is_array($extension) && isset($extension['valueCode']))
             ->mapWithKeys(static fn (array $extension) => [
-                $extension['valueCode'] => $extension['valueBoolean']
-                    ?? $extension['valueString']
-                    ?? $extension['valueDate']
-                    ?? $extension['valueUuid']
-                    ?? null,
+                $extension['valueCode'] => $extension['valueBoolean'] ?? ($extension['valueString'] ?? ($extension['valueDate'] ?? ($extension['valueUuid'] ?? null))),
             ]);
 
         $this->isAccident = (bool) $extensions->get('IS_ACCIDENT', false);
@@ -281,5 +213,17 @@ class CompositionTempDisabilityForm extends BaseForm
     private function asDate(mixed $value): string
     {
         return $value ? convertToAppDateFormat((string) $value) : '';
+    }
+
+    /** Available field choices; the component further restricts them by author and EMAL context. */
+    public function categoryOptions(): array
+    {
+        $descriptions = dictionary()->basics()->byName(CompositionCategory::DICTIONARY)->asCodeDescription();
+        $options = [];
+        foreach (CompositionType::TEMP_DISABILITY->categories() as $category) {
+            $options[$category->value] = $descriptions->get($category->value, $category->value);
+        }
+
+        return $options;
     }
 }

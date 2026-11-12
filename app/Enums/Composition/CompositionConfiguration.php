@@ -4,12 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums\Composition;
 
-use App\Classes\eHealth\SchemaResponseContract;
+use App\Classes\eHealth\EHealth;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
-use Carbon\CarbonImmutable;
-use Illuminate\Validation\ValidationException;
-use JsonException;
-use Throwable;
 
 /** Validated MIS mirror of the legacy service's environment-specific EMAL parameters. */
 enum CompositionConfiguration: string
@@ -95,23 +91,8 @@ enum CompositionConfiguration: string
 
     public function value(?string $index = null): mixed
     {
-        $settings = config('compositions.emal');
-        if (is_string($settings)) {
-            try {
-                $settings = json_decode($settings, true, 512, JSON_THROW_ON_ERROR);
-            } catch (JsonException) {
-                throw new CompositionGuardException(__('compositions.errors.configuration_unavailable'));
-            }
-        }
-
-        if (!is_array($settings) || array_is_list($settings) || !array_key_exists($this->value, $settings)) {
-            throw new CompositionGuardException(__('compositions.errors.configuration_unavailable'));
-        }
-
-        try {
-            $schema = json_decode(file_get_contents(resource_path('ehealth/contracts/composition-emal-config.schema.json')), true, flags: JSON_THROW_ON_ERROR);
-            SchemaResponseContract::validateData($settings, $schema);
-        } catch (JsonException | ValidationException) {
+        $settings = EHealth::composition()->emalConfiguration();
+        if (!array_key_exists($this->value, $settings)) {
             throw new CompositionGuardException(__('compositions.errors.configuration_unavailable'));
         }
 
@@ -164,41 +145,5 @@ enum CompositionConfiguration: string
         $map = $this->value();
 
         return $map === null || !array_key_exists($category, $map) ? null : $this->codes($category, allowEmpty: true);
-    }
-
-    /** EMAL range strings are mirrored as [inclusive minimum, inclusive maximum], with null for no bound. */
-    public function assertAgeAllowed(string $category, int $age): void
-    {
-        [$min, $max] = $this->value($category);
-        if ($min !== null && $max !== null && $max < $min) {
-            throw new CompositionGuardException(__('compositions.errors.configuration_unavailable'));
-        }
-        if (($min !== null && $age < $min) || ($max !== null && $age > $max)) {
-            throw new CompositionGuardException(__('compositions.errors.participant_age_not_allowed'));
-        }
-    }
-
-    /** A day-based timeout uses calendar dates, inclusive of the configured last day. */
-    public static function assertCancellationAllowed(?string $signedDate, ?string $reason = null): void
-    {
-        if (!self::CANCEL_ENABLED->enabled()) {
-            return;
-        }
-        $days = self::CANCEL_DAYS->days();
-        if ($reason !== null && self::REPLACE_ENABLED->enabled()
-            && in_array($reason, self::REPLACE_REASONS->codes(allowEmpty: true), true)) {
-            $days = self::REPLACE_CANCEL_DAYS->days();
-        }
-        if (blank($signedDate)) {
-            throw new CompositionGuardException(__('compositions.errors.configuration_unavailable'));
-        }
-        try {
-            $signed = CarbonImmutable::parse($signedDate)->setTimezone(config('app.timezone'))->startOfDay();
-        } catch (Throwable) {
-            throw new CompositionGuardException(__('compositions.errors.configuration_unavailable'));
-        }
-        if ($signed->isFuture() || $signed->addDays($days)->lt(CarbonImmutable::today())) {
-            throw new CompositionGuardException(__('compositions.errors.cancel_timeout'));
-        }
     }
 }

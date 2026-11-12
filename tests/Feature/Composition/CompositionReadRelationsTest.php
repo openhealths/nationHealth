@@ -21,6 +21,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use RuntimeException;
+use Tests\Feature\Composition\CompositionTestFixtures;
+use Tests\Feature\Composition\UsesCompositionDictionaries;
 use Tests\TestCase;
 
 class CompositionReadRelationsTest extends TestCase

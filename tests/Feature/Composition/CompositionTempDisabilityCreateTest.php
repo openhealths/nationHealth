@@ -11,6 +11,7 @@ use App\Enums\Composition\TreatmentViolation;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Livewire\Composition\CompositionTempDisabilityCreate;
+use App\Livewire\Person\Records\PatientCompositions;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Permission;
@@ -24,6 +25,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role as PermissionRole;
+use Tests\Feature\Composition\RefreshCompositionDatabase;
 use Tests\TestCase;
 
 /**
@@ -89,7 +91,7 @@ class CompositionTempDisabilityCreateTest extends TestCase
             ->assertSee(CompositionStatus::PRELIMINARY->label())
             ->assertDontSee(__('compositions.create_temp_disability.created'))
             ->assertSee(__('forms.sign_with_KEP'))
-            ->assertSee(TreatmentViolation::label('reject_hospitalization'))
+            ->assertSee((new PatientCompositions)->treatmentViolationLabel('reject_hospitalization'))
             ->assertDontSee('reject_hospitalization (');
     }
 

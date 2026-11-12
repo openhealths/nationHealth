@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Composition;
 
+use App\Livewire\Composition\CompositionCreate;
+use App\Livewire\Composition\CompositionTempDisabilityCreate;
 use App\Livewire\Composition\Forms\CompositionForm;
 use App\Livewire\Composition\Forms\CompositionTempDisabilityForm;
-use Livewire\Component;
 use PHPUnit\Framework\Attributes\Test;
+use ReflectionMethod;
 use Tests\TestCase;
 
 /**
@@ -211,19 +213,21 @@ class CompositionPayloadTest extends TestCase
             'eventPeriodStart' => '2026-08-01',
             'eventPeriodEnd' => '2026-08-10',
         ], $overrides);
-        $form = new CompositionTempDisabilityForm(new class extends Component
-        {}, 'form');
+        $component = new CompositionTempDisabilityCreate;
+        $form = new CompositionTempDisabilityForm($component, 'form');
+        $component->form = $form;
         $form->fill($data);
 
-        return $form->toPayload(self::AUTHOR);
+        return (new ReflectionMethod($component, 'buildCompositionPayload'))->invoke($component, self::AUTHOR);
     }
 
     private function newborn(array $data, string $authorUuid): array
     {
-        $form = new CompositionForm(new class extends Component
-        {}, 'form');
+        $component = new CompositionCreate;
+        $form = new CompositionForm($component, 'form');
+        $component->form = $form;
         $form->fill($data);
 
-        return $form->toPayload($authorUuid);
+        return (new ReflectionMethod($component, 'buildCompositionPayload'))->invoke($component, $authorUuid);
     }
 }

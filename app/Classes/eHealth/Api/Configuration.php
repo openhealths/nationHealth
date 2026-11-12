@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
+use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
-use App\Classes\eHealth\SchemaResponseContract;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -67,7 +67,7 @@ class Configuration extends Request
 
     protected function validateCompositions(EHealthResponse $response): array
     {
-        SchemaResponseContract::validate($response, 'GET /api/composition_configurations', 'composition');
+        EHealth::composition()->validateNativeResponse($response, 'GET /api/composition_configurations', 'composition');
         $body = $response->json();
         Validator::make(is_array($body) ? $body : [], [
             'data' => ['present', 'array', 'list'],
@@ -94,7 +94,7 @@ class Configuration extends Request
             'paging.total_entries' => ['required', 'integer', 'min:0'],
         ])->validate();
 
-        return array_map(static function (array $row): array {
+        foreach ($body['data'] as $row) {
             // Decode only after the complete native catalog envelope has passed validation.
             try {
                 $settings = json_decode($row['settings'], true, 512, JSON_THROW_ON_ERROR);
@@ -105,10 +105,9 @@ class Configuration extends Request
                 || !is_object(json_decode($row['settings']))) {
                 throw ValidationException::withMessages(['settings' => __('compositions.errors.invalid_response')]);
             }
-            $row['decoded_settings'] = $settings;
+        }
 
-            return $row;
-        }, $body['data']);
+        return $body['data'];
     }
 
     /**
@@ -213,5 +212,4 @@ class Configuration extends Request
 
         return $this->get(self::URL_OBSERVATIONS, $query);
     }
-
 }

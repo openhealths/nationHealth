@@ -11,7 +11,7 @@ use App\Traits\EnumUtils;
  *
  * Codes are upper-case, matching the live COMPOSITION_STATUS dictionary. Note that the
  * SwaggerHub search filter spells the error state `ENTERED-IN-ERROR` with hyphens while
- * every other source uses underscores; {@see fromEHealth()} accepts both.
+ * every other source uses underscores; component and persistence boundaries normalize both.
  *
  * @see https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/18024529953
  */
@@ -49,18 +49,6 @@ enum CompositionStatus: string
             self::PRELIMINARY => 'badge-dark',
             self::ENTERED_IN_ERROR => 'badge-red',
         };
-    }
-
-    /**
-     * Resolve a status received from eHealth, tolerating the hyphenated spelling.
-     */
-    public static function fromEHealth(?string $status): ?self
-    {
-        if ($status === null || $status === '') {
-            return null;
-        }
-
-        return self::tryFrom(str_replace('-', '_', strtoupper($status)));
     }
 
     /**

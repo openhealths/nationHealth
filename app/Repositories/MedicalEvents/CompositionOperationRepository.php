@@ -4,26 +4,19 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
-use App\Classes\eHealth\EHealth;
 use App\Enums\Composition\CompositionAsyncOperation;
 use App\Enums\Composition\CompositionJobStatus;
-use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
 use App\Enums\JobStatus;
 use App\Enums\ResponseStatus;
-use App\Exceptions\EHealth\EHealthException;
-use App\Jobs\CompositionAsyncProcessing;
 use App\Models\EhealthJob;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\MedicalEvents\Sql\CompositionOperation;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Models\User;
+use App\Repositories\MedicalEvents\BaseRepository;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Validation\ValidationException;
 
 class CompositionOperationRepository extends BaseRepository
 {
@@ -56,7 +49,6 @@ class CompositionOperationRepository extends BaseRepository
 
             return $record->load('job');
         });
-        $this->queue($record);
 
         return $record;
     }
@@ -98,101 +90,6 @@ class CompositionOperationRepository extends BaseRepository
         return $belongsToPatient || $belongsToMother ? $operation : null;
     }
 
-    public function queue(CompositionOperation $operation): void
-    {
-        if ($operation->status !== CompositionJobStatus::PENDING->value) {
-            return;
-        }
-        $token = session()->get(config('ehealth.api.oauth.bearer_token'));
-        $user = Auth::user();
-        $legalEntity = legalEntity();
-        if (!$token || !$user || !$legalEntity) {
-            return;
-        }
-        Bus::batch([new CompositionAsyncProcessing($operation, $legalEntity)])
-            ->withOption('legal_entity_id', $legalEntity->id)
-            ->withOption('token', Crypt::encryptString($token))
-            ->withOption('user', $user)
-            ->name(CompositionAsyncProcessing::BATCH_NAME)->onQueue('sync')->dispatch();
-    }
-
-    public function processResult(CompositionOperation $operation, array $status, string $token): bool
-    {
-        if ($operation->status !== CompositionJobStatus::PENDING->value) {
-            return true;
-        }
-        if ($status['status'] === CompositionJobStatus::FAILED->value) {
-            $this->fail($operation, $status);
-
-            return true;
-        }
-        $operation->job->update(['response_data' => $status]);
-        if ($status['status'] !== CompositionJobStatus::DONE->value) {
-            return false;
-        }
-        try {
-            $patient = $operation->personId !== null ? Person::findOrFail($operation->personId) : Preperson::findOrFail($operation->prepersonId);
-            $api = EHealth::composition()->withToken($token);
-            $composition = $operation->composition;
-            $uuid = $composition?->uuid ?? ($status['compositionUuid'] ?? null);
-            if ($uuid === null && $operation->operation === CompositionAsyncOperation::CREATE) {
-                $results = $api->searchAll(['subject' => $patient->uuid, 'encounter' => $operation->encounterUuid, 'type' => $operation->compositionType->value]);
-                foreach ($results as $result) {
-                    Repository::composition()->assertDocumentContext($result, [
-                        'subject.value' => $patient->uuid,
-                        'encounter.value' => $operation->encounterUuid,
-                        'type.coding.0.code' => $operation->compositionType->value,
-                    ]);
-                }
-                $candidates = collect($results)->pluck('identifier.value')->filter()->unique();
-                if ($candidates->count() === 1) {
-                    $uuid = $candidates->first();
-                }
-            }
-            if (!$uuid || !$operation->episodeUuid) {
-                $this->recordRetryError($operation, __('compositions.errors.created_not_found'));
-
-                return false;
-            }
-            $details = $api->getById($patient->uuid, $uuid, $operation->episodeUuid, $operation->encounterUuid)->validate();
-            Repository::composition()->assertDocumentContext($details, [
-                'identifier.value' => $uuid,
-                'subject.value' => $patient->uuid,
-                'author.value' => $operation->authorUuid,
-                'encounter.value' => $operation->encounterUuid,
-                'type.coding.0.code' => $operation->compositionType->value,
-            ]);
-            $expectedStatus = match ($operation->operation) {
-                CompositionAsyncOperation::CREATE => CompositionStatus::PRELIMINARY,
-                CompositionAsyncOperation::SIGN, CompositionAsyncOperation::ERLN_RETRY => CompositionStatus::FINAL,
-                CompositionAsyncOperation::CANCEL => CompositionStatus::ENTERED_IN_ERROR,
-            };
-            if (CompositionStatus::fromEHealth($details['status'] ?? null) !== $expectedStatus) {
-                $this->recordRetryError($operation, __('compositions.errors.created_unreadable'));
-
-                return false;
-            }
-            $integration = $operation->operation === CompositionAsyncOperation::ERLN_RETRY
-                ? $api->getIntegrationData($patient->uuid, $uuid, $operation->episodeUuid, $operation->encounterUuid)->validate()
-                : null;
-            $composition = Repository::composition()->store($details, $patient, $operation->episodeUuid);
-            if ($composition === null) {
-                return false;
-            }
-            if ($integration !== null) {
-                Repository::composition()->storeIntegration($composition, $integration);
-            }
-        } catch (EHealthException | ValidationException) {
-            // A remote job may be done before its validated document is available locally.
-            $this->recordRetryError($operation, __('compositions.errors.created_unreadable'));
-
-            return false;
-        }
-        $this->complete($operation, $composition);
-
-        return true;
-    }
-
     public function recordRetryError(CompositionOperation $operation, string $message): void
     {
         $operation->job->update(['response_data' => array_replace($operation->job->response_data ?? [], ['errors' => [$message]])]);
@@ -216,5 +113,10 @@ class CompositionOperationRepository extends BaseRepository
                 ]),
             ]);
         });
+    }
+
+    public function recordResponse(CompositionOperation $operation, array $response): void
+    {
+        $operation->job->update(['response_data' => $response]);
     }
 }

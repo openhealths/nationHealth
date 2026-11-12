@@ -8,31 +8,19 @@
 --}}
 @php
     $detail ??= [];
-    $status = \App\Enums\Composition\CompositionStatus::fromEHealth(data_get($detail, 'status'));
-    $type = \App\Enums\Composition\CompositionType::tryFrom((string) data_get($detail, 'type.coding.0.code'));
-    $category = \App\Enums\Composition\CompositionCategory::tryFrom((string) data_get($detail, 'category.coding.0.code'));
-
-    $extensions = collect(data_get($detail, 'extension', []))
-        ->filter(static fn ($extension) => is_array($extension) && isset($extension['valueCode']))
-        ->mapWithKeys(static fn (array $extension) => [
-            $extension['valueCode'] => $extension['valueUuid']
-                ?? $extension['valueDate']
-                ?? $extension['valueString']
-                ?? $extension['valueBoolean']
-                ?? null,
-        ]);
-
-    $asDate = static fn (?string $value) => $value
-        ? \Carbon\CarbonImmutable::parse($value)->format(config('app.date_format'))
-        : '-';
+    $display = $this->compositionDisplay($detail);
+    $status = $display['status'];
+    $type = $display['type'];
+    $category = $display['category'];
+    $extensions = $display['extensions'];
 
     $rows = [
         __('compositions.detail.number') => data_get($detail, 'title') ?: '-',
         __('compositions.detail.type') => $type?->label() ?? '-',
         __('compositions.detail.category') => $category?->label() ?? '-',
-        __('compositions.detail.date') => $asDate(data_get($detail, 'date')),
-        __('compositions.detail.period_start') => $asDate(data_get($detail, 'event.0.period.start')),
-        __('compositions.detail.period_end') => $asDate(data_get($detail, 'event.0.period.end')),
+        __('compositions.detail.date') => $this->compositionDate(data_get($detail, 'date')),
+        __('compositions.detail.period_start') => $this->compositionDate(data_get($detail, 'event.0.period.start')),
+        __('compositions.detail.period_end') => $this->compositionDate(data_get($detail, 'event.0.period.end')),
     ];
 @endphp
 
@@ -80,9 +68,9 @@
                             {{ __('compositions.detail.treatment_violation') }}
                         </div>
                         <div class="record-inner-value text-[14px] font-semibold break-words">
-                            {{ \App\Enums\Composition\TreatmentViolation::label((string) $extensions->get('TREATMENT_VIOLATION')) }}
+                            {{ $this->treatmentViolationLabel((string) $extensions->get('TREATMENT_VIOLATION')) }}
                             @if ($extensions->has('TREATMENT_VIOLATION_DATE'))
-                                ({{ $asDate($extensions->get('TREATMENT_VIOLATION_DATE')) }})
+                                ({{ $this->compositionDate($extensions->get('TREATMENT_VIOLATION_DATE')) }})
                             @endif
                         </div>
                     </div>

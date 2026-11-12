@@ -14,6 +14,9 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use ReflectionMethod;
+use Tests\Feature\Composition\CompositionTestFixtures;
+use Tests\Feature\Composition\RefreshCompositionDatabase;
 use Tests\TestCase;
 
 class Tv39CompositionWorkflowTest extends TestCase
@@ -89,7 +92,7 @@ class Tv39CompositionWorkflowTest extends TestCase
             ->assertSet('form.subjectUuid', $child->uuid)
             ->assertSet('form.sectionFocusUuid', $caregiver->uuid)
             ->assertSee($caregiver->fullName);
-        $payload = $component->instance()->form->toPayload($employee->uuid);
+        $payload = (new ReflectionMethod($component->instance(), 'buildCompositionPayload'))->invoke($component->instance(), $employee->uuid);
         $this->assertSame('preperson', data_get($payload, 'subject.type.coding.0.code'));
         $this->assertSame('person', data_get($payload, 'section.focus.type.coding.0.code'));
         $this->assertSame($child->uuid, data_get($payload, 'subject.value'));

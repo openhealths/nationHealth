@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\TestCase;
 
 class Tv39CompositionContractTest extends TestCase

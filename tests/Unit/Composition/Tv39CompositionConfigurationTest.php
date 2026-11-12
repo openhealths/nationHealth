@@ -6,8 +6,10 @@ namespace Tests\Unit\Composition;
 
 use App\Enums\Composition\CompositionConfiguration;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
+use App\Livewire\Person\Records\PatientCompositions;
 use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
+use ReflectionMethod;
 use Tests\Feature\Composition\UsesTv39CompositionConfiguration;
 use Tests\TestCase;
 
@@ -59,10 +61,10 @@ class Tv39CompositionConfigurationTest extends TestCase
     public function test_last_configured_calendar_day_is_allowed_and_next_day_is_refused(): void
     {
         $this->travelTo(CarbonImmutable::parse('2026-11-11T20:59:59Z'));
-        CompositionConfiguration::assertCancellationAllowed('2026-11-04T00:00:01Z');
+        (new ReflectionMethod(PatientCompositions::class, 'assertCancellationAllowed'))->invoke(new PatientCompositions, '2026-11-04T00:00:01Z');
         $this->assertTrue(true);
         $this->expectException(CompositionGuardException::class);
-        CompositionConfiguration::assertCancellationAllowed('2026-11-03T00:00:00Z');
+        (new ReflectionMethod(PatientCompositions::class, 'assertCancellationAllowed'))->invoke(new PatientCompositions, '2026-11-03T00:00:00Z');
     }
 
     public function test_replacement_reason_uses_its_own_timeout(): void
@@ -71,10 +73,10 @@ class Tv39CompositionConfigurationTest extends TestCase
         $settings[CompositionConfiguration::REPLACE_ENABLED->value] = true;
         config(['compositions.emal' => $settings]);
         $this->travelTo(CarbonImmutable::parse('2026-11-11T12:00:00Z'));
-        CompositionConfiguration::assertCancellationAllowed('2026-10-01T09:00:00Z', 'INCORRECT_PATIENT');
+        (new ReflectionMethod(PatientCompositions::class, 'assertCancellationAllowed'))->invoke(new PatientCompositions, '2026-10-01T09:00:00Z', 'INCORRECT_PATIENT');
         $this->assertTrue(true);
         $this->expectException(CompositionGuardException::class);
-        CompositionConfiguration::assertCancellationAllowed('2026-10-01T09:00:00Z', 'INCORRECT_OTHER');
+        (new ReflectionMethod(PatientCompositions::class, 'assertCancellationAllowed'))->invoke(new PatientCompositions, '2026-10-01T09:00:00Z', 'INCORRECT_OTHER');
     }
 
     public function test_disabled_timeout_does_not_apply_a_day_limit(): void
@@ -82,7 +84,7 @@ class Tv39CompositionConfigurationTest extends TestCase
         $settings = config('compositions.emal');
         $settings[CompositionConfiguration::CANCEL_ENABLED->value] = false;
         config(['compositions.emal' => $settings]);
-        CompositionConfiguration::assertCancellationAllowed('2020-01-01');
+        (new ReflectionMethod(PatientCompositions::class, 'assertCancellationAllowed'))->invoke(new PatientCompositions, '2020-01-01');
         $this->assertTrue(true);
     }
 
@@ -90,7 +92,7 @@ class Tv39CompositionConfigurationTest extends TestCase
     {
         $this->expectException(CompositionGuardException::class);
         $this->expectExceptionMessage(__('compositions.errors.configuration_unavailable'));
-        CompositionConfiguration::assertCancellationAllowed('not-a-date');
+        (new ReflectionMethod(PatientCompositions::class, 'assertCancellationAllowed'))->invoke(new PatientCompositions, 'not-a-date');
     }
 
     public function test_boolean_switch_cannot_be_a_string(): void

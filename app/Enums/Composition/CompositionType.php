@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums\Composition;
 
+use App\Enums\Composition\CompositionCategory;
 use App\Enums\User\Role;
 use App\Models\LegalEntity;
 use App\Traits\EnumUtils;
@@ -120,6 +121,26 @@ enum CompositionType: string
         return match ($this) {
             self::NEWBORN => 'COMPOSITION_CANCELLATION_REASONS_NEWBORN',
             self::TEMP_DISABILITY => 'COMPOSITION_CANCELLATION_REASONS_TEMP_DISABILITY',
+        };
+    }
+
+    /** Categories belonging to this conclusion type. */
+    public function categories(): array
+    {
+        return match ($this) {
+            self::NEWBORN => [CompositionCategory::LIVE_BIRTH],
+            self::TEMP_DISABILITY => [
+                CompositionCategory::SICKNESS,
+                CompositionCategory::CHILD_CARE,
+                CompositionCategory::FAMILY_CARE,
+                CompositionCategory::PARENTAL_CARE,
+                CompositionCategory::PREGNANCY,
+                CompositionCategory::QUARANTINE,
+                CompositionCategory::COVID19,
+                CompositionCategory::TEMP_TRANSFER,
+                CompositionCategory::PROSTHETIC,
+                CompositionCategory::RESTORATION,
+            ],
         };
     }
 }

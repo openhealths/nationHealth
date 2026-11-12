@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace App\Enums\Composition;
 
-use App\Exceptions\MedicalEvents\CompositionGuardException;
-use Carbon\CarbonImmutable;
-
 /**
  * Which set of pregnancy validity periods applies to a conclusion (TV 3.8.2.5.4).
  *
@@ -38,70 +35,5 @@ enum CompositionPregnancyPeriodMode: string
             self::APPENDED => 'EMAL_VALIDATION_PREGNANCY_APPENDED_COMPOSITION_ALLOWED_PERIOD',
             self::NEW, self::REPLACEMENT => 'EMAL_VALIDATION_PREGNANCY_NEW_COMPOSITION_ALLOWED_PERIODS',
         };
-    }
-
-    /**
-     * Decide the mode from the relation the conclusion carries.
-     */
-    public static function fromRelation(?string $relatesToCode, ?string $relatesToTargetUuid): self
-    {
-        if (blank($relatesToTargetUuid)) {
-            return self::NEW;
-        }
-
-        return $relatesToCode === 'appends' ? self::APPENDED : self::REPLACEMENT;
-    }
-
-    public function allowedDays(array $configurations): array
-    {
-        $name = $this->configurationName();
-
-        // Exact name match only. Substring matching cannot distinguish the two
-        // configurations reliably, and a wrong match silently widens the allowed set.
-        $days = collect($configurations)
-            ->filter(static fn (mixed $row): bool => is_array($row) && data_get($row, 'name') === $name)
-            ->pluck('value')
-            ->flatten()
-            ->filter(static fn (mixed $value): bool => is_int($value) && $value > 0)
-            ->map(static fn (mixed $value): int => (int) $value)
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
-
-        if ($days === []) {
-            throw new CompositionGuardException(
-                __('compositions.errors.pregnancy_periods_unavailable')
-            );
-        }
-
-        return $days;
-    }
-
-    public function allowedEndDates(string $start, array $configurations): array
-    {
-        $from = CarbonImmutable::parse($start);
-
-        $options = [];
-
-        foreach ($this->allowedDays($configurations) as $days) {
-            $options[$days] = $from->addDays($days - 1)->format(config('app.date_format'));
-        }
-
-        return $options;
-    }
-
-    public function assertPeriodAllowed(string $start, string $end, array $configurations): void
-    {
-        $allowed = $this->allowedEndDates($start, $configurations);
-        $candidate = CarbonImmutable::parse($end)->format(config('app.date_format'));
-
-        if (!in_array($candidate, $allowed, true)) {
-            throw new CompositionGuardException(
-                __('compositions.errors.pregnancy_period_not_allowed', [
-                    'periods' => implode(', ', $allowed),
-                ])
-            );
-        }
     }
 }

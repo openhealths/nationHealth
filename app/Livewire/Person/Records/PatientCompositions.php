@@ -6,26 +6,24 @@ namespace App\Livewire\Person\Records;
 
 use App\Classes\eHealth\EHealth;
 use App\Enums\Composition\CompositionAsyncOperation;
-use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionConfiguration;
 use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
-use App\Enums\MergeRequest\Status as MergeRequestStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
-use App\Livewire\Composition\Concerns\InteractsWithCompositions;
+use App\Livewire\Composition\CompositionComponent;
 use App\Livewire\Composition\Forms\CompositionCancellationForm;
+use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\MedicalEvents\Sql\CompositionOperation;
-use App\Models\MergeRequest;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\SignatureService;
+use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
@@ -48,9 +46,8 @@ use Throwable;
  *
  * ТЗ references: 3.8.1.3, 3.8.1.9, 3.8.1.10, 3.8.2.3, 3.8.2.11, 3.8.2.14, 3.8.2.15
  */
-class PatientCompositions extends BasePatientComponent
+class PatientCompositions extends CompositionComponent
 {
-    use InteractsWithCompositions;
     use WithFileUploads;
     use WithPagination;
 
@@ -360,7 +357,7 @@ class PatientCompositions extends BasePatientComponent
             return true;
         }
         try {
-            CompositionConfiguration::assertCancellationAllowed($composition->date, $this->form->reason);
+            $this->assertCancellationAllowed($composition->date, $this->form->reason);
         } catch (CompositionGuardException $exception) {
             Session::flash('error', $exception->getMessage());
             $this->addError('form.guard', $exception->getMessage());
@@ -497,7 +494,7 @@ class PatientCompositions extends BasePatientComponent
             $signer = app(SignatureService::class);
 
             $signedContent = $signer->signData(
-                $this->form->toCancellationPayload($composition->uuid, $composition->type),
+                $this->buildCancellationPayload($composition->uuid, $composition->type),
                 $this->form->password,
                 $this->form->knedp,
                 $this->form->keyContainerUpload,
@@ -509,13 +506,14 @@ class PatientCompositions extends BasePatientComponent
             // eHealth processes the cancellation asynchronously, so the conclusion is not
             // in error yet. The job is recorded so the poller can finish the job off;
             // discarding it would leave the row permanently claiming to be pending.
-            Repository::compositionOperation()->store($job, CompositionAsyncOperation::CANCEL, $this->patient(), [
+            $operation = Repository::compositionOperation()->store($job, CompositionAsyncOperation::CANCEL, $this->patient(), [
                 'composition_id' => $composition->id,
                 'composition_type' => $composition->type,
                 'encounter_uuid' => $composition->encounterUuid,
                 'episode_uuid' => $composition->episodeOfCareUuid,
                 'author_uuid' => $composition->authorUuid,
             ]);
+            $this->queueCompositionOperation($operation);
 
             $this->closeCancellationModal();
             Session::flash('success', __('compositions.messages.cancellation_submitted'));
@@ -613,13 +611,14 @@ class PatientCompositions extends BasePatientComponent
             // The retry is asynchronous: the ERLN status will not change until the job
             // finishes, so the job is recorded and the list poller reports the outcome
             // instead of an immediate refresh that can only show the stale status.
-            Repository::compositionOperation()->store($job, CompositionAsyncOperation::ERLN_RETRY, $this->patient(), [
+            $operation = Repository::compositionOperation()->store($job, CompositionAsyncOperation::ERLN_RETRY, $this->patient(), [
                 'composition_id' => $composition->id,
                 'composition_type' => $composition->type,
                 'encounter_uuid' => $composition->encounterUuid,
                 'episode_uuid' => $composition->episodeOfCareUuid,
                 'author_uuid' => $composition->authorUuid,
             ]);
+            $this->queueCompositionOperation($operation);
 
             $this->closeErlnResendModal();
             Session::flash('success', __('compositions.messages.erln_resent_successfully'));
@@ -753,35 +752,7 @@ class PatientCompositions extends BasePatientComponent
     #[Computed]
     public function clarifiableUnidentifiedConclusions(): Collection
     {
-        $patient = $this->patient();
-
-        if ($patient instanceof Preperson) {
-            return collect();
-        }
-
-        $mergedPrepersonIds = MergeRequest::query()
-            ->whereMasterPersonId($patient->id)
-            ->whereIn('status', [MergeRequestStatus::APPROVED->value, MergeRequestStatus::SIGNED->value])
-            ->pluck('merge_person_id');
-
-        if ($mergedPrepersonIds->isEmpty()) {
-            return collect();
-        }
-
-        return Composition::query()
-            ->whereIn('preperson_id', $mergedPrepersonIds)
-            ->ofType(CompositionType::TEMP_DISABILITY)
-            ->whereHas(
-                'categoryConcept.coding',
-                static fn ($query) => $query->where('code', CompositionCategory::SICKNESS->value)
-            )
-            ->signed()
-            // Only the newest one per merged record is offered: clarifying an already
-            // superseded conclusion is not what TV 3.8.2.12 describes.
-            ->orderByDesc('date')
-            ->get()
-            ->unique('preperson_id')
-            ->values();
+        return Repository::composition()->clarifiableUnidentifiedForPatient($this->patient());
     }
 
     /**
@@ -847,11 +818,7 @@ class PatientCompositions extends BasePatientComponent
         }
 
         // A malformed later detail or storage failure must leave every previous local record unchanged.
-        DB::transaction(static function () use ($repository, $patient, $validated): void {
-            foreach ($validated as [$details, $episodeUuid]) {
-                $repository->store($details, $patient, $episodeUuid);
-            }
-        });
+        $repository->storeMany($validated, $patient);
     }
 
     /**
@@ -867,5 +834,41 @@ class PatientCompositions extends BasePatientComponent
     public function render(): View
     {
         return view('livewire.composition.composition-index');
+    }
+
+    /** Build the cancellation document with the type's validated reason choice and the author's text. */
+    protected function buildCancellationPayload(string $compositionUuid, CompositionType $type): array
+    {
+        return [
+            'id' => $compositionUuid,
+            'reason' => [
+                'coding' => [['system' => 'eHealth/'.$type->cancellationReasonDictionary(), 'code' => $this->form->reason]],
+                'text' => $this->form->reasonText,
+            ],
+        ];
+    }
+
+    /** A day-based timeout includes the configured final calendar day. */
+    protected function assertCancellationAllowed(?string $signedDate, ?string $reason = null): void
+    {
+        if (!CompositionConfiguration::CANCEL_ENABLED->enabled()) {
+            return;
+        }
+        $days = CompositionConfiguration::CANCEL_DAYS->days();
+        if ($reason !== null && CompositionConfiguration::REPLACE_ENABLED->enabled()
+            && in_array($reason, CompositionConfiguration::REPLACE_REASONS->codes(allowEmpty: true), true)) {
+            $days = CompositionConfiguration::REPLACE_CANCEL_DAYS->days();
+        }
+        if (blank($signedDate)) {
+            throw new CompositionGuardException(__('compositions.errors.configuration_unavailable'));
+        }
+        try {
+            $signed = CarbonImmutable::parse($signedDate)->setTimezone(config('app.timezone'))->startOfDay();
+        } catch (Throwable) {
+            throw new CompositionGuardException(__('compositions.errors.configuration_unavailable'));
+        }
+        if ($signed->isFuture() || $signed->addDays($days)->lt(CarbonImmutable::today())) {
+            throw new CompositionGuardException(__('compositions.errors.cancel_timeout'));
+        }
     }
 }

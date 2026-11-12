@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Composition\Forms;
 
 use App\Core\BaseForm;
-use App\Enums\Composition\CompositionType;
-use App\Services\MedicalEvents\FhirResource;
 
 /**
  * Marking a Composition (МВН / МВТН) as entered in error.
@@ -35,21 +33,6 @@ class CompositionCancellationForm extends BaseForm
                 $allowedReasons === [] ? null : 'in:' . implode(',', array_keys($allowedReasons)),
             ]),
             'reasonText' => ['required', 'string', 'min:1', 'max:2000'],
-        ];
-    }
-
-    /**
-     * Build the object that gets signed and sent to cancelComposition.
-     *
-     * @return array<string, mixed>
-     */
-    public function toCancellationPayload(string $compositionUuid, CompositionType $type): array
-    {
-        return [
-            'id' => $compositionUuid,
-            'reason' => FhirResource::make()
-                ->coding('eHealth/'.$type->cancellationReasonDictionary(), $this->reason)
-                ->toCodeableConcept($this->reasonText),
         ];
     }
 

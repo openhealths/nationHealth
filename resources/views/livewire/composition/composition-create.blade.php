@@ -1,4 +1,3 @@
-@use('App\Enums\Composition\CompositionStatus')
 @use('App\Models\MedicalEvents\Sql\Composition')
 @use('Carbon\CarbonImmutable')
 @use('App\Livewire\Composition\CompositionCreate', 'Wizard')
@@ -516,7 +515,7 @@
                     <legend class="legend">{{ __('compositions.create_newborn.steps.review') }}</legend>
                     <div class="mt-6">
                         @php
-                            $reviewStatus = CompositionStatus::fromEHealth(data_get($compositionDetail, 'status'));
+                            $reviewStatus = $this->compositionStatus(data_get($compositionDetail, 'status'));
                         @endphp
 
                         @include('livewire.composition.parts.details-summary', ['detail' => $compositionDetail])

@@ -7,6 +7,7 @@ namespace Tests\Feature\Composition;
 use App\Classes\eHealth\EHealth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
+use Tests\Feature\Composition\CompositionTestFixtures;
 use Tests\TestCase;
 
 class CompositionResponseValidationTest extends TestCase

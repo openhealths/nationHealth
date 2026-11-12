@@ -12,9 +12,10 @@ use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\MedicalEvents\Sql\CompositionOperation;
 use App\Models\Person\Person;
 use App\Models\Preperson;
-use App\Repositories\MedicalEvents\CompositionOperationRepository;
+use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Tests\Feature\Composition\RefreshCompositionDatabase;
 use Tests\TestCase;
 
 class CompositionOperationRepositoryTest extends TestCase
@@ -25,7 +26,7 @@ class CompositionOperationRepositoryTest extends TestCase
     {
         Http::preventStrayRequests();
         $person = $this->person();
-        $repository = app(CompositionOperationRepository::class);
+        $repository = Repository::compositionOperation();
         $operation = $repository->store(['id' => 'create-job', 'status' => 'DONE'], CompositionAsyncOperation::CREATE, $person, [
             'composition_type' => CompositionType::NEWBORN, 'encounter_uuid' => (string) Str::uuid(),
             'episode_uuid' => (string) Str::uuid(), 'author_uuid' => (string) Str::uuid(),
@@ -46,7 +47,7 @@ class CompositionOperationRepositoryTest extends TestCase
         $person = $this->person();
         $otherPerson = $this->person();
         $preperson = Preperson::create(['uuid' => (string) Str::uuid(), 'gender' => 'MALE']);
-        $repository = app(CompositionOperationRepository::class);
+        $repository = Repository::compositionOperation();
         $failed = $repository->store(['id' => 'failed-job'], CompositionAsyncOperation::ERLN_RETRY, $person, []);
         $repository->fail($failed, ['status' => 'FAILED', 'errors' => ['Rejected']]);
         $retry = $repository->store(['id' => 'retry-job'], CompositionAsyncOperation::ERLN_RETRY, $person, []);
@@ -62,7 +63,7 @@ class CompositionOperationRepositoryTest extends TestCase
     public function test_recording_the_same_remote_job_twice_does_not_duplicate_technical_records(): void
     {
         $person = $this->person();
-        $repository = app(CompositionOperationRepository::class);
+        $repository = Repository::compositionOperation();
         $first = $repository->store(['id' => 'same-job'], CompositionAsyncOperation::SIGN, $person, []);
         $second = $repository->store(['id' => 'same-job'], CompositionAsyncOperation::SIGN, $person, []);
         $this->assertSame($first->id, $second->id);

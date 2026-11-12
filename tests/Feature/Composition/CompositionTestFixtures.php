@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Mockery;
 use Spatie\Permission\Models\Role as PermissionRole;
+use Tests\Feature\Composition\UsesTv39CompositionConfiguration;
 
 /**
  * Shared setup for the medical conclusion tests.

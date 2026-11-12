@@ -2,10 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Composition\Concerns;
+namespace App\Livewire\Composition;
 
 use App\Classes\eHealth\EHealth;
-use App\Classes\eHealth\SchemaResponseContract;
 use App\Enums\Composition\CompositionAsyncOperation;
 use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionConfiguration;
@@ -18,6 +17,7 @@ use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\MedicalEvents\ClinicalStorageException;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
+use App\Livewire\Composition\CompositionComponent;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\MedicalEvents\Sql\CompositionOperation;
 use App\Models\MedicalEvents\Sql\Encounter;
@@ -47,10 +47,8 @@ use Throwable;
  * Each concrete wizard still owns its details form and payload, because those are what
  * the contract treats as two different documents.
  */
-trait DrivesCompositionWizard
+abstract class CompositionCreateComponent extends CompositionComponent
 {
-    use InteractsWithCompositions;
-
     public const int STEP_ENCOUNTER = 1;
 
     public const int STEP_AUTH_METHOD = 2;
@@ -267,7 +265,7 @@ trait DrivesCompositionWizard
         }
 
         $authorUuid = $this->authorEmployeeUuid();
-        $payload = $this->form->toPayload((string) $authorUuid);
+        $payload = $this->buildCompositionPayload((string) $authorUuid);
         // Public form fields must still refer to the patient and encounter selected in the locked context.
         if (data_get($payload, 'subject.value') !== data_get($this->selectedEncounter, 'subjectUuid')
             || data_get($payload, 'subject.value') !== $this->encounterSubjectUuid()) {
@@ -392,7 +390,7 @@ trait DrivesCompositionWizard
                     // an empty method list still meets that precondition and never creates an authentication method.
                     try {
                         $response = EHealth::person()->getAuthMethods($participant->uuid);
-                        SchemaResponseContract::validate($response, 'GET /api/persons/{id}/authentication_methods', 'composition');
+                        EHealth::composition()->validateNativeResponse($response, 'GET /api/persons/{id}/authentication_methods', 'composition');
                         $response->validate();
                     } catch (EHealthConnectionException | EHealthException) {
                         throw new CompositionGuardException(__('compositions.errors.participant_status_unavailable'));
@@ -427,11 +425,11 @@ trait DrivesCompositionWizard
                 throw new CompositionGuardException(__('compositions.errors.participant_age_not_allowed'));
             }
             $age = $birthDate->age;
-            ($isFocus ? CompositionConfiguration::FOCUS_AGES : CompositionConfiguration::SUBJECT_AGES)->assertAgeAllowed($category, $age);
+            $this->assertParticipantAgeAllowed($isFocus ? CompositionConfiguration::FOCUS_AGES : CompositionConfiguration::SUBJECT_AGES, $category, $age);
             $newborn = $this->conclusionType() === CompositionType::NEWBORN;
             $ageEnabled = $newborn ? CompositionConfiguration::NEWBORN_AGE_ENABLED : CompositionConfiguration::DISABILITY_AGE_ENABLED;
             if (!$isFocus && $ageEnabled->enabled()) {
-                ($newborn ? CompositionConfiguration::NEWBORN_AGE : CompositionConfiguration::DISABILITY_AGE)->assertAgeAllowed($category, $age);
+                $this->assertParticipantAgeAllowed($newborn ? CompositionConfiguration::NEWBORN_AGE : CompositionConfiguration::DISABILITY_AGE, $category, $age);
             }
             $genderEnabled = $newborn ? CompositionConfiguration::NEWBORN_GENDER_ENABLED : CompositionConfiguration::DISABILITY_GENDER_ENABLED;
             if ($isFocus && $genderEnabled->enabled()) {
@@ -470,7 +468,7 @@ trait DrivesCompositionWizard
         }
         // Summary rows omit diagnoses; read the full native encounter only when the enabled rule requires it.
         $response = EHealth::encounter()->getById($this->encounterSubjectUuid(), $this->form->encounterUuid);
-        $native = SchemaResponseContract::validate($response, 'GET /api/patients/{patient_id}/encounters/{encounter_id}', 'composition');
+        $native = EHealth::composition()->validateNativeResponse($response, 'GET /api/patients/{patient_id}/encounters/{encounter_id}', 'composition');
         if ($native['id'] !== $this->form->encounterUuid
             || data_get($native, 'performer.identifier.value') !== $this->authorEmployeeUuid()) {
             throw new CompositionGuardException(__('compositions.errors.encounter_not_selectable'));
@@ -492,7 +490,7 @@ trait DrivesCompositionWizard
                 throw ValidationException::withMessages(['data' => __('compositions.errors.invalid_response')]);
             }
             if (data_get($item, 'identifier.value') !== $except
-                && CompositionStatus::fromEHealth($item['status']) !== CompositionStatus::ENTERED_IN_ERROR) {
+                && $this->compositionStatus($item['status']) !== CompositionStatus::ENTERED_IN_ERROR) {
                 throw new CompositionGuardException(__('compositions.errors.preperson_duplicate'));
             }
         }
@@ -579,9 +577,7 @@ trait DrivesCompositionWizard
         }
 
         if (ctype_digit($encounterRef)) {
-            return Encounter::query()
-                ->whereKey((int) $encounterRef)
-                ->value('uuid');
+            return Encounter::find((int) $encounterRef)?->uuid;
         }
 
         return null;
@@ -612,7 +608,7 @@ trait DrivesCompositionWizard
         try {
             $response = EHealth::person()->getAuthMethods($subjectUuid);
             // The shared patient client must keep its native union, including required audit metadata.
-            $native = SchemaResponseContract::validate($response, 'GET /api/persons/{id}/authentication_methods', 'composition');
+            $native = EHealth::composition()->validateNativeResponse($response, 'GET /api/persons/{id}/authentication_methods', 'composition');
             $response->validate();
             $this->authMethods = collect($native)->filter(static function (array $method): bool {
                 $endedAt = $method['ehealth_ended_at'] ?? ($method['ended_at'] ?? null);
@@ -755,9 +751,9 @@ trait DrivesCompositionWizard
 
         try {
             // Do not log the payload: it is the patient's medical record.
-            $job = EHealth::composition()->create($this->form->toPayload($authorUuid))->validate();
+            $job = EHealth::composition()->create($this->buildCompositionPayload($authorUuid))->validate();
 
-            MedicalEventsRepository::compositionOperation()->store($job, CompositionAsyncOperation::CREATE, $this->storagePatient(), [
+            $operation = MedicalEventsRepository::compositionOperation()->store($job, CompositionAsyncOperation::CREATE, $this->storagePatient(), [
                 'composition_type' => $this->conclusionType(),
                 'encounter_uuid' => $this->form->encounterUuid,
                 'episode_uuid' => $this->episodeUuid,
@@ -767,6 +763,7 @@ trait DrivesCompositionWizard
                     'selectedEncounter' => $this->selectedEncounter,
                 ],
             ]);
+            $this->queueCompositionOperation($operation);
             $this->asyncJobId = $job['id'];
             $this->asyncJobStatus = (string) ($job['status'] ?? CompositionJobStatus::PENDING->value);
             $this->asyncJobErrors = [];
@@ -877,7 +874,7 @@ trait DrivesCompositionWizard
         if ($operation === null || $operation->status !== CompositionJobStatus::PENDING->value) {
             return;
         }
-        MedicalEventsRepository::compositionOperation()->queue($operation);
+        $this->queueCompositionOperation($operation);
         $this->asyncJobErrors = [];
         $this->asyncJobStatus = CompositionJobStatus::PENDING->value;
     }
@@ -924,7 +921,7 @@ trait DrivesCompositionWizard
                 $this->form->encounterUuid
             )->validate();
 
-            MedicalEventsRepository::composition()->assertDocumentContext($details, [
+            EHealth::composition()->assertDocumentContext($details, [
                 'identifier.value' => $this->compositionUuid,
                 'subject.value' => $this->encounterSubjectUuid(),
                 'encounter.value' => $this->form->encounterUuid,
@@ -1006,7 +1003,9 @@ trait DrivesCompositionWizard
 
     public function sign(): void
     {
-        $composition = Composition::whereUuid($this->compositionUuid)->first();
+        $composition = $this->compositionUuid === null
+            ? null
+            : MedicalEventsRepository::composition()->findByUuid($this->compositionUuid);
 
         if (!$composition) {
             Session::flash('error', __('compositions.errors.not_found'));
@@ -1057,7 +1056,7 @@ trait DrivesCompositionWizard
 
             $job = EHealth::composition()->sign($composition->uuid, ['data' => $signedContent])->validate();
 
-            MedicalEventsRepository::compositionOperation()->store($job, CompositionAsyncOperation::SIGN, $this->storagePatient(), [
+            $operation = MedicalEventsRepository::compositionOperation()->store($job, CompositionAsyncOperation::SIGN, $this->storagePatient(), [
                 'composition_id' => $composition->id,
                 'composition_type' => $composition->type,
                 'encounter_uuid' => $composition->encounterUuid,
@@ -1068,6 +1067,7 @@ trait DrivesCompositionWizard
                     'selectedEncounter' => $this->selectedEncounter,
                 ],
             ]);
+            $this->queueCompositionOperation($operation);
 
             $this->showSignatureModal = false;
             $this->form->resetSigningFields();
@@ -1139,34 +1139,80 @@ trait DrivesCompositionWizard
         return MedicalEventsRepository::compositionOperation()->findForWizard($this->patient(), $this->asyncJobId ?? '', $this->conclusionType(), Auth::user());
     }
 
-    protected function resolveCreatedComposition(
-        string $patientUuid,
-        string $encounterUuid,
-        CompositionType $type
-    ): ?string {
-        try {
-            $results = EHealth::composition()->search([
-                'subject' => $patientUuid,
-                'encounter' => $encounterUuid,
-                'type' => $type->value,
-                'limit' => 2,
-            ])->validate();
-        } catch (Throwable $exception) {
-            Log::warning('Could not locate the created composition by encounter', [
-                'encounter' => $encounterUuid,
-                'error' => $exception->getMessage(),
-            ]);
+    abstract protected function buildCompositionPayload(string $authorEmployeeUuid): array;
 
-            return null;
+    protected function base(array $parts): array
+    {
+        $period = ['start' => $parts['periodStart']];
+
+        // МВН Confluence examples send `"end": null`; МВТН always has a concrete end.
+        if (($parts['periodEnd'] ?? null) !== null || ($parts['includeNullPeriodEnd'] ?? false)) {
+            $period['end'] = $parts['periodEnd'] ?? null;
         }
 
-        $candidates = collect($results)
-            ->pluck('identifier.value')
-            ->filter()
-            ->unique()
-            ->values();
+        return [
+            'type' => $this->codeableConcept('COMPOSITION_TYPES', $parts['type']->value),
+            'category' => $this->codeableConcept('COMPOSITION_CATEGORIES', $parts['category']),
+            // `event` is a list even though only the validity period is ever sent.
+            'event' => [
+                [
+                    'code' => $this->codeableConcept('COMPOSITION_EVENTS', 'COMPOSITION_VALIDITY_PERIOD'),
+                    'period' => $period,
+                ],
+            ],
+            'subject' => $this->resourceIdentifier($parts['subjectResource'], $parts['subjectUuid']),
+            'encounter' => $this->resourceIdentifier('encounter', $parts['encounterUuid']),
+            'author' => $this->resourceIdentifier('employee', $parts['authorEmployeeUuid']),
+            'section' => [
+                'focus' => $this->resourceIdentifier($parts['focusResource'], $parts['focusUuid']),
+            ],
+        ];
+    }
 
-        // A later date does not associate a conclusion with this async job.
-        return $candidates->count() === 1 ? $candidates->first() : null;
+    protected function informWith(?string $authenticationMethodUuid): array
+    {
+        return $authenticationMethodUuid
+            ? [['valueCode' => 'INFORM_WITH', 'valueUuid' => $authenticationMethodUuid]]
+            : [];
+    }
+
+    protected function codeableConcept(string $system, string $code): array
+    {
+        return ['coding' => [['system' => $system, 'code' => $code]]];
+    }
+
+    protected function resourceIdentifier(string $resource, string $uuid): array
+    {
+        // Composition uses the bare Identifier, without the Reference wrapper.
+        return [
+            'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => $resource]], 'text' => $resource],
+            'value' => $uuid,
+        ];
+    }
+
+    protected function startOfDay(string $date): string
+    {
+        return $this->date($date) . 'T00:00:01Z';
+    }
+
+    protected function endOfDay(string $date): string
+    {
+        return $this->date($date) . 'T20:59:59Z';
+    }
+
+    protected function date(string $date): string
+    {
+        return CarbonImmutable::parse($date)->format('Y-m-d');
+    }
+
+    protected function assertParticipantAgeAllowed(CompositionConfiguration $parameter, string $category, int $age): void
+    {
+        [$min, $max] = $parameter->value($category);
+        if ($min !== null && $max !== null && $max < $min) {
+            throw new CompositionGuardException(__('compositions.errors.configuration_unavailable'));
+        }
+        if (($min !== null && $age < $min) || ($max !== null && $age > $max)) {
+            throw new CompositionGuardException(__('compositions.errors.participant_age_not_allowed'));
+        }
     }
 }

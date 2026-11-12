@@ -13,9 +13,8 @@ use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
 use App\Enums\Composition\TreatmentViolation;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
-use App\Livewire\Composition\Concerns\DrivesCompositionWizard;
+use App\Livewire\Composition\CompositionCreateComponent;
 use App\Livewire\Composition\Forms\CompositionTempDisabilityForm;
-use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\Person\Person;
 use App\Models\Preperson;
@@ -41,9 +40,8 @@ use Livewire\WithFileUploads;
  * Nothing is written to the local table until eHealth has assigned the conclusion an id,
  * so abandoning the wizard leaves no orphaned rows behind.
  */
-class CompositionTempDisabilityCreate extends BasePatientComponent
+class CompositionTempDisabilityCreate extends CompositionCreateComponent
 {
-    use DrivesCompositionWizard;
     use WithFileUploads;
 
     public CompositionTempDisabilityForm $form;
@@ -105,7 +103,7 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
      */
     public function categoryOptions(): array
     {
-        $options = CompositionCategory::optionsFor(CompositionType::TEMP_DISABILITY);
+        $options = $this->form->categoryOptions();
         try {
             $categories = CompositionConfiguration::DISABILITY_CATEGORIES->codes();
             $position = data_get($this->selectedEncounter, 'authorPosition');
@@ -145,10 +143,7 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
         }
 
         try {
-            return $this->pregnancyPeriodMode()->allowedEndDates(
-                $this->form->eventPeriodStart,
-                $this->pregnancyConfigurations()
-            );
+            return $this->allowedPregnancyEndDates($this->form->eventPeriodStart);
         } catch (CompositionGuardException $exception) {
             // Fail closed: without the configuration there is no permitted period to
             // offer, and a free date entry here would only produce a rejected payload.
@@ -163,21 +158,12 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
      */
     private function pregnancyPeriodMode(): CompositionPregnancyPeriodMode
     {
-        return CompositionPregnancyPeriodMode::fromRelation(
-            $this->form->relatesToCode,
-            $this->form->relatesToTargetUuid
-        );
-    }
+        if (blank($this->form->relatesToTargetUuid)) {
+            return CompositionPregnancyPeriodMode::NEW;
+        }
 
-    private function pregnancyConfigurations(): array
-    {
-        // Legacy EMAL chart parameters have no public MIS provider endpoint. The modern
-        // composition_configurations catalog uses different JSON settings, not name/value rows.
-        $key = $this->pregnancyPeriodMode()->configurationName();
-        $parameter = CompositionConfiguration::from($key);
-        $value = $parameter->value();
-
-        return [['name' => $key, 'value' => $value]];
+        return $this->form->relatesToCode === CompositionRelation::APPENDS->value
+            ? CompositionPregnancyPeriodMode::APPENDED : CompositionPregnancyPeriodMode::REPLACEMENT;
     }
 
     /**
@@ -379,11 +365,7 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
 
         // TV 3.8.2.5.4 — a pregnancy period must be one eHealth publishes as allowed.
         if ($category->hasRestrictedValidityPeriods()) {
-            $this->pregnancyPeriodMode()->assertPeriodAllowed(
-                $this->form->eventPeriodStart,
-                $this->form->eventPeriodEnd,
-                $this->pregnancyConfigurations()
-            );
+            $this->assertPregnancyPeriodAllowed($this->form->eventPeriodStart, $this->form->eventPeriodEnd);
         }
 
         // TV 3.8.2.12, 3.8.2.13 — the chain is re-validated against eHealth, because the
@@ -403,7 +385,7 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
      */
     private function assertRelatedConclusionUsable(string $previousUuid, bool $isContinuation): Composition
     {
-        $previous = Composition::whereUuid($previousUuid)->first();
+        $previous = MedicalEventsRepository::composition()->findByUuid($previousUuid);
 
         if (!$previous?->isTempDisability) {
             throw new CompositionGuardException(__('compositions.errors.related_not_found'));
@@ -421,7 +403,7 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
             throw new CompositionGuardException(__('compositions.errors.related_unreadable'));
         }
 
-        $status = CompositionStatus::fromEHealth(data_get($fresh, 'status'));
+        $status = $this->compositionStatus(data_get($fresh, 'status'));
 
         if ($status !== CompositionStatus::FINAL) {
             throw new CompositionGuardException(__('compositions.errors.related_not_final'));
@@ -487,7 +469,7 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
         if ($replacement === null) {
             return;
         }
-        $previous = Composition::whereUuid(data_get($replacement, 'targetIdentifier.value'))->first();
+        $previous = MedicalEventsRepository::composition()->findByUuid(data_get($replacement, 'targetIdentifier.value'));
         // TV39 3.8.2.12.1 requires the signed identification pair immediately before KEP as well as at creation.
         if ($previous === null || !$this->mayClarify($previous)) {
             throw new CompositionGuardException(__('compositions.errors.related_not_clarifiable'));
@@ -509,11 +491,11 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
                 throw new CompositionGuardException(__('compositions.errors.related_unreadable'));
             }
             $details = EHealth::composition()->getById($previous->patientUuid, $uuid, $episode, $encounter)->validate();
-            MedicalEventsRepository::composition()->assertDocumentContext($details, [
+            EHealth::composition()->assertDocumentContext($details, [
                 'identifier.value' => $uuid, 'subject.value' => $previous->patientUuid,
                 'encounter.value' => $encounter, 'type.coding.0.code' => CompositionType::TEMP_DISABILITY->value,
             ]);
-            if (CompositionStatus::fromEHealth($details['status']) !== CompositionStatus::FINAL) {
+            if ($this->compositionStatus($details['status']) !== CompositionStatus::FINAL) {
                 continue;
             }
             $relations = $details['relatesTo'] ?? [];
@@ -544,12 +526,12 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
             if ($parent === null) {
                 break;
             }
-            $previous = Composition::whereUuid(data_get($parent, 'targetIdentifier.value'))->first();
+            $previous = MedicalEventsRepository::composition()->findByUuid(data_get($parent, 'targetIdentifier.value'));
             if ($previous === null) {
                 throw new CompositionGuardException(__('compositions.errors.related_unreadable'));
             }
             $fresh = $this->fetchComposition($previous);
-            if (CompositionStatus::fromEHealth($fresh['status'] ?? null) !== CompositionStatus::FINAL
+            if ($this->compositionStatus($fresh['status'] ?? null) !== CompositionStatus::FINAL
                 || data_get($fresh, 'category.coding.0.code') !== $this->form->category
                 || data_get($fresh, 'subject.value') !== $this->form->subjectUuid
                 || data_get($fresh, 'section.focus.value') !== $this->form->sectionFocusUuid
@@ -593,7 +575,7 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
             return;
         }
 
-        $previous = Composition::whereUuid($previousUuid)->first();
+        $previous = MedicalEventsRepository::composition()->findByUuid($previousUuid);
 
         if (!$previous?->isTempDisability
             || !$this->mayClarify($previous) || !in_array($previous->authorUuid, Auth::user()->getCompositionEmployeeUuids(), true)) {
@@ -625,5 +607,102 @@ class CompositionTempDisabilityCreate extends BasePatientComponent
     public function render(): View
     {
         return view('livewire.composition.composition-temp-disability-create');
+    }
+
+    /** Build the unsigned request only after the component has validated its context and form. */
+    protected function buildCompositionPayload(string $authorEmployeeUuid): array
+    {
+        $subjectResource = $this->form->isUnidentified ? 'preperson' : 'person';
+
+        $payload = $this->base([
+            'type' => CompositionType::TEMP_DISABILITY,
+            'category' => $this->form->category,
+            'subjectUuid' => $this->form->subjectUuid,
+            'subjectResource' => $subjectResource,
+            'encounterUuid' => $this->form->encounterUuid,
+            'authorEmployeeUuid' => $authorEmployeeUuid,
+            'focusUuid' => $this->form->sectionFocusUuid,
+            'focusResource' => $this->form->isFocusUnidentified ? 'preperson' : 'person',
+            'periodStart' => $this->startOfDay($this->form->eventPeriodStart),
+            'periodEnd' => $this->endOfDay($this->form->eventPeriodEnd),
+        ]);
+
+        $extensions = $this->informWith($this->form->informWithUuid ?? null);
+
+        foreach ([
+            'IS_ACCIDENT' => $this->form->isAccident ?? false,
+            'IS_INTOXICATED' => $this->form->isIntoxicated ?? false,
+            'IS_FOREIGN_TREATMENT' => $this->form->isForeignTreatment ?? false,
+            'IS_FORCE_RENEW' => $this->form->isForceRenew ?? false,
+        ] as $code => $isSet) {
+            if ($isSet) {
+                $extensions[] = ['valueCode' => $code, 'valueBoolean' => true];
+            }
+        }
+
+        if (!empty($this->form->treatmentViolation)) {
+            $extensions[] = [
+                'valueCode' => 'TREATMENT_VIOLATION',
+                'valueString' => $this->form->treatmentViolation,
+            ];
+
+            if (!empty($this->form->treatmentViolationDate)) {
+                $extensions[] = [
+                    'valueCode' => 'TREATMENT_VIOLATION_DATE',
+                    'valueDate' => $this->date($this->form->treatmentViolationDate),
+                ];
+            }
+        }
+
+        $payload['extension'] = $extensions;
+
+        if (!empty($this->form->relatesToTargetUuid)) {
+            $payload['relatesTo'] = [
+                'code' => $this->form->relatesToCode ?? CompositionRelation::REPLACES->value,
+                'targetIdentifier' => $this->resourceIdentifier('composition', $this->form->relatesToTargetUuid),
+            ];
+        }
+
+        return $payload;
+    }
+
+    protected function allowedPregnancyDays(): array
+    {
+        $parameter = CompositionConfiguration::from($this->pregnancyPeriodMode()->configurationName());
+        // Read the exact mode's validated EMAL value; a continuation never uses the new-case periods.
+        $days = collect($parameter->value())->flatten()->filter(static fn (mixed $value): bool => is_int($value) && $value > 0)
+            ->unique()->sort()->values()->all();
+        if ($days === []) {
+            throw new CompositionGuardException(__('compositions.errors.pregnancy_periods_unavailable'));
+        }
+
+        return $days;
+    }
+
+    protected function allowedPregnancyEndDates(string $start): array
+    {
+        $from = CarbonImmutable::parse($start);
+
+        $options = [];
+
+        foreach ($this->allowedPregnancyDays() as $days) {
+            $options[$days] = $from->addDays($days - 1)->format(config('app.date_format'));
+        }
+
+        return $options;
+    }
+
+    protected function assertPregnancyPeriodAllowed(string $start, string $end): void
+    {
+        $allowed = $this->allowedPregnancyEndDates($start);
+        $candidate = CarbonImmutable::parse($end)->format(config('app.date_format'));
+
+        if (!in_array($candidate, $allowed, true)) {
+            throw new CompositionGuardException(
+                __('compositions.errors.pregnancy_period_not_allowed', [
+                    'periods' => implode(', ', $allowed),
+                ])
+            );
+        }
     }
 }

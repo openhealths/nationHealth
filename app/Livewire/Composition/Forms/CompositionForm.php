@@ -5,15 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\Composition\Forms;
 
 use App\Core\BaseForm;
-use App\Livewire\Composition\Forms\Concerns\BuildsCompositionPayload;
 use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionType;
 use Illuminate\Validation\Rule;
 
 class CompositionForm extends BaseForm
 {
-    use BuildsCompositionPayload;
-
     public string $type = CompositionType::NEWBORN->value;
 
     public string $category = CompositionCategory::LIVE_BIRTH->value;
@@ -67,33 +64,6 @@ class CompositionForm extends BaseForm
     protected function rules(): array
     {
         return $this->compositionRules();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function toPayload(string $authorEmployeeUuid): array
-    {
-        $payload = $this->base([
-            'type' => CompositionType::NEWBORN,
-            'category' => $this->category,
-            'subjectUuid' => $this->prepersonUuid,
-            'subjectResource' => 'preperson',
-            'encounterUuid' => $this->encounterUuid,
-            'authorEmployeeUuid' => $authorEmployeeUuid,
-            'focusUuid' => $this->personUuid,
-            'focusResource' => 'person',
-            'periodStart' => $this->startOfDay($this->newbornBirthDate),
-            'periodEnd' => null,
-            'includeNullPeriodEnd' => true,
-        ]);
-
-        $payload['extension'] = array_merge($this->informWith($this->informWithUuid ?? null), [
-            ['valueCode' => 'NEWBORN_BIRTH_DATE', 'valueDate' => $this->date($this->newbornBirthDate)],
-            ['valueCode' => 'NEWBORN_SEX', 'valueString' => $this->newbornSex],
-        ]);
-
-        return $payload;
     }
 
     public function resetCompositionFields(): void
