@@ -8,6 +8,7 @@ use Exception;
 use App\Core\Arr;
 use App\Models\Role;
 use App\Models\Permission;
+use App\Models\LegalEntity;
 use Illuminate\Support\Carbon;
 use App\Models\LegalEntityType;
 use Illuminate\Console\Command;
@@ -234,7 +235,32 @@ abstract class MigrationsCommand extends Command
             $this->syncPermissions();
             $this->syncLegalEntityTypePermissions();
             $this->syncRolePermissions();
+
+            // Wait for the new permission pivots to be committed before dropping the cached whitelist.
+            DB::afterCommit($this->invalidatePermissionCaches(...));
         });
+    }
+
+    /**
+     * Clear cached legal entity types and allowed permission names for every entity and guard,
+     * including the shared store and this process's memoized copies, then reset Spatie's permission cache.
+     * Called after scope synchronization commits so subsequent logins use the updated permissions.
+     */
+    protected function invalidatePermissionCaches(): void
+    {
+        $cache = cache()->memo();
+        $guards = array_keys(config('auth.guards', []));
+
+        foreach (LegalEntity::query()->select('id')->lazyById(self::CHUNK_SIZE) as $legalEntity) {
+            // Forget through memo() to clear both the shared store and this process's copy.
+            $cache->forget('le_type:' . $legalEntity->id);
+
+            foreach ($guards as $guard) {
+                $cache->forget('allowed_permissions:' . $legalEntity->id . ':' . $guard);
+            }
+        }
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
     /**

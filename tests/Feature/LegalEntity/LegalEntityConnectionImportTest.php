@@ -143,7 +143,7 @@ class LegalEntityConnectionImportTest extends TestCase
         }
         $chain = Mockery::mock(FirstLoginSyncChain::class);
         if ($expectedJob === DivisionSync::class) {
-            $chain->shouldReceive('build')->once()->with($this->entity, [])->andReturn(new DivisionSync($this->entity));
+            $chain->shouldReceive('build')->once()->with($this->entity, [], $user)->andReturn(new DivisionSync($this->entity));
         } else {
             $chain->shouldNotReceive('build');
         }

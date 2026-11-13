@@ -32,16 +32,12 @@ class HealthcareServiceCreatePolicyTest extends TestCase
         return [
             'primary care owner' => [LegalEntity::TYPE_PRIMARY_CARE, Role::OWNER],
             'primary care admin' => [LegalEntity::TYPE_PRIMARY_CARE, Role::ADMIN],
-            'primary care hr' => [LegalEntity::TYPE_PRIMARY_CARE, Role::HR],
             'outpatient owner' => [LegalEntity::TYPE_OUTPATIENT, Role::OWNER],
             'outpatient admin' => [LegalEntity::TYPE_OUTPATIENT, Role::ADMIN],
-            'outpatient hr' => [LegalEntity::TYPE_OUTPATIENT, Role::HR],
             'emergency owner' => [LegalEntity::TYPE_EMERGENCY, Role::OWNER],
             'emergency admin' => [LegalEntity::TYPE_EMERGENCY, Role::ADMIN],
-            'emergency hr' => [LegalEntity::TYPE_EMERGENCY, Role::HR],
             'pharmacy pharmacy owner' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACY_OWNER],
-            'pharmacy owner' => [LegalEntity::TYPE_PHARMACY, Role::OWNER],
-            'pharmacy hr' => [LegalEntity::TYPE_PHARMACY, Role::HR]
+            'pharmacy owner' => [LegalEntity::TYPE_PHARMACY, Role::OWNER]
         ];
     }
 
@@ -55,12 +51,14 @@ class HealthcareServiceCreatePolicyTest extends TestCase
     {
         return [
             'primary care reorganization owner' => [LegalEntity::TYPE_PRIMARY_CARE, Role::REORGANIZATION_OWNER],
+            'primary care hr' => [LegalEntity::TYPE_PRIMARY_CARE, Role::HR],
             'primary care doctor' => [LegalEntity::TYPE_PRIMARY_CARE, Role::DOCTOR],
             'primary care assistant' => [LegalEntity::TYPE_PRIMARY_CARE, Role::ASSISTANT],
             'primary care receptionist' => [LegalEntity::TYPE_PRIMARY_CARE, Role::RECEPTIONIST],
             'primary care med admin' => [LegalEntity::TYPE_PRIMARY_CARE, Role::MED_ADMIN],
             'primary care laborant' => [LegalEntity::TYPE_PRIMARY_CARE, Role::LABORANT],
             'outpatient reorganization owner' => [LegalEntity::TYPE_OUTPATIENT, Role::REORGANIZATION_OWNER],
+            'outpatient hr' => [LegalEntity::TYPE_OUTPATIENT, Role::HR],
             'outpatient assistant' => [LegalEntity::TYPE_OUTPATIENT, Role::ASSISTANT],
             'outpatient specialist' => [LegalEntity::TYPE_OUTPATIENT, Role::SPECIALIST],
             'outpatient receptionist' => [LegalEntity::TYPE_OUTPATIENT, Role::RECEPTIONIST],
@@ -68,9 +66,11 @@ class HealthcareServiceCreatePolicyTest extends TestCase
             'outpatient laborant' => [LegalEntity::TYPE_OUTPATIENT, Role::LABORANT],
             'outpatient med coordinator' => [LegalEntity::TYPE_OUTPATIENT, Role::MED_COORDINATOR],
             'emergency reorganization owner' => [LegalEntity::TYPE_EMERGENCY, Role::REORGANIZATION_OWNER],
+            'emergency hr' => [LegalEntity::TYPE_EMERGENCY, Role::HR],
             'emergency specialist' => [LegalEntity::TYPE_EMERGENCY, Role::SPECIALIST],
             'emergency assistant' => [LegalEntity::TYPE_EMERGENCY, Role::ASSISTANT],
             'pharmacy pharmacist' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACIST],
+            'pharmacy hr' => [LegalEntity::TYPE_PHARMACY, Role::HR],
             'msp owner' => [LegalEntity::TYPE_MSP, Role::OWNER],
             'msp admin' => [LegalEntity::TYPE_MSP, Role::ADMIN],
             'msp hr' => [LegalEntity::TYPE_MSP, Role::HR],
