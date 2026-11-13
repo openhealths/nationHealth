@@ -11,8 +11,10 @@ use App\Enums\User\Role;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
+use App\Models\User;
 use App\Repositories\ContractRequestRepository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -38,10 +40,10 @@ class ContractRequestRepositoryTest extends TestCase
     {
         parent::setUp();
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')
+        $typeId = DB::table('legal_entity_types')
             ->where('name', 'PHARMACY')
             ->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')
+            ?? DB::table('legal_entity_types')
                 ->insertGetId(['name' => 'PHARMACY']);
 
         $this->legalEntity = LegalEntity::create([
@@ -155,6 +157,7 @@ class ContractRequestRepositoryTest extends TestCase
             'position' => 'Owner',
             'start_date' => now()->format('Y-m-d'),
             'party_id' => $party->id,
+            'user_id' => User::factory()->create()->id,
         ]);
     }
 

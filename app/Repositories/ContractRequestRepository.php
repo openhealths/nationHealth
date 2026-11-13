@@ -7,6 +7,9 @@ namespace App\Repositories;
 use App\Classes\eHealth\Api\ContractRequest as ApiMapper;
 use App\Models\Contracts\ContractRequest;
 use App\Models\Employee\Employee;
+use App\Models\LegalEntity;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 
 class ContractRequestRepository
 {
@@ -17,66 +20,63 @@ class ContractRequestRepository
      * @param  string  $type  The contract type (e.g., REIMBURSEMENT).
      * @return ContractRequest
      */
-    public function saveFromEHealth(array $eHealthData, string $type): ContractRequest
+    public function saveFromEHealth(array $eHealthData, string $type, ?LegalEntity $legalEntity = null, bool $details = false): ContractRequest
     {
-        /** @var ApiMapper $mapper */
-        $mapper = app(ApiMapper::class);
+        $legalEntity ??= legalEntity();
+        $remoteEntityId = data_get($eHealthData, 'contractor_legal_entity.id')
+            ?? (data_get($eHealthData, 'contractor_legal_entity.uuid') ?? ($eHealthData['contractor_legal_entity_id'] ?? null));
+        $uuid = $eHealthData['id'] ?? $eHealthData['uuid'];
+        $existing = ContractRequest::query()->where('uuid', $uuid)->first();
 
-        // 1. Map API attributes (basic mapping)
-        $attributes = $mapper->mapCreate($eHealthData);
-
-        // 2. Fix UUID: API returns 'id', local DB expects 'uuid'
-        if (isset($eHealthData['id'])) {
-            $attributes['uuid'] = $eHealthData['id'];
-            unset($attributes['id']);
+        // A response must never reassign a record owned by another facility.
+        if (($remoteEntityId !== null && $remoteEntityId !== $legalEntity->uuid)
+            || ($existing !== null && $existing->contractorLegalEntityId !== $legalEntity->uuid)) {
+            throw ValidationException::withMessages(['ehealth_error' => __('contracts.response_context_mismatch')]);
         }
 
-        // 3. Set System/Local fields
-        $attributes['contractor_legal_entity_id'] = legalEntity()->uuid;
-        // List sync calls GET /api/contract_requests/{capitation|reimbursement}; path type is source of truth.
-        // (Create is reimbursement-only for PHARMACY; capitation here is only for reading existing ESOZ records.)
-        $attributes['type'] = strtoupper($type);
+        $attributes = app(ApiMapper::class)->mapCreate($eHealthData);
 
+        // List summaries omit full details. Only supplied fields may replace persisted values.
+        $providedKeys = array_fill_keys(array_keys($eHealthData), true);
+        $providedKeys['uuid'] = true;
+        $providedKeys['data'] = true;
+        foreach (['contractor_legal_entity', 'contractor_owner', 'nhs_signer', 'nhs_legal_entity'] as $relation) {
+            if (array_key_exists($relation, $eHealthData)) {
+                $providedKeys[$relation . '_id'] = true;
+            }
+        }
+        if (isset($eHealthData['contract_type'])) {
+            $providedKeys['type'] = true;
+        }
+        if (!$details) {
+            $attributes = array_intersect_key($attributes, $providedKeys);
+        }
+        $attributes['data'] = $details ? $eHealthData : array_replace($existing?->data ?? [], $eHealthData);
+        unset($attributes['data']['sync_status'], $attributes['data']['uuid'], $attributes['data']['type']);
+        // Local drafts may contain upload objects; remote checksum strings remain part of the snapshot.
+        foreach (['statute_md5', 'additional_document_md5'] as $field) {
+            if (($attributes['data'][$field] ?? null) instanceof UploadedFile) {
+                unset($attributes['data'][$field]);
+            }
+        }
+
+        // A status transition without a reason clears the previous status's explanation.
+        if (array_key_exists('status', $eHealthData) && !array_key_exists('status_reason', $eHealthData)
+            && ($details || ($existing !== null && $existing->getRawOriginal('status') !== $eHealthData['status']))) {
+            $attributes['status_reason'] = null;
+            unset($attributes['data']['status_reason']);
+        }
+
+        $attributes['type'] = strtoupper($type);
         if (isset($eHealthData['sync_status'])) {
             $attributes['sync_status'] = $eHealthData['sync_status'];
         }
 
-        // Fallback to legalEntity owner ONLY if input is missing. Never use auth()->id() (int).
-        if (!isset($attributes['contractor_owner_id']) || empty($attributes['contractor_owner_id'])) {
-            $attributes['contractor_owner_id'] = $eHealthData['contractor_owner_id']
-                ?? $eHealthData['contractor_owner']['id']
-                ?? $eHealthData['contractor_owner']['uuid']
-                ?? Employee::query()->activeOwners(legalEntity()->id)->value('uuid');
+        $attributes['contractor_legal_entity_id'] = $legalEntity->uuid;
+        if (empty($attributes['contractor_owner_id']) && $existing === null) {
+            $attributes['contractor_owner_id'] = Employee::query()->activeOwners($legalEntity->id)->value('uuid');
         }
 
-        // 4. Handle JSON Data Column
-        // We must sanitize 'data' to remove PHP Objects (like UploadedFile) that cannot be JSON encoded.
-        $jsonSafeData = $eHealthData;
-
-        // Remove file objects from the JSON payload to prevent "Array to string conversion" error
-        if (isset($jsonSafeData['statute_md5'])) {
-            unset($jsonSafeData['statute_md5']);
-        }
-        if (isset($jsonSafeData['additional_document_md5'])) {
-            unset($jsonSafeData['additional_document_md5']);
-        }
-
-        $attributes['data'] = $jsonSafeData;
-
-        // 5. Handle Payment Details (if present)
-        if (isset($eHealthData['contractor_payment_details'])) {
-            $attributes['contractor_payment_details'] = $eHealthData['contractor_payment_details'];
-        }
-
-        // 6. Handle Medical Programs
-        if (isset($eHealthData['medical_programs'])) {
-            $attributes['medical_programs'] = $eHealthData['medical_programs'];
-        }
-
-        // 7. Update or Create record
-        return ContractRequest::updateOrCreate(
-            ['uuid' => $attributes['uuid']],
-            $attributes
-        );
+        return ContractRequest::updateOrCreate(['uuid' => $uuid], $attributes);
     }
 }

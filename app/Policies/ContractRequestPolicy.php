@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Enums\Contract\ContractRequestStatus;
+use App\Enums\Contract\Type;
+use App\Enums\User\Role;
 use App\Models\Contracts\ContractRequest;
 use App\Models\LegalEntity;
 use App\Models\User;
@@ -17,7 +19,7 @@ class ContractRequestPolicy
      */
     public function viewAny(User $user): Response
     {
-        if ($user->can('contract_request:read') || $user->can('contract_request:create')) {
+        if ($user->can('contract_request:read')) {
             return Response::allow();
         }
 
@@ -30,11 +32,11 @@ class ContractRequestPolicy
     public function view(User $user, ContractRequest $contractRequest): Response
     {
         // Strict Ownership Check via UUID
-        if ($contractRequest->contractor_legal_entity_id !== legalEntity()->uuid) {
+        if ($contractRequest->contractorLegalEntityId !== legalEntity()->uuid) {
             return Response::denyWithStatus(404);
         }
 
-        if ($user->can('contract_request:read') || $user->can('contract_request:create')) {
+        if ($user->can('contract_request:read')) {
             return Response::allow();
         }
 
@@ -94,7 +96,7 @@ class ContractRequestPolicy
      */
     public function approve(User $user, ContractRequest $contractRequest): Response
     {
-        if ($contractRequest->contractor_legal_entity_id !== legalEntity()->uuid) {
+        if ($contractRequest->contractorLegalEntityId !== legalEntity()->uuid) {
             return Response::denyWithStatus(404);
         }
 
@@ -106,9 +108,9 @@ class ContractRequestPolicy
             return Response::deny(__('contracts.policy.approve_denied'));
         }
 
-        if (($contractRequest->type === 'REIMBURSEMENT' || $contractRequest->type === \App\Enums\Contract\Type::REIMBURSEMENT->value)
-            && $user->hasAllowedRole([\App\Enums\User\Role::OWNER])
-            && legalEntity()->type->name === \App\Models\LegalEntity::TYPE_PRIMARY_CARE
+        if (($contractRequest->type === 'REIMBURSEMENT' || $contractRequest->type === Type::REIMBURSEMENT->value)
+            && $user->hasAllowedRole([Role::OWNER])
+            && legalEntity()->type->name === LegalEntity::TYPE_PRIMARY_CARE
         ) {
             return Response::deny(__('contracts.policy.approve_denied'));
         }
@@ -123,7 +125,7 @@ class ContractRequestPolicy
      */
     public function sign(User $user, ContractRequest $contractRequest): Response
     {
-        if ($contractRequest->contractor_legal_entity_id !== legalEntity()->uuid) {
+        if ($contractRequest->contractorLegalEntityId !== legalEntity()->uuid) {
             return Response::denyWithStatus(404);
         }
 
@@ -145,7 +147,7 @@ class ContractRequestPolicy
      */
     public function sync(User $user): Response
     {
-        if ($user->can('contract_request:read') || $user->can('contract_request:create')) {
+        if ($user->can('contract_request:read')) {
             return Response::allow();
         }
 

@@ -8,10 +8,13 @@ use App\Classes\eHealth\Api\ContractRequest as ApiContractRequest;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
+use App\Jobs\CompleteSync as CompleteSyncJob;
 use App\Models\Contracts\ContractRequest;
 use App\Models\LegalEntity;
+use App\Repositories\Repository;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Queue\Middleware\RateLimited;
+use Throwable;
 
 class ContractRequestDetailsUpsert extends EHealthJob
 {
@@ -45,31 +48,15 @@ class ContractRequestDetailsUpsert extends EHealthJob
      */
     protected function processResponse(?EHealthResponse $response): void
     {
-        $ehealthData = $response?->validate();
+        $ehealthData = $response->validate();
+        $ehealthData['sync_status'] = JobStatus::COMPLETED->value;
+        Repository::contractRequest()->saveFromEHealth($ehealthData, $this->contractRequestModel->type, $this->legalEntity, details: true);
+    }
 
-        if (!empty($ehealthData)) {
-            $this->contractRequestModel->update([
-                'contractor_base' => $ehealthData['contractor_base'] ?? $this->contractRequestModel->contractorBase,
-                'contractor_payment_details' => $ehealthData['contractor_payment_details'] ?? null,
-                'contractor_divisions' => $ehealthData['contractor_divisions'] ?? null,
-                'external_contractors' => $ehealthData['external_contractors'] ?? null,
-                'nhs_signer_id' => $ehealthData['nhs_signer']['id'] ?? $ehealthData['nhs_signer']['uuid'] ?? null,
-                'nhs_signer_base' => $ehealthData['nhs_signer_base'] ?? null,
-                'nhs_contract_price' => $ehealthData['nhs_contract_price'] ?? null,
-                'nhs_payment_method' => $ehealthData['nhs_payment_method'] ?? null,
-                'id_form' => $ehealthData['id_form'] ?? $this->contractRequestModel->idForm,
-                'contract_number' => $ehealthData['contract_number'] ?? $this->contractRequestModel->contractNumber,
-                'start_date' => $ehealthData['start_date'] ?? $this->contractRequestModel->startDate,
-                'end_date' => $ehealthData['end_date'] ?? $this->contractRequestModel->endDate,
-                'status' => $ehealthData['status'] ?? $this->contractRequestModel->status,
-                'status_reason' => $ehealthData['status_reason'] ?? $this->contractRequestModel->statusReason,
-                'inserted_at' => !empty($ehealthData['inserted_at'])
-                    ? \Illuminate\Support\Carbon::parse($ehealthData['inserted_at'])
-                    : $this->contractRequestModel->insertedAt,
-                'data' => $ehealthData,
-                'sync_status' => JobStatus::COMPLETED->value,
-            ]);
-        }
+    public function failed(?Throwable $exception): void
+    {
+        $this->contractRequestModel->update(['sync_status' => JobStatus::FAILED]);
+        parent::failed($exception);
     }
 
     protected function getAdditionalMiddleware(): array
@@ -85,7 +72,7 @@ class ContractRequestDetailsUpsert extends EHealthJob
     protected function getNextEntityJob(): ?EHealthJob
     {
         return $this->standalone || !$this->nextEntity
-            ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
+            ? new CompleteSyncJob($this->legalEntity, isFirstLogin: $this->isFirstLogin)
             : $this->nextEntity;
     }
 }

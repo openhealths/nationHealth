@@ -1,6 +1,7 @@
 @use('App\Enums\Contract\IdForm')
 @use('App\Enums\Contract\Type')
-@if(isset($contract) && isset($data))
+@use('App\Livewire\Contract\CapitationContractCreate')
+@if (isset($contract) && isset($data))
     @php
         $periodStart = formatDisplayDate($contract->start_date ?? data_get($data, 'start_date'));
         $periodEnd = formatDisplayDate($contract->end_date ?? data_get($data, 'end_date'));
@@ -23,24 +24,26 @@
         <div class="form-row-2">
             <div class="form-group group">
                 <label for="contract-type" class="label">{{ __('contracts.type') }}</label>
-                <input id="contract-type"
-                       type="text"
-                       value="{{ Type::resolveLabel($contract->type) }}"
-                       class="input peer"
-                       placeholder=" "
-                       disabled
-                       readonly
+                <input
+                    id="contract-type"
+                    type="text"
+                    value="{{ Type::resolveLabel($contract->type) }}"
+                    class="input peer"
+                    placeholder=" "
+                    disabled
+                    readonly
                 />
             </div>
             <div class="form-group group">
                 <label for="contract-form" class="label">{{ __('contracts.id_form_label') }}</label>
-                <input id="contract-form"
-                       type="text"
-                       value="{{ $idFormDisplay ?: '-' }}"
-                       class="input peer"
-                       placeholder=" "
-                       disabled
-                       readonly
+                <input
+                    id="contract-form"
+                    type="text"
+                    value="{{ $idFormDisplay ?: '-' }}"
+                    class="input peer"
+                    placeholder=" "
+                    disabled
+                    readonly
                 />
             </div>
         </div>
@@ -48,24 +51,26 @@
         <div class="form-row-2">
             <div class="form-group group">
                 <label for="contract-uuid" class="label">{{ __('contracts.id') }}</label>
-                <input id="contract-uuid"
-                       type="text"
-                       value="{{ $contract->uuid ?: data_get($data, 'id') ?: '-' }}"
-                       class="input peer font-mono text-sm"
-                       placeholder=" "
-                       disabled
-                       readonly
+                <input
+                    id="contract-uuid"
+                    type="text"
+                    value="{{ $contract->uuid ?: data_get($data, 'id') ?: '-' }}"
+                    class="input peer font-mono text-sm"
+                    placeholder=" "
+                    disabled
+                    readonly
                 />
             </div>
             <div class="form-group group">
                 <label for="contract-number" class="label">{{ __('contracts.number_label') }}</label>
-                <input id="contract-number"
-                       type="text"
-                       value="{{ $contractNumber ?: '-' }}"
-                       class="input peer"
-                       placeholder=" "
-                       disabled
-                       readonly
+                <input
+                    id="contract-number"
+                    type="text"
+                    value="{{ $contractNumber ?: '-' }}"
+                    class="input peer"
+                    placeholder=" "
+                    disabled
+                    readonly
                 />
             </div>
         </div>
@@ -73,24 +78,26 @@
         <div class="form-row-2">
             <div class="form-group group">
                 <label for="contract-period" class="label">{{ __('contracts.period_label') }}</label>
-                <input id="contract-period"
-                       type="text"
-                       value="{{ $periodStart && $periodEnd ? "{$periodStart} – {$periodEnd}" : ($periodStart ?: $periodEnd ?: '-') }}"
-                       class="input peer"
-                       placeholder=" "
-                       disabled
-                       readonly
+                <input
+                    id="contract-period"
+                    type="text"
+                    value="{{ $periodStart && $periodEnd ? "{$periodStart} – {$periodEnd}" : ($periodStart ?: $periodEnd ?: '-') }}"
+                    class="input peer"
+                    placeholder=" "
+                    disabled
+                    readonly
                 />
             </div>
             <div class="form-group group">
                 <label for="contract-created-at" class="label">{{ __('contracts.created_at_label') }}</label>
-                <input id="contract-created-at"
-                       type="text"
-                       value="{{ $createdAt ?: '-' }}"
-                       class="input peer"
-                       placeholder=" "
-                       disabled
-                       readonly
+                <input
+                    id="contract-created-at"
+                    type="text"
+                    value="{{ $createdAt ?: '-' }}"
+                    class="input peer"
+                    placeholder=" "
+                    disabled
+                    readonly
                 />
             </div>
         </div>
@@ -98,24 +105,26 @@
         <div class="form-row-2">
             <div class="form-group group">
                 <label for="contract-updated-at" class="label">{{ __('contracts.updated_at_label') }}</label>
-                <input id="contract-updated-at"
-                       type="text"
-                       value="{{ $updatedAt ?: '-' }}"
-                       class="input peer"
-                       placeholder=" "
-                       disabled
-                       readonly
+                <input
+                    id="contract-updated-at"
+                    type="text"
+                    value="{{ $updatedAt ?: '-' }}"
+                    class="input peer"
+                    placeholder=" "
+                    disabled
+                    readonly
                 />
             </div>
             <div class="form-group group">
                 <label for="contract-status-reason" class="label">{{ __('contracts.status_reason_label') }}</label>
-                <input id="contract-status-reason"
-                       type="text"
-                       value="{{ $statusReason ?: '-' }}"
-                       class="input peer"
-                       placeholder=" "
-                       disabled
-                       readonly
+                <input
+                    id="contract-status-reason"
+                    type="text"
+                    value="{{ $statusReason ?: '-' }}"
+                    class="input peer"
+                    placeholder=" "
+                    disabled
+                    readonly
                 />
             </div>
         </div>
@@ -123,24 +132,26 @@
         <div class="form-row-2">
             <div class="form-group group">
                 <label for="contract-parent" class="label">{{ __('contracts.parent_contract') }}</label>
-                <input id="contract-parent"
-                       type="text"
-                       value="{{ $parentContractId ?: '-' }}"
-                       class="input peer font-mono text-sm"
-                       placeholder=" "
-                       disabled
-                       readonly
+                <input
+                    id="contract-parent"
+                    type="text"
+                    value="{{ $parentContractId ?: '-' }}"
+                    class="input peer font-mono text-sm"
+                    placeholder=" "
+                    disabled
+                    readonly
                 />
             </div>
             <div class="form-group group">
                 <label for="contract-previous-request" class="label">{{ __('contracts.previous_request') }}</label>
-                <input id="contract-previous-request"
-                       type="text"
-                       value="{{ $previousRequestId ?: '-' }}"
-                       class="input peer font-mono text-sm"
-                       placeholder=" "
-                       disabled
-                       readonly
+                <input
+                    id="contract-previous-request"
+                    type="text"
+                    value="{{ $previousRequestId ?: '-' }}"
+                    class="input peer font-mono text-sm"
+                    placeholder=" "
+                    disabled
+                    readonly
                 />
             </div>
         </div>
@@ -148,33 +159,55 @@
         <div class="form-row-2">
             <div class="form-group group">
                 <label for="contract-issue-city" class="label">{{ __('contracts.issue_city') }}</label>
-                <input id="contract-issue-city"
-                       type="text"
-                       value="{{ $issueCity ?: '-' }}"
-                       class="input peer"
-                       placeholder=" "
-                       disabled
-                       readonly
+                <input
+                    id="contract-issue-city"
+                    type="text"
+                    value="{{ $issueCity ?: '-' }}"
+                    class="input peer"
+                    placeholder=" "
+                    disabled
+                    readonly
                 />
             </div>
-            @if($rmspAmount !== null && $rmspAmount !== '')
+            @if ($rmspAmount !== null && $rmspAmount !== '')
                 <div class="form-group group">
                     <label for="contract-rmsp" class="label">{{ __('contracts.contractor_rmsp_amount') }}</label>
-                    <input id="contract-rmsp"
-                           type="text"
-                           value="{{ $rmspAmount }}"
-                           class="input peer"
-                           placeholder=" "
-                           disabled
-                           readonly
+                    <input
+                        id="contract-rmsp"
+                        type="text"
+                        value="{{ $rmspAmount }}"
+                        class="input peer"
+                        placeholder=" "
+                        disabled
+                        readonly
                     />
                 </div>
             @endif
         </div>
+        <div class="form-row-2">
+            @foreach (['contract_id', 'contract_request_id', 'assignee_id', 'reason', 'external_contractor_flag', 'is_suspended'] as $field)
+                @if (array_key_exists($field, $data))
+                    <div class="form-group group">
+                        <label
+                            class="label"
+                            for="contract-{{ $field }}"
+                        >{{ __('contracts.ehealth_fields.' . $field) }}</label>
+                        <input
+                            id="contract-{{ $field }}"
+                            type="text"
+                            value="{{ is_bool($data[$field]) ? ($data[$field] ? __('forms.yes') : __('forms.no')) : $data[$field] }}"
+                            class="input peer"
+                            disabled
+                            readonly
+                        />
+                    </div>
+                @endif
+            @endforeach
+        </div>
     </fieldset>
 @else
     @php
-        $dictionary = $this instanceof \App\Livewire\Contract\CapitationContractCreate
+        $dictionary = $this instanceof CapitationContractCreate
             ? ($this->dictionaries['CONTRACT_TYPE'] ?? [])
             : ($this->dictionaries['REIMBURSEMENT_CONTRACT_TYPE'] ?? []);
     @endphp
@@ -185,20 +218,19 @@
         <p class="default-p mb-6">{{ __('contracts.contract_info') }}</p>
         <div class="form-row-2">
             <div class="form-group group">
-                <select wire:model="form.idForm"
-                        name="idForm"
-                        id="idForm"
-                        class="peer input-select @error('form.idForm') input-error @enderror"
-                        required
+                <select
+                    wire:model="form.idForm"
+                    name="idForm"
+                    id="idForm"
+                    class="peer input-select @error('form.idForm') input-error @enderror"
+                    required
                 >
                     <option value="" selected>{{ __('forms.select') }}</option>
-                    @foreach($dictionary as $key => $type)
+                    @foreach ($dictionary as $key => $type)
                         <option value="{{ $key }}">{{ $type }}</option>
                     @endforeach
                 </select>
-                <label for="idForm" class="label">
-                    {{ __('contracts.id_form_label') }}
-                </label>
+                <label for="idForm" class="label"> {{ __('contracts.id_form_label') }} </label>
                 @error('form.idForm')
                     <p class="text-error">{{ $message }}</p>
                 @enderror
@@ -206,40 +238,38 @@
         </div>
         <div class="form-row-2">
             <div class="form-group group datepicker-wrapper relative w-full">
-                <input wire:model="form.startDate"
-                       type="text"
-                       name="startDate"
-                       id="startDate"
-                       class="peer input pl-10 datepicker-input @error('form.startDate') input-error @enderror"
-                       placeholder=" "
-                       datepicker-autohide
-                       datepicker-format="{{ frontendDateFormat() }}"
-                       datepicker-button="false"
-                       autocomplete="off"
-                       required
+                <input
+                    wire:model="form.startDate"
+                    type="text"
+                    name="startDate"
+                    id="startDate"
+                    class="peer input pl-10 datepicker-input @error('form.startDate') input-error @enderror"
+                    placeholder=" "
+                    datepicker-autohide
+                    datepicker-format="{{ frontendDateFormat() }}"
+                    datepicker-button="false"
+                    autocomplete="off"
+                    required
                 />
-                <label for="startDate" class="wrapped-label">
-                    {{ __('contracts.start_date_label') }}
-                </label>
+                <label for="startDate" class="wrapped-label"> {{ __('contracts.start_date_label') }} </label>
                 @error('form.startDate')
                     <p class="text-error">{{ $message }}</p>
                 @enderror
             </div>
             <div class="form-group group datepicker-wrapper relative w-full">
-                <input wire:model="form.endDate"
-                       type="text"
-                       name="endDate"
-                       id="endDate"
-                       class="peer input pl-10 datepicker-input @error('form.endDate') input-error @enderror"
-                       placeholder=" "
-                       datepicker-autohide
-                       datepicker-format="{{ frontendDateFormat() }}"
-                       datepicker-button="false"
-                       autocomplete="off"
+                <input
+                    wire:model="form.endDate"
+                    type="text"
+                    name="endDate"
+                    id="endDate"
+                    class="peer input pl-10 datepicker-input @error('form.endDate') input-error @enderror"
+                    placeholder=" "
+                    datepicker-autohide
+                    datepicker-format="{{ frontendDateFormat() }}"
+                    datepicker-button="false"
+                    autocomplete="off"
                 />
-                <label for="endDate" class="wrapped-label">
-                    {{ __('contracts.end_date_label') }}
-                </label>
+                <label for="endDate" class="wrapped-label"> {{ __('contracts.end_date_label') }} </label>
                 @error('form.endDate')
                     <p class="text-error">{{ $message }}</p>
                 @enderror

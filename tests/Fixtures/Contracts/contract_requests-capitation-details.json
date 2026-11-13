@@ -1,0 +1,214 @@
+{
+  "meta": {
+    "code": 200,
+    "url": "https://example.com/resource",
+    "type": "object",
+    "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+  },
+  "data": {
+    "id": "09106b70-18b0-4726-b0ed-6bda1369fd52",
+    "contract_type": "CAPITATION",
+    "contractor_legal_entity": {
+      "id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+      "name": "Клініка Ноунейм",
+      "edrpou": "32323454",
+      "addresses": [
+        {
+          "type": "RESIDENCE",
+          "country": "UA",
+          "area": "Житомирська",
+          "region": "Бердичівський",
+          "settlement": "Київ",
+          "settlement_type": "CITY",
+          "settlement_id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+          "street_type": "STREET",
+          "street": "вул. Ніжинська",
+          "building": "15",
+          "apartment": "23",
+          "zip": "02090"
+        }
+      ]
+    },
+    "contractor_owner": {
+      "id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+      "party": {
+        "first_name": "Петро",
+        "last_name": "Іванов",
+        "second_name": "Миколайович"
+      }
+    },
+    "contractor_base": "на підставі закону про Медичне обслуговування населення",
+    "contractor_payment_details": {
+      "bank_name": "Банк номер 1",
+      "MFO": "351005",
+      "payer_account": "32009102701026"
+    },
+    "contractor_rmsp_amount": 50000,
+    "contractor_divisions": [
+      {
+        "id": "2922a240-63db-404e-b730-09222bfeb2dd",
+        "name": "Бориспільське відділення Клініки Ноунейм",
+        "addresses": [
+          {
+            "type": "RESIDENCE",
+            "country": "UA",
+            "area": "Житомирська",
+            "region": "Бердичівський",
+            "settlement": "Київ",
+            "settlement_type": "CITY",
+            "settlement_id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+            "street_type": "STREET",
+            "street": "вул. Ніжинська",
+            "building": "15",
+            "apartment": "23",
+            "zip": "02090"
+          }
+        ],
+        "phones": [
+          {
+            "type": "MOBILE",
+            "number": "+380503410870"
+          }
+        ],
+        "email": "email@example.com",
+        "working_hours": {
+          "mon": [
+            [
+              "08.00",
+              "12.00"
+            ],
+            [
+              "14.00",
+              "18.00"
+            ]
+          ],
+          "tue": [
+            [
+              "08.00",
+              "12.00"
+            ]
+          ],
+          "wed": [
+            [
+              "08.00",
+              "12.00"
+            ]
+          ],
+          "thu": [
+            [
+              "08.00",
+              "12.00"
+            ]
+          ],
+          "fri": [
+            [
+              "08.00",
+              "12.00"
+            ]
+          ]
+        },
+        "mountain_group": false
+      }
+    ],
+    "contractor_employee_divisions": [
+      {
+        "employee": {
+          "id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+          "party": {
+            "first_name": "Петро",
+            "last_name": "Іванов",
+            "second_name": "Миколайович"
+          },
+          "speciality": {
+            "speciality": "THERAPIST",
+            "speciality_officio": true,
+            "level": "FIRST",
+            "qualification_type": "AWARDING",
+            "attestation_name": "Академія Богомольця",
+            "attestation_date": "2017-02-28",
+            "valid_to_date": "2020-02-28",
+            "certificate_number": "AB/21331"
+          }
+        },
+        "staff_units": 0.5,
+        "declaration_limit": 2000,
+        "division_id": "2922a240-63db-404e-b730-09222bfeb2dd"
+      }
+    ],
+    "external_contractor_flag": true,
+    "external_contractors": [
+      {
+        "legal_entity": {
+          "id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+          "name": "Клініка Ноунейм"
+        },
+        "contract": {
+          "number": "1234567",
+          "issued_at": "2018-01-01",
+          "expires_at": "2019-01-01"
+        },
+        "divisions": [
+          {
+            "id": "2922a240-63db-404e-b730-09222bfeb2dd",
+            "name": "Бориспільське відділення Клініки Ноунейм",
+            "medical_service": "Послуга ПМД"
+          }
+        ]
+      }
+    ],
+    "id_form": "PMD_1",
+    "nhs_signer": {
+      "id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+      "party": {
+        "first_name": "Петро",
+        "last_name": "Іванов",
+        "second_name": "Миколайович"
+      }
+    },
+    "nhs_legal_entity": {
+      "id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+      "name": "Клініка Ноунейм",
+      "edrpou": "32323454",
+      "addresses": [
+        {
+          "type": "RESIDENCE",
+          "country": "UA",
+          "area": "Житомирська",
+          "region": "Бердичівський",
+          "settlement": "Київ",
+          "settlement_type": "CITY",
+          "settlement_id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+          "street_type": "STREET",
+          "street": "вул. Ніжинська",
+          "building": "15",
+          "apartment": "23",
+          "zip": "02090"
+        }
+      ]
+    },
+    "nhs_signer_base": "на підставі наказу",
+    "nhs_contract_price": 50000,
+    "nhs_payment_method": "BACKWARD",
+    "status": "NEW",
+    "status_reason": "Не відповідає попереднім домовленостям",
+    "issue_city": "Київ",
+    "contract_number": "0000-9EAX-XT7X-3115",
+    "contract_id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+    "parent_contract_id": "22e416c4-5747-41cd-9f73-c3a85cdee885",
+    "start_date": "2017-04-20",
+    "end_date": "2017-04-20",
+    "printout_content": "Contract request content",
+    "previous_request_id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+    "assignee_id": "22e416c4-5747-41cd-9f73-c3a85cdee885",
+    "updated_at": "2017-04-20T19:14:13Z",
+    "inserted_at": "2017-04-20T19:14:13Z"
+  },
+  "urgent": {
+    "documents": [
+      {
+        "type": "SIGNED_CONTENT",
+        "url": "https://storage.ehealth.world"
+      }
+    ]
+  }
+}

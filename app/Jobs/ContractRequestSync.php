@@ -8,6 +8,7 @@ use App\Classes\eHealth\Api\ContractRequest as ApiContractRequest;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
+use App\Jobs\CompleteSync as CompleteSyncJob;
 use App\Models\LegalEntity;
 use App\Models\User;
 use App\Repositories\Repository;
@@ -35,8 +36,9 @@ class ContractRequestSync extends EHealthJob
         ?User $user = null,
         string $contractType = 'REIMBURSEMENT',
         int $page = 1,
+        bool $standalone = false,
     ) {
-        parent::__construct($legalEntity, $nextEntity, $isFirstLogin, $page);
+        parent::__construct($legalEntity, $nextEntity, $isFirstLogin, $page, $standalone);
 
         // 2.Initialize our specific properties
         $this->contractType = $contractType;
@@ -66,15 +68,20 @@ class ContractRequestSync extends EHealthJob
      */
     protected function processResponse(?EHealthResponse $response): void
     {
-        $validatedData = $response?->validate();
+        $validatedData = $response->validate();
 
         if (!empty($validatedData)) {
             foreach ($validatedData as $item) {
                 // Add PARTIAL status to the item before saving
                 $item['sync_status'] = JobStatus::PARTIAL->value;
-                Repository::contractRequest()->saveFromEHealth($item, $this->contractType);
+                Repository::contractRequest()->saveFromEHealth($item, $this->contractType, $this->legalEntity);
             }
         }
+    }
+
+    protected function nextPageJob(): static
+    {
+        return new static($this->legalEntity, $this->nextEntity, $this->isFirstLogin, $this->user, $this->contractType, $this->page + 1, $this->standalone);
     }
 
     protected function getAdditionalMiddleware(): array
@@ -101,12 +108,13 @@ class ContractRequestSync extends EHealthJob
                 $this->nextEntity,
                 $this->isFirstLogin,
                 $this->user,
-                'REIMBURSEMENT'
+                'REIMBURSEMENT',
+                standalone: $this->standalone
             );
         }
 
         $nextJob = $this->standalone
-            ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
+            ? new CompleteSyncJob($this->legalEntity, isFirstLogin: $this->isFirstLogin)
             : $this->nextEntity;
 
         return $this->getContractRequestDetailsStartJob($this->legalEntity, $nextJob);

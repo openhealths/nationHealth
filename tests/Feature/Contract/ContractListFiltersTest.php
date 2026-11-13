@@ -9,7 +9,10 @@ use App\Enums\Contract\Type;
 use App\Livewire\Contract\ContractIndex;
 use App\Livewire\ContractRequest\ContractRequestIndex;
 use App\Models\LegalEntity;
+use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -17,6 +20,13 @@ use Tests\TestCase;
 class ContractListFiltersTest extends TestCase
 {
     use DatabaseTransactions;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAs(User::factory()->create());
+        Gate::before(static fn () => true);
+    }
 
     public function test_contract_request_reset_filters_clears_status_and_type(): void
     {
@@ -86,10 +96,10 @@ class ContractListFiltersTest extends TestCase
 
     private function createLegalEntity(string $typeName = 'PHARMACY'): LegalEntity
     {
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')
+        $typeId = DB::table('legal_entity_types')
             ->where('name', $typeName)
             ->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')
+            ?? DB::table('legal_entity_types')
                 ->insertGetId(['name' => $typeName]);
 
         return LegalEntity::create([

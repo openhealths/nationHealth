@@ -9,8 +9,10 @@ use App\Enums\User\Role;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Relations\Party;
+use App\Models\User;
 use App\Repositories\ContractRepository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -39,10 +41,10 @@ class ContractRepositoryTest extends TestCase
     {
         parent::setUp();
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')
+        $typeId = DB::table('legal_entity_types')
             ->where('name', 'PHARMACY')
             ->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')
+            ?? DB::table('legal_entity_types')
                 ->insertGetId(['name' => 'PHARMACY']);
 
         $this->legalEntity = LegalEntity::create([
@@ -93,7 +95,7 @@ class ContractRepositoryTest extends TestCase
 
     public function test_save_from_ehealth_extracts_contractor_legal_entity_id_from_nested_object(): void
     {
-        $contractorEntityId = (string) Str::uuid();
+        $contractorEntityId = $this->legalEntity->uuid;
         $eHealthData = array_merge($this->eHealthContractPayload(), [
             'contractor_legal_entity' => ['id' => $contractorEntityId, 'name' => 'Contractor'],
         ]);
@@ -108,7 +110,7 @@ class ContractRepositoryTest extends TestCase
 
     public function test_save_from_ehealth_falls_back_to_flat_contractor_legal_entity_id(): void
     {
-        $contractorEntityId = (string) Str::uuid();
+        $contractorEntityId = $this->legalEntity->uuid;
         $payload = $this->eHealthContractPayload();
         unset($payload['contractor_legal_entity']);
         $eHealthData = array_merge($payload, ['contractor_legal_entity_id' => $contractorEntityId]);
@@ -207,6 +209,7 @@ class ContractRepositoryTest extends TestCase
             'position' => 'Owner',
             'start_date' => now()->format('Y-m-d'),
             'party_id' => $party->id,
+            'user_id' => User::factory()->create()->id,
         ]);
     }
 
@@ -230,7 +233,7 @@ class ContractRepositoryTest extends TestCase
             'external_contractor_flag' => false,
             'external_contractors' => [],
             // eHealth always returns nested objects for these required fields
-            'contractor_legal_entity' => ['id' => (string) Str::uuid(), 'name' => 'Test Entity'],
+            'contractor_legal_entity' => ['id' => $this->legalEntity->uuid, 'name' => 'Test Entity'],
             'contractor_owner' => ['id' => (string) Str::uuid(), 'party' => []],
             'nhs_signer_id' => null,
             'nhs_legal_entity_id' => null,

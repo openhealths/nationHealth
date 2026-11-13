@@ -1,0 +1,23 @@
+{
+  "employee": {
+    "id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+    "party": {
+      "first_name": "Петро",
+      "last_name": "Іванов",
+      "second_name": "Миколайович"
+    },
+    "speciality": {
+      "speciality": "THERAPIST",
+      "speciality_officio": true,
+      "level": "FIRST",
+      "qualification_type": "AWARDING",
+      "attestation_name": "Академія Богомольця",
+      "attestation_date": "2017-02-28",
+      "valid_to_date": "2020-02-28",
+      "certificate_number": "AB/21331"
+    }
+  },
+  "staff_units": 0.5,
+  "declaration_limit": 2000,
+  "division_id": "2922a240-63db-404e-b730-09222bfeb2dd"
+}

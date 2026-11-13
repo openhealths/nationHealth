@@ -1,0 +1,39 @@
+{
+  "meta": {
+    "code": 200,
+    "url": "https://example.com/resource",
+    "type": "object",
+    "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+  },
+  "data": [
+    {
+      "id": "09106b70-18b0-4726-b0ed-6bda1369fd52",
+      "contract_type": "CAPITATION",
+      "contractor_legal_entity_id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+      "contractor_owner_id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+      "contractor_base": "на підставі закону про Медичне обслуговування населення",
+      "status": "NEW",
+      "status_reason": "Не відповідає попереднім домовленостям",
+      "nhs_signer_id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+      "nhs_legal_entity_id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+      "nhs_signer_base": "на підставі наказу",
+      "issue_city": "Київ",
+      "nhs_contract_price": 50000,
+      "nhs_payment_method": "BACKWARD",
+      "contract_number": "0000-9EAX-XT7X-3115",
+      "contract_id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+      "parent_contract_id": "22e416c4-5747-41cd-9f73-c3a85cdee885",
+      "start_date": "2017-04-20",
+      "end_date": "2017-04-20",
+      "id_form": "PMD_1",
+      "updated_at": "2017-04-20T19:14:13Z",
+      "inserted_at": "2017-04-20T19:14:13Z"
+    }
+  ],
+  "paging": {
+    "page_number": 2,
+    "page_size": 50,
+    "total_entries": 1000,
+    "total_pages": 23
+  }
+}

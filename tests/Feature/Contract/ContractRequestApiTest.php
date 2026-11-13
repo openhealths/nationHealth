@@ -10,6 +10,7 @@ use GuzzleHttp\Psr7\Response as GuzzleResponse;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
+use ReflectionClass;
 use Tests\TestCase;
 
 /**
@@ -151,35 +152,32 @@ class ContractRequestApiTest extends TestCase
         $this->assertSame('CAPITATION', $result[0]['type']);
     }
 
-    public function test_validate_many_allows_missing_contract_number_and_empty_nhs_signer(): void
+    public function test_validate_many_rejects_undocumented_null_optional_fields(): void
     {
         $api = new ContractRequest();
         $response = $this->makeEHealthResponseForMany($api, [[
             'id' => 'c4f40d3a-1111-2222-3333-444455556666',
             'contract_type' => 'REIMBURSEMENT',
             'status' => 'NEW',
-            'nhs_signer_id' => '',
+            'nhs_signer_id' => null,
+            'contract_number' => null,
         ]]);
 
-        $validated = $response->validate();
-
-        $this->assertSame('NEW', $validated[0]['status']);
-        $this->assertNull($validated[0]['contract_number'] ?? null);
-        $this->assertNull($validated[0]['nhs_signer_id']);
+        $this->expectException(ValidationException::class);
+        $response->validate();
     }
 
     // -----------------------------------------------------------------------
     // validateDetails() — tested directly without making an HTTP call
     // -----------------------------------------------------------------------
 
-    public function test_validate_details_succeeds_for_new_status_without_contractor_objects(): void
+    public function test_validate_details_succeeds_for_documented_new_status_response(): void
     {
         $api = new ContractRequest();
-        $response = $this->makeEHealthResponse($api, [
+        $response = $this->makeEHealthResponse($api, array_replace($this->detailsData(), [
             'id' => 'c4f40d3a-1111-2222-3333-444455556666',
             'status' => 'NEW',
-            // contractor_legal_entity and contractor_owner intentionally absent
-        ]);
+        ]));
 
         try {
             $validated = $response->validate();
@@ -201,11 +199,11 @@ class ContractRequestApiTest extends TestCase
     public function test_validate_details_returns_full_data_not_just_validated_subset(): void
     {
         $api = new ContractRequest();
-        $response = $this->makeEHealthResponse($api, [
+        $response = $this->makeEHealthResponse($api, array_replace($this->detailsData(), [
             'id' => 'c4f40d3a-1111-2222-3333-444455556666',
             'status' => 'NEW',
             'some_extra_ehealth_field' => 'extra_value',
-        ]);
+        ]));
 
         $result = $response->validate();
 
@@ -275,7 +273,9 @@ class ContractRequestApiTest extends TestCase
         $api = new ContractRequest($factory);
 
         // Transfer the factory's protected $stubCallbacks to the PendingRequest instance.
-        $stubs = (function () { return $this->stubCallbacks; })->call($factory);
+        $stubs = (function () {
+            return $this->stubCallbacks;
+        })->call($factory);
         $api->stub($stubs);
 
         return $api;
@@ -301,10 +301,10 @@ class ContractRequestApiTest extends TestCase
         $guzzleResponse = new GuzzleResponse(
             200,
             ['Content-Type' => 'application/json'],
-            json_encode(['data' => $data])
+            json_encode(['data' => array_map(fn (array $item): array => array_replace($this->listData($item['contract_type']), $item), $data), 'paging' => ['page_number' => 1, 'page_size' => 50, 'total_entries' => count($data), 'total_pages' => 1]])
         );
 
-        $reflector = new \ReflectionClass($api);
+        $reflector = new ReflectionClass($api);
         $method = $reflector->getMethod('validateMany');
         $method->setAccessible(true);
         $validator = $method->getClosure($api);
@@ -320,15 +320,29 @@ class ContractRequestApiTest extends TestCase
         $guzzleResponse = new GuzzleResponse(
             200,
             ['Content-Type' => 'application/json'],
-            json_encode(['data' => $data])
+            json_encode(['data' => $data, 'urgent' => []])
         );
 
-        $reflector = new \ReflectionClass($api);
+        $reflector = new ReflectionClass($api);
         $method = $reflector->getMethod('validateDetails');
         $method->setAccessible(true);
         $validator = $method->getClosure($api);
 
         return new EHealthResponse($guzzleResponse, $validator);
+    }
+
+    private function listData(string $type): array
+    {
+        $fixture = json_decode(file_get_contents(base_path('tests/Fixtures/Contracts/contract_requests-' . strtolower($type) . '-list.json')), true);
+
+        return $fixture['data'][0];
+    }
+
+    private function detailsData(): array
+    {
+        $fixture = json_decode(file_get_contents(base_path('tests/Fixtures/Contracts/contract_requests-reimbursement-details.json')), true);
+
+        return $fixture['data'];
     }
 
     private function contractRequestData(): array

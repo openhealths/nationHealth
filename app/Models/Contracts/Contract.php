@@ -6,10 +6,12 @@ namespace App\Models\Contracts;
 
 use App\Enums\Contract\ContractStatus;
 use App\Enums\JobStatus;
+use App\Models\Contracts\BaseContract as BaseContractModel;
 use App\Models\LegalEntity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Contract extends BaseContract
+class Contract extends BaseContractModel
 {
     protected $table = 'contracts';
 
@@ -17,6 +19,7 @@ class Contract extends BaseContract
     {
         $this->mergeFillable([
             'legal_entity_id',
+            'sync_status',
             'contract_id',
             'contract_request_id',
             'previous_request_id',
@@ -61,8 +64,18 @@ class Contract extends BaseContract
         'data' => 'array',
     ];
 
+    public function getIsSuspendedAttribute(): bool
+    {
+        return filter_var($this->data['is_suspended'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    }
+
     public function legalEntity(): BelongsTo
     {
         return $this->belongsTo(LegalEntity::class, 'legal_entity_id');
+    }
+
+    public function scopeForLegalEntity(Builder $query, LegalEntity $legalEntity): Builder
+    {
+        return $query->where('legal_entity_id', $legalEntity->id);
     }
 }

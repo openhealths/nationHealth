@@ -15,7 +15,7 @@ class ContractPolicy
      */
     public function viewAny(User $user): Response
     {
-        if ($user->can('contract_request:read') || $user->can('contract:read')) {
+        if ($user->can('contract:read')) {
             return Response::allow();
         }
 
@@ -28,11 +28,11 @@ class ContractPolicy
     public function view(User $user, Contract $contract): Response
     {
         // Strict check: Contract must belong to the current Legal Entity
-        if ((int) $contract->legal_entity_id !== (int) legalEntity()->id) {
+        if ((int) $contract->legalEntityId !== (int) legalEntity()->id) {
             return Response::denyWithStatus(404);
         }
 
-        if ($user->can('contract_request:read') || $user->can('contract:read')) {
+        if ($user->can('contract:read')) {
             return Response::allow();
         }
 
@@ -54,7 +54,7 @@ class ContractPolicy
      */
     public function sync(User $user): Response
     {
-        if ($user->can('contract:read') || $user->can('contract_request:read')) {
+        if ($user->can('contract:read')) {
             return Response::allow();
         }
 

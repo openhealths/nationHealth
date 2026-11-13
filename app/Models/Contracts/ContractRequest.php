@@ -6,8 +6,11 @@ namespace App\Models\Contracts;
 
 use App\Enums\Contract\ContractRequestStatus;
 use App\Enums\JobStatus;
+use App\Models\Contracts\BaseContract as BaseContractModel;
+use App\Models\LegalEntity;
+use Illuminate\Database\Eloquent\Builder;
 
-class ContractRequest extends BaseContract
+class ContractRequest extends BaseContractModel
 {
     protected $table = 'contract_requests';
 
@@ -52,4 +55,9 @@ class ContractRequest extends BaseContract
         'contractor_signed' => 'boolean',
         'sync_status' => JobStatus::class,
     ];
+
+    public function scopeForLegalEntity(Builder $query, LegalEntity $legalEntity): Builder
+    {
+        return $query->where('contractor_legal_entity_id', $legalEntity->uuid);
+    }
 }

@@ -7,17 +7,17 @@ namespace App\Providers;
 use App\Classes\Cipher\CipherSignatureProvider;
 use App\Contracts\SignatureProvider;
 use App\Jobs\ApprovalSync;
+use App\Jobs\CarePlanFullSync;
 use App\Jobs\ClinicalImpressionFullSync;
 use App\Jobs\ClinicalImpressionSync;
-use App\Jobs\ConditionSync;
 use App\Jobs\CompositionAsyncProcessing;
+use App\Jobs\ConditionSync;
 use App\Jobs\DetectedIssueSync;
 use App\Jobs\DeviceAssociationSync;
 use App\Jobs\DeviceDispenseSync;
 use App\Jobs\DeviceSync;
 use App\Jobs\DiagnosticReportSync;
 use App\Jobs\EmployeeRoleSync;
-use App\Jobs\CarePlanFullSync;
 use App\Jobs\EncounterFullSync;
 use App\Jobs\EncounterShortSync;
 use App\Jobs\EpisodeSync;
@@ -31,9 +31,11 @@ use App\Jobs\PersonAuthMethodSync;
 use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Jobs\SpecimenSync;
 use App\Livewire\Hooks\IgnoreSpuriousToJsonCalls;
+use App\Repositories\EHealthDatabaseBatchRepository;
 use App\Rules\TranslatedDateValidator;
 use Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider;
 use Fruitcake\LaravelDebugbar\ServiceProvider as DebugbarServiceProvider;
+use Illuminate\Bus\BatchFactory;
 use Illuminate\Bus\BatchRepository;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -41,8 +43,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
-use App\Repositories\EHealthDatabaseBatchRepository;
-use Illuminate\Bus\BatchFactory;
 use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
@@ -94,6 +94,11 @@ class AppServiceProvider extends ServiceProvider
                 $customAttributes
             )
         );
+
+        foreach (['ehealth-contract-get', 'ehealth-contract-request-get'] as $limiter) {
+            RateLimiter::for($limiter, static fn (object $job) => Limit::perMinute(30)
+                ->by($job->legalEntity->uuid));
+        }
 
         RateLimiter::for('ehealth-employee-get', function (object $job) {
             echo "Rate limiter set for user: " . $job->user->id . PHP_EOL; // TODO: remove it after testing

@@ -1,0 +1,55 @@
+{
+  "meta": {
+    "code": 200,
+    "url": "https://example.com/resource",
+    "type": "object",
+    "request_id": "6617aeec-15e2-4d6f-b9bd-53559c358f97#17810"
+  },
+  "data": [
+    {
+      "id": "09106b70-18b0-4726-b0ed-6bda1369fd52",
+      "contract_type": "REIMBURSEMENT",
+      "contractor_legal_entity_id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+      "contractor_owner": {
+        "id": "b075f148-7f93-4fc2-b2ec-2d81b19a9b7b",
+        "party": {
+          "first_name": "Петро",
+          "last_name": "Іванов",
+          "second_name": "Миколайович"
+        }
+      },
+      "contractor_base": "на підставі закону про Медичне обслуговування населення",
+      "status": "VERIFIED",
+      "contractor_divisions": [
+        {
+          "id": "2922a240-63db-404e-b730-09222bfeb2dd",
+          "name": "Бориспільське відділення Клініки Ноунейм"
+        }
+      ],
+      "nhs_signer_id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+      "nhs_legal_entity_id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+      "nhs_signer_base": "на підставі наказу",
+      "issue_city": "Київ",
+      "nhs_contract_price": 50000,
+      "contract_number": "0000-9EAX-XT7X-3115",
+      "contract_request_id": "df9f70ee-4b12-4740-b0f5-bb5aea116863",
+      "start_date": "2017-04-20",
+      "end_date": "2018-04-20",
+      "is_suspended": "false",
+      "id_form": "RMB",
+      "parent_contract_id": "09106b70-18b0-4726-b0ed-6bda1369fd52",
+      "assignee_id": "22e416c4-5747-41cd-9f73-c3a85cdee885",
+      "medical_programs": [
+        "3914a240-63db-404e-b730-09222bfeb2d0"
+      ],
+      "updated_at": "2017-04-20T19:14:13Z",
+      "inserted_at": "2017-04-20T19:14:13Z"
+    }
+  ],
+  "paging": {
+    "page_number": 2,
+    "page_size": 50,
+    "total_entries": 1000,
+    "total_pages": 23
+  }
+}

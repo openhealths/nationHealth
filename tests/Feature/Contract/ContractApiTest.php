@@ -98,14 +98,14 @@ class ContractApiTest extends TestCase
         $this->assertSame($data, $mapped['data']);
     }
 
-    public function test_map_create_defaults_status_when_missing(): void
+    public function test_map_create_does_not_invent_status_when_missing(): void
     {
         $data = $this->eHealthContractPayload();
         unset($data['status']);
 
         $mapped = $this->api->mapCreate($data);
 
-        $this->assertSame('ACTIVE', $mapped['status']);
+        $this->assertNull($mapped['status']);
     }
 
     public function test_map_create_preserves_verified_status(): void

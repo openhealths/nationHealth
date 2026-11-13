@@ -7,6 +7,8 @@ namespace App\Livewire\ContractRequest;
 use App\Classes\eHealth\EHealth;
 use App\Contracts\SignatureProvider;
 use App\Enums\Contract\IdForm;
+use App\Enums\Contract\Type;
+use App\Enums\JobStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Exceptions\Signature\SignatureException;
@@ -18,14 +20,28 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use RuntimeException;
+use Throwable;
 
 class ContractRequestShow extends Component
 {
     use WithFileUploads;
 
-    public ContractRequest $contractRequest;
+    #[Locked]
+    public int $contractRequestId;
+
+    protected ContractRequest $contractRequest;
+
+    public function boot(): void
+    {
+        if (isset($this->contractRequestId)) {
+            $this->contractRequest = ContractRequest::query()->forLegalEntity(legalEntity())->findOrFail($this->contractRequestId);
+            abort_if(Auth::user()->cannot('view', $this->contractRequest), 403);
+        }
+    }
     public SigningForm $form;
     public array $contractData = [];
     public array $medicalProgramNames = [];
@@ -34,14 +50,16 @@ class ContractRequestShow extends Component
 
     public function mount(LegalEntity $legalEntity, ContractRequest $contractRequest): void
     {
+        abort_if(Auth::user()->cannot('view', $contractRequest), 403);
+        $this->contractRequestId = $contractRequest->id;
         $this->contractRequest = $contractRequest;
+        $this->medicalProgramNames = $this->resolveMedicalProgramNames();
 
         if ($this->contractRequest->uuid && $this->contractRequest->type) {
             $this->syncDetailsFromEHealth();
         }
 
         $this->contractData = $this->normalizeContractData($this->contractRequest->data ?? []);
-        $this->medicalProgramNames = $this->resolveMedicalProgramNames();
     }
 
     public function canApproveContractRequest(): bool
@@ -56,10 +74,8 @@ class ContractRequestShow extends Component
 
     public function openApproveModal(): void
     {
-        $this->authorize('approve', $this->contractRequest);
-
-        if (!$this->canApproveContractRequest()) {
-            Session::flash('error', __('contracts.approve_unavailable_for_status'));
+        if (Auth::user()->cannot('approve', $this->contractRequest)) {
+            Session::flash('error', __('contracts.policy.approve_denied'));
 
             return;
         }
@@ -70,10 +86,8 @@ class ContractRequestShow extends Component
 
     public function openSignModal(): void
     {
-        $this->authorize('sign', $this->contractRequest);
-
-        if (!$this->canSignContractRequest()) {
-            Session::flash('error', __('contracts.sign_unavailable_for_status'));
+        if (Auth::user()->cannot('sign', $this->contractRequest)) {
+            Session::flash('error', __('contracts.policy.sign_denied'));
 
             return;
         }
@@ -93,10 +107,8 @@ class ContractRequestShow extends Component
 
     public function approve(): void
     {
-        $this->authorize('approve', $this->contractRequest);
-
-        if (!$this->canApproveContractRequest()) {
-            Session::flash('error', __('contracts.approve_unavailable_for_status'));
+        if (Auth::user()->cannot('approve', $this->contractRequest)) {
+            Session::flash('error', __('contracts.policy.approve_denied'));
 
             return;
         }
@@ -110,7 +122,9 @@ class ContractRequestShow extends Component
         }
 
         try {
-            $this->syncDetailsFromEHealth();
+            if (!$this->syncDetailsFromEHealth() || !$this->canApproveContractRequest()) {
+                return;
+            }
             $dataToSign = $this->buildJsonDataToSign();
             $signedContent = signatureService()->signData(
                 $dataToSign,
@@ -129,23 +143,21 @@ class ContractRequestShow extends Component
                 ]
             );
 
-            $this->persistEHealthResponse($response->getData());
+            $this->persistEHealthResponse($response->validate());
             $this->showSignatureModal = false;
             $this->pendingAction = null;
             Session::flash('success', __('contracts.approve_success'));
         } catch (SignatureException $exception) {
             $exception->handle('Error when signing contract request approval');
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             $this->handleActionError($exception, 'approve');
         }
     }
 
     public function sign(): void
     {
-        $this->authorize('sign', $this->contractRequest);
-
-        if (!$this->canSignContractRequest()) {
-            Session::flash('error', __('contracts.sign_unavailable_for_status'));
+        if (Auth::user()->cannot('sign', $this->contractRequest)) {
+            Session::flash('error', __('contracts.policy.sign_denied'));
 
             return;
         }
@@ -174,13 +186,13 @@ class ContractRequestShow extends Component
                 ]
             );
 
-            $this->persistEHealthResponse($response->getData());
+            $this->persistEHealthResponse($response->validate());
             $this->showSignatureModal = false;
             $this->pendingAction = null;
             Session::flash('success', __('contracts.sign_success'));
         } catch (SignatureException $exception) {
             $exception->handle('Error when signing contract request');
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             $this->handleActionError($exception, 'sign');
         }
     }
@@ -201,7 +213,7 @@ class ContractRequestShow extends Component
                 $this->contractRequest->uuid,
                 $contractType
             );
-            $signedContentData = $signedContentResponse->getData();
+            $signedContentData = $signedContentResponse->validate();
             $base64Payload = $signedContentData['content'] ?? $signedContentData['signed_content'] ?? null;
 
             if (is_string($base64Payload) && $base64Payload !== '') {
@@ -223,7 +235,9 @@ class ContractRequestShow extends Component
             ]);
         }
 
-        $this->syncDetailsFromEHealth();
+        if (!$this->syncDetailsFromEHealth()) {
+            throw new RuntimeException(__('contracts.details_unavailable'));
+        }
 
         return signatureService()->signData(
             $this->buildJsonDataToSign(),
@@ -241,12 +255,14 @@ class ContractRequestShow extends Component
     {
         $data = $this->normalizeContractData($this->contractRequest->fresh()->data ?? []);
 
-        if (!empty($this->contractRequest->printout_content)) {
-            $data['printout_content'] = $this->contractRequest->printout_content;
+        unset($data['urgent'], $data['uuid'], $data['type'], $data['sync_status']);
+
+        if (!empty($this->contractRequest->printoutContent)) {
+            $data['printout_content'] = $this->contractRequest->printoutContent;
         }
 
         if (empty($data)) {
-            throw new \RuntimeException(__('contracts.sign_data_unavailable'));
+            throw new RuntimeException(__('contracts.sign_data_unavailable'));
         }
 
         return $data;
@@ -266,12 +282,11 @@ class ContractRequestShow extends Component
         $this->contractData = $this->normalizeContractData($this->contractRequest->data ?? []);
     }
 
-    private function handleActionError(\Throwable $exception, string $action): void
+    private function handleActionError(Throwable $exception, string $action): void
     {
         if ($exception instanceof EHealthResponseException) {
             Log::error("Contract request {$action} eHealth API error", [
                 'status' => $exception->response->status(),
-                'body' => $exception->response->body(),
                 'contract_request_uuid' => $this->contractRequest->uuid,
             ]);
         } else {
@@ -304,66 +319,44 @@ class ContractRequestShow extends Component
      */
     private function resolveMedicalProgramNames(): array
     {
+        if ($this->contractRequest->type !== Type::REIMBURSEMENT->value) {
+            return [];
+        }
+
         try {
             return dictionary()->medicalPrograms()
                 ->pluck('name', 'id')
                 ->all();
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::warning('Failed to load medical program dictionary: '.$exception->getMessage());
 
             return [];
         }
     }
 
-    private function syncDetailsFromEHealth(): void
+    private function syncDetailsFromEHealth(): bool
     {
         try {
             $contractType = strtolower((string) $this->contractRequest->type);
-
-            $response = EHealth::contractRequest()->getDetails($contractType, $this->contractRequest->uuid);
-
-            $ehealthData = $response->getData();
-
-            if (empty($ehealthData)) {
-                return;
-            }
-
-            $printoutContent = null;
+            $data = EHealth::contractRequest()->getDetails($contractType, $this->contractRequest->uuid)->validate();
+            $data['sync_status'] = JobStatus::COMPLETED->value;
+            $this->contractRequest = Repository::contractRequest()->saveFromEHealth($data, $this->contractRequest->type, details: true);
+            $this->contractData = $this->normalizeContractData($this->contractRequest->data ?? []);
 
             try {
-                $printoutResponse = EHealth::contractRequest()->getPrintoutContent($this->contractRequest->uuid, $contractType);
-                $printoutData = $printoutResponse->getData();
-                $printoutContent = $printoutData['content'] ?? null;
-            } catch (\Exception $exception) {
-                Log::warning('Failed to fetch Contract Request printout content: ' . $exception->getMessage());
+                $printout = EHealth::contractRequest()->getPrintoutContent($this->contractRequest->uuid, $contractType)->validate();
+                $this->contractRequest->update(['printout_content' => $printout['printout_content']]);
+            } catch (Throwable $exception) {
+                Log::warning('Failed to read contract request printout', ['exception' => $exception::class]);
+                Session::flash('warning', __('contracts.printout_unavailable'));
             }
 
-            $this->contractRequest->update([
-                'contractor_base' => $ehealthData['contractor_base'] ?? $this->contractRequest->contractorBase,
-                'contractor_payment_details' => $ehealthData['contractor_payment_details'] ?? null,
-                'contractor_divisions' => $ehealthData['contractor_divisions'] ?? null,
-                'external_contractors' => $ehealthData['external_contractors'] ?? null,
-                'nhs_signer_id' => $ehealthData['nhs_signer']['id'] ?? $ehealthData['nhs_signer']['uuid'] ?? null,
-                'nhs_signer_base' => $ehealthData['nhs_signer_base'] ?? null,
-                'nhs_contract_price' => $ehealthData['nhs_contract_price'] ?? null,
-                'nhs_payment_method' => $ehealthData['nhs_payment_method'] ?? null,
-                'id_form' => $ehealthData['id_form'] ?? $this->contractRequest->idForm,
-                'contract_number' => $ehealthData['contract_number'] ?? $this->contractRequest->contractNumber,
-                'start_date' => $ehealthData['start_date'] ?? $this->contractRequest->startDate,
-                'end_date' => $ehealthData['end_date'] ?? $this->contractRequest->endDate,
-                'status' => $ehealthData['status'] ?? $this->contractRequest->status,
-                'status_reason' => $ehealthData['status_reason'] ?? $this->contractRequest->statusReason,
-                'inserted_at' => !empty($ehealthData['inserted_at'])
-                    ? \Illuminate\Support\Carbon::parse($ehealthData['inserted_at'])
-                    : $this->contractRequest->insertedAt,
-                'printout_content' => $printoutContent ?? $this->contractRequest->printoutContent,
-                'data' => $ehealthData,
-            ]);
+            return true;
+        } catch (Throwable $exception) {
+            Log::warning('Failed to read contract request details', ['exception' => $exception::class]);
+            Session::flash('error', __('contracts.details_unavailable'));
 
-            $this->contractRequest->refresh();
-            $this->contractRequest = $this->contractRequest->fresh();
-        } catch (\Exception $exception) {
-            Log::warning('Failed to fetch Contract Request details: ' . $exception->getMessage());
+            return false;
         }
     }
 
@@ -391,6 +384,7 @@ class ContractRequestShow extends Component
             ?? data_get($this->contractData, 'id_form');
 
         return view('livewire.contract-request.contract-request-show', [
+            'contractRequest' => $this->contractRequest,
             'idFormName' => IdForm::resolveLabel($idFormCode, $this->contractRequest->type),
         ]);
     }

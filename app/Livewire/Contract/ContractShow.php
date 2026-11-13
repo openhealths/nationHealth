@@ -6,14 +6,36 @@ namespace App\Livewire\Contract;
 
 use App\Classes\eHealth\EHealth;
 use App\Enums\Contract\IdForm;
+use App\Enums\Contract\Type;
+use App\Enums\JobStatus;
 use App\Models\Contracts\Contract;
 use App\Models\LegalEntity;
+use App\Repositories\Repository;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
+use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Throwable;
 
 class ContractShow extends Component
 {
-    public Contract $contract;
+    #[Locked]
+    public int $contractId;
+
+    protected Contract $contract;
+
+    public function boot(): void
+    {
+        if (isset($this->contractId)) {
+            $this->contract = Contract::query()->forLegalEntity(legalEntity())->findOrFail($this->contractId);
+            abort_if(Auth::user()->cannot('view', $this->contract), 403);
+        }
+    }
+
+    #[Locked]
+    public string $printoutContent = '';
 
     public array $data = [];
 
@@ -21,53 +43,34 @@ class ContractShow extends Component
 
     public function mount(LegalEntity $legalEntity, Contract $contract): void
     {
+        abort_if(Auth::user()->cannot('view', $contract), 403);
+        $this->contractId = $contract->id;
         $this->contract = $contract;
+        $this->medicalProgramNames = $this->resolveMedicalProgramNames();
 
         if ($this->contract->uuid) {
             $this->syncDetailsFromEHealth();
         }
 
         $this->data = $this->normalizeContractData($this->contract->data ?? []);
-        $this->medicalProgramNames = $this->resolveMedicalProgramNames();
     }
 
     private function syncDetailsFromEHealth(): void
     {
         try {
-            $response = EHealth::contract()->getDetails($this->contract->uuid);
-
-            $ehealthData = $response->getData();
-
-            if (!empty($ehealthData)) {
-                $this->contract->update([
-                    'contractor_base' => $ehealthData['contractor_base'] ?? $this->contract->contractorBase,
-                    'contractor_payment_details' => $ehealthData['contractor_payment_details'] ?? null,
-                    'contractor_divisions' => $ehealthData['contractor_divisions'] ?? null,
-                    'external_contractors' => $ehealthData['external_contractors'] ?? null,
-                    'external_contractor_flag' => $ehealthData['external_contractor_flag'] ?? $this->contract->externalContractorFlag,
-                    'nhs_signer_id' => $ehealthData['nhs_signer']['id'] ?? $ehealthData['nhs_signer']['uuid'] ?? null,
-                    'nhs_signer_base' => $ehealthData['nhs_signer_base'] ?? null,
-                    'nhs_contract_price' => $ehealthData['nhs_contract_price'] ?? null,
-                    'nhs_payment_method' => $ehealthData['nhs_payment_method'] ?? null,
-                    'medical_programs' => $ehealthData['medical_programs'] ?? $this->contract->medicalPrograms,
-                    'id_form' => $ehealthData['id_form'] ?? $this->contract->idForm,
-                    'contract_number' => $ehealthData['contract_number'] ?? $this->contract->contractNumber,
-                    'type' => isset($ehealthData['type'])
-                        ? strtoupper((string) $ehealthData['type'])
-                        : $this->contract->type,
-                    'start_date' => $ehealthData['start_date'] ?? $this->contract->startDate,
-                    'end_date' => $ehealthData['end_date'] ?? $this->contract->endDate,
-                    'status_reason' => $ehealthData['status_reason'] ?? $this->contract->statusReason,
-                    'inserted_at' => !empty($ehealthData['inserted_at'])
-                        ? \Illuminate\Support\Carbon::parse($ehealthData['inserted_at'])
-                        : $this->contract->insertedAt,
-                    'data' => $ehealthData,
-                ]);
-
-                $this->contract->refresh();
+            $data = EHealth::contract()->getDetails($this->contract->uuid, strtolower((string) $this->contract->type))->validate();
+            $data['sync_status'] = JobStatus::COMPLETED->value;
+            $this->contract = Repository::contract()->saveFromEHealth($data, details: true);
+            try {
+                $printout = EHealth::contract()->getPrintoutContent($this->contract->uuid, strtolower($this->contract->type))->validate();
+                $this->printoutContent = $printout['printout_content'];
+            } catch (Throwable $exception) {
+                Log::warning('Failed to read contract printout', ['exception' => $exception::class]);
+                Session::flash('warning', __('contracts.printout_unavailable'));
             }
-        } catch (\Exception $exception) {
-            Log::warning('Failed to fetch Contract details: '.$exception->getMessage());
+        } catch (Throwable $exception) {
+            Log::warning('Failed to read contract details', ['exception' => $exception::class]);
+            Session::flash('error', __('contracts.details_unavailable'));
         }
     }
 
@@ -76,11 +79,15 @@ class ContractShow extends Component
      */
     private function resolveMedicalProgramNames(): array
     {
+        if ($this->contract->type !== Type::REIMBURSEMENT->value) {
+            return [];
+        }
+
         try {
             return dictionary()->medicalPrograms()
                 ->pluck('name', 'id')
                 ->all();
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::warning('Failed to load medical program dictionary: '.$exception->getMessage());
 
             return [];
@@ -105,7 +112,7 @@ class ContractShow extends Component
         return [];
     }
 
-    public function render(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\View\View
+    public function render(): View
     {
         $idFormCode = $this->contract->idForm
             ?? data_get($this->data, 'id_form');

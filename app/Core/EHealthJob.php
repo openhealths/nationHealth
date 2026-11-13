@@ -4,35 +4,35 @@ declare(strict_types=1);
 
 namespace App\Core;
 
-use Throwable;
-use App\Models\User;
-use ReflectionClass;
+use App\Classes\eHealth\EHealthResponse;
 use App\Enums\JobStatus;
-use Illuminate\Bus\Batch;
-use App\Traits\FormTrait;
 use App\Jobs\CompleteSync;
 use App\Models\LegalEntity;
+use App\Models\User;
+use App\Notifications\SyncNotification;
+use App\Traits\BatchLegalEntityQueries;
+use App\Traits\FormTrait;
+use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Bus\Batch;
 use Illuminate\Bus\Batchable;
+use Illuminate\Bus\BatchRepository;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Bus\BatchRepository;
-use Illuminate\Support\Facades\Crypt;
-use App\Traits\BatchLegalEntityQueries;
-use App\Notifications\SyncNotification;
-use Illuminate\Queue\InteractsWithQueue;
-use App\Classes\eHealth\EHealthResponse;
-use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use ReflectionClass;
+use Throwable;
 
 abstract class EHealthJob implements ShouldQueue
 {
-    use Queueable;
     use Batchable;
+    use BatchLegalEntityQueries;
     use FormTrait;
     use InteractsWithQueue;
-    use BatchLegalEntityQueries;
+    use Queueable;
 
     public const string BATCH_NAME = 'FirstLoginSync';
 
@@ -139,7 +139,7 @@ abstract class EHealthJob implements ShouldQueue
         if ($response?->isNotLast()) {
             echo "Scheduling next page job: " . static::BATCH_NAME . " Page: " . $this->page . " Next Page: " . ($this->page + 1) . PHP_EOL;
             $this->batch()
-                ?->add(new static(legalEntity: $this->legalEntity, page: $this->page + 1, isFirstLogin: $this->isFirstLogin, nextEntity: $this->nextEntity, standalone: $this->standalone)
+                ?->add($this->nextPageJob()
                     ->delay(now()->addSeconds(self::RATE_LIMIT_DELAY)));
 
             return;
@@ -170,6 +170,18 @@ abstract class EHealthJob implements ShouldQueue
                 ->onQueue('sync')
                 ->dispatch();
         }
+    }
+
+    /** Resource jobs can preserve endpoint context when scheduling the next page. */
+    protected function nextPageJob(): static
+    {
+        return new static(
+            legalEntity: $this->legalEntity,
+            page: $this->page + 1,
+            isFirstLogin: $this->isFirstLogin,
+            nextEntity: $this->nextEntity,
+            standalone: $this->standalone
+        );
     }
 
     // Handle job failure
