@@ -248,8 +248,10 @@ trait ManagesConfidantPersonRelationships
         $this->showSignatureDrawer = true;
     }
 
-    public function signConfidantPersonRelationship(): void
+    public function signConfidantPersonRelationship(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if (Auth::user()->cannot('create', ConfidantPerson::class)) {
             Session::flash('error', __('patients.policy.sign_confidant'));
 
@@ -269,7 +271,7 @@ trait ManagesConfidantPersonRelationships
             $signedContent = signatureService()->signData(
                 $this->approvedData,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );

@@ -142,9 +142,11 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
     /**
      * Sign and submit the draft, unless it was submitted from another page since this one was opened.
      *
+     * @param  string  $keyContainer  Key container in base64
+     * @param  string  $password
      * @return void
      */
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
         if (Auth::user()->cannot('update', DiagnosticReport::findOrFail($this->diagnosticReportId))) {
             Session::flash('error', __('diagnostic-reports.policy.update'));
@@ -152,7 +154,7 @@ class DiagnosticReportEdit extends DiagnosticReportComponent
             return;
         }
 
-        parent::sign();
+        parent::sign($keyContainer, $password);
     }
 
     protected function loadSelectedElectronicReferral(string $uuid): string

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\DeviceRequest;
 
 use App\Classes\eHealth\EHealth;
+use App\Core\BaseForm;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Exceptions\Signature\SignatureException;
 use App\Models\LegalEntity;
@@ -26,13 +27,10 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 use Throwable;
 
 class DeviceRequestForm extends Component
 {
-    use WithFileUploads;
-
     #[Locked]
     public int $legalEntityId;
 
@@ -90,7 +88,7 @@ class DeviceRequestForm extends Component
 
     public bool $showSignatureModal = false;
 
-    public array $form = ['knedp' => '', 'keyContainerUpload' => null, 'keyContainerFileName' => '', 'password' => ''];
+    public BaseForm $form;
 
     public function mount(LegalEntity $legalEntity, Person $person): void
     {
@@ -453,9 +451,10 @@ class DeviceRequestForm extends Component
         }
     }
 
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
-        $this->validate(['form.knedp' => 'required|string', 'form.keyContainerUpload' => 'required|file|max:1024|extensions:dat,pfx,zs2,jks', 'form.password' => 'required|string']);
+        $this->form->useSigningSecrets($keyContainer, $password);
+        $validated = $this->form->validate($this->form->signingRules());
         $lock = Cache::lock('device-request-sign:'.$this->person->uuid.':'.($this->activityUuid ?? $this->requestUuid), 600);
 
         try {
@@ -470,7 +469,7 @@ class DeviceRequestForm extends Component
                 && ($saved['activityUuid'] ?? null) === $this->activityUuid, 409);
             $service = app(DeviceRequestLifecycleService::class);
             $prepared = $service->prepare($this->person, $this->legalEntity, $saved['data'], $saved['carePlanUuid'], $saved['activityUuid']);
-            $signedData = signatureService()->signData($prepared['payload'], $this->form['knedp'], $this->form['keyContainerUpload'], $this->form['password'], (string) Auth::user()->party->taxId);
+            $signedData = signatureService()->signData($prepared['payload'], $validated['knedp'], $validated['keyContainer'], $validated['password'], (string) Auth::user()->party->taxId);
             $response = EHealth::deviceRequest()->createSigned($this->person->uuid, ['signed_data' => $signedData, 'signed_data_encoding' => 'base64']);
             app(EHealthJobResolver::class)->resolve($response->getData());
             $remote = $service->details($this->person, $record->uuid);
@@ -491,9 +490,6 @@ class DeviceRequestForm extends Component
         } finally {
             $lock->release();
             $this->showSignatureModal = false;
-            $this->form['password'] = '';
-            $this->form['keyContainerUpload'] = null;
-            $this->form['keyContainerFileName'] = '';
         }
     }
 

@@ -26,7 +26,6 @@ use App\Repositories\EmployeeRepository;
 use App\Services\Employee\EmployeeRequestMatcher;
 use App\Services\Employee\EmployeeRequestProcessor;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -138,10 +137,9 @@ class EmployeeRequestRootCauseRegressionTest extends TestCase
             ->call('save')->assertHasErrors($issuer)->assertDispatched('validation-failed-scroll', firstErrorKey: $issuer)
             ->call('prepareForSigning')->assertHasErrors($issuer)->assertNotDispatched('open-request-preview-modal')
             ->assertSee('АА123456 — '.__('validation.custom.employee.document_issuer_required'));
-        $component->set('form.knedp', 'test')->set('form.password', 'test')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('test.dat', 1));
+        $component->set('form.knedp', 'test');
         foreach ([null, '', '   ', "\u{00a0}"] as $blank) {
-            $component->set($issuer, $blank)->call('sign')
+            $component->set($issuer, $blank)->call('sign', base64_encode('key-container'), 'test')
                 ->assertHasErrors($issuer)->assertHasNoErrors('form.documents.0.issuedBy');
         }
         $signature->shouldNotHaveReceived('signData');
@@ -149,7 +147,8 @@ class EmployeeRequestRootCauseRegressionTest extends TestCase
 
         $component->set($issuer, 'МВС')->call('save')->assertHasNoErrors()
             ->call('prepareForSigning')->assertHasNoErrors()->assertDispatched('open-request-preview-modal')
-            ->call('sign')->assertHasNoErrors()->assertDispatched('close-signature-modal');
+            ->call('sign', base64_encode('key-container'), 'test')->assertHasNoErrors()
+            ->assertDispatched('close-signature-modal');
         self::assertSame(RevisionStatus::SENT, $draft->fresh()->revision->status);
     }
 

@@ -143,7 +143,7 @@ class MedicationDispenseLifecycleService
         $signedContent = signatureService()->signData(
             $signPayload,
             $form['knedp'],
-            $form['keyContainerUpload'],
+            $form['keyContainer'],
             $form['password'],
             $employeeContext['signer_tax_id']
         );

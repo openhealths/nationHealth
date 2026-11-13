@@ -34,7 +34,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
-use Livewire\WithFileUploads;
 use App\Mail\UserCredentialsMail;
 use RuntimeException;
 use Throwable;
@@ -42,8 +41,6 @@ use Throwable;
 #[AllowDynamicProperties]
 abstract class AbstractEmployeeFormManager extends EmployeeComponent
 {
-    use WithFileUploads;
-
     #[Locked]
     public ?int $employeeRequestId = null;
     protected ?BaseEmployee $employeeRequest = null;
@@ -151,8 +148,9 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         return $status->label();
     }
 
-    public function sign()
+    public function sign(string $keyContainer = '', string $password = '')
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
         Log::info('Attempting to sign.');
 
         try {
@@ -166,7 +164,8 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->employeeRequestId = $this->employeeRequest->id;
 
             $requestToSign = $this->validateAndGetDraft();
-            $signedContent = $this->signEmployeeRequest($requestToSign);
+            $signingData = $this->form->validate($this->form->signingRules());
+            $signedContent = $this->signEmployeeRequest($requestToSign, $signingData);
 
             $eHealthResponseAsArray = EHealth::employeeRequest()->create($signedContent);
 
@@ -180,7 +179,6 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
             $this->createLocalUserForEmployeeRequest($requestToSign);
 
-            $this->resetSignatureFields();
             $this->showSignatureModal = false;
             $this->showRequestPreviewModal = false;
             $this->dispatch('close-signature-modal');
@@ -569,7 +567,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     abstract protected function handleDraftPersistence(): EmployeeRequest;
 
     /**
-     * Gets the draft and validates it, including KEP-specific validation.
+     * Gets the draft and checks that it has not been signed yet.
      */
     protected function validateAndGetDraft(): EmployeeRequest
     {
@@ -579,8 +577,6 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         if (is_null($requestToSign) || !is_null($requestToSign->uuid)) {
             throw new RuntimeException(__('forms.draft_not_found_or_already_signed'), 400);
         }
-
-        $this->form->validate($this->form->rulesForKepOnly());
 
         return $requestToSign;
     }
@@ -743,8 +739,12 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
     /**
      * Sign the employee request data with the signature provider.
+     *
+     * @param  EmployeeRequest  $requestToSign
+     * @param  array  $signingData  Validated KNEDP, key container and password
+     * @return string
      */
-    private function signEmployeeRequest(EmployeeRequest $requestToSign): string
+    private function signEmployeeRequest(EmployeeRequest $requestToSign, array $signingData): string
     {
         $requestToSign->loadMissing('revision');
         $nestedDataForRevision = $requestToSign->revision->data;
@@ -752,22 +752,14 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
 
         return signatureService()->signData(
             $payloadToSign,
-            $this->form->knedp,
-            $this->form->keyContainerUpload,
-            $this->form->password,
+            $signingData['knedp'],
+            $signingData['keyContainer'],
+            $signingData['password'],
             Auth::user()->party->tax_id
         );
     }
 
     // === SHARED HELPERS & UI LOGIC (Moved from Trait) ===
-
-    /**
-     * Resets only the fields related to the digital signature form inputs.
-     */
-    public function resetSignatureFields(): void
-    {
-        $this->form->reset('keyContainerUpload', 'keyContainerFileName', 'password', 'knedp');
-    }
 
     /**
      * Handles ValidationException by dispatching events for user feedback and scrolling.

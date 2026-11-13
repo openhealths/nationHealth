@@ -208,10 +208,14 @@ abstract class SpecimenComponent extends Component
     /**
      * Validate the specimen, sign it, send it to create and store it locally.
      *
+     * @param  string  $keyContainer  Key container in base64
+     * @param  string  $password
      * @return void
      */
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if (Auth::user()->cannot('create', Specimen::class)) {
             Session::flash('error', __('specimens.policy.create'));
 
@@ -237,7 +241,7 @@ abstract class SpecimenComponent extends Component
             $signedContent = signatureService()->signData(
                 Arr::toSnakeCase($fhirSpecimen),
                 $validatedCipher['knedp'],
-                $validatedCipher['keyContainerUpload'],
+                $validatedCipher['keyContainer'],
                 $validatedCipher['password'],
                 Auth::user()->party->taxId
             );
@@ -247,8 +251,6 @@ abstract class SpecimenComponent extends Component
 
             return;
         }
-
-        $this->form->resetSigningFields();
 
         try {
             $response = EHealth::specimen()->create($this->patientUuid, [

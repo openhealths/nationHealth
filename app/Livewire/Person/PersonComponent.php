@@ -838,10 +838,14 @@ class PersonComponent extends Component
     /**
      * Build and send API request 'Sign Person v2' and redirect to page if data is validated.
      *
+     * @param  string  $keyContainer  Key container in base64
+     * @param  string  $password
      * @return void
      */
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if (Auth::user()->cannot('sign', PersonRequest::class)) {
             Session::flash('error', __('patients.policy.sign'));
 
@@ -872,7 +876,7 @@ class PersonComponent extends Component
             $signedContent = signatureService()->signData(
                 $personRequestData,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );

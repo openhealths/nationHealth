@@ -8,7 +8,6 @@ use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Episode\Status;
 use App\Enums\Person\EncounterStatus;
-use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\EncounterPackage\Concerns\ManagesIncomingReferralSelection;
@@ -132,10 +131,14 @@ class EncounterPackageCreate extends EncounterPackageComponent
     /**
      * Persist the encounter as a draft, sign it and submit it to eHealth.
      *
+     * @param  string  $keyContainer  Key container in base64
+     * @param  string  $password
      * @return void
      */
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if (Auth::user()->cannot('create', Encounter::class)) {
             Session::flash('error', __('encounters.policy.create'));
             $this->showSignatureModal = false;
@@ -176,6 +179,14 @@ class EncounterPackageCreate extends EncounterPackageComponent
         }
 
         $formattedData = $this->packageBuilder->build($validatedData, $this->episodeType);
+
+        // Signed before anything is stored, so a failed signature leaves no draft behind either
+        $signedPackage = $this->signPackageContent($formattedData, $validated);
+        if ($signedPackage === null) {
+            return;
+        }
+
+        [$packageContent, $signedContent] = $signedPackage;
 
         try {
             $this->syncReferencedRecords();
@@ -226,39 +237,10 @@ class EncounterPackageCreate extends EncounterPackageComponent
             return;
         }
 
-        $formattedData = Arr::toSnakeCase($formattedData);
-
-        // Remove display_value from incoming_referral before sending to eHealth (schema rejects it); the episode was sent on its own
-        unset($formattedData['encounter']['incoming_referral']['display_value'], $formattedData['episode']);
-
-        try {
-            $signedContent = signatureService()->signData(
-                $formattedData,
-                $validated['knedp'],
-                $validated['keyContainerUpload'],
-                $validated['password'],
-                Auth::user()->party->taxId
-            );
-        } catch (SignatureException $exception) {
-            $exception->handle('Error when signing the encounter package');
-            $this->showSignatureModal = false;
-
-            // The draft and its episode are stored already, so signing is retried from the draft's edit page
-            $this->redirectRoute(
-                $this->prepersonId !== null ? 'prepersons.encounters.edit' : 'persons.encounters.edit',
-                $this->prepersonId !== null
-                    ? [legalEntity(), 'preperson' => $this->prepersonId, 'encounter' => $createdEncounterId]
-                    : [legalEntity(), 'person' => $this->personId, 'encounter' => $createdEncounterId],
-                navigate: true
-            );
-
-            return;
-        }
-
         $this->showSignatureModal = false;
 
         try {
-            $this->submitPackage(Encounter::findOrFail($createdEncounterId), $formattedData, $signedContent);
+            $this->submitPackage(Encounter::findOrFail($createdEncounterId), $packageContent, $signedContent);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while submitting encounter');
         } catch (Throwable $exception) {

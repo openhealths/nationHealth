@@ -189,8 +189,10 @@ class EditLegalEntity extends LegalEntity
         return $this->convertArrayKeysToCamelCase($documents);
     }
 
-    public function updateLegalEntity(): RedirectResponse|Redirector|null
+    public function updateLegalEntity(string $keyContainer = '', string $password = ''): RedirectResponse|Redirector|null
     {
+        $this->legalEntityForm->useSigningSecrets($keyContainer, $password);
+
         /*
          * This is need by Livewire behavior.
          * On the first render, mount() runs and assigns $this->legalEntity.

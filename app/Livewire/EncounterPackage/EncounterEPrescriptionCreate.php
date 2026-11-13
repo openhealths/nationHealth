@@ -21,8 +21,10 @@ class EncounterEPrescriptionCreate extends EncounterDocumentCreate
         $this->openEncounterEPrescriptionDrawer();
     }
 
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if ($this->actionType === 'sign_eprescription') {
             $this->signEncounterEPrescription();
         }

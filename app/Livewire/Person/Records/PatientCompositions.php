@@ -301,7 +301,6 @@ class PatientCompositions extends BasePatientComponent
         $this->cancellingCompositionUuid = $compositionUuid;
         unset($this->cancellationReasons, $this->cancellationWarning);
         $this->form->resetCancellationFields();
-        $this->form->resetSigningFields();
         $this->showSignatureModal = true;
     }
 
@@ -310,7 +309,6 @@ class PatientCompositions extends BasePatientComponent
         $this->showSignatureModal = false;
         $this->cancellingCompositionUuid = null;
         $this->form->resetCancellationFields();
-        $this->form->resetSigningFields();
     }
 
     /**
@@ -393,12 +391,14 @@ class PatientCompositions extends BasePatientComponent
      * Sign and submit the cancelComposition request.
      * ТЗ 3.8.1.10.4 / 3.8.2.15.4
      */
-    public function cancelComposition(): void
+    public function cancelComposition(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         try {
             // Validate on the form object so rules resolve against form.* properties
             // (component-level validate() looks for $this->reason, which does not exist).
-            $this->form->validate(array_merge(
+            $validated = $this->form->validate(array_merge(
                 $this->form->cancellationRules($this->cancellationReasons),
                 $this->form->signingRules()
             ));
@@ -429,9 +429,9 @@ class PatientCompositions extends BasePatientComponent
         try {
             $signedContent = signatureService()->signData(
                 $this->form->toCancellationPayload($composition->uuid, $composition->type),
-                $this->form->knedp,
-                $this->form->keyContainerUpload,
-                $this->form->password,
+                $validated['knedp'],
+                $validated['keyContainer'],
+                $validated['password'],
                 Auth::user()->party->taxId
             );
 

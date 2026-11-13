@@ -228,8 +228,10 @@ class EncounterReferralLayoutTest extends TestCase
         $document = new \DOMDocument();
         @$document->loadHTML('<?xml encoding="UTF-8">'.$html);
         $xpath = new \DOMXPath($document);
-        foreach (['mergeKnedp' => 'form.knedp', 'mergeKeyFile' => 'form.keyContainerUpload', 'mergePassword' => 'form.password'] as $id => $property) {
-            $this->assertSame($property, $xpath->query('//*[@id="'.$id.'"]')->item(0)->getAttribute('wire:model'));
+        $this->assertCount(1, $xpath->query('//select[@*[name()="wire:model" and .="form.knedp"]]'));
+        $this->assertCount(1, $xpath->query('//*[@data-method="sign"]'));
+        foreach (['//input[@type="file"]', '//input[@type="password"]'] as $query) {
+            $this->assertFalse($xpath->query($query)->item(0)->hasAttribute('wire:model'));
         }
         $this->assertCount(1, $xpath->query('//button[@*[name()="wire:click" and .="sign"]]'));
         $this->assertStringContainsString('showMergeFinalConsentDrawer = true', $html);

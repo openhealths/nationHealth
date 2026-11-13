@@ -461,10 +461,14 @@ class PrepersonMerge extends Component
     /**
      * Sign the approved merge request with the doctor's qualified digital signature and finalize the merge.
      *
+     * @param  string  $keyContainer  Key container in base64
+     * @param  string  $password
      * @return void
      */
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if (Auth::user()->cannot('sign', MergeRequest::class)) {
             Session::flash('error', __('preperson.policy.sign'));
 
@@ -488,7 +492,7 @@ class PrepersonMerge extends Component
             $signedContent = signatureService()->signData(
                 $dataToSign,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );

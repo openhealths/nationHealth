@@ -130,8 +130,9 @@ abstract class ContractComponent extends Component
         }
     }
 
-    public function create(): void
+    public function create(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
         $this->normalizePaymentDetails();
 
         // 1. Livewire Form Validation
@@ -230,7 +231,7 @@ abstract class ContractComponent extends Component
             $signedContent = signatureService()->signData(
                 $payload,
                 $signingData['knedp'],
-                $signingData['keyContainerUpload'],
+                $signingData['keyContainer'],
                 $signingData['password'],
                 Auth::user()->party->taxId
             );

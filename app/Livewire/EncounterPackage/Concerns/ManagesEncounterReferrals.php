@@ -536,7 +536,7 @@ trait ManagesEncounterReferrals
             $signedContent = signatureService()->signData(
                 $signPayload,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -558,7 +558,7 @@ trait ManagesEncounterReferrals
             $requestRecord->requestNumber = $dbData['request_number'] ?? null;
             $this->completeEncounterReferralSubmission($requestRecord);
         } catch (ValidationException $exception) {
-            if (array_intersect(array_keys($exception->errors()), ['form.knedp', 'form.password', 'form.keyContainerUpload']) === []) {
+            if (array_intersect(array_keys($exception->errors()), ['form.knedp', 'form.password', 'form.keyContainer']) === []) {
                 $this->showSignatureModal = false;
                 $this->actionType = null;
             }
@@ -587,7 +587,6 @@ trait ManagesEncounterReferrals
             if (isset($requestRecord) && $this->encounterReferralRequestIdToSign !== null) {
                 $this->encounterReferralSubmission = MedicalEventsRepository::serviceRequest()->submissionState($requestRecord);
                 if (($this->encounterReferralSubmission['status'] ?? null) === JobStatus::PENDING->value) {
-                    $this->form->resetSigningFields();
                     $this->afterEncounterReferralSubmitted();
                 }
             }
@@ -660,7 +659,6 @@ trait ManagesEncounterReferrals
         $this->encounterReferralRequestIdToSign = null;
         $this->afterEncounterReferralDraftChanged();
         $this->encounterReferralSubmission = [];
-        $this->form->resetSigningFields();
         Session::flash('success', filled($record->requestNumber)
             ? __('referrals.submission_created', ['number' => $record->requestNumber])
             : __('referrals.submission_created_without_number'));

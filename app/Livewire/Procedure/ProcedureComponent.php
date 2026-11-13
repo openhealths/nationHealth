@@ -276,8 +276,10 @@ class ProcedureComponent extends Component
         $this->redirectToPage($procedureId, 'edit');
     }
 
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if ($this->isReadonly) {
             return;
         }
@@ -303,13 +305,12 @@ class ProcedureComponent extends Component
             $signedContent = signatureService()->signData(
                 $requestData,
                 $validatedCipher['knedp'],
-                $validatedCipher['keyContainerUpload'],
+                $validatedCipher['keyContainer'],
                 $validatedCipher['password'],
                 Auth::user()->party->taxId
             );
         } catch (SignatureException $exception) {
             $exception->handle('Error when signing procedure');
-            Session::flash('error-modal', $exception->getMessage());
 
             return;
         }
@@ -321,7 +322,6 @@ class ProcedureComponent extends Component
             $procedureId = $this->persist($formattedData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while saving procedure');
-            Session::flash('error-modal', $exception->getMessage());
 
             return;
         }

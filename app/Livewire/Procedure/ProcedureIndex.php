@@ -316,8 +316,10 @@ class ProcedureIndex extends BasePatientComponent
         $this->showSignatureModal = true;
     }
 
-    public function cancelSelectedProcedure(): void
+    public function cancelSelectedProcedure(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if ($this->procedureUuid === null) {
             Session::flash('error', __('procedures.messages.not_found'));
 
@@ -366,7 +368,7 @@ class ProcedureIndex extends BasePatientComponent
             $signedContent = signatureService()->signData(
                 $signedPayload,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -376,8 +378,6 @@ class ProcedureIndex extends BasePatientComponent
 
             return;
         }
-
-        $this->form->resetSigningFields();
 
         $statusReason = FhirResource::make()
             ->coding('eHealth/procedure_status_reasons', $validated['statusReason'])
@@ -475,7 +475,6 @@ class ProcedureIndex extends BasePatientComponent
         $this->showSignatureModal = false;
         $this->procedureUuid = null;
         $this->form->resetCancellationFields();
-        $this->form->resetSigningFields();
 
         $this->resetErrorBag();
         $this->resetValidation();

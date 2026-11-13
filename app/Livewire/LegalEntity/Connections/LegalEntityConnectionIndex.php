@@ -14,7 +14,6 @@ use App\Models\Connection;
 use App\Models\LegalEntity;
 use App\Jobs\ConnectionSync;
 use Livewire\WithPagination;
-use Livewire\WithFileUploads;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Locked;
 use App\Classes\eHealth\EHealth;
@@ -40,7 +39,6 @@ class LegalEntityConnectionIndex extends LegalEntityConnectionComponent
 {
     use BatchLegalEntityQueries;
     use WithPagination;
-    use WithFileUploads;
 
     /**
      * Represents the current synchronization status for the component.
@@ -150,22 +148,24 @@ class LegalEntityConnectionIndex extends LegalEntityConnectionComponent
         $this->showSignatureModal = true;
     }
 
-    public function sign()
+    public function sign(string $keyContainer = '', string $password = '')
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if (Auth::user()->cannot('create', Connection::class)) {
             session()->flash('error', __('legal-entity-connection.policy.restrict.create'));
 
             return;
         }
 
-        $this->form->validate($this->form->rulesForSign(skipTaxIdValidation: true));
+        $validated = $this->form->validate($this->form->rulesForSign(skipTaxIdValidation: true));
 
         try {
             $signedData = signatureService()->signData(
                 $this->dataToSign,
-                $this->form->knedp,
-                $this->form->keyContainerUpload,
-                $this->form->password,
+                $validated['knedp'],
+                $validated['keyContainer'],
+                $validated['password'],
                 Auth::user()->party->tax_id
             );
         } catch (SignatureException $exception) {

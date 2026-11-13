@@ -501,134 +501,6 @@ trait ManagesCarePlanReferrals
         }
     }
 
-    public function signReferral(): void
-    {
-        if (empty($this->referralRequestIdToSign)) {
-            $this->flashUserError(__('Не вибрано документ для підписання'));
-            $this->showSignatureModal = false;
-
-            return;
-        }
-
-        $this->carePlan = Repository::carePlan()->findById($this->carePlan->id);
-
-        try {
-            $requestRecord = app(MedicalRequestOwnership::class)
-                ->referralForPerson((string) $this->referralRequestIdToSign, (int) $this->carePlan->personId);
-        } catch (ModelNotFoundException) {
-            Session::flash('error', __('care-plan.document_context_unavailable'));
-            $this->showSignatureModal = false;
-            $this->actionType = '';
-
-            return;
-        }
-
-        $kind = $requestRecord instanceof ServiceRequestRequest
-            ? 'service_request'
-            : 'device_request';
-
-        if ($kind === 'device_request') {
-            $this->redirectRoute('persons.device-requests.create', ['legalEntity' => legalEntity(), 'person' => $this->carePlan->person, 'draft' => $requestRecord->uuid]);
-
-            return;
-        }
-
-        try {
-            $activity = $this->ownedActivityByBasedOnUuid($requestRecord->basedOn?->value);
-
-            $employeeContext = $this->resolveReferralEmployeeContext($requestRecord, $activity);
-
-            $uuids = [
-                'person_uuid' => $this->carePlan->person->uuid,
-                'encounter_uuid' => $this->carePlan->encounter?->uuid ?? null,
-                'episode_uuid' => $this->carePlan->episodeUuid(),
-                'employee_uuid' => $employeeContext['employee_uuid'],
-                'legal_entity_uuid' => $employeeContext['legal_entity_uuid'],
-            ];
-
-            $dbData = $this->buildReferralSignDbData($requestRecord, $activity);
-            $this->assertReferralOccurrencePeriod($dbData);
-
-            if ($kind === 'service_request') {
-                $resource = Fhir::serviceRequest()->toFhir($dbData, $uuids + ['carePlanUuid' => $this->carePlan->uuid, 'resource' => MedicalEventsRepository::serviceRequest()->getResource($requestRecord)]);
-                $signPayload = ServiceRequestForm::buildCreateContent($resource);
-            } else {
-                $signPayload = (new DeviceRequestMapper())->toCreateSignedContent($dbData, $uuids, (string) $this->carePlan->uuid, (string) $activity->uuid);
-            }
-
-            $signedContent = signatureService()->signData(
-                $signPayload,
-                $this->form['knedp'],
-                $this->form['keyContainerUpload'],
-                $this->form['password'],
-                Auth::user()->party->taxId
-            );
-
-            $this->assertReferralOccurrencePeriod($dbData);
-            $requestRecord = MedicalEventsRepository::serviceRequest()->storeResource($resource, $this->carePlan->personId, $requestRecord->employeeId, $requestRecord->divisionId);
-            $finalResponse = $this->submitClinicalOperation($requestRecord, ['status' => 'active'], fn () => SubmissionApi::serviceRequest()->createSigned($this->carePlan->person->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']));
-            if ($finalResponse === null) {
-                $this->redirectRoute('care-plans.activities.show', [legalEntity(), $this->carePlan->id, $activity->id], navigate: true);
-
-                return;
-            }
-
-            $dbData = app(ReferralRequestLifecycleService::class)->persistAfterSignedCreate(
-                $dbData,
-                $finalResponse,
-                $kind,
-                (int) $this->carePlan->personId
-            );
-
-            $this->finalizeSignedReferral($dbData, $kind, $activity, alreadyPersisted: true);
-
-        } catch (ModelNotFoundException) {
-            Session::flash('error', __('care-plan.document_context_unavailable'));
-            $this->showSignatureModal = false;
-            $this->actionType = '';
-
-        } catch (ValidationException $exception) {
-            $this->showSignatureModal = false;
-            $this->initReferralForm($activity->id);
-            $this->setErrorBag($exception->validator->errors());
-            $this->flashUserError($exception->validator->errors()->first());
-        } catch (EHealthValidationException $e) {
-            if ($e->isDuplicateReferralError()) {
-                try {
-                    $activity = $this->ownedActivityByBasedOnUuid($requestRecord->basedOn?->value);
-
-                    $dbData = $this->buildReferralSignDbData($requestRecord, $activity);
-                    $dbData = app(ReferralRequestLifecycleService::class)->syncReferralFromRemote(
-                        $this->carePlan,
-                        $activity,
-                        $requestRecord,
-                        $kind,
-                        $dbData
-                    );
-                    $this->finalizeSignedReferral($dbData, $kind, $activity, alreadyPersisted: true, alreadyExists: true);
-                } catch (Exception $syncException) {
-                    Log::error('CarePlanShow: failed to sync referral after duplicate eHealth id: ' . $syncException->getMessage());
-                    $this->flashUserError(__('Документ вже існує в ЕСОЗ, але не вдалося синхронізувати локальні дані: ') . $syncException->getMessage());
-                    $this->showSignatureModal = false;
-                }
-
-                return;
-            }
-
-            $translatedMsg = $e->getTranslatedMessage();
-            Log::error('CarePlanShow: failed to sign referral validation: ' . $translatedMsg);
-            $this->flashUserError($translatedMsg);
-            $this->showSignatureModal = false;
-        } catch (SignatureException $exception) {
-            $exception->handle('Error when signing care plan referral');
-            $this->showSignatureModal = false;
-        } catch (Exception $e) {
-            Log::error('CarePlanShow: failed to sign referral: ' . $e->getMessage());
-            $this->flashUserError(__('Не вдалося підписати документ: ') . $e->getMessage());
-            $this->showSignatureModal = false;
-        }
-    }
-
     public function cancelReferral(string $requestId, string $kind): void
     {
         if ($kind === 'device_request') {
@@ -643,171 +515,6 @@ trait ManagesCarePlanReferrals
     {
         $this->referralExplanatoryLetter = '';
         $this->openSignatureModal('recall_referral', null, $requestId);
-    }
-
-    public function signRecallReferral(): void
-    {
-        if (empty($this->referralRequestIdToSign)) {
-            Session::flash('error', __('Не вибрано направлення для відкликання'));
-            $this->showSignatureModal = false;
-
-            return;
-        }
-
-        $letter = trim((string) $this->referralExplanatoryLetter);
-        if ($letter === '') {
-            $this->addError('referralExplanatoryLetter', __('care-plan.referral_recall_letter_required'));
-
-            return;
-        }
-
-        try {
-            $record = app(MedicalRequestOwnership::class)
-                ->referralForPerson((string) $this->referralRequestIdToSign, (int) $this->carePlan->personId);
-        } catch (ModelNotFoundException) {
-            Session::flash('error', __('care-plan.document_context_unavailable'));
-            $this->showSignatureModal = false;
-            $this->actionType = '';
-
-            return;
-        }
-        $service = $record instanceof ServiceRequestRequest ? $record : null;
-        $device = $service ? null : $record;
-
-        $record = $service ?: $device;
-
-        if (!$service) {
-            Session::flash('error', __('care-plan.referral_recall_service_only'));
-            $this->showSignatureModal = false;
-
-            return;
-        }
-
-        $this->validate(['statusReason' => ['required', 'string']]);
-        try {
-            $api = EHealth::serviceRequest();
-            $snapshot = $this->fetchServiceRequestSnapshot($this->carePlan->person->uuid, $record->uuid);
-            $record = MedicalEventsRepository::serviceRequest()->storeResource((new ServiceRequestMapper())->normalize($snapshot), (int) $this->carePlan->personId, $record->employeeId, $record->divisionId);
-            $payload = ServiceRequestForm::buildStatusContent($snapshot, $this->statusReason, $letter, 'eHealth/service_request_recall_reasons');
-
-            $signedContent = signatureService()->signData(
-                $payload,
-                $this->form['knedp'],
-                $this->form['keyContainerUpload'],
-                $this->form['password'],
-                Auth::user()->party->taxId
-            );
-
-            $finalResponse = $this->submitClinicalOperation($record, ['status' => 'recalled', 'statusReason' => $payload['status_reason'], 'explanatoryLetter' => $letter], fn () => SubmissionApi::serviceRequest()->recall($this->carePlan->person->uuid, $record->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']), 'service_request:recall');
-            if ($finalResponse === null) {
-                return;
-            }
-
-            $this->persistReferralStatusFromJob(
-                $finalResponse,
-                $record,
-                ServiceRequestStatus::RECALLED
-            );
-            $this->showSignatureModal = false;
-            $this->referralExplanatoryLetter = '';
-            $this->refreshCarePlan();
-            Session::flash('success', __('care-plan.referral_recall_success'));
-        } catch (EHealthValidationException $e) {
-            $translatedMsg = $e->getTranslatedMessage();
-            Log::error('CarePlanShow: failed to recall referral validation: '.$translatedMsg);
-            Session::flash('error', $translatedMsg);
-            $this->showSignatureModal = false;
-        } catch (SignatureException $exception) {
-            $exception->handle('Error when signing care plan referral recall');
-            $this->showSignatureModal = false;
-        } catch (Exception $e) {
-            Log::error('CarePlanShow: failed to recall referral: '.$e->getMessage());
-            Session::flash('error', __('Не вдалося відкликати направлення: ').$e->getMessage());
-            $this->showSignatureModal = false;
-        }
-    }
-
-    public function signCancelReferral(): void
-    {
-        if (empty($this->referralRequestIdToSign)) {
-            Session::flash('error', __('Не вибрано направлення для скасування'));
-            $this->showSignatureModal = false;
-
-            return;
-        }
-
-        try {
-            $record = app(MedicalRequestOwnership::class)
-                ->referralForPerson((string) $this->referralRequestIdToSign, (int) $this->carePlan->personId);
-        } catch (ModelNotFoundException) {
-            Session::flash('error', __('care-plan.document_context_unavailable'));
-            $this->showSignatureModal = false;
-            $this->actionType = '';
-
-            return;
-        }
-        $service = $record instanceof ServiceRequestRequest ? $record : null;
-        $device = $service ? null : $record;
-
-        $record = $service ?: $device;
-
-        $kind = $service ? 'service_request' : 'device_request';
-        if ($service) {
-            $this->validate(['statusReason' => ['required', 'string'], 'referralExplanatoryLetter' => ['required', 'string']]);
-        }
-
-        if ($kind === 'device_request') {
-            $this->redirectRoute('persons.device-requests', ['legalEntity' => legalEntity(), 'person' => $this->carePlan->person]);
-
-            return;
-        }
-
-        try {
-            $payload = [
-                'status_reason' => $this->statusReason ?: 'entered-in-error'
-            ];
-
-            if ($kind === 'service_request') {
-                $api = EHealth::serviceRequest();
-                $snapshot = $this->fetchServiceRequestSnapshot($this->carePlan->person->uuid, $record->uuid);
-                $record = MedicalEventsRepository::serviceRequest()->storeResource((new ServiceRequestMapper())->normalize($snapshot), (int) $this->carePlan->personId, $record->employeeId, $record->divisionId);
-                $payload = ServiceRequestForm::buildStatusContent($snapshot, $this->statusReason, trim($this->referralExplanatoryLetter), 'eHealth/service_request_cancel_reasons');
-            }
-
-            $signedContent = signatureService()->signData(
-                $kind === 'service_request' ? $payload : Arr::toSnakeCase($payload),
-                $this->form['knedp'],
-                $this->form['keyContainerUpload'],
-                $this->form['password'],
-                Auth::user()->party->taxId
-            );
-
-            $finalResponse = $this->submitClinicalOperation($record, ['status' => 'entered-in-error', 'statusReason' => $payload['status_reason'], 'explanatoryLetter' => trim($this->referralExplanatoryLetter)], fn () => SubmissionApi::serviceRequest()->cancel($this->carePlan->person->uuid, $record->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']), 'service_request:cancel');
-            if ($finalResponse === null) {
-                return;
-            }
-
-            $this->persistReferralStatusFromJob(
-                $finalResponse,
-                $record,
-                ServiceRequestStatus::ENTERED_IN_ERROR
-            );
-            $this->showSignatureModal = false;
-            $this->refreshCarePlan();
-            Session::flash('success', __('care-plan.referral_cancel_success'));
-        } catch (EHealthValidationException $e) {
-            $translatedMsg = $e->getTranslatedMessage();
-            Log::error('CarePlanShow: failed to cancel referral validation: ' . $translatedMsg);
-            Session::flash('error', $translatedMsg);
-            $this->showSignatureModal = false;
-        } catch (SignatureException $exception) {
-            $exception->handle('Error when signing care plan referral cancellation');
-            $this->showSignatureModal = false;
-        } catch (Exception $e) {
-            Log::error('CarePlanShow: failed to cancel referral: ' . $e->getMessage());
-            Session::flash('error', __('Не вдалося скасувати направлення: ') . $e->getMessage());
-            $this->showSignatureModal = false;
-        }
     }
 
     public function loadReferralPrintoutForm(string $requestId): string
@@ -915,6 +622,299 @@ trait ManagesCarePlanReferrals
         } catch (Exception $exception) {
             Log::error('CarePlanShow: failed to sync referral from eHealth: ' . $exception->getMessage());
             Session::flash('error', __('Не вдалося оновити направлення з ЕСОЗ: ') . $exception->getMessage());
+        }
+    }
+
+    protected function signReferral(array $signingData): void
+    {
+        if (empty($this->referralRequestIdToSign)) {
+            $this->flashUserError(__('Не вибрано документ для підписання'));
+            $this->showSignatureModal = false;
+
+            return;
+        }
+
+        $this->carePlan = Repository::carePlan()->findById($this->carePlan->id);
+
+        try {
+            $requestRecord = app(MedicalRequestOwnership::class)
+                ->referralForPerson((string) $this->referralRequestIdToSign, (int) $this->carePlan->personId);
+        } catch (ModelNotFoundException) {
+            Session::flash('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
+        }
+
+        $kind = $requestRecord instanceof ServiceRequestRequest
+            ? 'service_request'
+            : 'device_request';
+
+        if ($kind === 'device_request') {
+            $this->redirectRoute('persons.device-requests.create', ['legalEntity' => legalEntity(), 'person' => $this->carePlan->person, 'draft' => $requestRecord->uuid]);
+
+            return;
+        }
+
+        try {
+            $activity = $this->ownedActivityByBasedOnUuid($requestRecord->basedOn?->value);
+
+            $employeeContext = $this->resolveReferralEmployeeContext($requestRecord, $activity);
+
+            $uuids = [
+                'person_uuid' => $this->carePlan->person->uuid,
+                'encounter_uuid' => $this->carePlan->encounter?->uuid ?? null,
+                'episode_uuid' => $this->carePlan->episodeUuid(),
+                'employee_uuid' => $employeeContext['employee_uuid'],
+                'legal_entity_uuid' => $employeeContext['legal_entity_uuid'],
+            ];
+
+            $dbData = $this->buildReferralSignDbData($requestRecord, $activity);
+            $this->assertReferralOccurrencePeriod($dbData);
+
+            if ($kind === 'service_request') {
+                $resource = Fhir::serviceRequest()->toFhir($dbData, $uuids + ['carePlanUuid' => $this->carePlan->uuid, 'resource' => MedicalEventsRepository::serviceRequest()->getResource($requestRecord)]);
+                $signPayload = ServiceRequestForm::buildCreateContent($resource);
+            } else {
+                $signPayload = (new DeviceRequestMapper())->toCreateSignedContent($dbData, $uuids, (string) $this->carePlan->uuid, (string) $activity->uuid);
+            }
+
+            $signedContent = signatureService()->signData(
+                $signPayload,
+                $signingData['knedp'],
+                $signingData['keyContainer'],
+                $signingData['password'],
+                Auth::user()->party->taxId
+            );
+
+            $this->assertReferralOccurrencePeriod($dbData);
+            $requestRecord = MedicalEventsRepository::serviceRequest()->storeResource($resource, $this->carePlan->personId, $requestRecord->employeeId, $requestRecord->divisionId);
+            $finalResponse = $this->submitClinicalOperation($requestRecord, ['status' => 'active'], fn () => SubmissionApi::serviceRequest()->createSigned($this->carePlan->person->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']));
+            if ($finalResponse === null) {
+                $this->redirectRoute('care-plans.activities.show', [legalEntity(), $this->carePlan->id, $activity->id], navigate: true);
+
+                return;
+            }
+
+            $dbData = app(ReferralRequestLifecycleService::class)->persistAfterSignedCreate(
+                $dbData,
+                $finalResponse,
+                $kind,
+                (int) $this->carePlan->personId
+            );
+
+            $this->finalizeSignedReferral($dbData, $kind, $activity, alreadyPersisted: true);
+
+        } catch (ModelNotFoundException) {
+            Session::flash('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+        } catch (ValidationException $exception) {
+            $this->showSignatureModal = false;
+            $this->initReferralForm($activity->id);
+            $this->setErrorBag($exception->validator->errors());
+            $this->flashUserError($exception->validator->errors()->first());
+        } catch (EHealthValidationException $e) {
+            if ($e->isDuplicateReferralError()) {
+                try {
+                    $activity = $this->ownedActivityByBasedOnUuid($requestRecord->basedOn?->value);
+
+                    $dbData = $this->buildReferralSignDbData($requestRecord, $activity);
+                    $dbData = app(ReferralRequestLifecycleService::class)->syncReferralFromRemote(
+                        $this->carePlan,
+                        $activity,
+                        $requestRecord,
+                        $kind,
+                        $dbData
+                    );
+                    $this->finalizeSignedReferral($dbData, $kind, $activity, alreadyPersisted: true, alreadyExists: true);
+                } catch (Exception $syncException) {
+                    Log::error('CarePlanShow: failed to sync referral after duplicate eHealth id: ' . $syncException->getMessage());
+                    $this->flashUserError(__('Документ вже існує в ЕСОЗ, але не вдалося синхронізувати локальні дані: ') . $syncException->getMessage());
+                    $this->showSignatureModal = false;
+                }
+
+                return;
+            }
+
+            $translatedMsg = $e->getTranslatedMessage();
+            Log::error('CarePlanShow: failed to sign referral validation: ' . $translatedMsg);
+            $this->flashUserError($translatedMsg);
+            $this->showSignatureModal = false;
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing care plan referral');
+            $this->showSignatureModal = false;
+        } catch (Exception $e) {
+            Log::error('CarePlanShow: failed to sign referral: ' . $e->getMessage());
+            $this->flashUserError(__('Не вдалося підписати документ: ') . $e->getMessage());
+            $this->showSignatureModal = false;
+        }
+    }
+
+    protected function signRecallReferral(array $signingData): void
+    {
+        if (empty($this->referralRequestIdToSign)) {
+            Session::flash('error', __('Не вибрано направлення для відкликання'));
+            $this->showSignatureModal = false;
+
+            return;
+        }
+
+        $letter = trim((string) $this->referralExplanatoryLetter);
+        if ($letter === '') {
+            $this->addError('referralExplanatoryLetter', __('care-plan.referral_recall_letter_required'));
+
+            return;
+        }
+
+        try {
+            $record = app(MedicalRequestOwnership::class)
+                ->referralForPerson((string) $this->referralRequestIdToSign, (int) $this->carePlan->personId);
+        } catch (ModelNotFoundException) {
+            Session::flash('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
+        }
+        $service = $record instanceof ServiceRequestRequest ? $record : null;
+        $device = $service ? null : $record;
+
+        $record = $service ?: $device;
+
+        if (!$service) {
+            Session::flash('error', __('care-plan.referral_recall_service_only'));
+            $this->showSignatureModal = false;
+
+            return;
+        }
+
+        $this->validate(['statusReason' => ['required', 'string']]);
+        try {
+            $api = EHealth::serviceRequest();
+            $snapshot = $this->fetchServiceRequestSnapshot($this->carePlan->person->uuid, $record->uuid);
+            $record = MedicalEventsRepository::serviceRequest()->storeResource((new ServiceRequestMapper())->normalize($snapshot), (int) $this->carePlan->personId, $record->employeeId, $record->divisionId);
+            $payload = ServiceRequestForm::buildStatusContent($snapshot, $this->statusReason, $letter, 'eHealth/service_request_recall_reasons');
+
+            $signedContent = signatureService()->signData(
+                $payload,
+                $signingData['knedp'],
+                $signingData['keyContainer'],
+                $signingData['password'],
+                Auth::user()->party->taxId
+            );
+
+            $finalResponse = $this->submitClinicalOperation($record, ['status' => 'recalled', 'statusReason' => $payload['status_reason'], 'explanatoryLetter' => $letter], fn () => SubmissionApi::serviceRequest()->recall($this->carePlan->person->uuid, $record->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']), 'service_request:recall');
+            if ($finalResponse === null) {
+                return;
+            }
+
+            $this->persistReferralStatusFromJob(
+                $finalResponse,
+                $record,
+                ServiceRequestStatus::RECALLED
+            );
+            $this->showSignatureModal = false;
+            $this->referralExplanatoryLetter = '';
+            $this->refreshCarePlan();
+            Session::flash('success', __('care-plan.referral_recall_success'));
+        } catch (EHealthValidationException $e) {
+            $translatedMsg = $e->getTranslatedMessage();
+            Log::error('CarePlanShow: failed to recall referral validation: '.$translatedMsg);
+            Session::flash('error', $translatedMsg);
+            $this->showSignatureModal = false;
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing care plan referral recall');
+            $this->showSignatureModal = false;
+        } catch (Exception $e) {
+            Log::error('CarePlanShow: failed to recall referral: '.$e->getMessage());
+            Session::flash('error', __('Не вдалося відкликати направлення: ').$e->getMessage());
+            $this->showSignatureModal = false;
+        }
+    }
+
+    protected function signCancelReferral(array $signingData): void
+    {
+        if (empty($this->referralRequestIdToSign)) {
+            Session::flash('error', __('Не вибрано направлення для скасування'));
+            $this->showSignatureModal = false;
+
+            return;
+        }
+
+        try {
+            $record = app(MedicalRequestOwnership::class)
+                ->referralForPerson((string) $this->referralRequestIdToSign, (int) $this->carePlan->personId);
+        } catch (ModelNotFoundException) {
+            Session::flash('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
+        }
+        $service = $record instanceof ServiceRequestRequest ? $record : null;
+        $device = $service ? null : $record;
+
+        $record = $service ?: $device;
+
+        $kind = $service ? 'service_request' : 'device_request';
+        if ($service) {
+            $this->validate(['statusReason' => ['required', 'string'], 'referralExplanatoryLetter' => ['required', 'string']]);
+        }
+
+        if ($kind === 'device_request') {
+            $this->redirectRoute('persons.device-requests', ['legalEntity' => legalEntity(), 'person' => $this->carePlan->person]);
+
+            return;
+        }
+
+        try {
+            $payload = [
+                'status_reason' => $this->statusReason ?: 'entered-in-error'
+            ];
+
+            if ($kind === 'service_request') {
+                $api = EHealth::serviceRequest();
+                $snapshot = $this->fetchServiceRequestSnapshot($this->carePlan->person->uuid, $record->uuid);
+                $record = MedicalEventsRepository::serviceRequest()->storeResource((new ServiceRequestMapper())->normalize($snapshot), (int) $this->carePlan->personId, $record->employeeId, $record->divisionId);
+                $payload = ServiceRequestForm::buildStatusContent($snapshot, $this->statusReason, trim($this->referralExplanatoryLetter), 'eHealth/service_request_cancel_reasons');
+            }
+
+            $signedContent = signatureService()->signData(
+                $kind === 'service_request' ? $payload : Arr::toSnakeCase($payload),
+                $signingData['knedp'],
+                $signingData['keyContainer'],
+                $signingData['password'],
+                Auth::user()->party->taxId
+            );
+
+            $finalResponse = $this->submitClinicalOperation($record, ['status' => 'entered-in-error', 'statusReason' => $payload['status_reason'], 'explanatoryLetter' => trim($this->referralExplanatoryLetter)], fn () => SubmissionApi::serviceRequest()->cancel($this->carePlan->person->uuid, $record->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']), 'service_request:cancel');
+            if ($finalResponse === null) {
+                return;
+            }
+
+            $this->persistReferralStatusFromJob(
+                $finalResponse,
+                $record,
+                ServiceRequestStatus::ENTERED_IN_ERROR
+            );
+            $this->showSignatureModal = false;
+            $this->refreshCarePlan();
+            Session::flash('success', __('care-plan.referral_cancel_success'));
+        } catch (EHealthValidationException $e) {
+            $translatedMsg = $e->getTranslatedMessage();
+            Log::error('CarePlanShow: failed to cancel referral validation: ' . $translatedMsg);
+            Session::flash('error', $translatedMsg);
+            $this->showSignatureModal = false;
+        } catch (SignatureException $exception) {
+            $exception->handle('Error when signing care plan referral cancellation');
+            $this->showSignatureModal = false;
+        } catch (Exception $e) {
+            Log::error('CarePlanShow: failed to cancel referral: ' . $e->getMessage());
+            Session::flash('error', __('Не вдалося скасувати направлення: ') . $e->getMessage());
+            $this->showSignatureModal = false;
         }
     }
 

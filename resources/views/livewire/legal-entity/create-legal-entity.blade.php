@@ -115,7 +115,7 @@
                     @include('livewire.legal-entity.step._step_accreditation')
                     @include('livewire.legal-entity.step._step_license')
                     @include('livewire.legal-entity.step._step_additional_information')
-                    @include('livewire.legal-entity.step._step_public_offer')
+                    @include('livewire.legal-entity.step._step_public_offer', ['signingMethod' => 'createLegalEntity'])
 
                     <div class="steps-footer pt-6">
                         <div class="flex items-center">

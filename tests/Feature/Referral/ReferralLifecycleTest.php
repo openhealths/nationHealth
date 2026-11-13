@@ -821,7 +821,8 @@ class ReferralLifecycleTest extends TestCase
             'activity' => $this->serviceActivity,
         ])->call('openSignatureModal', 'sign_servicerequest', null, $draftUuid);
         $this->travelTo(\Carbon\Carbon::parse('2026-10-23T12:01:00+03:00'));
-        $component->call('signReferral')
+        $component->set('form.knedp', 'acsk_test')
+            ->call('sign', base64_encode('key-container'), '12345678')
             ->assertSet('showSignatureModal', false)
             ->assertSet('showReferralDrawer', true)
             ->assertSet('referralRequestIdToSign', $draftUuid)
@@ -1055,10 +1056,8 @@ class ReferralLifecycleTest extends TestCase
             ->assertSet('actionType', 'cancel_referral')
             ->set('statusReason', 'entered-in-error')
             ->set('referralExplanatoryLetter', 'Synthetic cancellation reason')
-            ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
-            ->call('signCancelReferral')
+            ->call('sign', base64_encode('key-container'), '12345678')
             ->assertSet('showSignatureModal', false)
             ->assertSee(__('care-plan.referral_cancel_success'))
             ->assertNotDispatched('flashMessage');
@@ -1119,10 +1118,8 @@ class ReferralLifecycleTest extends TestCase
             ->call('openSignatureModal', 'sign_servicerequest', null, $draftUuid)
             ->assertSet('showSignatureModal', true)
             ->assertSet('actionType', 'sign_servicerequest')
-            ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
-            ->call('sign')
+            ->call('sign', base64_encode('key-container'), '12345678')
             ->assertHasNoErrors(['statusReason'])
             ->assertSet('showSignatureModal', false);
 
@@ -1212,10 +1209,8 @@ class ReferralLifecycleTest extends TestCase
             ->call('initReferralForm', $this->serviceActivity->id)
             ->assertSet('showReferralDrawer', true)
             ->call('openSignatureModal', 'sign_servicerequest', null, $draftUuid)
-            ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
-            ->call('sign')
+            ->call('sign', base64_encode('key-container'), '12345678')
             ->assertSet('showSignatureModal', false);
 
         $this->assertNull(session('error'), (string) session('error'));
@@ -1437,10 +1432,8 @@ class ReferralLifecycleTest extends TestCase
             'activity' => $draftDeviceActivity,
         ])
             ->call('openSignatureModal', 'sign_activity', $draftDeviceActivity->id)
-            ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
-            ->call('sign')
+            ->call('sign', base64_encode('key-container'), '12345678')
             ->assertSet('showSignatureModal', false);
 
         $this->assertDatabaseHas('care_plan_activities', [

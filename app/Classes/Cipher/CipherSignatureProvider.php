@@ -18,7 +18,6 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use JsonException;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 /**
  * Signs data through the Cipher service: runs the session steps of {@see CipherRequest} in order and checks the key.
@@ -30,7 +29,7 @@ class CipherSignatureProvider implements SignatureProvider
      *
      * @param  array  $data
      * @param  string  $knedp
-     * @param  TemporaryUploadedFile  $keyContainer
+     * @param  string  $keyContainer  Key container in base64
      * @param  string  $password
      * @param  string  $taxId
      * @param  string|null  $edrpou
@@ -40,7 +39,7 @@ class CipherSignatureProvider implements SignatureProvider
     public function signData(
         array $data,
         string $knedp,
-        TemporaryUploadedFile $keyContainer,
+        string $keyContainer,
         string $password,
         string $taxId,
         ?string $edrpou = null
@@ -64,7 +63,7 @@ class CipherSignatureProvider implements SignatureProvider
      *
      * @param  string  $base64Data
      * @param  string  $knedp
-     * @param  TemporaryUploadedFile  $keyContainer
+     * @param  string  $keyContainer  Key container in base64
      * @param  string  $password
      * @param  string  $taxId
      * @param  string|null  $edrpou
@@ -74,19 +73,18 @@ class CipherSignatureProvider implements SignatureProvider
     public function signBase64Data(
         string $base64Data,
         string $knedp,
-        TemporaryUploadedFile $keyContainer,
+        string $keyContainer,
         string $password,
         string $taxId,
         ?string $edrpou = null
     ): string {
-        $base64KeyContainer = $this->readKeyContainer($keyContainer);
         $cipher = new CipherRequest();
         $ticketUuid = $cipher->createSession()->getTicketUuid();
 
         try {
             $cipher->loadSessionData($ticketUuid, $base64Data);
             $cipher->setSessionParameters($ticketUuid, $knedp);
-            $cipher->uploadKeyFile($ticketUuid, $base64KeyContainer);
+            $cipher->uploadKeyFile($ticketUuid, $keyContainer);
             $this->assertKeyCanSign($cipher->verifyKeyContainer($ticketUuid, $password)->response, $taxId, $edrpou);
             $cipher->initiateSignatureCreation($ticketUuid, $password);
 
@@ -100,17 +98,16 @@ class CipherSignatureProvider implements SignatureProvider
      * Read the key owner's data (name, tax ID) from the key container.
      *
      * @param  string  $knedp
-     * @param  TemporaryUploadedFile  $keyContainer
+     * @param  string  $keyContainer  Key container in base64
      * @param  string  $password
      * @return CipherResponse|PromiseInterface
      * @throws CipherConnectionException|CipherResponseException|CipherValidationException
      */
     public function getPersonalData(
         string $knedp,
-        TemporaryUploadedFile $keyContainer,
+        string $keyContainer,
         string $password
     ): CipherResponse|PromiseInterface {
-        $base64KeyContainer = $this->readKeyContainer($keyContainer);
         $cipher = new CipherRequest();
         $ticketUuid = $cipher->createSession()->getTicketUuid();
 
@@ -118,7 +115,7 @@ class CipherSignatureProvider implements SignatureProvider
             // Cipher needs session data before it accepts a key, so an empty JSON object is loaded
             $cipher->loadSessionData($ticketUuid, base64_encode('[]'));
             $cipher->setSessionParameters($ticketUuid, $knedp);
-            $cipher->uploadKeyFile($ticketUuid, $base64KeyContainer);
+            $cipher->uploadKeyFile($ticketUuid, $keyContainer);
 
             return $cipher->verifyKeyContainer($ticketUuid, $password);
         } finally {
@@ -158,7 +155,7 @@ class CipherSignatureProvider implements SignatureProvider
      * @return void
      * @throws CipherValidationException
      */
-    private function assertKeyCanSign(Response $keyInfo, string $taxId, ?string $edrpou = null): void
+    protected function assertKeyCanSign(Response $keyInfo, string $taxId, ?string $edrpou = null): void
     {
         if (!$keyInfo['signature']['canBeUsed']) {
             throw new CipherValidationException(__('validation.custom.cipher.kepNotValid'), $keyInfo);
@@ -182,24 +179,6 @@ class CipherSignatureProvider implements SignatureProvider
     }
 
     /**
-     * Read the key container straight from the temporary upload, so the private key is never copied to a web-accessible disk.
-     *
-     * @param  TemporaryUploadedFile  $keyContainer
-     * @return string
-     * @throws CipherValidationException When the temporary upload is gone, e.g. cleaned up after a day
-     */
-    private function readKeyContainer(TemporaryUploadedFile $keyContainer): string
-    {
-        $content = $keyContainer->get();
-
-        if ($content === null || $content === '') {
-            throw new CipherValidationException(__('validation.custom.cipher.kep_file_missing'));
-        }
-
-        return base64_encode($content);
-    }
-
-    /**
      * Delete the Cipher session together with the loaded data and key.
      * A failure here is only logged, so it does not hide the signature or the original error.
      *
@@ -207,7 +186,7 @@ class CipherSignatureProvider implements SignatureProvider
      * @param  string  $ticketUuid
      * @return void
      */
-    private function deleteSession(CipherRequest $cipher, string $ticketUuid): void
+    protected function deleteSession(CipherRequest $cipher, string $ticketUuid): void
     {
         try {
             $cipher->deleteSession($ticketUuid);
