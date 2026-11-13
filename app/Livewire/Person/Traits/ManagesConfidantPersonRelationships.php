@@ -269,7 +269,7 @@ trait ManagesConfidantPersonRelationships
             $signedContent = signatureService()->signData(
                 $this->approvedData,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );

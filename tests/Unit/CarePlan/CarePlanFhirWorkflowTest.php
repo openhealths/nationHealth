@@ -31,6 +31,10 @@ class CarePlanFhirWorkflowTest extends TestCase
             {
                 return ['actionType' => 'in:sign_plan'];
             }
+            protected function requiresDigitalSignature(): bool
+            {
+                return false;
+            }
             protected function signPlan(CarePlanRepository $repository): void
             {
                 $this->signedPlan = true;
@@ -55,14 +59,13 @@ class CarePlanFhirWorkflowTest extends TestCase
     {
         $component = new CarePlanShow();
         $rules = new ReflectionMethod($component, 'rulesForSigning');
+        $requiresSignature = new ReflectionMethod($component, 'requiresDigitalSignature');
         foreach (['complete', 'complete_activity'] as $action) {
             $component->actionType = $action;
-            $actual = $rules->invoke($component);
-            $this->assertSame('required|string', $actual['statusReason']);
-            $this->assertArrayNotHasKey('form.keyContainerUpload', $actual);
-            $this->assertArrayNotHasKey('form.password', $actual);
+            $this->assertSame('required|string', $rules->invoke($component)['statusReason']);
+            $this->assertFalse($requiresSignature->invoke($component));
         }
         $component->actionType = 'cancel';
-        $this->assertArrayHasKey('form.keyContainerUpload', $rules->invoke($component));
+        $this->assertTrue($requiresSignature->invoke($component));
     }
 }

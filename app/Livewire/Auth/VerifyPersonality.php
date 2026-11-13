@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Auth;
 
+use App\Core\BaseForm;
 use App\Enums\Status;
 use Livewire\Component;
 use App\Models\LegalEntity;
-use Livewire\WithFileUploads;
 use App\Models\Relations\Party;
 use Livewire\Attributes\Layout;
-use Livewire\Attributes\Validate;
 use App\Events\EhealthUserVerified;
 use Illuminate\Support\Facades\Auth;
 use App\Enums\Employee\RequestStatus;
@@ -20,28 +19,22 @@ use App\Models\Employee\EmployeeRequest;
 use App\Classes\Cipher\CipherSignatureProvider;
 use App\Exceptions\Cipher\CipherConnectionException;
 use App\Exceptions\Cipher\CipherException;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 #[Layout('layouts.guest')]
 class VerifyPersonality extends Component
 {
-    use WithFileUploads;
-
-    #[Validate(['required', 'string'])]
-    public string $knedp;
-
-    #[Validate(['required', 'file', 'extensions:dat,pfx,pk8,zs2,jks,p7s'])]
-    public ?TemporaryUploadedFile $keyContainerUpload = null;
-
-    #[Validate(['required', 'string'])]
-    public string $password;
+    public BaseForm $form;
 
     public function login(): void
     {
-        $this->validate();
+        $validated = $this->form->validate($this->form->signingRules());
 
         try {
-            $response = new CipherSignatureProvider()->getPersonalData($this->knedp, $this->keyContainerUpload, $this->password);
+            $response = new CipherSignatureProvider()->getPersonalData(
+                $validated['knedp'],
+                $validated['keyContainer'],
+                $validated['password']
+            );
         } catch (CipherException|CipherConnectionException $exception) {
             $exception->handle('Error when loading KEP key', 'Сталася помилка під час завантаження ключа');
 

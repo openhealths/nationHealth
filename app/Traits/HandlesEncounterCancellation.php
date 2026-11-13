@@ -18,7 +18,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
-use Livewire\WithFileUploads;
 use Throwable;
 
 /**
@@ -28,9 +27,6 @@ use Throwable;
  */
 trait HandlesEncounterCancellation
 {
-    // The signature modal takes the key container as an upload, so every page that cancels also handles files
-    use WithFileUploads;
-
     public bool $showCancellationModal = false;
 
     public bool $showSignatureModal = false;
@@ -261,7 +257,7 @@ trait HandlesEncounterCancellation
             $signedContent = signatureService()->signData(
                 $package,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -272,10 +268,8 @@ trait HandlesEncounterCancellation
             return;
         }
 
-        $this->form->resetSigningFields();
-
         try {
-            $response = EHealth::encounter()->cancel($this->patient()->uuid, [
+            EHealth::encounter()->cancel($this->patient()->uuid, [
                 'signed_data' => $signedContent,
                 'signed_data_encoding' => 'base64'
             ]);
@@ -287,8 +281,6 @@ trait HandlesEncounterCancellation
 
             return;
         }
-
-        logger()->debug('Job ID of cancel to further debug', $response->getData());
 
         // eHealth accepted the cancellation; only now persist it locally
         try {

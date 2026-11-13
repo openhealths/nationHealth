@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Employee\Forms;
 
 use App\Core\Arr;
+use App\Core\BaseForm;
 use App\Repositories\Repository;
 use App\Enums\Status;
 use App\Livewire\Employee\EmployeeCreate;
@@ -19,7 +20,6 @@ use App\Rules\UniquePassportRule;
 use Carbon\Carbon;
 use Closure;
 use Livewire\Component;
-use Livewire\Form;
 use App\Rules\Name;
 use App\Rules\TaxId;
 use App\Rules\BirthDate;
@@ -32,9 +32,8 @@ use Illuminate\Validation\Validator;
 use App\Models\Employee\Employee;
 use App\Rules\UniqueEmailInLegalEntity;
 use App\Models\Employee\EmployeeRequest;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
-class EmployeeForm extends Form
+class EmployeeForm extends BaseForm
 {
     public const array ROLE_DICTIONARIES = [
         'POSITION' => 'position',
@@ -55,12 +54,6 @@ class EmployeeForm extends Form
     public ?string $endDate = null;
     public ?int $existingPartyId = null;
     public ?string $divisionId = null;
-
-    public ?string $knedp = null;
-    public ?TemporaryUploadedFile $keyContainerUpload = null;
-    /** Original client filename for UI after modal close/reopen (input value cannot be restored). */
-    public string $keyContainerFileName = '';
-    public ?string $password = null;
 
     public array $documents = [];
     public array $party = [
@@ -117,15 +110,6 @@ class EmployeeForm extends Form
             $this->documentsRules(),
             $this->doctorRules()
         );
-    }
-
-    public function rulesForKepOnly(): array
-    {
-        return [
-            'knedp' => ['required', 'string'],
-            'password' => ['required', 'string'],
-            'keyContainerUpload' => ['required', 'file', 'extensions:dat,pfx,pk8,zs2,jks,p7s'],
-        ];
     }
 
     protected function rootFieldsRules(): array
@@ -933,7 +917,7 @@ class EmployeeForm extends Form
             $formData['existingPartyId'],
             $formData['positionIsCustom'],
             $formData['knedp'],
-            $formData['keyContainerUpload'],
+            $formData['keyContainer'],
             $formData['password']
         );
 

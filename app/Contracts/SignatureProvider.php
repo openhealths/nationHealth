@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Contracts;
 
 use App\Exceptions\Signature\SignatureException;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 /**
  * Qualified electronic signature (KEP) provider used to sign data before it is sent to eHealth.
@@ -17,7 +16,7 @@ interface SignatureProvider
      *
      * @param  array  $data
      * @param  string  $knedp
-     * @param  TemporaryUploadedFile  $keyContainer
+     * @param  string  $keyContainer  Key container in base64
      * @param  string  $password
      * @param  string  $taxId
      * @param  string|null  $edrpou
@@ -27,7 +26,7 @@ interface SignatureProvider
     public function signData(
         array $data,
         string $knedp,
-        TemporaryUploadedFile $keyContainer,
+        string $keyContainer,
         string $password,
         string $taxId,
         ?string $edrpou = null
@@ -38,7 +37,7 @@ interface SignatureProvider
      *
      * @param  string  $base64Data
      * @param  string  $knedp
-     * @param  TemporaryUploadedFile  $keyContainer
+     * @param  string  $keyContainer  Key container in base64
      * @param  string  $password
      * @param  string  $taxId
      * @param  string|null  $edrpou
@@ -48,7 +47,7 @@ interface SignatureProvider
     public function signBase64Data(
         string $base64Data,
         string $knedp,
-        TemporaryUploadedFile $keyContainer,
+        string $keyContainer,
         string $password,
         string $taxId,
         ?string $edrpou = null

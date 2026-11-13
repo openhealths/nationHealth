@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\MedicationRequest;
 
+use App\Core\BaseForm;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
 use App\Services\MedicalEvents\MedicationDispenseLifecycleService;
@@ -12,13 +13,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 use Throwable;
 
 class MedicationRequestIndex extends Component
 {
-    use WithFileUploads;
-
     public LegalEntity $legalEntity;
 
     public string $requestNumber = '';
@@ -40,13 +38,7 @@ class MedicationRequestIndex extends Component
 
     public ?string $actionType = 'dispense';
 
-    /** @var array<string, mixed> */
-    public array $form = [
-        'knedp' => '',
-        'keyContainerUpload' => null,
-        'keyContainerFileName' => '',
-        'password' => '',
-    ];
+    public BaseForm $form;
 
     public function search(MedicationDispenseLifecycleService $service): void
     {
@@ -115,13 +107,11 @@ class MedicationRequestIndex extends Component
         abort_unless($this->userCanDispense(), 403);
         try {
             $this->validate([
-                'form.knedp' => 'required|string',
-                'form.keyContainerUpload' => 'required',
-                'form.password' => 'required|string',
                 'selectedRequestId' => 'required|string',
                 'code' => 'required|string|min:4',
                 'medicationQty' => 'required|numeric|min:0.01',
             ]);
+            $validated = $this->form->validate($this->form->signingRules());
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -161,17 +151,15 @@ class MedicationRequestIndex extends Component
                 [
                     'code' => $this->code,
                     'medication_qty' => $this->medicationQty,
-                    'password' => $this->form['password'],
-                    'knedp' => $this->form['knedp'],
-                    'keyContainerUpload' => $this->form['keyContainerUpload'],
+                    'password' => $validated['password'],
+                    'knedp' => $validated['knedp'],
+                    'keyContainer' => $validated['keyContainer'],
                 ],
                 $service->resolvePharmacyEmployeeContext($employee)
             );
 
             $this->showSignatureModal = false;
-            $this->form['password'] = '';
-            $this->form['keyContainerUpload'] = null;
-            $this->form['keyContainerFileName'] = '';
+            $this->form->resetSigningFields();
             Session::flash('success', 'Електронний рецепт успішно погашено в аптеці.');
             $this->search($service);
         } catch (EHealthValidationException $exception) {
@@ -182,17 +170,6 @@ class MedicationRequestIndex extends Component
             Log::error('Pharmacy eRx dispense failed: '.$exception->getMessage());
             Session::flash('error', 'Не вдалося погасити рецепт: '.$exception->getMessage());
             $this->showSignatureModal = false;
-        }
-    }
-
-    public function updatedFormKeyContainerUpload(): void
-    {
-        $upload = $this->form['keyContainerUpload'] ?? null;
-
-        if ($upload && method_exists($upload, 'getClientOriginalName')) {
-            $this->form['keyContainerFileName'] = $upload->getClientOriginalName();
-        } elseif ($upload === null) {
-            $this->form['keyContainerFileName'] = '';
         }
     }
 

@@ -104,7 +104,7 @@
         </section>
 
         @include('livewire.employee.parts.modals.request-preview-modal')
-        @include('livewire.employee.parts.modals.signature-modal')
+        <x-signature-modal method="sign" />
         <x-forms.loading/>
 
     </div>

@@ -2,6 +2,7 @@
     <div
         data-employee-modal
         wire:ignore.self
+        x-effect="document.body.classList.toggle('overflow-hidden', showRequestPreviewModal)"
         x-show="showRequestPreviewModal"
         style="display: none"
         @keydown.escape="
@@ -45,7 +46,7 @@
             <div
                 wire:ignore.self
                 @click.stop
-                x-trap.noscroll.inert="showRequestPreviewModal"
+                x-trap.inert="showRequestPreviewModal"
                 class="modal-content h-fit max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-lg"
             >
                 <h3 class="modal-header">{{ __('forms.employee_request_preview_title') }}</h3>

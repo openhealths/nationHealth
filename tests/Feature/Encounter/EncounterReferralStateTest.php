@@ -32,8 +32,8 @@ class EncounterReferralStateTest extends TestCase
         Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('actionType', 'sign_referral')
             ->set('showSignatureModal', true)
-            ->assertSeeHtml('wire:click="sign"')
-            ->assertDontSeeHtml('wire:click="cancelSelectedEncounter"')
+            ->assertSeeHtml('wire:submit="sign"')
+            ->assertDontSeeHtml('wire:submit="cancelSelectedEncounter"')
             ->call('sign')
             ->assertSet('signedAction', 'sign_referral');
     }
@@ -43,8 +43,8 @@ class EncounterReferralStateTest extends TestCase
         Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('actionType', 'cancel_encounter')
             ->set('showSignatureModal', true)
-            ->assertSeeHtml('wire:click="cancelSelectedEncounter"')
-            ->assertDontSeeHtml('wire:click="sign"');
+            ->assertSeeHtml('wire:submit="cancelSelectedEncounter"')
+            ->assertDontSeeHtml('wire:submit="sign"');
     }
 
     #[DataProvider('unrelatedSignatureActions')]

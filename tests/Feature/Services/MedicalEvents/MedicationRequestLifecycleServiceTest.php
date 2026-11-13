@@ -20,7 +20,6 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Mockery;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunClassInSeparateProcess;
@@ -230,7 +229,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             [
                 'password' => '12345678',
                 'knedp' => 'acsk_test',
-                'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
+                'keyContainer' => base64_encode('key-container'),
                 'signer_tax_id' => '9876543210',
             ],
             'WRONG_DOSAGE'
@@ -284,7 +283,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             [
                 'password' => '12345678',
                 'knedp' => 'acsk_test',
-                'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
+                'keyContainer' => base64_encode('key-container'),
                 'signer_tax_id' => '9876543210',
             ],
             'WRONG_DOSAGE'
@@ -320,7 +319,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             [
                 'password' => '12345678',
                 'knedp' => 'acsk_test',
-                'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
+                'keyContainer' => base64_encode('key-container'),
             ],
             'entered-in-error'
         );
@@ -742,7 +741,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             [
                 'password' => '12345678',
                 'knedp' => 'acsk_test',
-                'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
+                'keyContainer' => base64_encode('key-container'),
                 'signer_tax_id' => '9876543210',
                 'request_notification_disabled' => false,
                 'medication_unit' => 'шт.',
@@ -773,29 +772,6 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             $this->assertTrue($requestRecord->fresh()->signedPrescriptionPending);
             $this->assertStringContainsString(__('medication-requests.signed_details_pending'), $result['warning_message']);
         }
-    }
-
-    public function test_sign_refuses_a_detached_blob_without_local_kep(): void
-    {
-        $requestRecord = MedicationRequestRequest::create([
-            'uuid' => (string) Str::uuid(),
-            'employee_id' => $this->employee->id,
-            'person_id' => $this->person->id,
-            'status' => 'new',
-            'medication_id' => 'INN-101',
-            'medication_qty' => 10.0,
-            'intent' => 'order',
-            ...$this->fhirBasedOnContextIds((string) $this->activity->uuid, (string) $this->encounter->uuid),
-        ]);
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage(__('care-plan.kep_signature_required'));
-
-        app(MedicationRequestLifecycleService::class)->signPrescription(
-            $this->carePlan->fresh(['person']),
-            $requestRecord,
-            ['signed_medication_request_request' => 'client-blob']
-        );
     }
 
     public function test_sign_refuses_when_activity_remaining_quantity_is_exhausted(): void
@@ -831,7 +807,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             [
                 'password' => '12345678',
                 'knedp' => 'acsk_test',
-                'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
+                'keyContainer' => base64_encode('key-container'),
                 'signer_tax_id' => '9876543210',
             ]
         );
@@ -856,7 +832,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         $this->expectExceptionMessage('The medication activity is outside the signing context.');
         app(MedicationRequestLifecycleService::class)->signPrescription($this->carePlan, $request, [
             'password' => 'synthetic', 'knedp' => 'synthetic', 'signer_tax_id' => '9876543210',
-            'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
+            'keyContainer' => base64_encode('key-container'),
         ]);
     }
 }

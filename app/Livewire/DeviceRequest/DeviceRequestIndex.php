@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\DeviceRequest;
 
 use App\Classes\eHealth\EHealth;
+use App\Core\BaseForm;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\Signature\SignatureException;
@@ -20,13 +21,10 @@ use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 use Throwable;
 
 class DeviceRequestIndex extends Component
 {
-    use WithFileUploads;
-
     #[Locked]
     public int $legalEntityId;
 
@@ -93,7 +91,7 @@ class DeviceRequestIndex extends Component
 
     public bool $showSignatureModal = false;
 
-    public array $form = ['knedp' => '', 'keyContainerUpload' => null, 'keyContainerFileName' => '', 'password' => ''];
+    public BaseForm $form;
 
     public function mount(LegalEntity $legalEntity, ?Person $person = null): void
     {
@@ -221,9 +219,9 @@ class DeviceRequestIndex extends Component
             'reasonText',
             'phone',
             'phoneConfirmed',
-            'showSignatureModal',
-            'form'
+            'showSignatureModal'
         );
+        $this->form->resetSigningFields();
         $this->resetValidation();
     }
 
@@ -371,13 +369,16 @@ class DeviceRequestIndex extends Component
 
     public function sign(): void
     {
-        $this->validate(['form.knedp' => 'required|string', 'form.keyContainerUpload' => 'required|file|max:1024|extensions:dat,pfx,zs2,jks', 'form.password' => 'required|string']);
+        $validated = $this->form->validate($this->form->signingRules());
 
         try {
             $service = app(DeviceRequestLifecycleService::class);
             $content = $service->actionContent($this->person, $this->legalEntity, $this->selectedId, $this->action, $this->reason, $this->reasonText);
-            $signedData = signatureService()->signData($content, $this->form['knedp'], $this->form['keyContainerUpload'], $this->form['password'], (string) Auth::user()->party->taxId);
+            $signedData = signatureService()->signData($content, $validated['knedp'], $validated['keyContainer'], $validated['password'], (string) Auth::user()->party->taxId);
             $this->selected = $service->submitAction($this->person, $this->legalEntity, $this->selectedId, $this->action, $signedData);
+
+            // Signing fields are kept after a failure, so the KNEDP and key do not have to be chosen again
+            $this->form->resetSigningFields();
             $this->action = '';
             Session::flash('success', __('device-requests.messages.status_changed'));
             $this->search(false);
@@ -387,9 +388,6 @@ class DeviceRequestIndex extends Component
             $this->error($exception);
         } finally {
             $this->showSignatureModal = false;
-            $this->form['password'] = '';
-            $this->form['keyContainerUpload'] = null;
-            $this->form['keyContainerFileName'] = '';
         }
     }
 

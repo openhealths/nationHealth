@@ -111,28 +111,6 @@ class EmployeeCriticalHighGapsTest extends TestCase
     }
 
     #[Test]
-    public function signature_modal_restores_key_file_name_after_reopen(): void
-    {
-        $blade = file_get_contents(
-            resource_path('views/livewire/employee/parts/modals/signature-modal.blade.php')
-        );
-
-        $this->assertNotFalse($blade);
-        $this->assertStringContainsString('keyContainerFileName', $blade);
-        $this->assertStringContainsString('syncFileNameFromWire', $blade);
-        $this->assertSame(1, preg_match('/\bx-effect="([^"]*)"/s', $blade, $effectMatches));
-        // Pint may reformat the handler; both close and reopen branches must remain intact.
-        $this->assertSame(
-            "if(!showSignatureModal){if(\$refs.keyContainerUpload)\$refs.keyContainerUpload.value='';}else{syncFileNameFromWire();}",
-            preg_replace('/\s+/', '', $effectMatches[1])
-        );
-        $this->assertTrue(
-            (new \ReflectionClass(\App\Livewire\Employee\Forms\EmployeeForm::class))
-                ->hasProperty('keyContainerFileName')
-        );
-    }
-
-    #[Test]
     public function employee_component_exposes_preview_and_core_lock_flags(): void
     {
         $component = new class extends EmployeeComponent

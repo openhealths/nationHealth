@@ -237,7 +237,7 @@ abstract class SpecimenComponent extends Component
             $signedContent = signatureService()->signData(
                 Arr::toSnakeCase($fhirSpecimen),
                 $validatedCipher['knedp'],
-                $validatedCipher['keyContainerUpload'],
+                $validatedCipher['keyContainer'],
                 $validatedCipher['password'],
                 Auth::user()->party->taxId
             );

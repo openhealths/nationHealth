@@ -388,7 +388,7 @@ trait DrivesCompositionWizard
                 'episode_uuid' => $this->episodeUuid,
                 'author_uuid' => $authorUuid,
                 'requestData' => [
-                    'form' => \Illuminate\Support\Arr::except($this->form->toArray(), ['password', 'knedp', 'keyContainerUpload']),
+                    'form' => \Illuminate\Support\Arr::except($this->form->toArray(), ['password', 'knedp', 'keyContainer']),
                     'selectedEncounter' => $this->selectedEncounter,
                 ],
             ]);
@@ -497,7 +497,7 @@ trait DrivesCompositionWizard
         $operation = app(CompositionOperationRepository::class)->findForWizard($this->patient(), $this->asyncJobId, $this->conclusionType(), Auth::user());
         abort_unless($operation !== null, 404);
         $formData = $operation->job->request_data['form'] ?? [];
-        $this->form->fill(\Illuminate\Support\Arr::except($formData, ['password', 'knedp', 'keyContainerUpload']));
+        $this->form->fill(\Illuminate\Support\Arr::except($formData, ['password', 'knedp', 'keyContainer']));
         $this->form->encounterUuid = $operation->encounterUuid;
         $this->selectedEncounter = $operation->job->request_data['selectedEncounter'] ?? null;
         $this->episodeUuid = $operation->episodeUuid;
@@ -637,7 +637,7 @@ trait DrivesCompositionWizard
             $signedContent = signatureService()->signData(
                 $this->compositionDetail,
                 $this->form->knedp,
-                $this->form->keyContainerUpload,
+                $this->form->keyContainer,
                 $this->form->password,
                 Auth::user()->party->taxId
             );
@@ -651,7 +651,7 @@ trait DrivesCompositionWizard
                 'episode_uuid' => $composition->episodeOfCareUuid,
                 'author_uuid' => $composition->authorUuid,
                 'requestData' => [
-                    'form' => \Illuminate\Support\Arr::except($this->form->toArray(), ['password', 'knedp', 'keyContainerUpload']),
+                    'form' => \Illuminate\Support\Arr::except($this->form->toArray(), ['password', 'knedp', 'keyContainer']),
                     'selectedEncounter' => $this->selectedEncounter,
                 ],
             ]);

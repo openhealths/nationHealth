@@ -112,6 +112,10 @@ trait CarePlanManager
         }
         try {
             $validated = $this->validate($this->rulesForSigning());
+
+            if ($this->requiresDigitalSignature()) {
+                $this->form->validate($this->form->signingRules());
+            }
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -263,9 +267,9 @@ trait CarePlanManager
 
             $signedContent = signatureService()->signData(
                 $payloadForSign,
-                $this->form['knedp'],
-                $this->form['keyContainerUpload'],
-                $this->form['password'],
+                $this->form->knedp,
+                $this->form->keyContainer,
+                $this->form->password,
                 Auth::user()->party->taxId
             );
 
@@ -337,7 +341,7 @@ trait CarePlanManager
             $repository->assertDraftSigningReady($this->carePlan);
             $resource = $repository->getResource($this->carePlan->id);
             $payload = CarePlanForm::buildCreateContent($resource);
-            $signedContent = signatureService()->signData($payload, $this->form['knedp'], $this->form['keyContainerUpload'], $this->form['password'], Auth::user()->party->taxId);
+            $signedContent = signatureService()->signData($payload, $this->form->knedp, $this->form->keyContainer, $this->form->password, Auth::user()->party->taxId);
             $result = $this->submitClinicalOperation($this->carePlan, ['status' => CarePlanStatus::PENDING->value], fn () => EHealth::carePlan()->create($this->carePlan->person->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']));
             if ($result === null) {
                 $this->activateAfterSubmission = true;
@@ -460,7 +464,7 @@ trait CarePlanManager
             }
             $resource = $activityRepository->getResource($activity->id);
             $payload = CarePlanActivityForm::buildCreateContent($resource);
-            $signedContent = signatureService()->signData($payload, $this->form['knedp'], $this->form['keyContainerUpload'], $this->form['password'], Auth::user()->party->taxId);
+            $signedContent = signatureService()->signData($payload, $this->form->knedp, $this->form->keyContainer, $this->form->password, Auth::user()->party->taxId);
             $result = $this->submitClinicalOperation($activity, ['status' => 'scheduled'], fn () => EHealth::carePlanActivity()->create($this->carePlan->person->uuid, $this->carePlan->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']));
             if ($result === null) {
                 $this->redirectRoute('care-plans.activities.show', [legalEntity(), $this->carePlan->id, $activity->id], navigate: true);
@@ -513,7 +517,7 @@ trait CarePlanManager
             } else {
                 $snapshot = $this->fetchActivityCancelSnapshot($this->carePlan->person->uuid, $this->carePlan->uuid, $activity->uuid);
                 $content = CarePlanActivityForm::buildCancelContent($snapshot, $reason);
-                $signed = signatureService()->signData($content, $this->form['knedp'], $this->form['keyContainerUpload'], $this->form['password'], Auth::user()->party->taxId);
+                $signed = signatureService()->signData($content, $this->form->knedp, $this->form->keyContainer, $this->form->password, Auth::user()->party->taxId);
                 $result = $this->submitClinicalOperation($activity, ['status' => 'cancelled', 'statusReason' => $reason], fn () => $api->cancel($this->carePlan->person->uuid, $this->carePlan->uuid, $activity->uuid, ['signed_data' => $signed, 'signed_data_encoding' => 'base64']));
             }
             if ($result === null) {
