@@ -1,5 +1,8 @@
+{{-- Scrolling is locked with a class, not x-trap.noscroll: the signature modal opens in the same response as this one
+     closes, and noscroll of one would restore the locked overflow saved by the other, leaving the page unscrollable --}}
 <div
     x-data="{ showCancellationModal: $wire.entangle('showCancellationModal') }"
+    x-effect="document.body.classList.toggle('overflow-hidden', showCancellationModal)"
     @open-specimen-cancellation.window="$wire.open($event.detail.id)"
 >
     <livewire:components.x-message :key="time()" />
@@ -24,7 +27,7 @@
                     class="modal-content mx-auto w-full max-w-2xl bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100"
                     @click.stop
                     x-transition
-                    x-trap.noscroll.inert="showCancellationModal"
+                    x-trap.inert="showCancellationModal"
                 >
                     <h3 class="mb-4 text-xl font-bold text-gray-900 dark:text-white">
                         {{ __('medical-events.cancel_modal.title') }}

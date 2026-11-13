@@ -14,7 +14,6 @@ use App\Models\Connection;
 use App\Models\LegalEntity;
 use App\Jobs\ConnectionSync;
 use Livewire\WithPagination;
-use Livewire\WithFileUploads;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Locked;
 use App\Classes\eHealth\EHealth;
@@ -40,7 +39,6 @@ class LegalEntityConnectionIndex extends LegalEntityConnectionComponent
 {
     use BatchLegalEntityQueries;
     use WithPagination;
-    use WithFileUploads;
 
     /**
      * Represents the current synchronization status for the component.
@@ -164,7 +162,7 @@ class LegalEntityConnectionIndex extends LegalEntityConnectionComponent
             $signedData = signatureService()->signData(
                 $this->dataToSign,
                 $this->form->knedp,
-                $this->form->keyContainerUpload,
+                $this->form->keyContainer,
                 $this->form->password,
                 Auth::user()->party->tax_id
             );

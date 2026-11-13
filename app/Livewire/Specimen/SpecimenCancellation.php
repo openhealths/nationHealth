@@ -122,7 +122,7 @@ class SpecimenCancellation extends Component
             $signedContent = signatureService()->signData(
                 Fhir::specimen()->toCancellationPackage($response->getData(), $validated['cancellationReason']),
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );

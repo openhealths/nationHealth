@@ -12,7 +12,6 @@ use App\Livewire\Person\Records\PatientCompositions;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\Person\Person;
 use App\Repositories\MedicalEvents\CompositionOperationRepository;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -60,7 +59,7 @@ class PatientCompositionsTest extends TestCase
             ->set('form.reasonText', 'Помилково створений висновок')
             ->set('form.knedp', 'ca-1')
             ->set('form.password', 'secret')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 8))
+            ->set('form.keyContainer', base64_encode('key-container'))
             ->call('cancelComposition');
 
         $component->assertSet('showSignatureModal', false);

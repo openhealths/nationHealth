@@ -8,52 +8,7 @@
 @if ($shouldRender)
     <template x-teleport="body">
         <div
-            x-data="{
-                showSignatureModal: $wire.entangle('showSignatureModal'),
-                fileName: '{{ __('forms.no_file_chosen') }}',
-                noFileLabel: '{{ __('forms.no_file_chosen') }}',
-                // Keep the visible filename across Livewire redraws (e.g. opening drawers
-                // while the KEP modal stays open). Native <input type=file> cannot be restored.
-                displayFileName() {
-                    const stored = $wire.form?.keyContainerFileName;
-                    if (stored) {
-                        return stored;
-                    }
-                    if (this.fileName && this.fileName !== this.noFileLabel && ! String(this.fileName).startsWith('livewire-file:')) {
-                        return this.fileName;
-                    }
-                    return this.noFileLabel;
-                },
-                setFileNameFromInput(event) {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                        this.fileName = file.name;
-                        $wire.set('form.keyContainerFileName', file.name);
-                    } else {
-                        this.fileName = this.noFileLabel;
-                        $wire.set('form.keyContainerFileName', '');
-                    }
-                },
-                syncFileNameFromWire() {
-                    const stored = $wire.form?.keyContainerFileName;
-                    if (stored) {
-                        this.fileName = stored;
-                        return;
-                    }
-                    if ($wire.form?.keyContainerUpload) {
-                        return;
-                    }
-                    this.fileName = this.noFileLabel;
-                },
-            }"
-            x-effect="
-                if (! showSignatureModal) {
-                    if ($refs.keyContainerUpload) $refs.keyContainerUpload.value = '';
-                    fileName = noFileLabel;
-                } else {
-                    syncFileNameFromWire();
-                }
-            "
+            x-data="{ showSignatureModal: $wire.entangle('showSignatureModal') }"
             x-show="showSignatureModal"
             x-cloak
             role="dialog"
@@ -90,84 +45,7 @@
                                 </div>
                                 @endif
 
-                                {{-- KEP Provider --}}
-                                <div>
-                                    <label for="knedp" class="default-label">{{ __('forms.knedp') }} *</label>
-                                    {{-- Deferred: avoid a Livewire round-trip on every KNEPD change before sign --}}
-                                    <select class="input-modal" wire:model="form.knedp" name="knedp" id="knedp">
-                                        <option value="" selected>{{ __('forms.select') }}</option>
-                                        @foreach (signatureService()->getCertificateAuthorities() as $certificateType)
-                                        <option
-                                            value="{{ $certificateType['id'] }}"
-                                            wire:key="{{ $certificateType['id'] }}"
-                                        >
-                                            {{ $certificateType['name'] }}
-                                        </option>
-                                        @endforeach
-                                    </select>
-
-                                    @error('form.knedp')
-                                    <p class="text-error">{{ $message }}</p>
-                                    @enderror
-                                </div>
-
-                                {{-- Key File --}}
-                                <div>
-                                    <label for="keyContainerUpload" class="default-label">
-                                        {{ __('forms.key_container_upload') }} *
-                                    </label>
-                                    <div class="file-input-wrapper">
-                                        <label for="keyContainerUpload" class="file-input-button">
-                                            {{ __('forms.choose_file') }}
-                                        </label>
-                                        <span class="file-input-text" x-text="displayFileName()"></span>
-                                        <input
-                                            type="file"
-                                            wire:model="form.keyContainerUpload"
-                                            class="hidden"
-                                            id="keyContainerUpload"
-                                            name="keyContainerUpload"
-                                            x-ref="keyContainerUpload"
-                                            accept=".dat,.pfx,.pk8,.zs2,.jks,.p7s"
-                                            @change="setFileNameFromInput($event)"
-                                            x-on:livewire-upload-finish="
-                                                if ($wire.form?.keyContainerFileName) {
-                                                    fileName = $wire.form.keyContainerFileName;
-                                                }
-                                            "
-                                        />
-                                    </div>
-                                    <div
-                                        wire:loading
-                                        wire:target="form.keyContainerUpload"
-                                        class="mt-2 text-sm text-gray-500"
-                                    >
-                                        {{ __('general.loading') }}...
-                                    </div>
-
-                                    @error('form.keyContainerUpload')
-                                    <p class="text-error">{{ $message }}</p>
-                                    @enderror
-                                </div>
-
-                                {{-- Password --}}
-                                <div>
-                                    <label for="password" class="default-label">{{ __('forms.password') }} *</label>
-                                    <x-password-field>
-                                        <input
-                                            type="password"
-                                            wire:model="form.password"
-                                            class="default-input"
-                                            id="password"
-                                            name="password"
-                                            autocomplete="current-password"
-                                        />
-                                    </x-password-field>
-
-                                    @error('form.password')
-                                    <p class="text-error">{{ $message }}</p>
-                                    @enderror
-                                </div>
+                                <x-signature-fields />
                             </div>
 
                             <div class="mt-6 flex flex-row items-center gap-4 border-t border-gray-200 pt-6">

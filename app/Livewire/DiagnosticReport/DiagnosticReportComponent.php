@@ -474,7 +474,7 @@ abstract class DiagnosticReportComponent extends Component
             $signedContent = signatureService()->signData(
                 $requestData,
                 $validatedCipher['knedp'],
-                $validatedCipher['keyContainerUpload'],
+                $validatedCipher['keyContainer'],
                 $validatedCipher['password'],
                 Auth::user()->party->taxId
             );

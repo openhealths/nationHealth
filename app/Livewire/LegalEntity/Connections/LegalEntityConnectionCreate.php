@@ -8,7 +8,6 @@ use RuntimeException;
 use App\Enums\Status;
 use App\Models\Connection;
 use App\Models\LegalEntity;
-use Livewire\WithFileUploads;
 use Livewire\Attributes\Title;
 use App\Models\LegalEntityType;
 use Livewire\Attributes\Locked;
@@ -28,8 +27,7 @@ use App\Livewire\LegalEntity\Connections\Form\ConnectionForm;
 
 class LegalEntityConnectionCreate extends LegalEntityConnectionComponent
 {
-    use BatchLegalEntityQueries,
-        WithFileUploads;
+    use BatchLegalEntityQueries;
 
     protected const array LEGAL_ENTITY_TYPES = [
         LegalEntity::TYPE_PRIMARY_CARE,
@@ -151,7 +149,7 @@ class LegalEntityConnectionCreate extends LegalEntityConnectionComponent
             $signedData = signatureService()->signData(
                 $this->dataToSign,
                 $this->form->knedp,
-                $this->form->keyContainerUpload,
+                $this->form->keyContainer,
                 $this->form->password,
                 $this->form->taxId
             );

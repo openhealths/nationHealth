@@ -24,7 +24,5 @@ return [
     'password' => 'Password',
     'password_confirmation' => 'Password confirmation',
     'need_register' => 'Already register?',
-    'has_account' => 'Has account?',
-    'key_file_description' => 'Key file carrier (e.g., key.dat, *.jks, *.pfx, etc.)',
-    'key_file_invalid_extension' => 'Choose a file in .dat, .pfx, .pk8, .zs2, .jks, or .p7s format.',
+    'has_account' => 'Has account?'
 ];

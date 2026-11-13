@@ -27,21 +27,6 @@ class DiagnosticReportCancellationForm extends BaseForm
         $this->explanatoryLetter = null;
     }
 
-    public function resetSigningFields(): void
-    {
-        if (isset($this->knedp)) {
-            $this->knedp = '';
-        }
-
-        if (isset($this->password)) {
-            $this->password = '';
-        }
-
-        if (isset($this->keyContainerUpload)) {
-            unset($this->keyContainerUpload);
-        }
-    }
-
     protected function rules(): array
     {
         return $this->cancellationRules();
