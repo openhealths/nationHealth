@@ -6,29 +6,21 @@ namespace App\Models\MedicalEvents\Sql;
 
 use App\Casts\EHealthTimestampCast;
 use App\Enums\Composition\CompositionCategory;
-use App\Enums\Composition\CompositionExtension;
 use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
-use App\Models\MedicalEvents\Sql\CompositionEvent;
-use App\Models\MedicalEvents\Sql\CompositionIntegration;
-use App\Models\MedicalEvents\Sql\CompositionOperation;
-use App\Models\MedicalEvents\Sql\Identifier;
-use App\Models\MedicalEvents\Sql\Period;
 use App\Models\Person\Person;
 use App\Models\Preperson;
-use App\Repositories\MedicalEvents\Repository;
+use App\Enums\Composition\CompositionExtension;
 use Carbon\CarbonImmutable;
-use DateTimeInterface;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class Composition extends Model
 {
@@ -208,7 +200,7 @@ class Composition extends Model
     {
         return Attribute::get(
             fn (): string => $this->eventPeriod?->start
-                ? CarbonImmutable::parse($this->eventPeriod->start)->format((string) config('app.date_format'))
+                ? \Carbon\CarbonImmutable::parse($this->eventPeriod->start)->format((string) config('app.date_format'))
                 : ''
         );
     }
@@ -217,7 +209,7 @@ class Composition extends Model
     {
         return Attribute::get(
             fn (): string => $this->eventPeriod?->end
-                ? CarbonImmutable::parse($this->eventPeriod->end)->format((string) config('app.date_format'))
+                ? \Carbon\CarbonImmutable::parse($this->eventPeriod->end)->format((string) config('app.date_format'))
                 : ''
         );
     }
@@ -226,7 +218,7 @@ class Composition extends Model
     {
         return Attribute::get(
             fn (): string => $this->date
-                ? CarbonImmutable::parse($this->date)->format((string) config('app.date_format'))
+                ? \Carbon\CarbonImmutable::parse($this->date)->format((string) config('app.date_format'))
                 : ''
         );
     }
@@ -291,7 +283,7 @@ class Composition extends Model
     }
 
     /** Local presentation only. Signing always uses a fresh eHealth response. */
-    public function events(): HasMany
+    public function events(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(CompositionEvent::class)->orderBy('position');
     }
@@ -308,30 +300,30 @@ class Composition extends Model
             }
             $extensions[] = [
                 'valueCode' => $field->value,
-                $field->valueKey() => $value instanceof DateTimeInterface ? $value->format('Y-m-d') : $value,
+                $field->valueKey() => $value instanceof \DateTimeInterface ? $value->format('Y-m-d') : $value,
             ];
         }
         $identifier = static fn (?Identifier $value): ?array => $value === null ? null
-            : Repository::identifier()->toReference($value)['identifier'];
+            : \App\Repositories\MedicalEvents\Repository::identifier()->toReference($value)['identifier'];
         $detail = [
             'identifier' => ['value' => $this->uuid],
             'status' => $this->status->value,
             'title' => $this->title,
             'date' => $this->isoDate($this->getRawOriginal('date')),
-            'type' => $this->typeConcept === null ? null : Repository::codeableConcept()->toResource($this->typeConcept),
-            'category' => $this->categoryConcept === null ? null : Repository::codeableConcept()->toResource($this->categoryConcept),
+            'type' => $this->typeConcept === null ? null : \App\Repositories\MedicalEvents\Repository::codeableConcept()->toResource($this->typeConcept),
+            'category' => $this->categoryConcept === null ? null : \App\Repositories\MedicalEvents\Repository::codeableConcept()->toResource($this->categoryConcept),
             'section' => ['focus' => $identifier($this->sectionFocus)],
-            'event' => $this->eventPeriod === null ? [] : [['period' => Repository::period()->toResource($this->eventPeriod)]],
+            'event' => $this->eventPeriod === null ? [] : [['period' => \App\Repositories\MedicalEvents\Repository::period()->toResource($this->eventPeriod)]],
             'extension' => $extensions,
         ];
         $events = $this->events->map(function (CompositionEvent $event): array {
             $result = [];
             if ($event->code !== null) {
-                $result['code'] = Repository::codeableConcept()->toResource($event->code);
+                $result['code'] = \App\Repositories\MedicalEvents\Repository::codeableConcept()->toResource($event->code);
             }
             $period = $event->position === 0 ? $this->eventPeriod : $event->period;
             if ($period !== null) {
-                $result['period'] = Repository::period()->toResource($period);
+                $result['period'] = \App\Repositories\MedicalEvents\Repository::period()->toResource($period);
             }
 
             return $result;
@@ -357,7 +349,7 @@ class Composition extends Model
     private function erlnIntegration(): ?CompositionIntegration
     {
         return $this->integrations->first(fn (CompositionIntegration $item): bool =>
-            $item->component === CompositionIntegration::ERLN_COMPONENT && $item->type === CompositionIntegration::ERLN_CREATION);
+            $item->component === 'ERLN' && $item->type === 'CREATE_ERLN_RECORD');
     }
 
     #[Scope]

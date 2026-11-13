@@ -7,14 +7,11 @@ namespace Tests\Feature\Composition;
 use App\Classes\eHealth\Api\Patient\Encounter as EncounterApi;
 use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionStatus;
-use App\Enums\Composition\TreatmentViolation;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Livewire\Composition\CompositionTempDisabilityCreate;
-use App\Livewire\Person\Records\PatientCompositions;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
-use App\Models\Permission;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Models\Relations\Party;
@@ -24,8 +21,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
-use Spatie\Permission\Models\Role as PermissionRole;
-use Tests\Feature\Composition\RefreshCompositionDatabase;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 /**
@@ -91,7 +87,7 @@ class CompositionTempDisabilityCreateTest extends TestCase
             ->assertSee(CompositionStatus::PRELIMINARY->label())
             ->assertDontSee(__('compositions.create_temp_disability.created'))
             ->assertSee(__('forms.sign_with_KEP'))
-            ->assertSee((new PatientCompositions)->treatmentViolationLabel('reject_hospitalization'))
+            ->assertSee(\App\Enums\Composition\TreatmentViolation::label('reject_hospitalization'))
             ->assertDontSee('reject_hospitalization (');
     }
 
@@ -311,10 +307,7 @@ class CompositionTempDisabilityCreateTest extends TestCase
      */
     private function fakeEncounters(array $encounters = []): void
     {
-        Http::fake(['*' => Http::response(['data' => $encounters, 'meta' => [], 'paging' => [
-            'page' => 1, 'page_size' => max(1, count($encounters)),
-            'total_entries' => count($encounters), 'total_pages' => $encounters === [] ? 0 : 1,
-        ]], 200)]);
+        Http::fake(['*' => Http::response(['data' => $encounters, 'meta' => [], 'paging' => []], 200)]);
 
         $factory = Http::getFacadeRoot();
         $api = new EncounterApi($factory);
@@ -348,8 +341,6 @@ class CompositionTempDisabilityCreateTest extends TestCase
             'class' => ['system' => 'eHealth/encounter_classes', 'code' => 'AMB'],
             'type' => ['coding' => [['system' => 'eHealth/encounter_types', 'code' => 'AMB']]],
             'period' => ['start' => '2026-08-01T09:00:00Z', 'end' => '2026-08-01T09:30:00Z'],
-            'reasons' => [],
-            'actions' => [],
             'performer' => $this->reference('employee', $performerUuid),
             'episode' => $this->reference('episode_of_care', $episodeUuid ?? (string) Str::uuid()),
             'visit' => $this->reference('visit', (string) Str::uuid()),
@@ -362,7 +353,6 @@ class CompositionTempDisabilityCreateTest extends TestCase
     private function reference(string $resource, string $uuid): array
     {
         return [
-            'display_value' => 'Test reference',
             'identifier' => [
                 'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => $resource]]],
                 'value' => $uuid,
@@ -435,11 +425,6 @@ class CompositionTempDisabilityCreateTest extends TestCase
             'gender' => 'MALE',
         ]);
 
-        foreach (['composition:create', 'composition:read'] as $scope) {
-            $permission = Permission::findOrCreate($scope, 'web');
-            $permission->legalEntityTypes()->syncWithoutDetaching([$typeId]);
-        }
-
         $this->instance('legalEntity', $legalEntity);
 
         if (config('permission.teams')) {
@@ -451,9 +436,6 @@ class CompositionTempDisabilityCreateTest extends TestCase
             Permission::findOrCreate('composition:read', 'web'),
         );
 
-        $permissionRole = PermissionRole::findOrCreate(Role::SPECIALIST->value, 'web');
-        $permissionRole->syncPermissions(['composition:create', 'composition:read']);
-        $user->assignRole($permissionRole);
         $this->actingAs($user);
 
         return compact('legalEntity', 'person', 'user', 'employee');

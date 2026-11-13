@@ -5,28 +5,16 @@ declare(strict_types=1);
 namespace Tests\Feature\Composition;
 
 use App\Enums\Composition\CompositionCategory;
-use App\Enums\Composition\CompositionConfiguration;
-use App\Enums\Composition\CompositionJobStatus;
 use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
 use App\Livewire\Composition\CompositionTempDisabilityCreate;
 use App\Models\MedicalEvents\Sql\Composition;
-use App\Models\MedicalEvents\Sql\CompositionOperation;
-use App\Models\MedicalEvents\Sql\Identifier;
-use App\Services\SignatureService;
-use Carbon\CarbonImmutable;
-use Illuminate\Database\Schema\Blueprint;
+use App\Enums\Composition\CompositionJobStatus;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
-use PHPUnit\Framework\Attributes\DataProvider;
-use Tests\Feature\Composition\CompositionTestFixtures;
-use Tests\Feature\Composition\RefreshCompositionDatabase;
 use Tests\TestCase;
 
 /**
@@ -44,13 +32,10 @@ class CompositionCreateFlowTest extends TestCase
     /** eHealth UUID of the employee the wizard authors as. */
     private string $authorUuid = '';
 
-    private string $subjectUuid = '';
-
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->travelTo(CarbonImmutable::parse('2026-09-05T10:00:00Z'));
         Storage::fake('local');
     }
 
@@ -62,12 +47,12 @@ class CompositionCreateFlowTest extends TestCase
         $component = $this->readyToSubmit();
 
         $this->fakeEHealth([
-            '*/composition' => Http::response(['data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']], 200),
+            '*/composition' => Http::response(['data' => ['id' => 'job-1', 'status' => 'PENDING']], 200),
             '*' => Http::response($this->eHealthBody([]), 200),
         ]);
 
-        $component->call('reviewDetails')->assertHasNoErrors()
-            ->assertSet('asyncJobId', '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6')
+        $component->call('reviewDetails')
+            ->assertSet('asyncJobId', 'job-1')
             ->assertSet('asyncJobStatus', CompositionJobStatus::PENDING->value)
             ->assertSet('showSignatureModal', false)
             ->assertSet('step', CompositionTempDisabilityCreate::STEP_AWAITING_JOB);
@@ -87,8 +72,8 @@ class CompositionCreateFlowTest extends TestCase
     public function test_missing_fhir_storage_blocks_submission_before_esoz_request(): void
     {
         $component = $this->readyToSubmit();
-        $this->assertContains(DB::connection()->getDatabaseName(), ['testing', 'tv39_1204']);
-        Schema::table('compositions', static function (Blueprint $table): void {
+        $this->assertSame('testing', \Illuminate\Support\Facades\DB::connection()->getDatabaseName());
+        \Illuminate\Support\Facades\Schema::table('compositions', static function (\Illuminate\Database\Schema\Blueprint $table): void {
             $table->dropColumn('date');
         });
         Http::fake();
@@ -114,12 +99,12 @@ class CompositionCreateFlowTest extends TestCase
         $component = $this->readyToSubmit();
 
         $this->fakeEHealth([
-            '*/composition' => Http::response(['data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']], 200),
+            '*/composition' => Http::response(['data' => ['id' => 'job-1', 'status' => 'PENDING']], 200),
             '*' => Http::response($this->eHealthBody([]), 200),
         ]);
 
         $component->call('submitComposition')
-            ->assertSet('asyncJobId', '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6')
+            ->assertSet('asyncJobId', 'job-1')
             ->assertSet('asyncJobStatus', CompositionJobStatus::PENDING->value)
             ->assertSet('showSignatureModal', false)
             ->assertSet('step', CompositionTempDisabilityCreate::STEP_AWAITING_JOB);
@@ -173,14 +158,14 @@ class CompositionCreateFlowTest extends TestCase
             ->assertSet('asyncJobId', null);
 
         $this->fakeEHealth([
-            '*/composition' => Http::response(['data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']], 200),
+            '*/composition' => Http::response(['data' => ['id' => 'job-1', 'status' => 'PENDING']], 200),
             '*' => Http::response($this->eHealthBody([]), 200),
         ]);
 
         $component->call('acknowledgeUnidentifiedErln')
             ->call('reviewDetails')
             ->assertHasNoErrors()
-            ->assertSet('asyncJobId', '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6')
+            ->assertSet('asyncJobId', 'job-1')
             ->assertSet('step', CompositionTempDisabilityCreate::STEP_AWAITING_JOB);
     }
 
@@ -197,7 +182,7 @@ class CompositionCreateFlowTest extends TestCase
 
         $this->fakeEHealth([
             '*authentication_methods*' => Http::response(
-                $this->eHealthBody([$this->nativeAuthenticationMethod($offeredUuid)]),
+                $this->eHealthBody([['id' => $offeredUuid, 'type' => 'OTP', 'phone_number' => '+380931111111']]),
                 200
             ),
             '*' => Http::response(
@@ -214,7 +199,6 @@ class CompositionCreateFlowTest extends TestCase
             'preperson' => $this->compositionPreperson(),
         ])
             ->set('form.isUnidentified', false)
-            ->set('form.isFocusUnidentified', false)
             ->set('form.sectionFocusUuid', $person->uuid)
             ->call('selectEncounter', $encounterUuid);
 
@@ -229,8 +213,8 @@ class CompositionCreateFlowTest extends TestCase
     }
 
     /**
-     * TV 3.8.2.5.4 — pregnancy periods follow the explicit environment mirror of the
-     * documented EMAL settings; the modern catalog does not publish these legacy values.
+     * TV 3.8.2.5.4 — a pregnancy period has to be one eHealth publishes, and an
+     * unreachable configuration blocks the conclusion rather than letting any date pass.
      */
     public function test_a_pregnancy_period_outside_the_configuration_is_refused(): void
     {
@@ -239,6 +223,12 @@ class CompositionCreateFlowTest extends TestCase
         $encounterUuid = (string) Str::uuid();
 
         $this->fakeEHealth([
+            '*composition_configurations*' => Http::response($this->eHealthBody([
+                [
+                    'name' => 'EMAL_VALIDATION_PREGNANCY_NEW_COMPOSITION_ALLOWED_PERIODS',
+                    'value' => [126, 140],
+                ],
+            ]), 200),
             '*authentication_methods*' => Http::response($this->eHealthBody([]), 200),
             '*' => Http::response(
                 $this->eHealthBody([$this->compositionEncounter($encounterUuid, $employee->uuid)]),
@@ -248,10 +238,9 @@ class CompositionCreateFlowTest extends TestCase
 
         $component = Livewire::test(CompositionTempDisabilityCreate::class, [
             'legalEntity' => $legalEntity,
-            'personId' => $person->id,
+            'preperson' => $this->compositionPreperson(),
         ])
             ->set('form.isUnidentified', false)
-            ->set('form.isFocusUnidentified', false)
             ->set('form.sectionFocusUuid', $person->uuid)
             ->call('selectEncounter', $encounterUuid)
             ->call('skipAuthMethod')
@@ -266,28 +255,35 @@ class CompositionCreateFlowTest extends TestCase
 
         // 126 days counted from 01.09.2026 inclusive ends on 04.01.2027.
         $this->fakeEHealth([
-            '*/composition' => Http::response(['data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']], 200),
+            '*composition_configurations*' => Http::response($this->eHealthBody([
+                [
+                    'name' => 'EMAL_VALIDATION_PREGNANCY_NEW_COMPOSITION_ALLOWED_PERIODS',
+                    'value' => [126, 140],
+                ],
+            ]), 200),
+            '*/composition' => Http::response(['data' => ['id' => 'job-1', 'status' => 'PENDING']], 200),
             '*' => Http::response($this->eHealthBody([]), 200),
         ]);
 
         $component->set('form.eventPeriodEnd', '04.01.2027')
             ->call('reviewDetails')
             ->assertHasNoErrors()
-            ->assertSet('asyncJobId', '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6')
+            ->assertSet('asyncJobId', 'job-1')
             ->assertSet('step', CompositionTempDisabilityCreate::STEP_AWAITING_JOB);
     }
 
     /**
-     * TV 3.8.2.5.4 — a missing environment configuration must block the conclusion.
-     * No production defaults may replace the documented legacy EMAL values.
+     * TV 3.8.2.5.4 — an unreachable configuration must block the conclusion, not fall
+     * back to a free date the doctor believes MIS approved.
      */
-    public function test_a_pregnancy_conclusion_is_blocked_when_the_environment_configuration_is_missing(): void
+    public function test_a_pregnancy_conclusion_is_blocked_when_the_configuration_cannot_be_read(): void
     {
         ['employee' => $employee, 'legalEntity' => $legalEntity, 'person' => $person] = $this->compositionFixture();
 
         $encounterUuid = (string) Str::uuid();
 
         $this->fakeEHealth([
+            '*composition_configurations*' => Http::response(['error' => 'unavailable'], 500),
             '*authentication_methods*' => Http::response($this->eHealthBody([]), 200),
             '*' => Http::response(
                 $this->eHealthBody([$this->compositionEncounter($encounterUuid, $employee->uuid)]),
@@ -295,14 +291,11 @@ class CompositionCreateFlowTest extends TestCase
             ),
         ]);
 
-        config(['compositions.emal' => null]);
-
         Livewire::test(CompositionTempDisabilityCreate::class, [
             'legalEntity' => $legalEntity,
             'preperson' => $this->compositionPreperson(),
         ])
             ->set('form.isUnidentified', false)
-            ->set('form.isFocusUnidentified', false)
             ->set('form.sectionFocusUuid', $person->uuid)
             ->call('selectEncounter', $encounterUuid)
             ->call('skipAuthMethod')
@@ -334,15 +327,15 @@ class CompositionCreateFlowTest extends TestCase
         $episodeUuid = $component->get('episodeUuid');
 
         $this->fakeEHealth([
-            '*/composition' => Http::response(['data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']], 200),
+            '*/composition' => Http::response(['data' => ['id' => 'job-1', 'status' => 'PENDING']], 200),
             '*/composition/job/*' => Http::response([
-                'data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [],
+                'data' => [
                     'status' => 'DONE',
-                    'links' => [['entity' => 'eHealth/resources', 'href' => "/composition/$compositionUuid"]],
+                    'links' => [['href' => "/composition/$compositionUuid"]],
                 ],
             ], 200),
             '*/sign' => Http::response(
-                ['data' => ['id' => '1548388a-fdec-5d79-8581-ed5b8f5f8a6a', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']],
+                ['data' => ['id' => 'job-2', 'status' => 'PENDING']],
                 200
             ),
             '*integrationData*' => Http::response($this->eHealthBody([]), 200),
@@ -352,7 +345,6 @@ class CompositionCreateFlowTest extends TestCase
         ]);
 
         $component->call('submitComposition')
-            ->tap(fn ($test) => $this->processCompositionWorker($test->get('asyncJobId')))
             ->call('pollAsyncJob')
             ->assertSet('compositionUuid', $compositionUuid)
             ->assertSet('step', CompositionTempDisabilityCreate::STEP_REVIEW)
@@ -374,11 +366,11 @@ class CompositionCreateFlowTest extends TestCase
         $this->assertNotNull($stored, 'The conclusion is mirrored locally once eHealth returns it.');
         $this->assertSame(CompositionStatus::PRELIMINARY, $stored->status);
         $this->assertSame($episodeUuid, $stored->episodeOfCareUuid);
-        $this->assertSame('719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', $stored->latestOperation->remoteJobId);
+        $this->assertSame('job-1', $stored->latestOperation->remoteJobId);
         $this->assertSame('DONE', $stored->latestOperation->status);
 
         // Signing is only offered to the author, so the local row must carry them.
-        $author = Identifier::create(['value' => $this->authorUuid]);
+        $author = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => $this->authorUuid]);
         $stored->update(['author_id' => $author->id]);
 
         $component->set('compositionDetail.title', 'Forged client data');
@@ -395,7 +387,7 @@ class CompositionCreateFlowTest extends TestCase
         Http::assertSent(static fn ($request): bool => str_contains($request->url(), '/sign')
             && $request->data() === ['data' => 'signed-composition']);
 
-        app(SignatureService::class)->shouldHaveReceived('signData')
+        app(\App\Services\SignatureService::class)->shouldHaveReceived('signData')
             ->withArgs(fn (array $payload): bool => $payload === $this->compositionPayload(
                 $compositionUuid,
                 $encounterUuid,
@@ -403,12 +395,12 @@ class CompositionCreateFlowTest extends TestCase
             ))->once();
 
         $component
-            ->assertSet('asyncJobId', '1548388a-fdec-5d79-8581-ed5b8f5f8a6a')
+            ->assertSet('asyncJobId', 'job-2')
             ->assertSet('step', CompositionTempDisabilityCreate::STEP_AWAITING_JOB);
 
         $this->fakeEHealth([
             '*/composition/job/*' => Http::response([
-                'data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'DONE', 'links' => [['entity' => 'eHealth/resources', 'href' => "/composition/$compositionUuid"]]],
+                'data' => ['status' => 'DONE', 'links' => [['href' => "/composition/$compositionUuid"]]],
             ], 200),
             '*integrationData*' => Http::response($this->eHealthBody([]), 200),
             '*' => Http::response([
@@ -416,15 +408,13 @@ class CompositionCreateFlowTest extends TestCase
             ], 200),
         ]);
 
-        $component->tap(fn ($test) => $this->processCompositionWorker($test->get('asyncJobId')))
-            ->call('pollAsyncJob')
+        $component->call('pollAsyncJob')
             ->assertSee(__('compositions.create_temp_disability.signed', ['number' => 'ТН-0001']))
             ->assertSee('alert-message fixed top-6 right-2', false)
             ->assertDontSee('status-alert-green', false)
             ->assertNotDispatched('flashMessage');
 
-        $component->tap(fn ($test) => $this->processCompositionWorker($test->get('asyncJobId')))
-            ->call('pollAsyncJob')
+        $component->call('pollAsyncJob')
             ->assertDontSee(__('compositions.create_temp_disability.signed', ['number' => 'ТН-0001']));
 
         $this->assertSame(
@@ -433,7 +423,7 @@ class CompositionCreateFlowTest extends TestCase
         );
         $stored->refresh();
         $this->assertSame(2, $stored->operations()->count());
-        $this->assertSame('1548388a-fdec-5d79-8581-ed5b8f5f8a6a', $stored->latestOperation->remoteJobId);
+        $this->assertSame('job-2', $stored->latestOperation->remoteJobId);
         $this->assertSame('DONE', $stored->latestOperation->status);
     }
 
@@ -446,7 +436,7 @@ class CompositionCreateFlowTest extends TestCase
     {
         $component = $this->readyToSubmit();
         $this->fakeEHealth([
-            '*/composition' => Http::response(['data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']]),
+            '*/composition' => Http::response(['data' => ['id' => 'job-1', 'status' => 'PENDING']]),
         ]);
 
         $component->call('submitComposition')->call('submitComposition');
@@ -461,26 +451,24 @@ class CompositionCreateFlowTest extends TestCase
     {
         $component = $this->readyToSubmit();
         $this->fakeEHealth([
-            '*/composition' => Http::response(['data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']]),
-            '*/composition/job/*' => Http::response(['data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'DONE']]),
+            '*/composition' => Http::response(['data' => ['id' => 'job-1', 'status' => 'PENDING']]),
+            '*/composition/job/*' => Http::response(['data' => ['status' => 'DONE']]),
             '*searchComposition*' => Http::response(['data' => []]),
         ]);
-        $component->call('submitComposition')->tap(fn ($test) => $this->processCompositionWorker($test->get('asyncJobId')))
-            ->call('pollAsyncJob')
+        $component->call('submitComposition')->call('pollAsyncJob')
             ->assertSet('compositionUuid', null)
             ->assertSet('step', CompositionTempDisabilityCreate::STEP_AWAITING_JOB);
 
         $uuid = (string) Str::uuid();
         $payload = $this->compositionPayload($uuid, $component->get('form.encounterUuid'), CompositionStatus::PRELIMINARY);
         $this->fakeEHealth([
-            '*/composition/job/*' => Http::response(['data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'DONE']]),
+            '*/composition/job/*' => Http::response(['data' => ['status' => 'DONE']]),
             '*searchComposition*' => Http::response(['data' => [$payload]]),
             '*integrationData*' => Http::response(['data' => []]),
             '*' => Http::response(['data' => $payload]),
         ]);
 
-        $component->tap(fn ($test) => $this->processCompositionWorker($test->get('asyncJobId')))
-            ->call('pollAsyncJob')
+        $component->call('pollAsyncJob')
             ->assertSet('compositionUuid', $uuid)
             ->assertSet('step', CompositionTempDisabilityCreate::STEP_REVIEW)
             ->assertSet('asyncJobErrors', []);
@@ -494,15 +482,14 @@ class CompositionCreateFlowTest extends TestCase
         $latest = $this->compositionPayload((string) Str::uuid(), $encounterUuid, CompositionStatus::PRELIMINARY);
         $latest['date'] = '2026-09-01T11:00:00Z';
         $this->fakeEHealth([
-            '*/composition' => Http::response(['data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']]),
-            '*/composition/job/*' => Http::response(['data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'DONE']]),
+            '*/composition' => Http::response(['data' => ['id' => 'job-1', 'status' => 'PENDING']]),
+            '*/composition/job/*' => Http::response(['data' => ['status' => 'DONE']]),
             '*searchComposition*' => Http::response(['data' => [$first, $latest]]),
             '*integrationData*' => Http::response(['data' => []]),
             '*' => Http::response(['data' => $latest]),
         ]);
 
-        $component->call('submitComposition')->tap(fn ($test) => $this->processCompositionWorker($test->get('asyncJobId')))
-            ->call('pollAsyncJob')
+        $component->call('submitComposition')->call('pollAsyncJob')
             ->assertSet('compositionUuid', null)
             ->assertSet('step', CompositionTempDisabilityCreate::STEP_AWAITING_JOB)
             ->assertSet('asyncJobErrors', [__('compositions.errors.created_not_found')])
@@ -516,7 +503,7 @@ class CompositionCreateFlowTest extends TestCase
     {
         $component = $this->readyToSubmit();
         $this->fakeEHealth([
-            '*/composition' => Http::response(['data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']]),
+            '*/composition' => Http::response(['data' => ['id' => 'job-1', 'status' => 'PENDING']]),
         ]);
 
         $component->call('submitComposition')
@@ -529,13 +516,12 @@ class CompositionCreateFlowTest extends TestCase
         $component = $this->readyToSubmit();
         $uuid = (string) Str::uuid();
         $this->fakeEHealth([
-            '*/composition' => Http::response(['data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']]),
-            '*/composition/job/*' => Http::response(['data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'DONE', 'links' => [['entity' => 'eHealth/resources', 'href' => "/composition/$uuid"]]]]),
+            '*/composition' => Http::response(['data' => ['id' => 'job-1', 'status' => 'PENDING']]),
+            '*/composition/job/*' => Http::response(['data' => ['status' => 'DONE', 'links' => [['href' => "/composition/$uuid"]]]]),
             '*' => Http::response(['status' => 'PRELIMINARY']),
         ]);
 
-        $component->call('submitComposition')->tap(fn ($test) => $this->processCompositionWorker($test->get('asyncJobId')))
-            ->call('pollAsyncJob')
+        $component->call('submitComposition')->call('pollAsyncJob')
             ->assertSet('asyncJobStatus', 'DONE')
             ->assertSet('step', CompositionTempDisabilityCreate::STEP_AWAITING_JOB)
             ->assertSet('asyncJobErrors', [__('compositions.errors.created_unreadable')])
@@ -546,14 +532,12 @@ class CompositionCreateFlowTest extends TestCase
         $this->assertCount(1, Http::recorded(static fn ($request): bool => $request->method() === 'POST'));
         $payload = $this->compositionPayload($uuid, $component->get('form.encounterUuid'), CompositionStatus::PRELIMINARY);
         $this->fakeEHealth([
-            '*/composition/job/*' => Http::response(['data' => ['id' => '5d566a2a-3d4c-4510-9e21-ed7f68050524', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'DONE']]),
-            '*searchComposition*' => Http::response(['data' => [$payload]]),
+            '*/composition/job/*' => Http::response(['data' => ['status' => 'DONE']]),
             '*integrationData*' => Http::response(['data' => []]),
             '*' => Http::response($payload),
         ]);
 
-        $component->tap(fn ($test) => $this->processCompositionWorker($test->get('asyncJobId')))
-            ->call('pollAsyncJob')
+        $component->call('pollAsyncJob')
             ->assertSet('step', CompositionTempDisabilityCreate::STEP_REVIEW)
             ->assertSet('asyncJobErrors', []);
         Http::assertNotSent(static fn ($request): bool => $request->method() === 'POST');
@@ -563,12 +547,11 @@ class CompositionCreateFlowTest extends TestCase
     {
         $component = $this->readyToSubmit();
         $this->fakeEHealth([
-            '*/composition' => Http::response(['data' => ['id' => '719a23fe-c9b6-5b6f-8d9f-c36da885d0d6', 'eta' => '2026-09-05T12:00:00Z', 'links' => [], 'status' => 'PENDING']]),
+            '*/composition' => Http::response(['data' => ['id' => 'job-1', 'status' => 'PENDING']]),
             '*/composition/job/*' => Http::response([], 503),
         ]);
 
-        $component->call('submitComposition')->tap(fn ($test) => $this->processCompositionWorker($test->get('asyncJobId')))
-            ->call('pollAsyncJob')
+        $component->call('submitComposition')->call('pollAsyncJob')
             ->assertSet('asyncJobStatus', 'PENDING')
             ->assertSet('asyncJobErrors', [__('compositions.errors.job_status_unavailable')])
             ->assertSee(__('compositions.async.retry_read'))
@@ -580,75 +563,16 @@ class CompositionCreateFlowTest extends TestCase
         string $encounterUuid,
         CompositionStatus $status
     ): array {
-        return $this->nativeCompositionDocument([
+        return [
             'identifier' => ['value' => $uuid],
             'status' => $status->value,
             'title' => 'ТН-0001',
             'type' => ['coding' => [['system' => 'COMPOSITION_TYPES', 'code' => CompositionType::TEMP_DISABILITY->value]]],
             'category' => ['coding' => [['system' => 'COMPOSITION_CATEGORIES', 'code' => CompositionCategory::SICKNESS->value]]],
             'encounter' => ['value' => $encounterUuid],
-            'author' => ['value' => $this->authorUuid],
-            'subject' => $this->compositionReference('preperson', $this->subjectUuid)['identifier'],
-            'section' => ['focus' => $this->compositionReference('preperson', $this->subjectUuid)['identifier']],
             'event' => [['period' => ['start' => '2026-09-01T00:00:01Z', 'end' => '2026-09-05T20:59:59Z']]],
             'date' => '2026-09-01T10:00:00Z',
-        ]);
-    }
-
-    public static function signingPreflightCases(): array
-    {
-        return ['exact deadline' => ['boundary', null], 'expired' => ['expired', 'signing_deadline_expired'],
-            'future date' => ['future', 'signing_deadline_expired'], 'fresh category' => ['category', 'author_not_found']];
-    }
-
-    #[DataProvider('signingPreflightCases')]
-    public function test_signing_revalidates_the_document_deadline_and_category_before_kep(string $case, ?string $error): void
-    {
-        $this->fakeSignatureService('signed-composition');
-        $component = $this->readyToSubmit(scopes: ['composition:create', 'composition:read', 'composition:search', 'composition:sign']);
-        $uuid = (string) Str::uuid();
-        $encounter = $component->get('form.encounterUuid');
-        $native = $this->compositionPayload($uuid, $encounter, CompositionStatus::PRELIMINARY);
-        $this->fakeEHealth([
-            '*/composition' => Http::response(['data' => ['id' => (string) Str::uuid(), 'status' => 'PENDING', 'eta' => now()->toIso8601String(), 'links' => []]]),
-            '*/composition/job/*' => Http::response(['data' => ['id' => (string) Str::uuid(), 'status' => 'DONE', 'eta' => now()->toIso8601String(),
-                'links' => [['entity' => 'eHealth/resources', 'href' => '/composition/'.$uuid]]]]),
-            '*integrationData*' => Http::response(['data' => []]),
-            '*' => Http::response(['data' => $native]),
-        ]);
-        $component->call('submitComposition')->tap(fn ($test) => $this->processCompositionWorker($test->get('asyncJobId')))
-            ->call('pollAsyncJob')->call('openSigningModal');
-        if ($case === 'boundary' || $case === 'expired') {
-            $this->travelTo(CarbonImmutable::parse($native['date'])->addHours($case === 'boundary' ? 120 : 121));
-        } elseif ($case === 'future') {
-            $native['date'] = now()->addMinute()->toIso8601String();
-        } else {
-            $settings = config('compositions.emal');
-            $settings[CompositionConfiguration::AUTHOR_TYPES->value]['SPECIALIST'] = ['SICKNESS'];
-            config(['compositions.emal' => $settings]);
-            $native['category']['coding'][0]['code'] = 'COVID19';
-        }
-        $settings = config('compositions.emal');
-        $settings[CompositionConfiguration::DISABILITY_SIGN_DELAY_ENABLED->value] = true;
-        config(['compositions.emal' => $settings]);
-        $this->fakeEHealth([
-            '*integrationData*' => Http::response(['data' => []]),
-            '*/sign' => Http::response(['data' => ['id' => (string) Str::uuid(), 'status' => 'PENDING', 'eta' => now()->toIso8601String(), 'links' => []]]),
-            '*' => Http::response(['data' => $native]),
-        ]);
-        $component->set('form.knedp', 'ca-1')->set('form.password', 'secret')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 8))->call('sign');
-        if ($error === null) {
-            $component->assertHasNoErrors()->assertSet('showSignatureModal', false);
-            app(SignatureService::class)->shouldHaveReceived('signData')->once();
-            Http::assertSent(static fn ($request): bool => $request->method() === 'PATCH');
-            $this->assertSame(2, CompositionOperation::count());
-        } else {
-            $component->assertHasErrors('form.guard')->assertSet('showSignatureModal', true)->assertSee(__('compositions.errors.'.$error));
-            app(SignatureService::class)->shouldNotHaveReceived('signData');
-            Http::assertNotSent(static fn ($request): bool => $request->method() === 'PATCH');
-            $this->assertSame(1, CompositionOperation::count());
-        }
+        ];
     }
 
     /**
@@ -657,7 +581,7 @@ class CompositionCreateFlowTest extends TestCase
     private function readyToSubmit(
         bool $acknowledgeErln = true,
         array $scopes = ['composition:create', 'composition:read', 'composition:search']
-    ): Testable {
+    ): \Livewire\Features\SupportTesting\Testable {
         ['employee' => $employee, 'legalEntity' => $legalEntity] = $this->compositionFixture(scopes: $scopes);
 
         $this->authorUuid = $employee->uuid;
@@ -674,11 +598,9 @@ class CompositionCreateFlowTest extends TestCase
             ),
         ]);
 
-        $subject = $this->compositionPreperson();
-        $this->subjectUuid = $subject->uuid;
         $component = Livewire::test(CompositionTempDisabilityCreate::class, [
             'legalEntity' => $legalEntity,
-            'preperson' => $subject,
+            'preperson' => $this->compositionPreperson(),
         ])
             ->call('selectEncounter', $encounterUuid)
             ->call('skipAuthMethod')

@@ -1,9 +1,6 @@
-@use('App\Models\MedicalEvents\Sql\Composition')
-@use('App\Enums\Composition\TreatmentViolation')
 @use('App\Livewire\Composition\CompositionTempDisabilityCreate', 'Wizard')
 @use('App\Enums\Composition\CompositionCategory')
 @use('App\Enums\Composition\CompositionJobStatus')
-@use('Carbon\CarbonImmutable')
 
 <x-layouts.patient
     :showLegacyMessages="false"
@@ -51,7 +48,7 @@
                                         <div class="record-inner-value text-[15px] font-semibold">
                                             {{
                                                 data_get($encounter, 'period.start')
-                                                ? CarbonImmutable::parse(data_get($encounter, 'period.start'))->format(config('app.date_format'))
+                                                ? \Carbon\CarbonImmutable::parse(data_get($encounter, 'period.start'))->format(config('app.date_format'))
                                                 : '-'
                                             }}
                                         </div>
@@ -129,12 +126,6 @@
                         {{ __('compositions.create_temp_disability.auth_method_hint') }}
                     </div>
 
-                    @if ($this->authenticationManagementUrl)
-                        <div class="mb-4 flex flex-wrap gap-3">
-                            <a href="{{ $this->authenticationManagementUrl }}" target="_blank" rel="noopener" class="button-minor">{{ __('compositions.wizard.manage_authentication') }}</a>
-                            <button type="button" wire:click="refreshAuthenticationMethods" class="button-minor">{{ __('compositions.wizard.refresh_authentication') }}</button>
-                        </div>
-                    @endif
                     <div class="space-y-3">
                         @foreach ($authMethods as $method)
                             <div
@@ -243,21 +234,6 @@
                             @enderror
                         </div>
 
-                        @if ($this->isCareCategory())
-                            <div class="form-group group">
-                                <label for="composition-focus-query" class="label">{{ __('compositions.care_focus') }} *</label>
-                                <input id="composition-focus-query" type="text" class="input w-full" wire:model="focusQuery" wire:keydown.enter.prevent="searchFocus" />
-                                <button type="button" class="button-minor" wire:click="searchFocus">{{ __('forms.search') }}</button>
-                                @foreach ($this->focusMatches as $match)
-                                    <button type="button" class="button-minor block" wire:click="selectFocus({{ $match['id'] }})">{{ $match['name'] }}</button>
-                                @endforeach
-                                <p>{{ $focusFullName }}</p>
-                                @error('form.sectionFocusUuid')
-                                    <p class="text-error">{{ $message }}</p>
-                                @enderror
-                            </div>
-                        @endif
-
                         <div class="form-group group">
                             <div class="datepicker-wrapper">
                                 <input
@@ -341,7 +317,7 @@
                                 class="input-select peer w-full"
                             >
                                 <option value="">{{ __('forms.select') }} ...</option>
-                                @foreach ($this->dictionaries[TreatmentViolation::DICTIONARY] ?? [] as $code => $description)
+                                @foreach ($this->dictionaries[\App\Enums\Composition\TreatmentViolation::DICTIONARY] ?? [] as $code => $description)
                                     <option value="{{ $code }}">{{ $description }}</option>
                                 @endforeach
                             </select>
@@ -417,9 +393,9 @@
                 </div>
             @endif
             @if ($step === Wizard::STEP_AWAITING_JOB)
-                <div @if ($asyncJobStatus === CompositionJobStatus::PENDING->value && !$asyncJobErrors) wire:poll.3s="pollAsyncJob" @endif>
+                <div @if ($asyncJobStatus === CompositionJobStatus::PENDING->value) wire:poll.3s="pollAsyncJob" @endif>
                     <livewire:components.submission-status
-                        :record-type="Composition::class"
+                        :record-type="\App\Models\MedicalEvents\Sql\Composition::class"
                         :record-id="0"
                         :record-status-label="$asyncJobStatus"
                         :composition-operation-id="$this->compositionOperationId"
@@ -427,11 +403,8 @@
                     />
                     @if ($asyncJobErrors)
                         <p class="mt-3 text-sm text-red-600" role="alert">{{ implode(' ', $asyncJobErrors) }}</p>
-                        @if ($asyncJobStatus !== CompositionJobStatus::FAILED->value)
-                            <button type="button" wire:click="retryAsyncJob" class="button-primary mt-4">{{ __('compositions.async.retry_read') }}</button>
-                        @endif
                     @endif
-                    @if ($asyncJobStatus === CompositionJobStatus::FAILED->value && $compositionUuid === null)
+                    @if ($asyncJobStatus === \App\Enums\Composition\CompositionJobStatus::FAILED->value && $compositionUuid === null)
                         <button type="button" wire:click="restart" class="button-primary mt-4">
                             {{ __('forms.update') }}
                         </button>
@@ -444,7 +417,7 @@
                     <legend class="legend">{{ __('compositions.create_temp_disability.steps.review') }}</legend>
                     <div class="mt-6">
                         @php
-                            $reviewStatus = $this->compositionStatus(data_get($compositionDetail, 'status'));
+                            $reviewStatus = \App\Enums\Composition\CompositionStatus::fromEHealth(data_get($compositionDetail, 'status'));
                         @endphp
 
                         @include('livewire.composition.parts.details-summary', ['detail' => $compositionDetail])

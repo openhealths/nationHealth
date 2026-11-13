@@ -7,13 +7,9 @@ namespace App\Repositories;
 use App\Core\Arr;
 use App\Models\Person\Person;
 use App\Models\Person\PersonRequest;
-use App\Models\Preperson;
 use App\Models\Relations\PersonVerificationDetail;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOneOrMany;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Throwable;
 
 class PersonRepository
@@ -35,37 +31,11 @@ class PersonRepository
         return Person::findOrFail($personId);
     }
 
-    public function findByUuid(string $uuid): ?Person
-    {
-        if (!Str::isUuid($uuid)) {
-            return null;
-        }
-
-        return Person::whereUuid($uuid)->first();
-    }
-
     public function searchBySurname(string $surname): array
     {
         return Person::whereHas('names', fn ($query) => $query->whereLike('last_name', '%'.$surname.'%'))
             ->whereNotNull('uuid')->with('names')->orderBy('id')->limit(20)->get()
             ->map(fn (Person $person): array => ['id' => $person->id, 'name' => $person->fullName])->all();
-    }
-
-    /** Local person/preperson field choices, without remote calls or changes to records. */
-    public function searchByNameOrUuid(string $term, bool $unidentified = false): Collection
-    {
-        if ($unidentified) {
-            return Preperson::query()->where(static fn (Builder $query): Builder => $query
-                ->whereLike('last_name', "%{$term}%")
-                ->orWhereLike('first_name', "%{$term}%")
-                ->orWhere('uuid', $term))->limit(10)->get();
-        }
-
-        return Person::query()->with('names')->where(static function (Builder $query) use ($term): void {
-            $query->whereHas('names', static fn (Builder $names): Builder => $names
-                ->whereLike('last_name', "%{$term}%")
-                ->orWhereLike('first_name', "%{$term}%"))->orWhere('uuid', $term);
-        })->limit(10)->get();
     }
 
     /**

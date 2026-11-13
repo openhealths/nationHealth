@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Composition;
 
-use App\Livewire\Composition\CompositionTempDisabilityCreate;
 use App\Livewire\Composition\Forms\CompositionTempDisabilityForm;
 use Illuminate\Contracts\Validation\Validator as ValidatorContract;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
-use ReflectionMethod;
 use Tests\TestCase;
 
 /**
@@ -184,9 +182,7 @@ class CompositionTempDisabilityFormTest extends TestCase
         $form->eventPeriodEnd = '10.08.2026';
         $form->isAccident = true;
 
-        $component = new CompositionTempDisabilityCreate;
-        $component->form = $form;
-        $payload = (new ReflectionMethod($component, 'buildCompositionPayload'))->invoke($component,
+        $payload = $form->toPayload(
             '43cc2161-1c2b-481b-a618-77e35817f850'
         );
 

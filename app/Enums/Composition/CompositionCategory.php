@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Enums\Composition;
 
-use App\Enums\Composition\CompositionType;
 use App\Traits\EnumUtils;
 
 /**
@@ -59,6 +58,30 @@ enum CompositionCategory: string
     /** Лікування в санаторно-курортному закладі. */
     case RESTORATION = 'RESTORATION';
 
+    /**
+     * Categories selectable for a given conclusion type.
+     *
+     * @return array<self>
+     */
+    public static function forType(CompositionType $type): array
+    {
+        return match ($type) {
+            CompositionType::NEWBORN => [self::LIVE_BIRTH],
+            CompositionType::TEMP_DISABILITY => [
+                self::SICKNESS,
+                self::CHILD_CARE,
+                self::FAMILY_CARE,
+                self::PARENTAL_CARE,
+                self::PREGNANCY,
+                self::QUARANTINE,
+                self::COVID19,
+                self::TEMP_TRANSFER,
+                self::PROSTHETIC,
+                self::RESTORATION,
+            ],
+        };
+    }
+
     public function type(): CompositionType
     {
         return $this === self::LIVE_BIRTH
@@ -109,5 +132,20 @@ enum CompositionCategory: string
             ->byName(self::DICTIONARY)
             ->asCodeDescription()
             ->get($this->value, $this->value);
+    }
+
+    public static function optionsFor(CompositionType $type): array
+    {
+        $descriptions = dictionary()->basics()
+            ->byName(CompositionCategory::DICTIONARY)
+            ->asCodeDescription();
+
+        $options = [];
+
+        foreach (CompositionCategory::forType($type) as $category) {
+            $options[$category->value] = $descriptions->get($category->value, $category->value);
+        }
+
+        return $options;
     }
 }

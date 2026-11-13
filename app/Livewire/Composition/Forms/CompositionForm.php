@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Composition\Forms;
 
 use App\Core\BaseForm;
+use App\Dto\Composition\Ehealth as EhealthData;
 use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionType;
 use Illuminate\Validation\Rule;
@@ -64,6 +65,17 @@ class CompositionForm extends BaseForm
     protected function rules(): array
     {
         return $this->compositionRules();
+    }
+
+    /**
+     * @deprecated Map the validated form to EhealthData in the component.
+     * Kept for existing payload consumers while the other form is migrated separately.
+     *
+     * @return array<string, mixed>
+     */
+    public function toPayload(string $authorEmployeeUuid): array
+    {
+        return new EhealthData($authorEmployeeUuid)->fromForm($this)->toArray();
     }
 
     public function resetCompositionFields(): void

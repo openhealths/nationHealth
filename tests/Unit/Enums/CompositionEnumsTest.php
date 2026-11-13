@@ -8,7 +8,6 @@ use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionJobStatus;
 use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
-use App\Livewire\Person\Records\PatientCompositions;
 use App\Services\Dictionary\Dictionaries\BasicDictionary;
 use Illuminate\Support\Facades\Cache;
 use PHPUnit\Framework\Attributes\Test;
@@ -77,17 +76,17 @@ class CompositionEnumsTest extends TestCase
     #[Test]
     public function status_resolution_accepts_the_hyphenated_spelling_used_by_the_search_filter(): void
     {
-        $this->assertSame(CompositionStatus::ENTERED_IN_ERROR, (new PatientCompositions)->compositionStatus('ENTERED-IN-ERROR'));
-        $this->assertSame(CompositionStatus::ENTERED_IN_ERROR, (new PatientCompositions)->compositionStatus('ENTERED_IN_ERROR'));
-        $this->assertSame(CompositionStatus::FINAL, (new PatientCompositions)->compositionStatus('final'));
+        $this->assertSame(CompositionStatus::ENTERED_IN_ERROR, CompositionStatus::fromEHealth('ENTERED-IN-ERROR'));
+        $this->assertSame(CompositionStatus::ENTERED_IN_ERROR, CompositionStatus::fromEHealth('ENTERED_IN_ERROR'));
+        $this->assertSame(CompositionStatus::FINAL, CompositionStatus::fromEHealth('final'));
     }
 
     #[Test]
     public function status_resolution_returns_null_for_unknown_and_empty_input(): void
     {
-        $this->assertNull((new PatientCompositions)->compositionStatus(null));
-        $this->assertNull((new PatientCompositions)->compositionStatus(''));
-        $this->assertNull((new PatientCompositions)->compositionStatus('SOMETHING_ELSE'));
+        $this->assertNull(CompositionStatus::fromEHealth(null));
+        $this->assertNull(CompositionStatus::fromEHealth(''));
+        $this->assertNull(CompositionStatus::fromEHealth('SOMETHING_ELSE'));
     }
 
     #[Test]
@@ -107,7 +106,7 @@ class CompositionEnumsTest extends TestCase
     {
         $this->assertSame(
             [CompositionCategory::LIVE_BIRTH],
-            CompositionType::NEWBORN->categories()
+            CompositionCategory::forType(CompositionType::NEWBORN)
         );
     }
 
@@ -116,7 +115,7 @@ class CompositionEnumsTest extends TestCase
     {
         $codes = array_map(
             static fn (CompositionCategory $category) => $category->value,
-            CompositionType::TEMP_DISABILITY->categories()
+            CompositionCategory::forType(CompositionType::TEMP_DISABILITY)
         );
 
         $this->assertSame(

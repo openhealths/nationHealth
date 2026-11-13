@@ -1,13 +1,10 @@
-@use('App\Models\MedicalEvents\Sql\Composition')
-@use('App\Models\MedicalEvents\Sql\CompositionIntegration')
-
 {{-- Both ids are forwarded: the layout switches its whole navigation between the person
      and preperson route families based on which one is set. --}}
 <x-layouts.patient :showLegacyMessages="false" :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <x-slot name="headerActions">
         <div class="flex flex-wrap gap-2">
-            @can('viewAny', Composition::class)
+            @can('viewAny', \App\Models\MedicalEvents\Sql\Composition::class)
                 <button
                     type="button"
                     wire:click="sync"
@@ -24,7 +21,7 @@
                     {{ __('forms.synchronise_with_eHealth') }}
                 </button>
             @endcan
-            @can('createNewborn', Composition::class)
+            @can('createNewborn', \App\Models\MedicalEvents\Sql\Composition::class)
                 <a
                     href="{{ $this->createNewbornUrl }}"
                     class="button-primary-outline flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
@@ -33,7 +30,7 @@
                     {{ __('compositions.actions.create_newborn') }}
                 </a>
             @endcan
-            @can('createTempDisability', Composition::class)
+            @can('createTempDisability', \App\Models\MedicalEvents\Sql\Composition::class)
                 <a
                     href="{{ $this->createTempDisabilityUrl }}"
                     class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
@@ -117,29 +114,6 @@
             </div>
 
             <div class="space-y-4">
-                @foreach ($this->pendingOperations as $operation)
-                    <div wire:key="composition-operation-{{ $operation->id }}">
-                        <p>
-                            {{ __('compositions.async.pending') }} {{ $operation->composition?->title ?: $operation->remoteJobId }}
-                        </p>
-                        @if ($operation->error)
-                            <p>
-                                {{ $operation->error }}
-                            </p>
-                        @endif
-                        <button
-                            type="button"
-                            wire:click="retryAsyncJob('{{ $operation->remoteJobId }}')"
-                            wire:loading.attr="disabled"
-                            class="button-primary-outline"
-                        >
-                            {{ __('compositions.async.retry_read') }}
-                        </button>
-                    </div>
-                @endforeach
-                @if ($focusSearchResults !== null)
-                    @include('livewire.composition.focus-search-results')
-                @else
                 @forelse ($this->paginatedCompositions as $composition)
                     <div class="record-inner-card" wire:key="composition-{{ $composition->id }}">
                         <div class="record-inner-header">
@@ -239,9 +213,9 @@
 
                                         @if (
                                             $composition->isTempDisability
-                                                && $composition->status->isCancellable()
-                                                && $personId
-                                        )
+                                                                                                                                                                    && $composition->status->isCancellable()
+                                                                                                                                                                    && $personId
+)
                                             <a
                                                 href="{{ $this->refineUrl($composition) }}"
                                                 class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
@@ -348,12 +322,9 @@
                 @empty
                     <x-nothing-found :description="null" />
                 @endforelse
-                @endif
             </div>
 
-            @if ($focusSearchResults === null)
-                <div class="mt-4">{{ $this->paginatedCompositions->links() }}</div>
-            @endif
+            <div class="mt-4">{{ $this->paginatedCompositions->links() }}</div>
         </div>
     </div>
 
@@ -371,13 +342,6 @@
         <x-slot name="title">{{ __('compositions.erln_resend.title') }}</x-slot>
 
         <x-slot name="content">
-            @foreach ($integrationData ?? [] as $integration)
-                @if ($integration['component'] === CompositionIntegration::ERLN_COMPONENT && $integration['type'] === CompositionIntegration::ERLN_CREATION && ($integration['integrationStatus'] ?? null) === CompositionIntegration::ERROR_STATUS)
-                    <p>
-                        {{ __('compositions.erln_resend.error_message') }}: {{ $integration['statusMessage'] ?? __('compositions.errors.erln_resend_not_error') }}
-                    </p>
-                @endif
-            @endforeach
             <p>{{ __('compositions.erln_resend.confirm_message') }}</p>
         </x-slot>
 

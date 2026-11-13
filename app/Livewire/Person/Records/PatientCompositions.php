@@ -5,26 +5,24 @@ declare(strict_types=1);
 namespace App\Livewire\Person\Records;
 
 use App\Classes\eHealth\EHealth;
+use App\Enums\MergeRequest\Status as MergeRequestStatus;
 use App\Enums\Composition\CompositionAsyncOperation;
-use App\Enums\Composition\CompositionConfiguration;
-use App\Enums\Composition\CompositionJobStatus;
+use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
-use App\Exceptions\MedicalEvents\CompositionGuardException;
-use App\Livewire\Composition\CompositionComponent;
 use App\Livewire\Composition\Forms\CompositionCancellationForm;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\MedicalEvents\Sql\CompositionOperation;
+use App\Repositories\MedicalEvents\CompositionOperationRepository;
+use App\Models\MergeRequest;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\SignatureService;
-use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
@@ -33,7 +31,6 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
-use RuntimeException;
 use Throwable;
 
 /**
@@ -48,8 +45,9 @@ use Throwable;
  *
  * ТЗ references: 3.8.1.3, 3.8.1.9, 3.8.1.10, 3.8.2.3, 3.8.2.11, 3.8.2.14, 3.8.2.15
  */
-class PatientCompositions extends CompositionComponent
+class PatientCompositions extends BasePatientComponent
 {
+    use \App\Livewire\Composition\Concerns\InteractsWithCompositions;
     use WithFileUploads;
     use WithPagination;
 
@@ -66,9 +64,6 @@ class PatientCompositions extends CompositionComponent
     /** @var string|null UUID of the composition being cancelled */
     #[Locked]
     public ?string $cancellingCompositionUuid = null;
-
-    #[Locked]
-    public ?string $cancellingCompositionDate = null;
 
     /** @var bool Whether to show the composition detail modal */
     public bool $showDetailModal = false;
@@ -98,10 +93,6 @@ class PatientCompositions extends CompositionComponent
 
     public string $filterSectionFocusUuid = '';
 
-    /** Validated search rows retain their real subject and do not transfer ownership to this card. */
-    #[Locked]
-    public ?array $focusSearchResults = null;
-
     /** @var string|null UUID of the composition being re-sent to ERLN */
     #[Locked]
     public ?string $resendingErlnCompositionUuid = null;
@@ -109,17 +100,11 @@ class PatientCompositions extends CompositionComponent
     /** @var bool Whether to show the ERLN re-send confirmation modal */
     public bool $showErlnResendModal = false;
 
-    /** Only primitive snapshots cross Livewire requests; operations stay in the repository. */
-    #[Locked]
-    public array $trackedOperationStates = [];
-
     // Lifecycle
 
     protected function initializeComponent(): void
     {
-        foreach ($this->pendingOperations() as $operation) {
-            $this->trackedOperationStates[$operation->id] = ['status' => $operation->status, 'error' => $operation->error];
-        }
+        // Nothing extra to initialise here; patient data is loaded by BasePatientComponent.
     }
 
     // Computed properties
@@ -176,7 +161,6 @@ class PatientCompositions extends CompositionComponent
 
     public function sync(): void
     {
-        $this->focusSearchResults = null;
         $this->resetPage();
 
         if ($this->refreshFromEHealth(applyFilters: false)) {
@@ -188,40 +172,19 @@ class PatientCompositions extends CompositionComponent
 
     public function resetFilters(): void
     {
-        $this->focusSearchResults = null;
         $this->reset([
             'filterType',
             'filterStatus',
             'filterEncounterId',
             'filterEpisodeOfCareId',
             'filterSectionFocusUuid',
+            'isSearching',
         ]);
 
         $this->resetPage();
     }
 
     // Detail view
-
-    public function viewFocusResult(string $uuid): void
-    {
-        if (Auth::user()->cannot('viewAny', Composition::class)) {
-            Session::flash('error', __('compositions.errors.search_not_allowed'));
-
-            return;
-        }
-        $result = collect($this->focusSearchResults ?? [])->first(
-            static fn (array $row): bool => data_get($row, 'identifier.value') === $uuid
-        );
-        if ($result === null) {
-            Session::flash('error', __('compositions.errors.not_found'));
-
-            return;
-        }
-        $this->compositionDetail = $result;
-        $this->viewingCompositionUuid = $uuid;
-        $this->integrationData = null;
-        $this->showDetailModal = true;
-    }
 
     /**
      * Show the locally stored composition payload (TV 3.8.1.6.1 / 3.8.2.8.1).
@@ -241,11 +204,7 @@ class PatientCompositions extends CompositionComponent
             return;
         }
 
-        if (Auth::user()->cannot('view', $composition)) {
-            Session::flash('error', __('compositions.errors.view_not_allowed'));
-
-            return;
-        }
+        abort_unless(Auth::user()->can('view', $composition), 404);
 
         $this->compositionDetail = $composition->toDetail();
         $this->showDetailModal = true;
@@ -277,11 +236,7 @@ class PatientCompositions extends CompositionComponent
             return;
         }
 
-        if (Auth::user()->cannot('view', $composition)) {
-            Session::flash('error', __('compositions.errors.view_not_allowed'));
-
-            return;
-        }
+        abort_unless(Auth::user()->can('view', $composition), 404);
 
         try {
             $templateId = $composition->type->printTemplateId();
@@ -293,12 +248,9 @@ class PatientCompositions extends CompositionComponent
                 $templateId
             );
 
-            $document = $response->validate();
             $this->showDetailModal = false;
-            $this->printFormHtml = $document['content'];
+            $this->printFormHtml = $response->body();
             $this->showPrintModal = true;
-        } catch (ValidationException $exception) {
-            Session::flash('error', __('compositions.errors.invalid_response'));
         } catch (EHealthConnectionException | EHealthException $exception) {
             Session::flash('error', __('compositions.errors.print_form_failed'));
 
@@ -331,73 +283,34 @@ class PatientCompositions extends CompositionComponent
             return;
         }
 
-        if (Auth::user()->cannot('cancel', $composition)) {
-            Session::flash('error', __('compositions.errors.cancel_not_allowed'));
+        // Status and authorship are checked by the policy. The remaining preconditions from
+        // TV 3.8.1.10.1 and 3.8.2.15.1 — that no integration process has started, and that
+        // the cancellation timeout has not elapsed — are only known to eHealth, which
+        // rejects the request itself.
+        abort_unless(Auth::user()->can('cancel', $composition), 404);
+
+        // TV 3.8.1.10.1 — a birth conclusion cannot be cancelled once DRACS / DIIA
+        // processing has started. The call is skipped for МВТН: those may already
+        // have an ERLN record and are cancelled together with it.
+        if ($composition->isNewborn && ($this->fetchIntegration($composition) !== [])) {
+            Session::flash('error', __('compositions.errors.cancel_has_integration'));
 
             return;
         }
 
-        if (Repository::compositionOperation()->hasPendingForComposition($composition)) {
-            Session::flash('info', __('compositions.async.pending'));
-
-            return;
-        }
-        try {
-            $snapshot = $this->currentCompositionSnapshot($composition);
-            if (Auth::user()->cannot('cancel', $snapshot)) {
-                Session::flash('error', __('compositions.errors.cancel_not_allowed'));
-
-                return;
-            }
-            if ($snapshot->isNewborn && $this->fetchIntegration($snapshot) !== []) {
-                throw new CompositionGuardException(__('compositions.errors.cancel_has_integration'));
-            }
-            $this->cancellingCompositionUuid = $compositionUuid;
-            $this->cancellingCompositionDate = $snapshot->date;
-            unset($this->cancellationReasons, $this->cancellationWarning);
-            if ($this->cancellationReasons === []) {
-                // A replacement reason may have a longer deadline, so retain every still-allowed reason.
-                if ($snapshot->isTempDisability) {
-                    $this->assertCancellationAllowed($snapshot->date);
-                }
-                throw new CompositionGuardException(__('compositions.errors.invalid_response'));
-            }
-            $this->form->resetCancellationFields();
-            $this->form->resetSigningFields();
-            $this->showSignatureModal = true;
-        } catch (CompositionGuardException $exception) {
-            Session::flash('error', $exception->getMessage());
-        } catch (ValidationException $exception) {
-            Session::flash('error', __('compositions.errors.invalid_response'));
-        } catch (EHealthConnectionException | EHealthException $exception) {
-            $exception->handle('Could not check cancellation of the medical conclusion');
-        }
+        $this->cancellingCompositionUuid = $compositionUuid;
+        unset($this->cancellationReasons, $this->cancellationWarning);
+        $this->form->resetCancellationFields();
+        $this->form->resetSigningFields();
+        $this->showSignatureModal = true;
     }
 
     public function closeCancellationModal(): void
     {
         $this->showSignatureModal = false;
         $this->cancellingCompositionUuid = null;
-        $this->cancellingCompositionDate = null;
         $this->form->resetCancellationFields();
         $this->form->resetSigningFields();
-    }
-
-    private function assertCancellationWithinConfiguredPeriod(Composition $composition): bool
-    {
-        if (!$composition->isTempDisability) {
-            return true;
-        }
-        try {
-            $this->assertCancellationAllowed($composition->date, $this->form->reason);
-        } catch (CompositionGuardException $exception) {
-            Session::flash('error', $exception->getMessage());
-            $this->addError('form.guard', $exception->getMessage());
-
-            return false;
-        }
-
-        return true;
     }
 
     /**
@@ -455,23 +368,10 @@ class PatientCompositions extends CompositionComponent
             return [];
         }
 
-        $reasons = dictionary()->basics()
+        return dictionary()->basics()
             ->byName($composition->type->cancellationReasonDictionary())
             ->asCodeDescription()
             ->all();
-
-        if (!$composition->isTempDisability || $this->cancellingCompositionDate === null) {
-            return $reasons;
-        }
-        return array_filter($reasons, function (string $reason): bool {
-            try {
-                $this->assertCancellationAllowed($this->cancellingCompositionDate, $reason);
-
-                return true;
-            } catch (CompositionGuardException) {
-                return false;
-            }
-        }, ARRAY_FILTER_USE_KEY);
     }
 
     /**
@@ -495,110 +395,71 @@ class PatientCompositions extends CompositionComponent
      */
     public function cancelComposition(): void
     {
+        try {
+            // Validate on the form object so rules resolve against form.* properties
+            // (component-level validate() looks for $this->reason, which does not exist).
+            $this->form->validate(array_merge(
+                $this->form->cancellationRules($this->cancellationReasons),
+                $this->form->signingRules()
+            ));
+        } catch (ValidationException $e) {
+            $this->setErrorBag($e->validator->getMessageBag());
+
+            return;
+        }
+
         $composition = $this->findLocalComposition((string) $this->cancellingCompositionUuid);
 
         if (!$composition) {
             return;
         }
 
-        if (Auth::user()->cannot('cancel', $composition)) {
-            Session::flash('error', __('compositions.errors.cancel_not_allowed'));
+        $this->authorize('cancel', $composition);
+
+        // TV 3.8.1.10.1 — re-checked here rather than only when the modal opened. The
+        // modal can stay open for as long as signing takes, and DRACS / DIIA processing
+        // may well have started in between.
+        if ($composition->isNewborn && ($this->fetchIntegration($composition) !== [])) {
+            $this->closeCancellationModal();
+            Session::flash('error', __('compositions.errors.cancel_has_integration'));
 
             return;
         }
 
-        $lock = Cache::lock('composition-write:'.$composition->uuid, 600);
-        if (!$lock->get()) {
-            Session::flash('info', __('compositions.async.pending'));
-
-            return;
-        }
         try {
-            if (Repository::compositionOperation()->hasPendingForComposition($composition)) {
-                Session::flash('info', __('compositions.async.pending'));
-
-                return;
-            }
-            $snapshot = $this->currentCompositionSnapshot($composition);
-            if (Auth::user()->cannot('cancel', $snapshot)) {
-                Session::flash('error', __('compositions.errors.cancel_not_allowed'));
-
-                return;
-            }
-            $this->cancellingCompositionDate = $snapshot->date;
-            unset($this->cancellationReasons);
-            if (!$this->assertCancellationWithinConfiguredPeriod($snapshot)) {
-                return;
-            }
-            try {
-                $this->form->validate(array_merge(
-                    $this->form->cancellationRules($this->cancellationReasons),
-                    $this->form->signingRules()
-                ));
-            } catch (ValidationException $exception) {
-                $this->setErrorBag($exception->validator->getMessageBag());
-
-                return;
-            }
-            // Re-read integration immediately before KEP; opening the modal is not sufficient evidence.
-            if ($snapshot->isNewborn && $this->fetchIntegration($snapshot) !== []) {
-                throw new CompositionGuardException(__('compositions.errors.cancel_has_integration'));
-            }
             /** @var SignatureService $signer */
             $signer = app(SignatureService::class);
 
-            try {
-                $signedContent = $signer->signData(
-                    $this->buildCancellationPayload($composition->uuid, $composition->type),
-                    $this->form->password,
-                    $this->form->knedp,
-                    $this->form->keyContainerUpload,
-                    Auth::user()->party->taxId
-                );
-            } catch (RuntimeException $exception) {
-                $this->addError('form.guard', $exception->getMessage());
-                Session::flash('error', $exception->getMessage());
-
-                return;
-            }
+            $signedContent = $signer->signData(
+                $this->form->toCancellationPayload($composition->uuid, $composition->type),
+                $this->form->password,
+                $this->form->knedp,
+                $this->form->keyContainerUpload,
+                Auth::user()->party->taxId
+            );
 
             $job = EHealth::composition()->cancel($composition->uuid, ['data' => $signedContent])->validate();
 
             // eHealth processes the cancellation asynchronously, so the conclusion is not
             // in error yet. The job is recorded so the poller can finish the job off;
             // discarding it would leave the row permanently claiming to be pending.
-            $operation = Repository::compositionOperation()->store($job, CompositionAsyncOperation::CANCEL, $this->patient(), [
+            app(CompositionOperationRepository::class)->store($job, CompositionAsyncOperation::CANCEL, $this->patient(), [
                 'composition_id' => $composition->id,
                 'composition_type' => $composition->type,
                 'encounter_uuid' => $composition->encounterUuid,
                 'episode_uuid' => $composition->episodeOfCareUuid,
                 'author_uuid' => $composition->authorUuid,
             ]);
-            $this->trackedOperationStates[$operation->id] = ['status' => CompositionJobStatus::PENDING->value, 'error' => null];
 
             $this->closeCancellationModal();
-            if (!$this->queueCompositionOperation($operation)) {
-                Session::flash('error', __('compositions.errors.job_status_unavailable'));
-
-                return;
-            }
-            Session::flash('info', __('compositions.messages.cancellation_submitted'));
-        } catch (CompositionGuardException $exception) {
-            $this->addError('form.guard', $exception->getMessage());
-            Session::flash('error', $exception->getMessage());
-        } catch (ValidationException $exception) {
-            Session::flash('error', __('compositions.errors.invalid_response'));
-        } catch (EHealthConnectionException | EHealthException $exception) {
-            $exception->handle('Failed to cancel the medical conclusion');
-        } catch (Throwable $exception) {
-            Session::flash('error', __($this->showSignatureModal
-                ? 'clinical-storage.write_failed' : 'compositions.errors.async_processing_failed'));
+            Session::flash('success', __('compositions.messages.cancellation_submitted'));
+        } catch (Throwable $e) {
+            Session::flash('error', $e->getMessage());
 
             Log::error('Failed to cancel composition', [
-                'exceptionType' => $exception::class,
+                'compositionUuid' => $this->cancellingCompositionUuid,
+                'error' => $e->getMessage(),
             ]);
-        } finally {
-            $lock->release();
         }
     }
 
@@ -610,40 +471,7 @@ class PatientCompositions extends CompositionComponent
      */
     public function pollAsyncJobs(): void
     {
-        if (Auth::user()->cannot('viewAny', Composition::class)) {
-            return;
-        }
-        $feedback = null;
-        foreach (Repository::compositionOperation()->trackedForPatient($this->patient(), array_keys($this->trackedOperationStates)) as $operation) {
-            if (Auth::user()->cannot('readOperation', [Composition::class, $operation])) {
-                continue;
-            }
-            $previous = $this->trackedOperationStates[$operation->id];
-            if ($operation->status === CompositionJobStatus::PENDING->value) {
-                if ($operation->error !== null && $operation->error !== $previous['error']) {
-                    $feedback = ['error', $operation->error];
-                }
-                $this->trackedOperationStates[$operation->id] = ['status' => $operation->status, 'error' => $operation->error];
-
-                continue;
-            }
-            unset($this->trackedOperationStates[$operation->id]);
-            if ($operation->status === CompositionJobStatus::FAILED->value) {
-                $feedback = ['error', $operation->error ?: __('compositions.errors.async_job_failed')];
-            } elseif ($feedback === null) {
-                // Completion means the worker validated and stored the expected resource state.
-                $key = match ($operation->operation) {
-                    CompositionAsyncOperation::CANCEL => 'cancellation_confirmed',
-                    CompositionAsyncOperation::ERLN_RETRY => 'erln_retry_processed',
-                    default => 'operation_confirmed',
-                };
-                $feedback = ['success', __('compositions.messages.'.$key)];
-            }
-        }
-        if ($feedback !== null) {
-            Session::flash($feedback[0], $feedback[1]);
-        }
-        unset($this->paginatedCompositions, $this->hasPendingAsyncJobs, $this->pendingOperations);
+        unset($this->paginatedCompositions, $this->hasPendingAsyncJobs);
     }
 
     /**
@@ -658,46 +486,9 @@ class PatientCompositions extends CompositionComponent
     /**
      * @return Collection<int, CompositionOperation>
      */
-    #[Computed]
-    public function pendingOperations(): Collection
+    private function pendingOperations(): Collection
     {
-        if (Auth::user()->cannot('viewAny', Composition::class)) {
-            return collect();
-        }
-
-        return Repository::compositionOperation()->pendingForPatient($this->patient())
-            ->filter(fn (CompositionOperation $operation): bool => !Auth::user()->cannot('readOperation', [Composition::class, $operation]));
-    }
-
-    public function retryAsyncJob(string $jobId): void
-    {
-        if (Auth::user()->cannot('viewAny', Composition::class)) {
-            Session::flash('error', __('compositions.errors.view_not_allowed'));
-
-            return;
-        }
-        $operation = Repository::compositionOperation()->findForPatient($this->patient(), $jobId);
-        if ($operation === null || $operation->status !== CompositionJobStatus::PENDING->value) {
-            return;
-        }
-        if (Auth::user()->cannot('readOperation', [Composition::class, $operation])) {
-            Session::flash('error', __('compositions.errors.view_not_allowed'));
-
-            return;
-        }
-        // Retry only the GET/worker for the accepted job; never repeat its write or KEP.
-        try {
-            $this->trackedOperationStates[$operation->id] = ['status' => CompositionJobStatus::PENDING->value, 'error' => null];
-            if (!$this->queueCompositionOperation($operation)) {
-                Session::flash('error', __('compositions.errors.job_status_unavailable'));
-
-                return;
-            }
-            Session::flash('info', __('compositions.messages.result_read_requested'));
-        } catch (Throwable $exception) {
-            Session::flash('error', __('compositions.errors.async_processing_failed'));
-            Log::error('Could not queue the existing medical conclusion result', ['exceptionType' => $exception::class]);
-        }
+        return app(CompositionOperationRepository::class)->pendingForPatient($this->patient());
     }
 
     // ERLN re-send (МВТН only — ТЗ 3.8.2.14)
@@ -716,35 +507,10 @@ class PatientCompositions extends CompositionComponent
             return;
         }
 
-        if (Auth::user()->cannot('resendErln', $composition)) {
-            Session::flash('error', __('compositions.errors.erln_resend_not_allowed'));
+        abort_unless(Auth::user()->can('resendErln', $composition), 404);
 
-            return;
-        }
-        if (Repository::compositionOperation()->hasPendingForComposition($composition)) {
-            Session::flash('info', __('compositions.async.pending'));
-
-            return;
-        }
-        try {
-            $snapshot = $this->currentCompositionSnapshot($composition);
-            $integration = $this->fetchIntegration($snapshot);
-            if (Auth::user()->cannot('resendErln', [$snapshot, $integration])) {
-                Session::flash('error', __('compositions.errors.erln_resend_not_error'));
-
-                return;
-            }
-            // TV39 requires the exact failed ERLN task and its message before asking for a retry.
-            $this->integrationData = $integration;
-            $this->resendingErlnCompositionUuid = $compositionUuid;
-            $this->showErlnResendModal = true;
-        } catch (CompositionGuardException $exception) {
-            Session::flash('error', $exception->getMessage());
-        } catch (ValidationException $exception) {
-            Session::flash('error', __('compositions.errors.invalid_response'));
-        } catch (EHealthConnectionException | EHealthException $exception) {
-            $exception->handle('Could not check the ERLN retry');
-        }
+        $this->resendingErlnCompositionUuid = $compositionUuid;
+        $this->showErlnResendModal = true;
     }
 
     public function closeErlnResendModal(): void
@@ -765,66 +531,31 @@ class PatientCompositions extends CompositionComponent
             return;
         }
 
-        if (Auth::user()->cannot('resendErln', $composition)) {
-            Session::flash('error', __('compositions.errors.erln_resend_not_allowed'));
+        $this->authorize('resendErln', $composition);
 
-            return;
-        }
-        $lock = Cache::lock('composition-write:'.$composition->uuid, 600);
-        if (!$lock->get()) {
-            Session::flash('info', __('compositions.async.pending'));
-
-            return;
-        }
         try {
-            if (Repository::compositionOperation()->hasPendingForComposition($composition)) {
-                Session::flash('info', __('compositions.async.pending'));
-
-                return;
-            }
-            $snapshot = $this->currentCompositionSnapshot($composition);
-            $integration = $this->fetchIntegration($snapshot);
-            if (Auth::user()->cannot('resendErln', [$snapshot, $integration])) {
-                Session::flash('error', __('compositions.errors.erln_resend_not_error'));
-
-                return;
-            }
             $job = EHealth::composition()->resendErln($composition->uuid)->validate();
 
             // The retry is asynchronous: the ERLN status will not change until the job
             // finishes, so the job is recorded and the list poller reports the outcome
             // instead of an immediate refresh that can only show the stale status.
-            $operation = Repository::compositionOperation()->store($job, CompositionAsyncOperation::ERLN_RETRY, $this->patient(), [
+            app(CompositionOperationRepository::class)->store($job, CompositionAsyncOperation::ERLN_RETRY, $this->patient(), [
                 'composition_id' => $composition->id,
                 'composition_type' => $composition->type,
                 'encounter_uuid' => $composition->encounterUuid,
                 'episode_uuid' => $composition->episodeOfCareUuid,
                 'author_uuid' => $composition->authorUuid,
             ]);
-            $this->trackedOperationStates[$operation->id] = ['status' => CompositionJobStatus::PENDING->value, 'error' => null];
 
             $this->closeErlnResendModal();
-            if (!$this->queueCompositionOperation($operation)) {
-                Session::flash('error', __('compositions.errors.job_status_unavailable'));
-
-                return;
-            }
-            Session::flash('info', __('compositions.messages.erln_resent_successfully'));
-        } catch (CompositionGuardException $exception) {
-            Session::flash('error', $exception->getMessage());
-        } catch (ValidationException $exception) {
-            Session::flash('error', __('compositions.errors.invalid_response'));
-        } catch (EHealthConnectionException | EHealthException $exception) {
-            $exception->handle('Failed to resend the medical conclusion to ERLN');
-        } catch (Throwable $exception) {
-            Session::flash('error', __($this->showErlnResendModal
-                ? 'clinical-storage.write_failed' : 'compositions.errors.async_processing_failed'));
+            Session::flash('success', __('compositions.messages.erln_resent_successfully'));
+        } catch (Throwable $e) {
+            Session::flash('error', $e->getMessage());
 
             Log::error('Failed to resend МВТН to ERLN', [
-                'exceptionType' => $exception::class,
+                'compositionUuid' => $this->resendingErlnCompositionUuid,
+                'error' => $e->getMessage(),
             ]);
-        } finally {
-            $lock->release();
         }
     }
 
@@ -843,17 +574,11 @@ class PatientCompositions extends CompositionComponent
             return;
         }
 
-        if (Auth::user()->cannot('view', $composition)) {
-            Session::flash('error', __('compositions.errors.view_not_allowed'));
-
-            return;
-        }
+        abort_unless(Auth::user()->can('view', $composition), 404);
 
         try {
             $this->syncIntegration($composition);
             Session::flash('success', __('compositions.messages.integration_refreshed'));
-        } catch (ValidationException $exception) {
-            Session::flash('error', __('compositions.errors.invalid_response'));
         } catch (EHealthConnectionException | EHealthException $exception) {
             $exception->handle('Error refreshing composition integration data');
         }
@@ -881,11 +606,7 @@ class PatientCompositions extends CompositionComponent
     {
         // TV 3.8.1.9 / 3.8.2.11 — searching is its own capability, and a user who may not
         // see conclusions here must not be able to pull them into the local table either.
-        if (Auth::user()->cannot('viewAny', Composition::class)) {
-            Session::flash('error', __('compositions.errors.search_not_allowed'));
-
-            return false;
-        }
+        abort_unless(Auth::user()->can('viewAny', Composition::class), 404);
 
         try {
             // `subject` and `focus` are mutually exclusive, so searching by an explicit
@@ -905,24 +626,27 @@ class PatientCompositions extends CompositionComponent
                 'limit' => $limit,
             ]);
 
-            $results = EHealth::composition()->searchAll($query);
-
-            // Publish search results only after every page validates, so a malformed later page cannot claim completion.
-            $this->syncLocalCompositions($results, $searchByFocus);
-            $this->focusSearchResults = $searchByFocus ? array_values($results) : null;
+            $seen = [];
+            do {
+                $items = EHealth::composition()->search($query)->validate();
+                $newItems = array_filter(
+                    $items,
+                    static fn (array $item): bool =>
+                    !isset($seen[data_get($item, 'identifier.value')])
+                );
+                if ($newItems === []) {
+                    break;
+                }
+                $this->syncLocalCompositions($newItems, $searchByFocus);
+                foreach ($newItems as $item) {
+                    $seen[data_get($item, 'identifier.value')] = true;
+                }
+                $query['offset'] = ($query['offset'] ?? 0) + $limit;
+            } while (count($items) === $limit);
 
             return true;
-        } catch (ValidationException $exception) {
-            Session::flash('error', __('compositions.errors.invalid_response'));
-
-            return false;
         } catch (EHealthConnectionException | EHealthException $exception) {
             $exception->handle('Error searching compositions');
-
-            return false;
-        } catch (Throwable $exception) {
-            Session::flash('error', __('clinical-storage.write_failed'));
-            Log::error('Could not store the medical conclusion search', ['exceptionType' => $exception::class]);
 
             return false;
         }
@@ -936,19 +660,46 @@ class PatientCompositions extends CompositionComponent
     #[Computed]
     public function clarifiableUnidentifiedConclusions(): Collection
     {
-        return Repository::composition()->clarifiableUnidentifiedForPatient($this->patient());
+        $patient = $this->patient();
+
+        if ($patient instanceof Preperson) {
+            return collect();
+        }
+
+        $mergedPrepersonIds = MergeRequest::query()
+            ->whereMasterPersonId($patient->id)
+            ->whereIn('status', [MergeRequestStatus::APPROVED->value, MergeRequestStatus::SIGNED->value])
+            ->pluck('merge_person_id');
+
+        if ($mergedPrepersonIds->isEmpty()) {
+            return collect();
+        }
+
+        return Composition::query()
+            ->whereIn('preperson_id', $mergedPrepersonIds)
+            ->ofType(CompositionType::TEMP_DISABILITY)
+            ->whereHas(
+                'categoryConcept.coding',
+                static fn ($query) => $query->where('code', CompositionCategory::SICKNESS->value)
+            )
+            ->signed()
+            // Only the newest one per merged record is offered: clarifying an already
+            // superseded conclusion is not what TV 3.8.2.12 describes.
+            ->orderByDesc('date')
+            ->get()
+            ->unique('preperson_id')
+            ->values();
     }
 
     /**
      * Upsert compositions returned by the eHealth search into the local DB.
      *
-     * Validate all readable details before atomically publishing the search snapshot.
+     * Search rows are merged into the local record, then enriched when read context is available.
      */
     private function syncLocalCompositions(array $compositions, bool $searchByFocus): void
     {
         $patient = $this->patient();
         $repository = Repository::composition();
-        $validated = [];
 
         foreach ($compositions as $item) {
             if (!is_array($item) || !data_get($item, 'identifier.value')) {
@@ -975,39 +726,17 @@ class PatientCompositions extends CompositionComponent
                 ];
             }
 
-            // Authorize the prospective resource without storing a partial search row.
-            $composition = $repository->findForPatient($patient, data_get($item, 'identifier.value'))
-                ?? new Composition([
-                    'uuid' => data_get($item, 'identifier.value'),
-                    $patient instanceof Preperson ? 'preperson_id' : 'person_id' => $patient->id,
-                ]);
-            $episodeUuid = data_get($item, 'episodeOfCare.value') ?? $composition->episodeOfCareUuid;
-            $encounterUuid = data_get($item, 'encounter.value') ?? $composition->encounterUuid;
+            $composition = $repository->store(
+                $item,
+                $patient,
+                data_get($item, 'episodeOfCare.value')
+            );
 
-            // Search remains independently permitted; only readable resources receive full enrichment.
-            if (filled($episodeUuid) && filled($encounterUuid)) {
-                if (Auth::user()->cannot('view', $composition)) {
-                    $validated[] = [$item, $episodeUuid];
-
-                    continue;
-                }
-                $item = $this->fetchCompositionDetails(
-                    $this->uuid,
-                    $composition->uuid,
-                    $episodeUuid,
-                    $encounterUuid,
-                    array_filter([
-                        'author.value' => data_get($item, 'author.value') ?? $composition->authorUuid,
-                        'type.coding.0.code' => data_get($item, 'type.coding.0.code') ?? $composition->type?->value,
-                        'subject.type.coding.0.code' => $patient instanceof Preperson ? 'preperson' : 'person',
-                    ], static fn ($value): bool => $value !== null)
-                );
+            // Synchronization loads the full record; opening its detail modal stays local.
+            if ($composition?->hasReadContext && Auth::user()->can('view', $composition)) {
+                $repository->store($this->fetchComposition($composition), $patient, $composition->episodeOfCareUuid);
             }
-            $validated[] = [$item, $episodeUuid];
         }
-
-        // A malformed later detail or storage failure must leave every previous local record unchanged.
-        $repository->storeMany($validated, $patient);
     }
 
     /**
@@ -1023,41 +752,5 @@ class PatientCompositions extends CompositionComponent
     public function render(): View
     {
         return view('livewire.composition.composition-index');
-    }
-
-    /** Build the cancellation document with the type's validated reason choice and the author's text. */
-    protected function buildCancellationPayload(string $compositionUuid, CompositionType $type): array
-    {
-        return [
-            'id' => $compositionUuid,
-            'reason' => [
-                'coding' => [['system' => 'eHealth/'.$type->cancellationReasonDictionary(), 'code' => $this->form->reason]],
-                'text' => $this->form->reasonText,
-            ],
-        ];
-    }
-
-    /** A day-based timeout includes the configured final calendar day. */
-    protected function assertCancellationAllowed(?string $signedDate, ?string $reason = null): void
-    {
-        if (!CompositionConfiguration::CANCEL_ENABLED->enabled()) {
-            return;
-        }
-        $days = CompositionConfiguration::CANCEL_DAYS->days();
-        if ($reason !== null && CompositionConfiguration::REPLACE_ENABLED->enabled()
-            && in_array($reason, CompositionConfiguration::REPLACE_REASONS->codes(allowEmpty: true), true)) {
-            $days = CompositionConfiguration::REPLACE_CANCEL_DAYS->days();
-        }
-        if (blank($signedDate)) {
-            throw new CompositionGuardException(__('compositions.errors.configuration_unavailable'));
-        }
-        try {
-            $signed = CarbonImmutable::parse($signedDate)->setTimezone(config('app.timezone'))->startOfDay();
-        } catch (Throwable) {
-            throw new CompositionGuardException(__('compositions.errors.configuration_unavailable'));
-        }
-        if ($signed->isFuture() || $signed->addDays($days)->lt(CarbonImmutable::today())) {
-            throw new CompositionGuardException(__('compositions.errors.cancel_timeout'));
-        }
     }
 }

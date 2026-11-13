@@ -4,19 +4,18 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Enums;
 
-use App\Livewire\Person\Records\PatientCompositions;
-use Tests\Feature\Composition\UsesCompositionDictionaries;
+use App\Enums\Composition\TreatmentViolation;
 use Tests\TestCase;
 
 class TreatmentViolationTest extends TestCase
 {
-    use UsesCompositionDictionaries;
+    use \Tests\Feature\Composition\UsesCompositionDictionaries;
 
     public function test_resolves_known_codes_to_ukrainian_descriptions(): void
     {
         $this->assertSame(
             'відмова від госпіталізації',
-            (new PatientCompositions)->treatmentViolationLabel('reject_hospitalization')
+            TreatmentViolation::label('reject_hospitalization')
         );
     }
 
@@ -24,13 +23,13 @@ class TreatmentViolationTest extends TestCase
     {
         $this->assertSame(
             'unknown_violation_code',
-            (new PatientCompositions)->treatmentViolationLabel('unknown_violation_code')
+            TreatmentViolation::label('unknown_violation_code')
         );
     }
 
     public function test_blank_codes_render_as_a_dash(): void
     {
-        $this->assertSame('-', (new PatientCompositions)->treatmentViolationLabel(null));
-        $this->assertSame('-', (new PatientCompositions)->treatmentViolationLabel(''));
+        $this->assertSame('-', TreatmentViolation::label(null));
+        $this->assertSame('-', TreatmentViolation::label(''));
     }
 }

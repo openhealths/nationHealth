@@ -46,10 +46,7 @@ class CompositionOperation extends Model
     {
         return Attribute::get(fn (): string => match ($this->job->status) {
             JobStatus::COMPLETED->value => CompositionJobStatus::DONE->value,
-            // A failed local worker does not prove that eHealth rejected its request.
-            JobStatus::FAILED->value => ($this->job->response_data['status'] ?? null) === CompositionJobStatus::FAILED->value
-                ? CompositionJobStatus::FAILED->value
-                : CompositionJobStatus::PENDING->value,
+            JobStatus::FAILED->value => CompositionJobStatus::FAILED->value,
             default => CompositionJobStatus::PENDING->value,
         });
     }
@@ -62,12 +59,7 @@ class CompositionOperation extends Model
     #[Scope]
     protected function pending(Builder $query): Builder
     {
-        return $query->whereHas('job', fn (Builder $job) => $job
-            ->where('status', '!=', JobStatus::COMPLETED->value)
-            ->where(fn (Builder $unconfirmed) => $unconfirmed
-                ->where('status', '!=', JobStatus::FAILED->value)
-                ->orWhere('response_data->status', '!=', CompositionJobStatus::FAILED->value)
-                ->orWhereNull('response_data->status')));
+        return $query->whereHas('job', fn (Builder $job) => $job->where('status', JobStatus::PENDING->value));
     }
 
     #[Scope]

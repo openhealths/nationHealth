@@ -10,11 +10,8 @@ use App\Classes\eHealth\Api\Patient\Encounter as EncounterApi;
 use App\Classes\eHealth\Api\Person as PersonApi;
 use App\Enums\Status;
 use App\Enums\User\Role;
-use App\Jobs\CompositionAsyncProcessing;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\CompositionOperation;
-use App\Models\Permission;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Models\Relations\Party;
@@ -25,8 +22,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Mockery;
-use Spatie\Permission\Models\Role as PermissionRole;
-use Tests\Feature\Composition\UsesTv39CompositionConfiguration;
+use App\Models\Permission;
 
 /**
  * Shared setup for the medical conclusion tests.
@@ -37,75 +33,6 @@ use Tests\Feature\Composition\UsesTv39CompositionConfiguration;
  */
 trait CompositionTestFixtures
 {
-    use UsesTv39CompositionConfiguration;
-
-    protected function nativeAuthenticationMethod(string $uuid, string $type = 'OTP'): array
-    {
-        $method = [
-            'id' => $uuid, 'type' => $type, 'phone_number' => '+380501234567',
-            'inserted_at' => now()->utc()->toIso8601String(), 'inserted_by' => (string) Str::uuid(),
-        ];
-        if ($type === 'THIRD_PERSON') {
-            unset($method['phone_number']);
-            $method['value'] = (string) Str::uuid();
-        }
-
-        return $method;
-    }
-    /** Run the real background client and processor without starting a queue worker. */
-    protected function processCompositionWorker(string $jobId): void
-    {
-        $operation = CompositionOperation::whereRemoteJobId($jobId)->firstOrFail();
-        $worker = new class ($operation, legalEntity()) extends CompositionAsyncProcessing
-        {
-            public function processForTest(): void
-            {
-                $this->token = 'synthetic-token';
-                $this->processResponse($this->sendRequest($this->token));
-            }
-        };
-        $worker->processForTest();
-    }
-
-    protected function processAllCompositionWorkers(): void
-    {
-        foreach (CompositionOperation::pending()->pluck('remote_job_id') as $jobId) {
-            $this->processCompositionWorker($jobId);
-        }
-    }
-
-    /** Complete successful native document; callers supply deliberate test identities. */
-    protected function nativeCompositionDocument(array $overrides = []): array
-    {
-        $uuid = '89678f60-4cdc-4fe3-ae83-e8b3ebd35c59';
-        $reference = $this->compositionReference('person', $uuid)['identifier'];
-        $document = [
-            'identifier' => $this->compositionReference('composition', $uuid)['identifier'],
-            'status' => 'PRELIMINARY', 'title' => 'Test conclusion', 'date' => '2026-09-05T10:00:00Z',
-            'type' => ['coding' => [['system' => 'COMPOSITION_TYPES', 'code' => 'TEMP_DISABILITY']]],
-            'category' => ['coding' => [['system' => 'COMPOSITION_CATEGORIES', 'code' => 'SICKNESS']]],
-            'author' => $this->compositionReference('employee', $uuid)['identifier'],
-            'subject' => $reference,
-            'custodian' => $this->compositionReference('legal_entity', $uuid)['identifier'],
-            'encounter' => $this->compositionReference('encounter', $uuid)['identifier'],
-            'section' => ['focus' => $reference], 'extension' => [], 'relatesTo' => [],
-            'event' => [['period' => ['start' => '2026-09-01T00:00:01Z', 'end' => '2026-09-05T20:59:59Z']]],
-        ];
-        foreach (['identifier', 'author', 'subject', 'custodian', 'encounter'] as $field) {
-            if (isset($overrides[$field])) {
-                $overrides[$field] = array_replace($document[$field], $overrides[$field]);
-            }
-        }
-        if (isset($overrides['section']['focus'])) {
-            $overrides['section']['focus'] = array_replace($reference, $overrides['section']['focus']);
-        }
-        if (isset($overrides['relatesTo']['targetIdentifier'])) {
-            $overrides['relatesTo']['targetIdentifier'] = array_replace($reference, $overrides['relatesTo']['targetIdentifier']);
-        }
-
-        return array_replace($document, $overrides);
-    }
-
     /**
      * Put the user inside a conclusion-issuing legal entity.
      *
@@ -157,30 +84,18 @@ trait CompositionTestFixtures
             'party_id' => $party->id,
         ]);
 
-        $employee->specialities()->create(['speciality' => 'OBSTETRICS_AND_GYNECOLOGY', 'speciality_officio' => true,
-            'level' => 'FIRST', 'attestation_name' => 'Synthetic qualification',
-            'attestation_date' => '2020-01-01', 'certificate_number' => 'TEST-001']);
         $user->employees()->attach($employee->id);
 
         $person = Person::create([
             'uuid' => (string) Str::uuid(),
             'birth_date' => '2001-02-23',
-            'gender' => 'FEMALE',
-            'verification_status' => 'VERIFIED',
-            'no_tax_id' => false,
-            'tax_id' => '1234567890',
+            'gender' => 'MALE',
         ]);
         $person->names()->create([
             'last_name' => 'Якийсь',
             'first_name' => 'Пацієнт',
             'language' => 'uk',
         ]);
-        $person->documents()->create(['type' => 'PASSPORT', 'number' => 'АА123456']);
-
-        foreach ($scopes as $scope) {
-            $permission = Permission::findOrCreate($scope, 'web');
-            $permission->legalEntityTypes()->syncWithoutDetaching([$typeId]);
-        }
 
         $this->instance('legalEntity', $legalEntity);
 
@@ -197,12 +112,6 @@ trait CompositionTestFixtures
             );
         }
 
-        if ($scopes !== []) {
-            $permissionRole = PermissionRole::findOrCreate($role->value, 'web');
-            $permissionRole->syncPermissions($scopes);
-            $user->assignRole($permissionRole);
-        }
-
         $this->actingAs($user);
 
         return compact('legalEntity', 'person', 'user', 'employee');
@@ -215,8 +124,6 @@ trait CompositionTestFixtures
             'first_name' => 'Невідомий',
             'last_name' => 'Пацієнт',
             'gender' => 'MALE',
-            'status' => 'active',
-            'birth_date' => today()->format('Y-m-d'),
         ]);
     }
 
@@ -278,14 +185,11 @@ trait CompositionTestFixtures
      */
     protected function eHealthBody(array $data): array
     {
-        return ['data' => $data, 'meta' => [], 'paging' => [
-            'page_number' => 1, 'page_size' => max(1, count($data)),
-            'total_entries' => count($data), 'total_pages' => $data === [] ? 0 : 1,
-        ]];
+        return ['data' => $data, 'meta' => [], 'paging' => []];
     }
 
     /**
-     * Complete native Medical Events encounter, including required list/detail fields.
+     * An encounter shaped the way the Encounter API validator insists on.
      *
      * @return array<string, mixed>
      */
@@ -298,13 +202,11 @@ trait CompositionTestFixtures
         return [
             'id' => $uuid,
             'status' => $status,
-            'inserted_at' => now()->startOfDay()->addHours(9)->toIso8601String(),
-            'updated_at' => now()->startOfDay()->addHours(9)->addMinutes(30)->toIso8601String(),
+            'inserted_at' => '2026-08-01T09:00:00Z',
+            'updated_at' => '2026-08-01T09:30:00Z',
             'class' => ['system' => 'eHealth/encounter_classes', 'code' => 'AMB'],
-            'type' => ['coding' => [['system' => 'eHealth/encounter_types', 'code' => 'service_delivery_location']]],
-            'period' => ['start' => now()->startOfDay()->addHours(9)->toIso8601String(), 'end' => now()->startOfDay()->addHours(9)->addMinutes(30)->toIso8601String()],
-            'reasons' => [],
-            'actions' => [],
+            'type' => ['coding' => [['system' => 'eHealth/encounter_types', 'code' => 'AMB']]],
+            'period' => ['start' => '2026-08-01T09:00:00Z', 'end' => '2026-08-01T09:30:00Z'],
             'performer' => $this->compositionReference('employee', $performerUuid),
             'episode' => $this->compositionReference('episode_of_care', $episodeUuid ?? (string) Str::uuid()),
             'visit' => $this->compositionReference('visit', (string) Str::uuid()),
@@ -317,7 +219,6 @@ trait CompositionTestFixtures
     protected function compositionReference(string $resource, string $uuid): array
     {
         return [
-            'display_value' => 'Test reference',
             'identifier' => [
                 'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => $resource]]],
                 'value' => $uuid,

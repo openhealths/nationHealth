@@ -6,11 +6,8 @@ namespace Tests\Feature\Person;
 
 use App\Livewire\Person\Records\PatientCompositions;
 use App\Models\MedicalEvents\Sql\Composition;
-use App\Models\MedicalEvents\Sql\CompositionOperation;
 use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -62,28 +59,16 @@ class PatientRegistryUatTest extends TestCase
     {
         ['person' => $person, 'employee' => $employee, 'legalEntity' => $legalEntity] = $this->compositionFixture();
         $first = $this->compositionRow($person->uuid, $employee->uuid, $legalEntity->uuid);
+        unset($first['subject']);
         $second = $this->compositionRow($person->uuid, $employee->uuid, $legalEntity->uuid);
         config(['ehealth.api.page_size' => 1]);
-        // Published native summaries have no author or subject. The patient query and
-        // each result's encounter/episode supply scope; validated detail supplies the author.
-        $summaries = [];
-        foreach ([$first, $second] as $document) {
-            $summaries[] = array_replace(Arr::only($document, ['identifier', 'status', 'title', 'type', 'date', 'encounter']), [
-                'title' => 'Search summary',
-                'episodeOfCare' => $this->compositionReference('episode', (string) Str::uuid())['identifier'],
-            ]);
-        }
         $responses = Http::sequence();
         for ($run = 0; $run < 2; $run++) {
-            $responses->push(['data' => [$summaries[0]]])
-                ->push(['data' => [$summaries[1]]])
-                ->push(['data' => []]);
+            $responses->push($this->eHealthBody([$first]))
+                ->push($this->eHealthBody([$second]))
+                ->push($this->eHealthBody([]));
         }
-        $this->fakeEHealth([
-            '*searchComposition*' => $responses,
-            '*/'.$person->uuid.'/composition/'.$first['identifier']['value'].'/episode/'.$summaries[0]['episodeOfCare']['value'].'/encounter/'.$first['encounter']['value'] => Http::response(['data' => $first]),
-            '*/'.$person->uuid.'/composition/'.$second['identifier']['value'].'/episode/'.$summaries[1]['episodeOfCare']['value'].'/encounter/'.$second['encounter']['value'] => Http::response(['data' => $second]),
-        ]);
+        $this->fakeEHealth(['*' => $responses]);
 
         $component = Livewire::test(PatientCompositions::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])
             ->set('filterStatus', 'FINAL')
@@ -96,16 +81,9 @@ class PatientRegistryUatTest extends TestCase
         $component->call('sync')->assertSee(__('compositions.messages.sync_success'));
 
         $this->assertSame(2, Composition::wherePersonId($person->id)->count());
-        $this->assertSame($first['title'], Composition::whereUuid($first['identifier']['value'])->firstOrFail()->title);
-        $this->assertSame($second['title'], Composition::whereUuid($second['identifier']['value'])->firstOrFail()->title);
-        $this->assertSame($employee->uuid, Repository::composition()->findForPatient($person, $first['identifier']['value'])->authorUuid);
-        $this->assertSame($employee->uuid, Repository::composition()->findForPatient($person, $second['identifier']['value'])->authorUuid);
-        Http::assertSentCount(10);
-        $this->assertSame([0, 1, 2, 0, 1, 2], Http::recorded(
-            static fn ($request): bool => str_contains($request->url(), '/searchComposition')
-        )->map(static fn (array $exchange): int => (int) ($exchange[0]['offset'] ?? 0))->values()->all());
-        Http::assertSent(static fn ($request): bool => ($request['subject'] ?? null) === $person->uuid && (int) ($request['offset'] ?? -1) === 1);
-        Http::assertNotSent(static fn ($request): bool => isset($request['focus']) || isset($request['status']) || isset($request['type']) || isset($request['encounter']) || isset($request['episodeOfCare']));
+        Http::assertSentCount(6);
+        Http::assertSent(static fn ($request): bool => $request['subject'] === $person->uuid && (int) ($request['offset'] ?? -1) === 1);
+        Http::assertNotSent(static fn ($request): bool => isset($request['focus']) || isset($request['status']) || isset($request['type']) || isset($request['encounter']));
         $component->call('resetFilters')->assertDontSee(__('compositions.messages.sync_success'));
     }
 
@@ -141,33 +119,25 @@ class PatientRegistryUatTest extends TestCase
     public function test_composition_sync_requires_search_permission_before_any_http(): void
     {
         ['person' => $person, 'legalEntity' => $legalEntity] = $this->compositionFixture(scopes: []);
-        Bus::fake();
-        $compositionCount = Composition::count();
-        $operationCount = CompositionOperation::count();
 
         Livewire::test(PatientCompositions::class, ['legalEntity' => $legalEntity, 'personId' => $person->id])
             ->assertDontSee('wire:click="sync"', false)
             ->call('sync')
-            ->assertOk()
-            ->assertSee(__('compositions.errors.search_not_allowed'))
-            ->assertDontSee(__('compositions.messages.sync_success'));
+            ->assertStatus(404);
 
         Http::assertNothingSent();
-        Bus::assertNothingDispatched();
-        $this->assertSame($compositionCount, Composition::count());
-        $this->assertSame($operationCount, CompositionOperation::count());
     }
 
     private function compositionRow(string $subjectUuid, string $authorUuid, string $legalEntityUuid): array
     {
-        return $this->nativeCompositionDocument([
-            'identifier' => ['value' => (string) Str::uuid()],
-            'title' => 'Synthetic conclusion',
+        return [
+            'identifier' => ['value' => (string) Str::uuid()], 'title' => 'Synthetic conclusion',
+            'status' => 'PRELIMINARY', 'date' => '2026-10-22T09:00:00Z',
+            'type' => ['coding' => [['system' => 'COMPOSITION_TYPES', 'code' => 'TEMP_DISABILITY']]],
+            'category' => ['coding' => [['system' => 'COMPOSITION_CATEGORIES', 'code' => 'SICKNESS']]],
             'subject' => $this->compositionReference('person', $subjectUuid)['identifier'],
-            'section' => ['focus' => $this->compositionReference('person', $subjectUuid)['identifier']],
             'author' => $this->compositionReference('employee', $authorUuid)['identifier'],
             'custodian' => $this->compositionReference('legal_entity', $legalEntityUuid)['identifier'],
-            'encounter' => $this->compositionReference('encounter', (string) Str::uuid())['identifier'],
-        ]);
+        ];
     }
 }

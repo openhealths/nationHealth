@@ -4,26 +4,15 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
-use App\Enums\Composition\CompositionCategory;
-use App\Enums\Composition\CompositionExtension;
 use App\Enums\Composition\CompositionStatus;
-use App\Enums\Composition\CompositionType;
-use App\Enums\MergeRequest\Status as MergeRequestStatus;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
+use App\Enums\Composition\CompositionExtension;
 use App\Models\MedicalEvents\Sql\Composition;
-use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
-use App\Models\MergeRequest;
 use App\Models\Person\Person;
 use App\Models\Preperson;
-use App\Models\User;
-use App\Repositories\MedicalEvents\BaseRepository;
-use App\Repositories\MedicalEvents\Repository;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
-use InvalidArgumentException;
 
 class CompositionRepository extends BaseRepository
 {
@@ -46,54 +35,11 @@ class CompositionRepository extends BaseRepository
             ->with(self::READ_RELATIONS)->whereUuid($uuid)->first();
     }
 
-    public function findByUuid(string $uuid): ?Composition
-    {
-        return $this->model->newQuery()->whereUuid($uuid)->first();
-    }
-
-    public function hasActiveBirthConclusion(string $subjectUuid): bool
-    {
-        return $this->model->newQuery()->whereHas('subject', static fn (Builder $subject): Builder => $subject->whereValue($subjectUuid))
-            ->ofType(CompositionType::NEWBORN)->excludingErrors()->exists();
-    }
-
-    /** The registry displays the newest signed sickness conclusion of each merged unidentified record. */
-    public function clarifiableUnidentifiedForPatient(Person|Preperson $patient): Collection
-    {
-        if ($patient instanceof Preperson) {
-            return collect();
-        }
-        $mergedPrepersonIds = MergeRequest::query()->whereMasterPersonId($patient->id)
-            ->whereIn('status', [MergeRequestStatus::APPROVED->value, MergeRequestStatus::SIGNED->value])
-            ->pluck('merge_person_id');
-        if ($mergedPrepersonIds->isEmpty()) {
-            return collect();
-        }
-
-        return $this->model->newQuery()->whereIn('preperson_id', $mergedPrepersonIds)
-            ->ofType(CompositionType::TEMP_DISABILITY)
-            ->whereHas('categoryConcept.coding', static fn (Builder $coding): Builder => $coding->where('code', CompositionCategory::SICKNESS->value))
-            ->signed()->orderByDesc('date')->get()->unique('preperson_id')->values();
-    }
-
     public function hasSignedIdentification(Person $patient, int $prepersonId): bool
     {
-        return MergeRequest::whereMasterPersonId($patient->id)
+        return \App\Models\MergeRequest::whereMasterPersonId($patient->id)
             ->whereMergePersonId($prepersonId)
-            ->whereStatus(MergeRequestStatus::SIGNED->value)->exists();
-    }
-
-    /** BA03/BA07: the shared encounter view receives only readable documents of its source patient. */
-    public function forEncounter(Person|Preperson $patient, Encounter $encounter, User $user): Collection
-    {
-        if ($user->cannot('viewAny', Composition::class) || $user->cannot('view', [$encounter, $patient])
-            || !Encounter::forPatient($patient)->whereKey($encounter->id)->exists()) {
-            return collect();
-        }
-
-        return $this->model->newQuery()->forPatient($patient)->forEncounter($encounter->uuid)
-            ->with(self::READ_RELATIONS)->recentlyUpdatedFirst()->get()
-            ->filter(static fn (Composition $composition): bool => $user->can('view', $composition))->values();
+            ->whereStatus(\App\Enums\MergeRequest\Status::SIGNED->value)->exists();
     }
 
     public function paginateForPatient(Person|Preperson $patient, array $filters, int $perPage): LengthAwarePaginator
@@ -140,7 +86,7 @@ class CompositionRepository extends BaseRepository
             $composition = $this->model->newQuery()->with(['typeConcept.coding', 'categoryConcept.coding'])->firstOrNew(['uuid' => $uuid]);
             [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
             if ($composition->exists && ((int) $composition->getAttribute($ownerColumn) !== (int) $ownerId)) {
-                throw new InvalidArgumentException('A Composition cannot be reassigned to another patient.');
+                throw new \InvalidArgumentException('A Composition cannot be reassigned to another patient.');
             }
 
             $attributes = [
@@ -152,7 +98,7 @@ class CompositionRepository extends BaseRepository
             foreach (['status', 'title', 'date'] as $field) {
                 if (array_key_exists($field, $details)) {
                     $attributes[$field] = $field === 'status'
-                        ? CompositionStatus::from(str_replace('-', '_', strtoupper($details[$field])))->value
+                        ? CompositionStatus::fromEHealth($details[$field])->value
                         : $details[$field];
                 }
             }
@@ -194,13 +140,8 @@ class CompositionRepository extends BaseRepository
                 $attributes['episode_of_care_id'] = $this->storeIdentifier($episodeReference, $composition->episodeOfCareId);
             }
             if (array_key_exists('relatesTo', $details)) {
-                // Legacy creation uses one object; native reads return an ordered relation list.
-                // The local continuation picker uses its primary relationship, while signing
-                // always rereads and validates the complete native document.
-                $relations = $details['relatesTo'] ?? [];
-                $relation = is_array($relations) && array_is_list($relations) ? ($relations[0] ?? []) : $relations;
-                $attributes['relates_to_code'] = data_get($relation, 'code');
-                $attributes['relates_to_target_id'] = $this->storeIdentifier(data_get($relation, 'targetIdentifier'), $composition->relatesToTargetId);
+                $attributes['relates_to_code'] = data_get($details, 'relatesTo.code');
+                $attributes['relates_to_target_id'] = $this->storeIdentifier(data_get($details, 'relatesTo.targetIdentifier'), $composition->relatesToTargetId);
             }
 
             // The shared presentation cast truncates fractions; this owned write preserves UTC precision.
@@ -208,7 +149,7 @@ class CompositionRepository extends BaseRepository
             $composition->fill($attributes);
             if (array_key_exists('date', $details)) {
                 $raw = $composition->getAttributes();
-                $raw['date'] = isset($details['date']) ? CarbonImmutable::parse($details['date'], 'UTC')->utc()->format('Y-m-d H:i:s.u') : null;
+                $raw['date'] = isset($details['date']) ? \Carbon\CarbonImmutable::parse($details['date'], 'UTC')->utc()->format('Y-m-d H:i:s.u') : null;
                 $composition->setRawAttributes($raw);
             }
             $composition->save();
@@ -267,15 +208,5 @@ class CompositionRepository extends BaseRepository
         $existing = $existingId === null ? null : Identifier::find($existingId);
 
         return Repository::identifier()->update($existing ?? Repository::identifier()->store($value), ['identifier' => $reference])->id;
-    }
-
-    /** All remote summaries and details must be validated before this atomic import starts. */
-    public function storeMany(array $documents, Person|Preperson $patient): void
-    {
-        $this->storageTransaction(function () use ($documents, $patient): void {
-            foreach ($documents as [$details, $episodeUuid]) {
-                $this->store($details, $patient, $episodeUuid);
-            }
-        });
     }
 }

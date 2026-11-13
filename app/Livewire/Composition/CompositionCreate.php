@@ -4,28 +4,29 @@ declare(strict_types=1);
 
 namespace App\Livewire\Composition;
 
-use App\Classes\eHealth\EHealth;
-use App\Enums\Composition\CompositionStatus;
 use App\Enums\Composition\CompositionType;
+use App\Enums\Composition\CompositionStatus;
+use App\Classes\eHealth\EHealth;
+use App\Dto\Composition\Ehealth as EhealthData;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\MedicalEvents\CompositionGuardException;
-use App\Livewire\Composition\CompositionCreateComponent;
+use App\Livewire\Composition\Concerns\DrivesCompositionWizard;
 use App\Livewire\Composition\Forms\CompositionForm;
+use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\Person\Person;
 use App\Models\Preperson;
-use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
-use App\Repositories\Repository;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\WithFileUploads;
+use Symfony\Component\ObjectMapper\ObjectMapper;
+use Symfony\Component\PropertyAccess\PropertyAccess;
 
 /**
  * Creating a birth conclusion (МВН) — TV 3.8.1.
@@ -34,8 +35,9 @@ use Livewire\WithFileUploads;
  * `section.focus`. The wizard can be opened from either card: the missing counterpart
  * is chosen before an encounter of the newborn can be picked.
  */
-class CompositionCreate extends CompositionCreateComponent
+class CompositionCreate extends BasePatientComponent
 {
+    use DrivesCompositionWizard;
     use WithFileUploads;
 
     public CompositionForm $form;
@@ -119,11 +121,32 @@ class CompositionCreate extends CompositionCreateComponent
     {
         $term = trim($this->counterpartSearchTerm);
 
-        if ($term === '' || Auth::user()->cannot($this->createAbility(), Composition::class)) {
+        if ($term === '') {
             return collect();
         }
 
-        return Repository::person()->searchByNameOrUuid($term, unidentified: !$this->needsMother);
+        if ($this->needsMother) {
+            return Person::query()
+                ->with('names')
+                ->where(static function ($query) use ($term): void {
+                    $query->whereHas(
+                        'names',
+                        static fn ($names) => $names
+                            ->whereLike('last_name', "%{$term}%")
+                            ->orWhereLike('first_name', "%{$term}%")
+                    )->orWhere('uuid', $term);
+                })
+                ->limit(10)
+                ->get();
+        }
+
+        return Preperson::query()
+            ->where(static fn ($query) => $query
+                ->whereLike('last_name', "%{$term}%")
+                ->orWhereLike('first_name', "%{$term}%")
+                ->orWhere('uuid', $term))
+            ->limit(10)
+            ->get();
     }
 
     /**
@@ -131,11 +154,6 @@ class CompositionCreate extends CompositionCreateComponent
      */
     public function searchCounterpart(): void
     {
-        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
-            Session::flash('error', __('compositions.errors.create_newborn_not_allowed'));
-
-            return;
-        }
         $this->counterpartSearchTerm = trim($this->counterpartQuery);
         unset($this->counterpartMatches);
     }
@@ -159,16 +177,18 @@ class CompositionCreate extends CompositionCreateComponent
             return false;
         }
 
-        return MedicalEventsRepository::composition()->hasActiveBirthConclusion($this->form->prepersonUuid);
+        return Composition::query()
+            ->whereHas(
+                'subject',
+                fn ($query) => $query->where('value', $this->form->prepersonUuid)
+            )
+            ->ofType(CompositionType::NEWBORN)
+            ->excludingErrors()
+            ->exists();
     }
 
     public function selectMother(int $personId): void
     {
-        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
-            Session::flash('error', __('compositions.errors.create_newborn_not_allowed'));
-
-            return;
-        }
         $person = Person::with('names')->find($personId);
 
         if (!$person) {
@@ -205,11 +225,6 @@ class CompositionCreate extends CompositionCreateComponent
 
     public function selectNewborn(int $prepersonId): void
     {
-        if (Auth::user()->cannot($this->createAbility(), Composition::class)) {
-            Session::flash('error', __('compositions.errors.create_newborn_not_allowed'));
-
-            return;
-        }
         $preperson = Preperson::find($prepersonId);
 
         if (!$preperson) {
@@ -330,6 +345,14 @@ class CompositionCreate extends CompositionCreateComponent
         return $this->form->compositionRules($this->sexOptions);
     }
 
+    /** Map only the validated birth form; workflow and author selection stay in the component. */
+    protected function buildCompositionPayload(string $authorEmployeeUuid): array
+    {
+        return new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessor())
+            ->map($this->form, new EhealthData($authorEmployeeUuid))
+            ->toArray();
+    }
+
     /**
      * TV 3.8.1.3 — a newborn may hold only one birth conclusion that is not in error.
      *
@@ -342,19 +365,12 @@ class CompositionCreate extends CompositionCreateComponent
         }
 
         try {
-            $results = EHealth::composition()->searchAll([
+            $existsRemotely = collect(EHealth::composition()->search([
                 'subject' => $this->form->prepersonUuid,
                 'type' => CompositionType::NEWBORN->value,
-            ]);
-            foreach ($results as $result) {
-                EHealth::composition()->assertDocumentContext($result, [
-                    'subject.value' => $this->form->prepersonUuid,
-                    'type.coding.0.code' => CompositionType::NEWBORN->value,
-                ]);
-            }
-            $existsRemotely = collect($results)->contains(
-                fn (array $item): bool =>
-                $this->compositionStatus($item['status']) !== CompositionStatus::ENTERED_IN_ERROR
+            ])->validate())->contains(
+                static fn (array $item): bool =>
+                CompositionStatus::fromEHealth($item['status']) !== CompositionStatus::ENTERED_IN_ERROR
             );
         } catch (EHealthConnectionException | EHealthException $exception) {
             Log::error('Could not verify whether the newborn already has a birth conclusion', [
@@ -377,30 +393,5 @@ class CompositionCreate extends CompositionCreateComponent
     public function render(): View
     {
         return view('livewire.composition.composition-create');
-    }
-
-    /** Build the unsigned request only after the component has validated its context and form. */
-    protected function buildCompositionPayload(string $authorEmployeeUuid): array
-    {
-        $payload = $this->base([
-            'type' => CompositionType::NEWBORN,
-            'category' => $this->form->category,
-            'subjectUuid' => $this->form->prepersonUuid,
-            'subjectResource' => 'preperson',
-            'encounterUuid' => $this->form->encounterUuid,
-            'authorEmployeeUuid' => $authorEmployeeUuid,
-            'focusUuid' => $this->form->personUuid,
-            'focusResource' => 'person',
-            'periodStart' => $this->startOfDay($this->form->newbornBirthDate),
-            'periodEnd' => null,
-            'includeNullPeriodEnd' => true,
-        ]);
-
-        $payload['extension'] = array_merge($this->informWith($this->form->informWithUuid ?? null), [
-            ['valueCode' => 'NEWBORN_BIRTH_DATE', 'valueDate' => $this->date($this->form->newbornBirthDate)],
-            ['valueCode' => 'NEWBORN_SEX', 'valueString' => $this->form->newbornSex],
-        ]);
-
-        return $payload;
     }
 }
