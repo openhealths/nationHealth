@@ -4,32 +4,49 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Auth\EHealth\Services\TokenStorage;
+use App\Enums\Declaration\Status;
 use App\Enums\Status as LegalEntityStatus;
 use App\Enums\User\Role;
-use App\Enums\Declaration\Status;
 use App\Models\Declaration;
-use App\Models\LegalEntity;
 use App\Models\Employee\Employee;
+use App\Models\LegalEntity;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
 class DeclarationPolicy
 {
+    // The full chain also reads declaration requests and patient authentication methods.
+    protected const array SYNC_SCOPES = [
+        'declaration:read',
+        'declaration_request:read',
+        'person:read'
+    ];
+
     /**
      * Deny every ability when the current legal entity is not eligible to operate with declarations.
      * The legal entity must be active or reorganized and have a type allowed for declaration requests.
+     *
+     * Laravel passes the model or class as $subject before additional context arguments.
+     * This hook does not inspect $subject, but accepts it so $legalEntity receives the correct positional argument.
+     * The class name is removed only before the ability method is called, not before this hook.
      *
      * @param  User  $user
      * @param  string  $ability
      * @return Response|null
      */
-    public function before(User $user, string $ability): ?Response
-    {
-        $legalEntity = legalEntity();
+    public function before(
+        User $user,
+        string $ability,
+        Declaration|string|null $subject = null,
+        ?LegalEntity $legalEntity = null
+    ): ?Response {
+        $legalEntity ??= legalEntity();
 
         if (
-            ($legalEntity->status !== LegalEntityStatus::ACTIVE->value && $legalEntity->status !== LegalEntityStatus::REORGANIZED->value)
-            || !in_array($legalEntity->type->name, config('ehealth.declaration_request_legal_entity_types'), true)
+            !$legalEntity
+            || ($legalEntity->status !== LegalEntityStatus::ACTIVE->value && $legalEntity->status !== LegalEntityStatus::REORGANIZED->value)
+            || !\in_array($legalEntity->type->name, config('ehealth.declaration_request_legal_entity_types'), true)
         ) {
             return Response::denyWithStatus(404);
         }
@@ -91,7 +108,6 @@ class DeclarationPolicy
         if (
             legalEntity()->status !== LegalEntityStatus::ACTIVE->value
             || $user->cannot('declaration_request:write')
-            || $user->cannot('declaration_request:approve')
             || $user->cannot('declaration_request:sign')
         ) {
             return Response::denyWithStatus(404);
@@ -120,13 +136,22 @@ class DeclarationPolicy
 
     /**
      * Determine whether the user can synchronize all the declarations.
+     *
+     * Laravel forwards the legal entity context to both before() and this method.
+     * Queued calls supply granted scopes explicitly. Web calls require both the current
+     * session's token scopes and the user's permissions.
      */
-    public function sync(User $user): Response
+    public function sync(User $user, ?LegalEntity $legalEntity = null, ?array $tokenScopes = null): Response
     {
-        if ($user->can('declaration:read') && $user->can('declaration_request:read') && $user->can('person:read')) {
-            return Response::allow();
+        $grantedScopes = $tokenScopes ?? app(TokenStorage::class)->getTokenScopes();
+
+        foreach (self::SYNC_SCOPES as $scope) {
+            if (!\in_array($scope, $grantedScopes, true)
+                || ($tokenScopes === null && $user->cannot($scope))) {
+                return Response::denyWithStatus(404);
+            }
         }
 
-        return Response::denyWithStatus(404);
+        return Response::allow();
     }
 }

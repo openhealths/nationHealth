@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Listeners;
 
 use Throwable;
-use App\Enums\JobStatus;
 use App\Enums\Status;
+use App\Enums\JobStatus;
 use App\Events\EHealthUserLogin;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
 use App\Jobs\LegalEntityDetailsSync;
+use Illuminate\Support\Facades\Auth;
 use App\Notifications\SyncNotification;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -58,7 +58,7 @@ class FirstLoginOwnerSynchronization implements ShouldQueue
                 isFirstLogin: true,
                 scopes: $event->scopes
             )
-            : app(FirstLoginSyncChain::class)->build($event->legalEntity, $event->scopes);
+            : app(FirstLoginSyncChain::class)->build($event->legalEntity, $event->scopes, $user);
 
         Bus::batch([$initialJob])
             ->name('FirstLoginSync')

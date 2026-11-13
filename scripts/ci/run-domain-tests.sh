@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run PHPUnit suites owned for:
-# Employee · Party · Care Plan · Care Plan Activity · ePrescription · Service Request · Device Request · Healthcare Service
+# Auth · Employee · Party · Declaration · Equipment · Care Plan · Care Plan Activity · ePrescription · Service Request · Device Request · Healthcare Service
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -13,6 +13,11 @@ php artisan config:clear --no-interaction
 # Paths kept explicit so CI can expand gradually without running the full suite.
 DOMAIN_PATHS=(
   tests/Feature/SharedCodingPersistenceTest.php
+  tests/Feature/Auth/DashboardRedirectTest.php
+  tests/Feature/Auth/DashboardRoleRedirectTest.php
+  tests/Feature/Console/ScopeCacheInvalidationTest.php
+  tests/Feature/Equipment/EquipmentSyncPolicyContextTest.php
+  tests/Feature/LegalEntity/LegalEntityDetailsReloadTest.php
   tests/Unit/Models/CodingSerializationTest.php
   tests/Unit/Models/EmployeeDisplayLabelsTest.php
   tests/Unit/Employee
@@ -53,6 +58,7 @@ DOMAIN_PATHS=(
   tests/Unit/eHealth/Api/ConfigurationQueryTest.php
   tests/Feature/Employee
   tests/Feature/Party
+  tests/Feature/Declaration
   tests/Feature/CarePlan
   tests/Feature/CarePlanActivityPayloadTest.php
   tests/Feature/Encounter/EncounterDocumentPagesTest.php
