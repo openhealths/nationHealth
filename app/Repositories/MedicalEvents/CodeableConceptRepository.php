@@ -9,7 +9,13 @@ use App\Models\MedicalEvents\Sql\Identifier as SqlIdentifier;
 
 class CodeableConceptRepository extends BaseRepository
 {
-    /** The caller must eager-load coding; serialization itself performs no query. */
+    /**
+     * Codeable concept as an array of its coding (system and code) and text, null when the concept is absent.
+     * Text is included only when set. The caller must eager-load coding; serialization itself performs no query.
+     *
+     * @param  SqlCodeableConcept|null  $concept
+     * @return array|null
+     */
     public function toResource(?SqlCodeableConcept $concept): ?array
     {
         if ($concept === null) {
@@ -20,9 +26,9 @@ class CodeableConceptRepository extends BaseRepository
         if ($concept->text !== null) {
             $data['text'] = $concept->text;
         }
+
         foreach ($concept->getRelation('coding')->sortBy('id') as $coding) {
-            $item = ['system' => $coding->system, 'code' => $coding->code];
-            $data['coding'][] = $item;
+            $data['coding'][] = ['system' => $coding->system, 'code' => $coding->code];
         }
 
         return $data;
@@ -53,33 +59,30 @@ class CodeableConceptRepository extends BaseRepository
         if (array_key_exists('text', $codeableConceptData) || !$codeableConcept->exists) {
             $codeableConcept->text = $codeableConceptData['text'] ?? null;
         }
+
         $codeableConcept->save();
+
         if (array_key_exists('coding', $codeableConceptData)) {
-            $existing = $codeableConcept->coding()->orderBy('id')->get();
+            $existing = $codeableConcept->relationLoaded('coding')
+                ? $codeableConcept->coding->sortBy('id')->values()
+                : $codeableConcept->coding()->orderBy('id')->get();
             $ids = [];
+
             foreach (array_values($codeableConceptData['coding'] ?? []) as $index => $data) {
                 $coding = $existing->get($index) ?? $codeableConcept->coding()->make();
                 $coding->fill(['system' => $data['system'] ?? null, 'code' => $data['code']]);
                 $coding->save();
                 $ids[] = $coding->id;
             }
-            $codeableConcept->coding()->whereNotIn('id', $ids)->delete();
+
+            if ($existing->count() > count($ids)) {
+                $codeableConcept->coding()->whereNotIn('id', $ids)->delete();
+            }
+
             $codeableConcept->unsetRelation('coding');
         }
 
         return $codeableConcept;
-    }
-
-    /**
-     * Update related codeable concept by ID.
-     *
-     * @param  int  $id
-     * @param  array  $data
-     * @return mixed
-     */
-    public function updateById(int $id, array $data): SqlCodeableConcept
-    {
-        return $this->update($this->model->findOrFail($id), $data);
     }
 
     /**
@@ -110,5 +113,4 @@ class CodeableConceptRepository extends BaseRepository
 
         return $codeableConcept->delete();
     }
-
 }

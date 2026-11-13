@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Classes\eHealth\Api\Responses\Collections\HealthcareServiceDetails;
+use App\Classes\eHealth\EHealth;
+use App\Classes\eHealth\EHealthResponse;
 use App\Core\EHealthJob;
+use App\Dto\HealthcareService\Model as HealthcareServiceData;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\LegalEntity;
 use App\Repositories\Repository;
-use App\Classes\eHealth\EHealth;
 use GuzzleHttp\Promise\PromiseInterface;
-use App\Classes\eHealth\EHealthResponse;
 use Illuminate\Queue\Middleware\RateLimited;
 use Throwable;
 
@@ -46,13 +49,18 @@ class HealthcareServiceSync extends EHealthJob
      */
     protected function processResponse(?EHealthResponse $response): void
     {
-        $healthcareServicesData = $response?->validate();
+        $responses = $response?->validate();
 
-        if (empty($healthcareServicesData)) {
+        if (empty($responses)) {
             return;
         }
 
-        Repository::healthcareService()->sync($response?->map($healthcareServicesData));
+        $healthcareServices = array_map(
+            static fn (HealthcareServiceDetails $item): HealthcareServiceData => objectMapper()->map($item, HealthcareServiceData::class),
+            $responses
+        );
+
+        Repository::healthcareService()->sync($this->legalEntity, ...$healthcareServices);
     }
 
     /**
