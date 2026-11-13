@@ -37,6 +37,13 @@ if (!function_exists('convertToLocalTimezone')) {
     }
 }
 
+if (!function_exists('formatUtcDatabaseTimestamp')) {
+    function formatUtcDatabaseTimestamp(?string $value): ?string
+    {
+        return $value === null ? null : CarbonImmutable::parse($value, 'UTC')->utc()->format('Y-m-d H:i:s.u');
+    }
+}
+
 if (!function_exists('convertToYmd')) {
     function convertToYmd(string $dateString): string
     {
