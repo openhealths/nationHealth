@@ -8,7 +8,6 @@ use App\Core\Arr;
 use App\Core\BaseForm;
 use App\Rules\ContractRules\SameYearAs;
 use Carbon\CarbonImmutable;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 abstract class BaseContractRequestForm extends BaseForm
 {
@@ -35,12 +34,6 @@ abstract class BaseContractRequestForm extends BaseForm
     public $additionalDocumentMd5;
 
     public array $contractorPaymentDetails;
-
-    public string $knedp;
-
-    public TemporaryUploadedFile $keyContainerUpload;
-
-    public string $password;
 
     /**
      * Base rules for both types of contract

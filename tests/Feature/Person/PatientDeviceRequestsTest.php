@@ -26,7 +26,6 @@ use App\Services\MedicalEvents\EHealthJobResolver;
 use App\Contracts\SignatureProvider;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -150,7 +149,7 @@ class PatientDeviceRequestsTest extends TestCase
         Livewire::test(DeviceRequestCreationHarness::class, [
             'legalEntity' => $this->legalEntity, 'person' => $this->person, 'draftId' => $this->requestId,
         ])->set('form.knedp', 'test')->set('form.password', 'test')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('test.dat', 1))
+            ->set('form.keyContainer', base64_encode('key-container'))
             ->call('sign')->assertHasNoErrors()
             ->assertRedirect(route('persons.device-requests.view', [
                 'legalEntity' => $this->legalEntity, 'person' => $this->person, 'deviceRequest' => $this->requestId,

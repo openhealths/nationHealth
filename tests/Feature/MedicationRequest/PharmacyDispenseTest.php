@@ -15,7 +15,6 @@ use App\Models\Relations\Party;
 use App\Models\User;
 use App\Contracts\SignatureProvider;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -184,7 +183,7 @@ class PharmacyDispenseTest extends TestCase
             ->set('code', '1234')
             ->set('form.knedp', 'acsk_test')
             ->set('form.password', '12345678')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 10))
+            ->set('form.keyContainer', base64_encode('key-container'))
             ->call('sign')
             ->assertSet('showSignatureModal', false)
             ->assertSee('Електронний рецепт успішно погашено в аптеці.')

@@ -23,7 +23,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use RuntimeException;
 use Throwable;
 
@@ -54,22 +53,6 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
     protected function requestType(): string
     {
         return 'ePrescription';
-    }
-
-    /**
-     * @param  array<string, mixed>  $formData
-     */
-    private function requireLocalKep(array $formData): void
-    {
-        if (
-            trim((string) ($formData['password'] ?? '')) === ''
-            || trim((string) ($formData['knedp'] ?? '')) === ''
-            || !($formData['keyContainerUpload'] ?? null) instanceof TemporaryUploadedFile
-        ) {
-            throw new InvalidArgumentException(__('care-plan.kep_signature_required'));
-        }
-
-        $this->resolveSignerTaxId($formData);
     }
 
     /**
@@ -274,8 +257,6 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
         string $informWith = '',
         float $remainingQty = 0.0
     ): array {
-        $this->requireLocalKep($formData);
-
         $personId = $contextModel instanceof CarePlan ? (int) $contextModel->personId : (int) $contextModel->person_id;
         if ($personId !== (int) $requestRecord->personId) {
             throw new InvalidArgumentException('The medication signing context belongs to another patient.');
@@ -302,7 +283,7 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
         $signedContent = signatureService()->signData(
             $this->buildSignPayload($contextModel, $requestRecord, $informWith),
             $formData['knedp'],
-            $formData['keyContainerUpload'],
+            $formData['keyContainer'],
             $formData['password'],
             $this->resolveSignerTaxId($formData)
         );
@@ -385,8 +366,6 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
             return $result;
         }
 
-        $this->requireLocalKep($formData);
-
         $personUuid = app(MedicationRequestRepository::class)->personUuid((int) $requestRecord->personId);
 
         $signedContent = null;
@@ -401,7 +380,7 @@ class MedicationRequestLifecycleService extends EHealthRequestLifecycleService i
         $signedContent = signatureService()->signData(
             $this->buildRejectSignPayload($personUuid, $activeId, $statusReason, $formData),
             $formData['knedp'],
-            $formData['keyContainerUpload'],
+            $formData['keyContainer'],
             $formData['password'],
             $signerTaxId
         );

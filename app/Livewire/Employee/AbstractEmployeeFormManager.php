@@ -34,7 +34,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
-use Livewire\WithFileUploads;
 use App\Mail\UserCredentialsMail;
 use RuntimeException;
 use Throwable;
@@ -42,8 +41,6 @@ use Throwable;
 #[AllowDynamicProperties]
 abstract class AbstractEmployeeFormManager extends EmployeeComponent
 {
-    use WithFileUploads;
-
     #[Locked]
     public ?int $employeeRequestId = null;
     protected ?BaseEmployee $employeeRequest = null;
@@ -580,7 +577,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             throw new RuntimeException(__('forms.draft_not_found_or_already_signed'), 400);
         }
 
-        $this->form->validate($this->form->rulesForKepOnly());
+        $this->form->validate($this->form->signingRules());
 
         return $requestToSign;
     }
@@ -753,7 +750,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         return signatureService()->signData(
             $payloadToSign,
             $this->form->knedp,
-            $this->form->keyContainerUpload,
+            $this->form->keyContainer,
             $this->form->password,
             Auth::user()->party->tax_id
         );
@@ -766,7 +763,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
      */
     public function resetSignatureFields(): void
     {
-        $this->form->reset('keyContainerUpload', 'keyContainerFileName', 'password', 'knedp');
+        $this->form->resetSigningFields();
     }
 
     /**

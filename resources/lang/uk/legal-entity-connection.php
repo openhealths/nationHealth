@@ -49,10 +49,6 @@ return [
     'btn_update_secret_short' => 'Зміна client_secret',
     'btn_update_callback_short' => 'Оновити redirect_uri',
 
-    'signature_modal_title' => 'Електронний підпис',
-    'btn_cancel' => 'Скасувати',
-    'btn_sign' => 'Підписати',
-
     'sync' => [
         'error' => [
             'fail' => 'Помилка синхронізації підключень СГуСОЗ',

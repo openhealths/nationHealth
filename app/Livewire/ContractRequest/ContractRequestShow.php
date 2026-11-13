@@ -115,7 +115,7 @@ class ContractRequestShow extends Component
             $signedContent = signatureService()->signData(
                 $dataToSign,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -208,7 +208,7 @@ class ContractRequestShow extends Component
                 return signatureService()->signBase64Data(
                     $base64Payload,
                     $validated['knedp'],
-                    $validated['keyContainerUpload'],
+                    $validated['keyContainer'],
                     $validated['password'],
                     Auth::user()->party->taxId
                 );
@@ -228,7 +228,7 @@ class ContractRequestShow extends Component
         return signatureService()->signData(
             $this->buildJsonDataToSign(),
             $validated['knedp'],
-            $validated['keyContainerUpload'],
+            $validated['keyContainer'],
             $validated['password'],
             Auth::user()->party->taxId
         );

@@ -230,7 +230,7 @@ abstract class ContractComponent extends Component
             $signedContent = signatureService()->signData(
                 $payload,
                 $signingData['knedp'],
-                $signingData['keyContainerUpload'],
+                $signingData['keyContainer'],
                 $signingData['password'],
                 Auth::user()->party->taxId
             );

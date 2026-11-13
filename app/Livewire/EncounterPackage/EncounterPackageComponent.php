@@ -15,6 +15,7 @@ use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\Signature\SignatureException;
 use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Livewire\EncounterPackage\Forms\ClinicalImpressionForm;
 use App\Livewire\EncounterPackage\Forms\DetectedIssueForm;
@@ -709,6 +710,39 @@ class EncounterPackageComponent extends Component
 
             $validated['procedures'][$index]['basedOnIdentifier'] = $uuid;
         }
+    }
+
+    /**
+     * Turn the package into the content sent to eHealth and sign it. Called before the episode is created or the
+     * package is sent, so a failed signature leaves nothing behind and the user retries in the open modal.
+     *
+     * @param  array  $formattedData
+     * @param  array  $signingData  Validated KNEDP, key container and password
+     * @return array|null The package content and its signed version, or null when signing failed
+     */
+    protected function signPackageContent(array $formattedData, array $signingData): ?array
+    {
+        $packageContent = Arr::toSnakeCase($formattedData);
+
+        // Remove display_value from incoming_referral (eHealth schema rejects it); the episode is sent on its own
+        unset($packageContent['encounter']['incoming_referral']['display_value'], $packageContent['episode']);
+
+        try {
+            $signedContent = signatureService()->signData(
+                $packageContent,
+                $signingData['knedp'],
+                $signingData['keyContainer'],
+                $signingData['password'],
+                Auth::user()->party->taxId
+            );
+        } catch (SignatureException $exception) {
+            // Signing fields are kept, so after a failed signature the KNEDP and key do not have to be chosen again
+            $exception->handle('Error when signing the encounter package');
+
+            return null;
+        }
+
+        return [$packageContent, $signedContent];
     }
 
     /**

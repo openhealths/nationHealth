@@ -558,9 +558,9 @@ trait ManagesCarePlanReferrals
 
             $signedContent = signatureService()->signData(
                 $signPayload,
-                $this->form['knedp'],
-                $this->form['keyContainerUpload'],
-                $this->form['password'],
+                $this->form->knedp,
+                $this->form->keyContainer,
+                $this->form->password,
                 Auth::user()->party->taxId
             );
 
@@ -692,9 +692,9 @@ trait ManagesCarePlanReferrals
 
             $signedContent = signatureService()->signData(
                 $payload,
-                $this->form['knedp'],
-                $this->form['keyContainerUpload'],
-                $this->form['password'],
+                $this->form->knedp,
+                $this->form->keyContainer,
+                $this->form->password,
                 Auth::user()->party->taxId
             );
 
@@ -776,9 +776,9 @@ trait ManagesCarePlanReferrals
 
             $signedContent = signatureService()->signData(
                 $kind === 'service_request' ? $payload : Arr::toSnakeCase($payload),
-                $this->form['knedp'],
-                $this->form['keyContainerUpload'],
-                $this->form['password'],
+                $this->form->knedp,
+                $this->form->keyContainer,
+                $this->form->password,
                 Auth::user()->party->taxId
             );
 

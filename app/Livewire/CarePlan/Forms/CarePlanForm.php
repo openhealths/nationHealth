@@ -7,11 +7,11 @@ namespace App\Livewire\CarePlan\Forms;
 use Illuminate\Support\Facades\Validator;
 
 use App\Core\Arr;
+use App\Core\BaseForm;
 
 use Carbon\CarbonImmutable;
-use Livewire\Form;
 
-class CarePlanForm extends Form
+class CarePlanForm extends BaseForm
 {
     public string $patient = '';
     public string $medical_number = '';
@@ -34,10 +34,6 @@ class CarePlanForm extends Form
     public array $medicalRecords = [];
     public ?string $based_on = null;
     public ?string $part_of = null;
-    public string $knedp = '';
-    public mixed $keyContainerUpload = null;
-    public string $keyContainerFileName = '';
-    public string $password = '';
 
     /**
      * Get the default validation rules.
@@ -66,11 +62,7 @@ class CarePlanForm extends Form
      */
     public function rulesForSigning(): array
     {
-        return array_merge($this->rules(), [
-            'knedp' => 'required|string',
-            'keyContainerUpload' => 'required|file|max:1024',
-            'password' => 'required|string',
-        ]);
+        return array_merge($this->rules(), $this->signingRules());
     }
 
     public function periodStartIsoDate(): string
@@ -103,7 +95,7 @@ class CarePlanForm extends Form
             'informWith' => __('care-plan.inform_with'),
             'termsOfService' => __('forms.providing_condition'),
             'knedp' => __('forms.knedp') ?? 'КНЕДП',
-            'keyContainerUpload' => __('forms.key_container') ?? 'Ключ-контейнер',
+            'keyContainer' => __('forms.key_container') ?? 'Ключ-контейнер',
             'password' => __('forms.password'),
         ];
     }

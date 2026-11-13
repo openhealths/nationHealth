@@ -17,7 +17,6 @@ use App\Services\MedicalEvents\MedicationRequestLifecycleService;
 use App\Contracts\SignatureProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -136,11 +135,11 @@ class StandaloneRequestSigningTest extends TestCase
 
         $this->signature->shouldReceive('signData')
             ->once()
-            ->withArgs(static function (array $data, string $knedp, $keyFile, string $password, string $taxId) use ($draftContent): bool {
+            ->withArgs(static function (array $data, string $knedp, string $keyContainer, string $password, string $taxId) use ($draftContent): bool {
                 return $data === $draftContent
                     && $password === 'secret'
                     && $knedp === 'knedp-1'
-                    && $keyFile instanceof UploadedFile
+                    && $keyContainer === base64_encode('key-container')
                     && $taxId === '9876543210';
             })
             ->andReturn('REAL-KEP-SIGNATURE');
@@ -154,7 +153,7 @@ class StandaloneRequestSigningTest extends TestCase
             ->assertSet('isDraftCreated', true)
             ->assertSet('draftId', $draftId)
             ->set('form.knedp', 'knedp-1')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 10))
+            ->set('form.keyContainer', base64_encode('key-container'))
             ->set('form.password', 'secret')
             ->call('sign')
             ->assertSet('showSignatureModal', false)
@@ -179,7 +178,7 @@ class StandaloneRequestSigningTest extends TestCase
             ->set('duration', '30')
             ->call('createDraft')
             ->call('sign')
-            ->assertHasErrors(['form.knedp', 'form.keyContainerUpload', 'form.password']);
+            ->assertHasErrors(['form.knedp', 'form.keyContainer', 'form.password']);
     }
 
     public function test_prescription_signing_is_refused_before_a_draft_exists(): void
@@ -256,7 +255,7 @@ class StandaloneRequestSigningTest extends TestCase
             // A modified browser field cannot replace the persisted draft during KEP submission.
             ->set('request.quantity', 999)
             ->set('form.knedp', 'knedp-1')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 10))
+            ->set('form.keyContainer', base64_encode('key-container'))
             ->set('form.password', 'secret')
             ->call('sign')
             ->assertSet('showSignatureModal', false)

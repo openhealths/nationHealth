@@ -17,7 +17,6 @@ use App\Enums\User\Role;
 use App\Rules\TaxId;
 use App\Traits\FormTrait;
 use Illuminate\Support\Str;
-use Livewire\WithFileUploads;
 use App\Models\LegalEntityType;
 use App\Livewire\Actions\Logout;
 use App\Repositories\Repository;
@@ -45,7 +44,6 @@ use App\Livewire\LegalEntity\Forms\LegalEntitiesRequestApi;
 abstract class LegalEntity extends Component
 {
     use FormTrait;
-    use WithFileUploads;
     use AddressSearch;
 
     /**
@@ -295,7 +293,7 @@ abstract class LegalEntity extends Component
         // Convert form data to an array, leaving out the signing credentials
         $data = $this->prepareDataForRequest(Arr::except(
             $this->legalEntityForm->toArray(),
-            ['knedp', 'keyContainerUpload', 'keyContainerFileName', 'password']
+            ['knedp', 'keyContainer', 'password']
         ));
 
         Log::info('Legal Entity Success SOURCE DATA', $data);
@@ -304,7 +302,7 @@ abstract class LegalEntity extends Component
             $base64Data = signatureService()->signData(
                 $data,
                 $this->legalEntityForm->knedp,
-                $this->legalEntityForm->keyContainerUpload,
+                $this->legalEntityForm->keyContainer,
                 $this->legalEntityForm->password,
                 $data['owner']['tax_id'],
                 $data['edrpou']

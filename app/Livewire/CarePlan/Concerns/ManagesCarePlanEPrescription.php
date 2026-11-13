@@ -507,74 +507,6 @@ trait ManagesCarePlanEPrescription
         }
     }
 
-    public function signEPrescription(): void
-    {
-        if (empty($this->ePrescriptionRequestIdToSign)) {
-            Session::flash('error', __('Не вибрано заявку на рецепт для підписання'));
-            $this->showSignatureModal = false;
-
-            return;
-        }
-
-        $this->authorizeCarePlanActivityWrite();
-
-        try {
-            $requestRecord = app(MedicalRequestOwnership::class)
-                ->medicationForPerson((string) $this->ePrescriptionRequestIdToSign, (int) $this->carePlan->personId);
-
-            $result = app(MedicationRequestLifecycleService::class)->signPrescription(
-                $this->carePlan,
-                $requestRecord,
-                array_merge($this->form, [
-                    'request_notification_disabled' => filter_var(
-                        $this->ePrescriptionSelectedProgram['settings']['request_notification_disabled'] ?? false,
-                        FILTER_VALIDATE_BOOLEAN
-                    ),
-                    'medication_unit' => $this->ePrescriptionForm['medication_unit'] ?? 'од.',
-                    'signer_tax_id' => Auth::user()?->party?->taxId,
-                ]),
-                $requestRecord->informWith ?? '',
-                $this->ePrescriptionRemainingQty
-            );
-
-            if (!empty($result['show_remaining_qty_warning']) || !empty($result['warning_message'])) {
-                $this->ePrescriptionShowRemainingQtyWarning = true;
-                $this->ePrescriptionRemainingQtyWarningMessage = (string) ($result['warning_message'] ?? '');
-            }
-
-            if (!empty($result['warning_message'])) {
-                Session::flash('warning', $result['warning_message']);
-            }
-
-            Session::flash('success', $result['success_message']);
-            $this->showSignatureModal = false;
-            $this->ePrescriptionRequestIdToSign = null;
-            try {
-                $this->refreshCarePlan();
-            } catch (\Throwable $exception) {
-                Log::warning('Signed prescription page refresh is pending', ['exceptionType' => $exception::class]);
-                Session::flash('warning', trim(($result['warning_message'] ?? '')."\n".__('care-plan.eprescription_signed_refresh_pending')));
-            }
-
-        } catch (ModelNotFoundException) {
-            Session::flash('error', __('care-plan.document_context_unavailable'));
-            $this->showSignatureModal = false;
-            $this->actionType = '';
-
-            return;
-        } catch (EHealthValidationException $e) {
-            $e->report();
-            $translatedMsg = $e->getTranslatedMessage();
-            Log::error('CarePlanShow: failed to sign E-Prescription validation: ' . $translatedMsg);
-            Session::flash('error', $translatedMsg);
-            $this->showSignatureModal = false;
-        } catch (Exception $e) {
-            Log::error('CarePlanShow: failed to sign E-Prescription: ' . $e->getMessage());
-            Session::flash('error', __('Помилка при підписанні рецепту: ') . $e->getMessage());
-            $this->showSignatureModal = false;
-        }
-    }
-
     public function rejectPrescription(string $requestId): void
     {
         $this->authorizeCarePlanActivityWrite();
@@ -605,52 +537,6 @@ trait ManagesCarePlanEPrescription
         } catch (Exception $e) {
             Log::error('CarePlanShow: failed to reject prescription: ' . $e->getMessage());
             Session::flash('error', __('Не вдалося відхилити рецепт: ') . $e->getMessage());
-        }
-    }
-
-    public function signRejectPrescription(): void
-    {
-        if (empty($this->ePrescriptionRequestIdToSign)) {
-            Session::flash('error', __('Не вибрано рецепт для відхилення'));
-            $this->showSignatureModal = false;
-
-            return;
-        }
-
-        $this->authorizeCarePlanActivityWrite();
-
-        try {
-            $requestRecord = app(MedicalRequestOwnership::class)
-                ->medicationForPerson((string) $this->ePrescriptionRequestIdToSign, (int) $this->carePlan->personId);
-
-            app(MedicationRequestLifecycleService::class)->rejectPrescription(
-                $this->carePlan,
-                $requestRecord,
-                array_merge($this->form, ['signer_tax_id' => Auth::user()?->party?->taxId]),
-                $this->statusReason
-            );
-
-            $this->showSignatureModal = false;
-            $this->refreshCarePlan();
-            Session::flash('success', __('Електронний рецепт успішно відхилено.'));
-
-        } catch (ModelNotFoundException) {
-            Session::flash('error', __('care-plan.document_context_unavailable'));
-            $this->showSignatureModal = false;
-            $this->actionType = '';
-
-            return;
-        } catch (EHealthValidationException $e) {
-            $e->report();
-            $translatedMsg = $e->getTranslatedMessage();
-            Log::error('CarePlanShow: failed to reject prescription validation: ' . $translatedMsg);
-            Session::flash('error', $translatedMsg);
-            $this->showSignatureModal = false;
-        } catch (Exception $e) {
-            Log::error('CarePlanShow: failed to reject prescription: ' . $e->getMessage());
-            $errorMsg = __('Не вдалося відхилити рецепт: ') . $e->getMessage();
-            Session::flash('error', $errorMsg);
-            $this->showSignatureModal = false;
         }
     }
 
@@ -724,6 +610,132 @@ trait ManagesCarePlanEPrescription
             Session::flash('error', __('Не вдалося завантажити форму пам’ятки.'));
 
             return '<h3>' . e(__('Не вдалося сформувати дані для друку. Спробуйте ще раз.')) . '</h3>';
+        }
+    }
+
+    /**
+     * Sign the prescription request with the KEP. Reached only through sign(), which validates the signing fields
+     * first.
+     *
+     * @return void
+     */
+    protected function signEPrescription(): void
+    {
+        if (empty($this->ePrescriptionRequestIdToSign)) {
+            Session::flash('error', __('Не вибрано заявку на рецепт для підписання'));
+            $this->showSignatureModal = false;
+
+            return;
+        }
+
+        $this->authorizeCarePlanActivityWrite();
+
+        try {
+            $requestRecord = app(MedicalRequestOwnership::class)
+                ->medicationForPerson((string) $this->ePrescriptionRequestIdToSign, (int) $this->carePlan->personId);
+
+            $result = app(MedicationRequestLifecycleService::class)->signPrescription(
+                $this->carePlan,
+                $requestRecord,
+                array_merge($this->form->all(), [
+                    'request_notification_disabled' => filter_var(
+                        $this->ePrescriptionSelectedProgram['settings']['request_notification_disabled'] ?? false,
+                        FILTER_VALIDATE_BOOLEAN
+                    ),
+                    'medication_unit' => $this->ePrescriptionForm['medication_unit'] ?? 'од.',
+                    'signer_tax_id' => Auth::user()?->party?->taxId,
+                ]),
+                $requestRecord->informWith ?? '',
+                $this->ePrescriptionRemainingQty
+            );
+
+            if (!empty($result['show_remaining_qty_warning']) || !empty($result['warning_message'])) {
+                $this->ePrescriptionShowRemainingQtyWarning = true;
+                $this->ePrescriptionRemainingQtyWarningMessage = (string) ($result['warning_message'] ?? '');
+            }
+
+            if (!empty($result['warning_message'])) {
+                Session::flash('warning', $result['warning_message']);
+            }
+
+            Session::flash('success', $result['success_message']);
+            $this->showSignatureModal = false;
+            $this->ePrescriptionRequestIdToSign = null;
+            try {
+                $this->refreshCarePlan();
+            } catch (\Throwable $exception) {
+                Log::warning('Signed prescription page refresh is pending', ['exceptionType' => $exception::class]);
+                Session::flash('warning', trim(($result['warning_message'] ?? '')."\n".__('care-plan.eprescription_signed_refresh_pending')));
+            }
+
+        } catch (ModelNotFoundException) {
+            Session::flash('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
+        } catch (EHealthValidationException $e) {
+            $e->report();
+            $translatedMsg = $e->getTranslatedMessage();
+            Log::error('CarePlanShow: failed to sign E-Prescription validation: ' . $translatedMsg);
+            Session::flash('error', $translatedMsg);
+            $this->showSignatureModal = false;
+        } catch (Exception $e) {
+            Log::error('CarePlanShow: failed to sign E-Prescription: ' . $e->getMessage());
+            Session::flash('error', __('Помилка при підписанні рецепту: ') . $e->getMessage());
+            $this->showSignatureModal = false;
+        }
+    }
+
+    /**
+     * Sign the rejection of an active prescription with the KEP. Reached only through sign(), which validates the
+     * reason and the signing fields first.
+     *
+     * @return void
+     */
+    protected function signRejectPrescription(): void
+    {
+        if (empty($this->ePrescriptionRequestIdToSign)) {
+            Session::flash('error', __('Не вибрано рецепт для відхилення'));
+            $this->showSignatureModal = false;
+
+            return;
+        }
+
+        $this->authorizeCarePlanActivityWrite();
+
+        try {
+            $requestRecord = app(MedicalRequestOwnership::class)
+                ->medicationForPerson((string) $this->ePrescriptionRequestIdToSign, (int) $this->carePlan->personId);
+
+            app(MedicationRequestLifecycleService::class)->rejectPrescription(
+                $this->carePlan,
+                $requestRecord,
+                array_merge($this->form->all(), ['signer_tax_id' => Auth::user()?->party?->taxId]),
+                $this->statusReason
+            );
+
+            $this->showSignatureModal = false;
+            $this->refreshCarePlan();
+            Session::flash('success', __('Електронний рецепт успішно відхилено.'));
+
+        } catch (ModelNotFoundException) {
+            Session::flash('error', __('care-plan.document_context_unavailable'));
+            $this->showSignatureModal = false;
+            $this->actionType = '';
+
+            return;
+        } catch (EHealthValidationException $e) {
+            $e->report();
+            $translatedMsg = $e->getTranslatedMessage();
+            Log::error('CarePlanShow: failed to reject prescription validation: ' . $translatedMsg);
+            Session::flash('error', $translatedMsg);
+            $this->showSignatureModal = false;
+        } catch (Exception $e) {
+            Log::error('CarePlanShow: failed to reject prescription: ' . $e->getMessage());
+            $errorMsg = __('Не вдалося відхилити рецепт: ') . $e->getMessage();
+            Session::flash('error', $errorMsg);
+            $this->showSignatureModal = false;
         }
     }
 

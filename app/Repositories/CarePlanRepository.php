@@ -69,7 +69,7 @@ class CarePlanRepository extends MedicalEventsBaseRepository
 
     public function formContext(array $form, ?int $localId = null): array
     {
-        unset($form['keyContainerUpload'], $form['key_container_upload'], $form['password'], $form['knedp'], $form['keyContainerFileName']);
+        unset($form['keyContainer'], $form['key_container'], $form['password'], $form['knedp']);
         $data = Arr::toCamelCase($form);
         foreach (['basedOn', 'partOf'] as $field) {
             if (array_key_exists($field, $data) && $data[$field] === null) {

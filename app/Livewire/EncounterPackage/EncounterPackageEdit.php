@@ -29,7 +29,6 @@ use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Fhir;
 use App\Traits\HandlesEncounterCancellation;
-use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Database\Eloquent\Builder;
@@ -292,11 +291,165 @@ class EncounterPackageEdit extends EncounterPackageComponent
     }
 
     /**
-     * Validate and update data.
+     * Validate and store the package as a draft.
+     *
+     * @return void
+     */
+    public function save(): void
+    {
+        if ($this->storeDraft() !== null) {
+            Session::flash('success', __('encounters.messages.updated'));
+        }
+    }
+
+    /**
+     * Submit encrypted data about person encounter.
+     *
+     * @return void
+     */
+    public function sign(): void
+    {
+        if ($this->actionType === 'sign_eprescription') {
+            $this->signEncounterEPrescription();
+
+            return;
+        }
+
+        if ($this->actionType === 'sign_referral') {
+            $this->signEncounterReferral();
+
+            return;
+        }
+
+        if ($this->isReadonly) {
+            return;
+        }
+
+        // The package may have been submitted from another page since this one was opened
+        if (Auth::user()->cannot('update', Encounter::findOrFail($this->encounterId))) {
+            Session::flash('error', __('encounters.policy.update'));
+            $this->showSignatureModal = false;
+
+            return;
+        }
+
+        try {
+            $validated = $this->form->validate($this->form->signingRules());
+        } catch (ValidationException $exception) {
+            // The KEP errors render inside the signature modal, so it stays open to show them
+            Session::flash('error', $exception->validator->errors()->first());
+            $this->setErrorBag($exception->validator->getMessageBag());
+
+            return;
+        }
+
+        // Stored without the "draft updated" message, the user is told only how signing and sending ended
+        $formattedData = $this->storeDraft();
+        if (is_null($formattedData)) {
+            return;
+        }
+
+        $formattedData['encounter']['status'] = EncounterStatus::FINISHED->value;
+
+        $signedPackage = $this->signPackageContent($formattedData, $validated);
+        if ($signedPackage === null) {
+            return;
+        }
+
+        [$packageContent, $signedContent] = $signedPackage;
+
+        if (isset($formattedData['episode'])) {
+            $formattedData['episode']['status'] = EpisodeStatus::ACTIVE->value;
+
+            try {
+                EHealth::episode()->create($this->patientUuid, Arr::toSnakeCase($formattedData['episode']));
+            } catch (EHealthException|EHealthConnectionException $exception) {
+                $exception->handle('Error when create episode');
+                $this->showSignatureModal = false;
+
+                return;
+            }
+
+            // eHealth accepted the episode; only now promote the local draft
+            try {
+                Repository::episode()->updateDraft(
+                    Episode::whereUuid($this->draftEpisodeId)->firstOrFail(),
+                    $formattedData['episode']
+                );
+            } catch (Throwable $exception) {
+                $this->handleDatabaseErrors($exception, 'Failed to store created episode');
+                $this->showSignatureModal = false;
+
+                return;
+            }
+
+            // The episode exists in eHealth now, so a retry after a failure below refers to it instead of creating it again
+            $this->episodeType = 'existing';
+            $this->form->episode = array_merge(
+                $this->form->episode,
+                ['id' => $this->draftEpisodeId, 'typeCode' => '', 'name' => '']
+            );
+            $this->draftEpisodeId = null;
+        }
+
+        $this->showSignatureModal = false;
+
+        try {
+            $this->submitPackage(Encounter::findOrFail($this->encounterId), $packageContent, $signedContent);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while submitting encounter');
+
+            return;
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Error while tracking encounter submission');
+
+            return;
+        }
+
+        $this->redirectRoute(
+            $this->prepersonId !== null ? 'prepersons.encounters.package.show' : 'persons.encounters.package.show',
+            $this->prepersonId !== null
+                ? [legalEntity(), 'preperson' => $this->prepersonId, 'encounter' => $this->encounterId]
+                : [legalEntity(), 'person' => $this->personId, 'encounter' => $this->encounterId],
+            navigate: true
+        );
+    }
+
+    /**
+     * Ask for the reason the whole package is being marked as entered in error, dropping whatever records
+     * were picked before, so that the encounter itself is the one being cancelled.
+     *
+     * @return void
+     */
+    public function openPackageCancellation(): void
+    {
+        $this->selectedRecords = self::NO_RECORDS_SELECTED;
+
+        $this->openEncounterCancellation($this->encounterUuid);
+    }
+
+    /**
+     * Ask for the reason the picked records are being marked as entered in error.
+     *
+     * @return void
+     */
+    public function openRecordsCancellation(): void
+    {
+        if ($this->selectedCancellationRecords() === []) {
+            Session::flash('error', __('encounters.messages.cancel_records_not_picked'));
+
+            return;
+        }
+
+        $this->openEncounterCancellation($this->encounterUuid);
+    }
+
+    /**
+     * Validate the package and store it as a draft. Returns the package to sign, or null when it was not stored.
      *
      * @return array|null
      */
-    public function save(): ?array
+    protected function storeDraft(): ?array
     {
         if ($this->isReadonly) {
             return null;
@@ -426,8 +579,6 @@ class EncounterPackageEdit extends EncounterPackageComponent
             return null;
         }
 
-        Session::flash('success', __('encounters.messages.updated'));
-
         // Sections with no records stay out of the package, the same way the create flow signs it
         return array_filter([
             'encounter' => $fhirEncounter,
@@ -444,162 +595,6 @@ class EncounterPackageEdit extends EncounterPackageComponent
             'detectedIssues' => $fhirDetectedIssues,
             'clinicalImpressions' => $fhirClinicalImpressions
         ]);
-    }
-
-    /**
-     * Submit encrypted data about person encounter.
-     *
-     * @return void
-     */
-    public function sign(): void
-    {
-        if ($this->actionType === 'sign_eprescription') {
-            $this->signEncounterEPrescription();
-
-            return;
-        }
-
-        if ($this->actionType === 'sign_referral') {
-            $this->signEncounterReferral();
-
-            return;
-        }
-
-        if ($this->isReadonly) {
-            return;
-        }
-
-        // The package may have been submitted from another page since this one was opened
-        if (Auth::user()->cannot('update', Encounter::findOrFail($this->encounterId))) {
-            Session::flash('error', __('encounters.policy.update'));
-            $this->showSignatureModal = false;
-
-            return;
-        }
-
-        try {
-            $validated = $this->form->validate($this->form->signingRules());
-        } catch (ValidationException $exception) {
-            // The KEP errors render inside the signature modal, so it stays open to show them
-            Session::flash('error', $exception->validator->errors()->first());
-            $this->setErrorBag($exception->validator->getMessageBag());
-
-            return;
-        }
-
-        $formattedData = $this->save();
-        if (is_null($formattedData)) {
-            return;
-        }
-
-        if (isset($formattedData['episode'])) {
-            $formattedData['episode']['status'] = EpisodeStatus::ACTIVE->value;
-
-            try {
-                EHealth::episode()->create($this->patientUuid, Arr::toSnakeCase($formattedData['episode']));
-            } catch (EHealthException|EHealthConnectionException $exception) {
-                $exception->handle('Error when create episode');
-                $this->showSignatureModal = false;
-
-                return;
-            }
-
-            // eHealth accepted the episode; only now promote the local draft
-            try {
-                Repository::episode()->updateDraft(
-                    Episode::whereUuid($this->draftEpisodeId)->firstOrFail(),
-                    $formattedData['episode']
-                );
-            } catch (Throwable $exception) {
-                $this->handleDatabaseErrors($exception, 'Failed to store created episode');
-                $this->showSignatureModal = false;
-
-                return;
-            }
-
-            // The episode exists in eHealth now, so a retry after a failure below refers to it instead of creating it again
-            $this->episodeType = 'existing';
-            $this->form->episode = array_merge(
-                $this->form->episode,
-                ['id' => $this->draftEpisodeId, 'typeCode' => '', 'name' => '']
-            );
-            $this->draftEpisodeId = null;
-
-            // The episode was sent on its own, it is not part of the signed package
-            unset($formattedData['episode']);
-        }
-
-        $formattedData['encounter']['status'] = EncounterStatus::FINISHED->value;
-        $formattedData = Arr::toSnakeCase($formattedData);
-
-        // Remove display_value from incoming_referral before sending to eHealth (schema rejects it)
-        unset($formattedData['encounter']['incoming_referral']['display_value']);
-
-        try {
-            $signedContent = signatureService()->signData(
-                $formattedData,
-                $validated['knedp'],
-                $validated['keyContainerUpload'],
-                $validated['password'],
-                Auth::user()->party->taxId
-            );
-        } catch (SignatureException $exception) {
-            $exception->handle('Error when signing the encounter package');
-            $this->showSignatureModal = false;
-
-            return;
-        }
-
-        $this->showSignatureModal = false;
-
-        try {
-            $this->submitPackage(Encounter::findOrFail($this->encounterId), $formattedData, $signedContent);
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error while submitting encounter');
-
-            return;
-        } catch (Throwable $exception) {
-            $this->handleDatabaseErrors($exception, 'Error while tracking encounter submission');
-
-            return;
-        }
-
-        $this->redirectRoute(
-            $this->prepersonId !== null ? 'prepersons.encounters.package.show' : 'persons.encounters.package.show',
-            $this->prepersonId !== null
-                ? [legalEntity(), 'preperson' => $this->prepersonId, 'encounter' => $this->encounterId]
-                : [legalEntity(), 'person' => $this->personId, 'encounter' => $this->encounterId],
-            navigate: true
-        );
-    }
-
-    /**
-     * Ask for the reason the whole package is being marked as entered in error, dropping whatever records
-     * were picked before, so that the encounter itself is the one being cancelled.
-     *
-     * @return void
-     */
-    public function openPackageCancellation(): void
-    {
-        $this->selectedRecords = self::NO_RECORDS_SELECTED;
-
-        $this->openEncounterCancellation($this->encounterUuid);
-    }
-
-    /**
-     * Ask for the reason the picked records are being marked as entered in error.
-     *
-     * @return void
-     */
-    public function openRecordsCancellation(): void
-    {
-        if ($this->selectedCancellationRecords() === []) {
-            Session::flash('error', __('encounters.messages.cancel_records_not_picked'));
-
-            return;
-        }
-
-        $this->openEncounterCancellation($this->encounterUuid);
     }
 
     /**

@@ -1057,7 +1057,7 @@ class ReferralLifecycleTest extends TestCase
             ->set('referralExplanatoryLetter', 'Synthetic cancellation reason')
             ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
+            ->set('form.keyContainer', base64_encode('key-container'))
             ->call('signCancelReferral')
             ->assertSet('showSignatureModal', false)
             ->assertSee(__('care-plan.referral_cancel_success'))
@@ -1121,7 +1121,7 @@ class ReferralLifecycleTest extends TestCase
             ->assertSet('actionType', 'sign_servicerequest')
             ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
+            ->set('form.keyContainer', base64_encode('key-container'))
             ->call('sign')
             ->assertHasNoErrors(['statusReason'])
             ->assertSet('showSignatureModal', false);
@@ -1214,7 +1214,7 @@ class ReferralLifecycleTest extends TestCase
             ->call('openSignatureModal', 'sign_servicerequest', null, $draftUuid)
             ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
+            ->set('form.keyContainer', base64_encode('key-container'))
             ->call('sign')
             ->assertSet('showSignatureModal', false);
 
@@ -1439,7 +1439,7 @@ class ReferralLifecycleTest extends TestCase
             ->call('openSignatureModal', 'sign_activity', $draftDeviceActivity->id)
             ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
+            ->set('form.keyContainer', base64_encode('key-container'))
             ->call('sign')
             ->assertSet('showSignatureModal', false);
 

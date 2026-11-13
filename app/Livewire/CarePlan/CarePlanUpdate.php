@@ -19,12 +19,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
-use Livewire\WithFileUploads;
 
 class CarePlanUpdate extends CarePlanCreate
 {
-    use WithFileUploads;
-
     #[\Livewire\Attributes\Locked]
     public CarePlan $carePlan;
 
@@ -201,7 +198,7 @@ class CarePlanUpdate extends CarePlanCreate
             $signedContent = signatureService()->signData(
                 $carePlanPayload,
                 $this->form->knedp,
-                $this->form->keyContainerUpload,
+                $this->form->keyContainer,
                 $this->form->password,
                 Auth::user()->party->taxId
             );
