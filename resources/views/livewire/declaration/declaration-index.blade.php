@@ -2,7 +2,8 @@
 @use('App\Enums\Declaration\RequestStatus')
 @use('App\Enums\JobStatus')
 @use('Carbon\CarbonImmutable')
-@use('\App\Enums\User\Role')
+@use('App\Enums\User\Role')
+@use('App\Models\Declaration')
 
 @php
     $hasLegators = legalEntity()->legators->isNotEmpty();
@@ -14,17 +15,19 @@
     <x-header-navigation x-data="{ showFilter: false }">
         <x-slot name="title">{{ __('forms.declarations') }}</x-slot>
 
-        <div class="mt-2 ml-auto flex items-center gap-2 lg:mt-0">
-            <button
-                :key="sync - button"
-                wire:click="{{ !$this->isSync ? 'sync' : '' }}"
-                class="{{ $this->isSync ? 'button-sync-disabled' : 'button-sync' }} flex items-center gap-2 whitespace-nowrap"
-                {{ $this->isSync ? 'disabled' : '' }}
-            >
-                @icon('refresh', 'w-4 h-4')
-                <span>{{ ($syncStatus === JobStatus::PAUSED->value || $syncStatus === JobStatus::FAILED->value) ? __('forms.sync_retry') : __('forms.synchronise_with_eHealth') }}</span>
-            </button>
-        </div>
+        @can('sync', Declaration::class)
+            <div class="mt-2 ml-auto flex items-center gap-2 lg:mt-0">
+                <button
+                    :key="sync - button"
+                    wire:click="{{ !$this->isSync ? 'sync' : '' }}"
+                    class="{{ $this->isSync ? 'button-sync-disabled' : 'button-sync' }} flex items-center gap-2 whitespace-nowrap"
+                    {{ $this->isSync ? 'disabled' : '' }}
+                >
+                    @icon('refresh', 'w-4 h-4')
+                    <span>{{ ($syncStatus === JobStatus::PAUSED->value || $syncStatus === JobStatus::FAILED->value) ? __('forms.sync_retry') : __('forms.synchronise_with_eHealth') }}</span>
+                </button>
+            </div>
+        @endcan
 
         <x-slot name="navigation">
             <div class="flex">

@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Listeners\Synchronization;
 
+use App\Models\User;
+use App\Models\Equipment;
 use App\Core\EHealthJob;
-use App\Jobs\DivisionSync;
 use App\Jobs\CompleteSync;
+use App\Jobs\DivisionSync;
 use App\Jobs\EmployeeSync;
 use App\Jobs\EquipmentSync;
 use App\Models\LegalEntity;
+use App\Models\Declaration;
 use App\Jobs\ConnectionSync;
 use App\Jobs\LegalEntitySync;
 use App\Jobs\DeclarationsSync;
@@ -20,10 +23,8 @@ use App\Services\Party\PartyVerificationBulkAccess;
 
 class FirstLoginSyncChain
 {
-    public function build(LegalEntity $legalEntity, array $scopes): EHealthJob
+    public function build(LegalEntity $legalEntity, array $scopes, User $user): EHealthJob
     {
-        $legalEntityType = $legalEntity->type->name;
-
         // Create a chain of jobs for synchronization
 
         // This is the last job in the chain
@@ -39,7 +40,7 @@ class FirstLoginSyncChain
             isFirstLogin: true
         );
 
-        if (\in_array(EquipmentSync::SCOPE_REQUIRED, $scopes, true)) {
+        if ($user->can('sync', [Equipment::class, $scopes])) {
             $nextJob = new EquipmentSync(
                 legalEntity: $legalEntity,
                 nextEntity: $nextJob,
@@ -47,7 +48,7 @@ class FirstLoginSyncChain
             );
         }
 
-        if ($legalEntityType !== LegalEntity::TYPE_PHARMACY && $legalEntityType !== LegalEntity::TYPE_EMERGENCY) {
+        if ($user->can('sync', [Declaration::class, $legalEntity, $scopes])) {
             $nextJob = new DeclarationsSync(
                 legalEntity: $legalEntity,
                 nextEntity: $nextJob,

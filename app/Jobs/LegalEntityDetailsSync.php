@@ -122,7 +122,7 @@ class LegalEntityDetailsSync extends EHealthJob
     {
         // Synchronize the next entities chain (first login) if needed
         if ($this->isFirstLogin && !$this->standalone && !$this->nextEntity) {
-            return app(FirstLoginSyncChain::class)->build($this->legalEntity, $this->scopes);
+            return app(FirstLoginSyncChain::class)->build($this->legalEntity, $this->scopes, $this->user);
         }
 
         return $this->standalone || !$this->nextEntity
