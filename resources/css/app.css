@@ -4,6 +4,7 @@
 @import "./responsive.css";
 
 @config "../../tailwind.config.js"; /* imports old configuration from transition form v3 to v4 */
+@source "../../node_modules/flowbite-datepicker/js";
 
 [x-cloak] {
     display: none !important;
