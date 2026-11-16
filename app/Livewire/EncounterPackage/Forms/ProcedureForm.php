@@ -4,24 +4,24 @@ declare(strict_types=1);
 
 namespace App\Livewire\EncounterPackage\Forms;
 
+use App\Enums\Device\Status as DeviceStatus;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Equipment\Status as EquipmentStatus;
-use App\Enums\Device\Status as DeviceStatus;
 use App\Enums\Person\ProcedureStatus;
 use App\Enums\Status;
-use App\Models\MedicalEvents\Sql\Device;
+use App\Enums\User\Role;
 use App\Models\Employee\Employee;
 use App\Models\Equipment;
+use App\Models\MedicalEvents\Sql\Device;
+use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
 use App\Rules\MedicalEvents\PaperReferralRules;
-use App\Rules\PrimarySourceRequiredForAssistant;
 use App\Rules\PastDateTime;
-use App\Rules\AfterOrEqualDateTime;
+use App\Rules\PrimarySourceRequiredForAssistant;
+use Carbon\CarbonImmutable;
 use Closure;
-use App\Enums\User\Role;
 use Illuminate\Validation\Rule;
 use Livewire\Form;
-use Carbon\CarbonImmutable;
 use Throwable;
 
 class ProcedureForm extends Form
@@ -494,7 +494,7 @@ class ProcedureForm extends Form
             return;
         }
 
-        $allowedEmployeeTypes = config('ehealth.encounter_package_allowed_procedure_performer_employee_types', []);
+        $allowedEmployeeTypes = config('ehealth.encounter.package_allowed_procedure_performer_employee_types', []);
 
         if (!in_array($employee->employeeType, $allowedEmployeeTypes, true)) {
             $fail(__('procedures.validation.performer_employee_invalid_type'));

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
-use App\Enums\Person\EncounterStatus;
 use App\Casts\EHealthTimestampCast;
 use App\Contracts\SubmittedToEHealth;
+use App\Enums\Person\EncounterStatus;
 use App\Models\EhealthLink;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
@@ -20,9 +20,9 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Procedure extends Model implements SubmittedToEHealth
 {
@@ -478,7 +478,7 @@ class Procedure extends Model implements SubmittedToEHealth
     {
         $serviceIds = dictionary()->services()
             ->flattened()
-            ->whereIn('code', config('ehealth.summary_procedures_allowed'))
+            ->whereIn('code', config('ehealth.procedure.summary_procedures_allowed'))
             ->pluck('id');
 
         return $query->whereHas(

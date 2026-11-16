@@ -6,12 +6,12 @@ namespace App\Livewire\EncounterPackage\Forms;
 
 use App\Core\BaseForm;
 use App\Enums\Status;
+use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Rules\InDictionary;
 use App\Rules\OnlyOnePrimaryDiagnosis;
 use App\Rules\PastDateTime;
-use App\Models\Employee\Employee;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Support\Facades\Auth;
@@ -65,6 +65,9 @@ class EncounterForm extends BaseForm
                 'required',
                 'date_format:' . config('app.date_format'),
                 'before_or_equal:today',
+                'after_or_equal:' . CarbonImmutable::today()
+                    ->subDays(config('ehealth.encounter.max_days_passed'))
+                    ->format(config('app.date_format')),
                 $this->notBeforeEpisodeStart()
             ],
             'encounter.periodStart' => [
@@ -297,8 +300,8 @@ class EncounterForm extends BaseForm
     private function episodeTypeAllowedForLegalEntityAndEmployee(): In
     {
         return Rule::in(array_intersect(
-            config('ehealth.legal_entity_episode_types')[legalEntity()->type->name],
-            config('ehealth.employee_episode_types')[$this->component->employeeType]
+            config('ehealth.episode.legal_entity_episode_types')[legalEntity()->type->name],
+            config('ehealth.episode.employee_episode_types')[$this->component->employeeType]
         ));
     }
 
@@ -356,7 +359,7 @@ class EncounterForm extends BaseForm
                 return;
             }
 
-            $allowed = config("ehealth.episode_type_encounter_classes.$episodeTypeCode", []);
+            $allowed = config("ehealth.episode.type_encounter_classes.$episodeTypeCode", []);
             if (!in_array($value, $allowed, true)) {
                 $fail(__('validation.custom.encounter.classCode.episode_type_forbidden', [
                     'value' => $encounterClassLabels[$value]
@@ -407,7 +410,7 @@ class EncounterForm extends BaseForm
         return static function (string $attribute, mixed $value, Closure $fail) use (
             $encounterClassLabels
         ): void {
-            $allowed = config('ehealth.legal_entity_encounter_classes.' . legalEntity()->type->name, []);
+            $allowed = config('ehealth.encounter.legal_entity_classes.' . legalEntity()->type->name, []);
 
             if (!in_array($value, $allowed, true)) {
                 $fail(__('validation.custom.encounter.classCode.legal_entity_forbidden', [
@@ -431,7 +434,7 @@ class EncounterForm extends BaseForm
                 return;
             }
 
-            $classTypes = config("ehealth.encounter_class_encounter_types.$classCode", []);
+            $classTypes = config("ehealth.encounter.class_types.$classCode", []);
 
             if (!in_array($value, $classTypes, true)) {
                 $fail(__('validation.custom.encounter.typeCode.class_forbidden', ['value' => $value]));
@@ -477,7 +480,7 @@ class EncounterForm extends BaseForm
             }
 
             $classCode = $this->encounter['classCode'] ?? '';
-            $allowedClasses = config("ehealth.performer_employee_encounter_classes.$performer->employeeType", []);
+            $allowedClasses = config("ehealth.encounter.performer_employee_classes.$performer->employeeType", []);
 
             if ($classCode !== '' && !in_array($classCode, $allowedClasses, true)) {
                 $fail(__('validation.custom.encounter.performer_class_forbidden', ['type' => $performer->employeeType]));
@@ -486,7 +489,7 @@ class EncounterForm extends BaseForm
             }
 
             $typeCode = $this->encounter['typeCode'] ?? '';
-            $allowedTypes = config("ehealth.performer_employee_encounter_types.$performer->employeeType", []);
+            $allowedTypes = config("ehealth.encounter.performer_employee_types.$performer->employeeType", []);
 
             if ($typeCode !== '' && !in_array($typeCode, $allowedTypes, true)) {
                 $fail(__('validation.custom.encounter.performer_type_forbidden', ['type' => $performer->employeeType]));
@@ -556,7 +559,7 @@ class EncounterForm extends BaseForm
                 return;
             }
 
-            $allowedEmployeeTypes = config('ehealth.encounter_package_allowed_encounter_participant_employee_types');
+            $allowedEmployeeTypes = config('ehealth.encounter.package_allowed_encounter_participant_employee_types');
 
             if (!in_array($employee->employeeType, $allowedEmployeeTypes, true)) {
                 $fail(__('validation.custom.encounter.participant.employee_invalid_type'));
@@ -570,7 +573,7 @@ class EncounterForm extends BaseForm
                 return;
             }
 
-            $allowedEmployeeTypesForEncounter = config("ehealth.encounter_type_{$encounterType}_encounter_participant_employee_types_allowed", []);
+            $allowedEmployeeTypesForEncounter = config("ehealth.encounter.type_encounter_participant_employee_types_allowed.$encounterType", []);
 
             if ($allowedEmployeeTypesForEncounter !== [] && !in_array($employee->employeeType, $allowedEmployeeTypesForEncounter, true)) {
                 $fail(__('validation.custom.encounter.participant.employee_type_forbidden_for_encounter', ['type' => $employee->employeeType,]));
@@ -685,7 +688,7 @@ class EncounterForm extends BaseForm
                 ->filter(static fn (array $observation): bool => filled($observation['codeCode'] ?? null));
 
             $missing = array_diff(
-                config('ehealth.preperson_required_observation_codes', []),
+                config('ehealth.encounter.preperson_required_observation_codes', []),
                 $observations->pluck('codeCode')->all()
             );
 
@@ -700,7 +703,7 @@ class EncounterForm extends BaseForm
 
             $notAllowed = $observations->reject(static fn (array $observation): bool => in_array(
                 $observation['codeCode'],
-                config('ehealth.preperson_allowed_observation_codes', []),
+                config('ehealth.encounter.preperson_allowed_observation_codes', []),
                 true
             ));
 

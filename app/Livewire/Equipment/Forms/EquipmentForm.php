@@ -42,7 +42,7 @@ class EquipmentForm extends Form
      */
     public function rules(): array
     {
-        $requiredTypes = config('ehealth.equipment_types_with_required_serial_number', []);
+        $requiredTypes = config('ehealth.equipment.types_with_required_serial_number', []);
 
         return [
             'names' => ['required', 'array', 'min:1'],

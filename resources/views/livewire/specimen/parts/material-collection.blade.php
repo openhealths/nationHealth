@@ -160,7 +160,7 @@
                 <label for="specimenDurationCode" class="sr-only">{{ __('specimens.unit') }}</label>
                 <select x-model="modalSpecimen.durationCode" id="specimenDurationCode" class="input-select peer">
                     <option value="" selected>{{ __('forms.select') }}</option>
-                    @foreach (config('ehealth.specimen_duration_allowed_codes') as $code)
+                    @foreach (config('ehealth.specimen.duration_allowed_codes') as $code)
                         <option value="{{ $code }}">{{ $this->dictionaries['eHealth/ucum/units'][$code] }}</option>
                     @endforeach
                 </select>

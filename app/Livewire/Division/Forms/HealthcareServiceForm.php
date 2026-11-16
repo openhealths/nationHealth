@@ -5,20 +5,20 @@ declare(strict_types=1);
 namespace App\Livewire\Division\Forms;
 
 use App\Core\Arr;
-use Livewire\Form;
+use App\Enums\Division\Status;
+use App\Enums\License\Type;
 use App\Models\Division;
+use App\Models\HealthcareService;
 use App\Rules\InDictionary;
 use Carbon\CarbonImmutable;
-use App\Enums\License\Type;
-use App\Enums\Division\Status;
-use Illuminate\Validation\Rule;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\MessageBag;
-use Illuminate\Validation\Validator;
-use App\Models\HealthcareService;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Validation\Validator;
+use Livewire\Form;
 
 class HealthcareServiceForm extends Form
 {
@@ -71,31 +71,30 @@ class HealthcareServiceForm extends Form
      */
     public function rules(): array
     {
-        $categoriesConfigKey = 'healthcare_service_' . strtolower(legalEntity()->type->name) . '_categories';
         $providingConditionConfigKey = 'legal_entity_' . strtolower(legalEntity()->type->name) . '_providing_conditions';
 
         $categoryCode = Arr::get($this->category, 'coding.0.code');
 
         $licenseType = $categoryCode
-            ? config('ehealth.healthcare_service_' . strtolower($categoryCode) . '_license_type')
+            ? config("ehealth.healthcare_service.license_type.$categoryCode")
             : null;
         $isLicenseRequiredForType = !empty($licenseType);
 
         $isSpecialityRequiredForCategory = in_array(
             $categoryCode,
-            config('ehealth.healthcare_service_speciality_type_field_required_for_categories', []),
+            config('ehealth.healthcare_service.speciality_type_field_required_for_categories', []),
             true
         );
 
         $isProvidingConditionRequiredForCategory = in_array(
             $categoryCode,
-            config('ehealth.healthcare_service_providing_condition_field_required_for_categories', []),
+            config('ehealth.healthcare_service.providing_condition_field_required_for_categories', []),
             true
         );
 
         $isTypeRequiredForCategory = in_array(
             $categoryCode,
-            config('ehealth.healthcare_service_type_field_required_for_categories', []),
+            config('ehealth.healthcare_service.type_field_required_for_categories', []),
             true
         );
 
@@ -115,7 +114,7 @@ class HealthcareServiceForm extends Form
                 'required',
                 'string',
                 new InDictionary('HEALTHCARE_SERVICE_CATEGORIES'),
-                Rule::in(config("ehealth.$categoriesConfigKey", []))
+                Rule::in(config('ehealth.healthcare_service.categories.' . legalEntity()->type->name, []))
             ],
             'specialityType' => [
                 'nullable',

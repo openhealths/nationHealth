@@ -11,11 +11,11 @@ use App\Enums\Declaration\Status;
 use App\Enums\JobStatus;
 use App\Enums\Person\AuthenticationMethod;
 use App\Enums\User\Role;
-use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\Signature\SignatureException;
 use App\Livewire\Declaration\Forms\DeclarationForm as Form;
 use App\Models\Declaration;
 use App\Models\DeclarationRequest;
@@ -200,7 +200,7 @@ abstract class DeclarationComponent extends Component
 
         // A child below the self-authentication age can act only through a confidant person, whose presence is proven by the THIRD_PERSON method
         $this->isNeedToPersonUpdate = !$this->isNeedToResign && (
-            $hasNoAuthMethod || ($patient->age < config('ehealth.no_self_auth_age') && !$hasThirdPerson)
+            $hasNoAuthMethod || ($patient->age < config('ehealth.system_global_parameters.no_self_auth_age') && !$hasThirdPerson)
         );
 
         // The simplified flow signs the form built by the System, so there is no mark for the user to confirm

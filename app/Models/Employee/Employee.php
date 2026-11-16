@@ -4,26 +4,26 @@ declare(strict_types=1);
 
 namespace App\Models\Employee;
 
-use Carbon\Carbon;
-use App\Models\User;
-use App\Models\LegalEntity;
+use App\Casts\EHealthDateCast;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Models\Declaration;
-use App\Casts\EHealthDateCast;
-use Database\Factories\Employee\EmployeeFactory;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\LegalEntity;
 use App\Models\Relations\Education;
-use App\Models\Relations\Speciality;
 use App\Models\Relations\Qualification;
 use App\Models\Relations\ScienceDegree;
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Relations\Speciality;
 use App\Models\ReorganizationEmployeeDeclaration;
+use App\Models\User;
+use Carbon\Carbon;
+use Database\Factories\Employee\EmployeeFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphOne;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class Employee extends BaseEmployee
 {
@@ -355,7 +355,7 @@ class Employee extends BaseEmployee
     #[Scope]
     protected function manageableBy(Builder $query, User $user): Builder
     {
-        return config('ehealth.allow_other_le_employees_to_manage_episode')
+        return config('ehealth.episode.allow_other_le_employees_to_manage_episode')
             ? $query->whereLegalEntityId(legalEntity()->id)
             : $query->wherePartyId($user->partyId);
     }
@@ -405,7 +405,7 @@ class Employee extends BaseEmployee
      */
     public function allowedConditionCodesBySystem(): array
     {
-        $employeeTypeRestrictions = config("ehealth.employee_type_conditions_allowed.$this->employeeType");
+        $employeeTypeRestrictions = config("ehealth.condition.employee_type_conditions_allowed.$this->employeeType");
 
         if ($employeeTypeRestrictions === null) {
             return [];
@@ -425,7 +425,7 @@ class Employee extends BaseEmployee
      */
     public function forbiddenIcd10ConditionCodes(): array
     {
-        $specialityCodes = config('ehealth.icd10am_speciality_conditions_allowed', []);
+        $specialityCodes = config('ehealth.condition.icd10_am_speciality_conditions_allowed', []);
 
         $heldSpecialities = $this->loadMissing('specialities')
             ->specialities

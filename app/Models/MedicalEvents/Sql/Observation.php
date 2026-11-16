@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
-use App\Enums\Person\EncounterStatus;
-use App\Enums\Person\DiagnosticReportStatus;
 use App\Casts\EHealthTimestampCast;
+use App\Enums\Person\DiagnosticReportStatus;
+use App\Enums\Person\EncounterStatus;
 use App\Enums\Person\ObservationStatus;
 use App\Models\Person\Person;
 use App\Models\Preperson;
@@ -564,7 +564,7 @@ class Observation extends Model
             'code.coding',
             static fn (Builder $coding): Builder => $coding->whereIn(
                 'code',
-                config('ehealth.summary_observations_allowed')
+                config('ehealth.observation.summary_observations_allowed')
             )
         );
     }

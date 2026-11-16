@@ -6,46 +6,46 @@ namespace App\Livewire\EncounterPackage;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Enums\ClinicalImpression\Status as ClinicalImpressionStatus;
 use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\Equipment\AvailabilityStatus;
-use App\Enums\ClinicalImpression\Status as ClinicalImpressionStatus;
-use App\Enums\Person\ImmunizationStatus;
 use App\Enums\Person\DeviceRequestStatus;
+use App\Enums\Person\ImmunizationStatus;
 use App\Enums\Status;
 use App\Enums\User\Role;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Livewire\EncounterPackage\Forms\ClinicalImpressionForm;
+use App\Livewire\EncounterPackage\Forms\ConditionForm;
 use App\Livewire\EncounterPackage\Forms\DetectedIssueForm;
 use App\Livewire\EncounterPackage\Forms\DeviceAssociationForm;
-use App\Livewire\EncounterPackage\Forms\DeviceForm;
 use App\Livewire\EncounterPackage\Forms\DeviceDispenseForm;
-use App\Livewire\EncounterPackage\Forms\ConditionForm;
+use App\Livewire\EncounterPackage\Forms\DeviceForm;
 use App\Livewire\EncounterPackage\Forms\DiagnosticReportForm;
+use App\Livewire\EncounterPackage\Forms\EncounterForm as Form;
 use App\Livewire\EncounterPackage\Forms\ImmunizationForm;
 use App\Livewire\EncounterPackage\Forms\ObservationForm;
 use App\Livewire\EncounterPackage\Forms\ProcedureForm;
 use App\Livewire\EncounterPackage\Forms\SpecimenForm;
-use App\Livewire\EncounterPackage\Forms\EncounterForm as Form;
 use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Immunization;
-use App\Models\MedicalEvents\Sql\Observation;
-use App\Models\MedicalEvents\Sql\Specimen;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
-use App\Models\Person\Person;
-use App\Models\Preperson;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\EpisodeCurrentDiagnosis;
-use App\Repositories\Repository;
+use App\Models\MedicalEvents\Sql\Immunization;
+use App\Models\MedicalEvents\Sql\Observation;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Models\MedicalEvents\Sql\Specimen;
+use App\Models\Person\Person;
+use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
-use App\Services\MedicalEvents\Fhir;
+use App\Repositories\Repository;
 use App\Services\Dictionary\Mappers\ImmunizationDictionaryMapper;
 use App\Services\MedData\MedData;
+use App\Services\MedicalEvents\Fhir;
 use App\Traits\FormTrait;
 use App\Traits\SearchesElectronicReferrals;
 use Illuminate\Support\Collection;
@@ -777,9 +777,9 @@ class EncounterPackageComponent extends Component
 
         $this->form->encounter['performerId'] = $encounterWriterEmployee->uuid;
 
-        $participantEmployeeTypes = config('ehealth.encounter_package_allowed_encounter_participant_employee_types');
-        $diagnosticReportEmployeeTypes = config('ehealth.encounter_package_allowed_diagnostic_report_performer_employee_types', []);
-        $performerEmployeeTypes = array_keys(config('ehealth.performer_employee_encounter_classes', []));
+        $participantEmployeeTypes = config('ehealth.encounter.package_allowed_encounter_participant_employee_types');
+        $diagnosticReportEmployeeTypes = config('ehealth.encounter.package_allowed_diagnostic_report_performer_employee_types', []);
+        $performerEmployeeTypes = array_keys(config('ehealth.encounter.performer_employee_classes', []));
 
         $employees = Employee::whereLegalEntityId(legalEntity()->id)
             ->active()
@@ -816,8 +816,8 @@ class EncounterPackageComponent extends Component
                 'uuid' => $employee->uuid,
                 'name' => $employee->fullName,
                 'position' => $employee->position,
-                'encounterClasses' => config("ehealth.performer_employee_encounter_classes.$employee->employeeType", []),
-                'encounterTypes' => config("ehealth.performer_employee_encounter_types.$employee->employeeType", [])
+                'encounterClasses' => config("ehealth.encounter.performer_employee_classes.$employee->employeeType", []),
+                'encounterTypes' => config("ehealth.encounter.performer_employee_types.$employee->employeeType", [])
             ])
             ->values()
             ->toArray();
@@ -834,7 +834,7 @@ class EncounterPackageComponent extends Component
             ->toArray();
 
         $this->procedureEmployees = collect($this->diagnosticReportEmployees)
-            ->whereIn('employeeType', config('ehealth.encounter_package_allowed_procedure_performer_employee_types', []))
+            ->whereIn('employeeType', config('ehealth.encounter.package_allowed_procedure_performer_employee_types', []))
             ->values()
             ->toArray();
 
@@ -1456,14 +1456,14 @@ class EncounterPackageComponent extends Component
     protected function adjustEpisodeTypes(): void
     {
         $keys = array_intersect(
-            config("ehealth.legal_entity_episode_types.$this->legalEntityType", []),
-            config("ehealth.employee_episode_types.$this->employeeType", [])
+            config("ehealth.episode.legal_entity_episode_types.$this->legalEntityType", []),
+            config("ehealth.episode.employee_episode_types.$this->employeeType", [])
         );
 
         $this->adjustDictionary('eHealth/episode_types', $keys);
 
         // The whole map is kept, as the existing episodes may be of a type the user cannot open themselves
-        $this->episodeTypeClasses = config('ehealth.episode_type_encounter_classes', []);
+        $this->episodeTypeClasses = config('ehealth.episode.type_encounter_classes', []);
     }
 
     /**
@@ -1474,8 +1474,8 @@ class EncounterPackageComponent extends Component
     protected function adjustEncounterClasses(): void
     {
         $keys = array_intersect(
-            config("ehealth.legal_entity_encounter_classes.$this->legalEntityType", []),
-            config("ehealth.performer_employee_encounter_classes.$this->employeeType", [])
+            config("ehealth.encounter.legal_entity_classes.$this->legalEntityType", []),
+            config("ehealth.encounter.performer_employee_classes.$this->employeeType", [])
         );
 
         $this->adjustDictionary('eHealth/encounter_classes', $keys);
@@ -1496,7 +1496,7 @@ class EncounterPackageComponent extends Component
         $this->encounterClassTypes = collect($this->dictionaries['eHealth/encounter_classes'])
             ->keys()
             ->mapWithKeys(static fn (string $classCode): array => [
-                $classCode => config("ehealth.encounter_class_encounter_types.$classCode", [])
+                $classCode => config("ehealth.encounter.class_types.$classCode", [])
             ])
             ->toArray();
 

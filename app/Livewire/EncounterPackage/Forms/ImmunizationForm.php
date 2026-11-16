@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Livewire\EncounterPackage\Forms;
 
 use App\Enums\Status;
+use App\Enums\User\Role;
 use App\Models\Employee\Employee;
 use App\Rules\InDictionary;
 use App\Rules\PastDateTime;
 use App\Services\Dictionary\Mappers\ImmunizationDictionaryMapper;
+use Carbon\CarbonImmutable;
 use Closure;
-use App\Enums\User\Role;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\RequiredIf;
 use Livewire\Form;
@@ -77,7 +78,14 @@ class ImmunizationForm extends Form
                 'string',
                 new InDictionary('eHealth/vaccine_codes')
             ],
-            'immunizations.*.date' => ['required_with:immunizations', 'before:tomorrow', 'date'],
+            'immunizations.*.date' => [
+                'required_with:immunizations',
+                'before:tomorrow',
+                'date',
+                'after_or_equal:' . CarbonImmutable::today()
+                    ->subDays(config('ehealth.encounter.immunization_max_days_passed'))
+                    ->format(config('app.date_format'))
+            ],
             'immunizations.*.time' => Rule::forEach(fn (mixed $value, string $attribute) => [
                 'required_with:immunizations',
                 'date_format:H:i',

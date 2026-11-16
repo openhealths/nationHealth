@@ -27,7 +27,7 @@ class SpecimenForm extends BaseForm
         $collectedType = $this->specimen['collectedType'] ?? '';
         // The range picker keeps both bounds in one field
         $periodBounds = array_map('trim', explode('—', $this->specimen['collectedPeriodRange'] ?? ''));
-        $minCollectedDate = CarbonImmutable::today()->subDays(config('ehealth.specimen_max_days_passed'));
+        $minCollectedDate = CarbonImmutable::today()->subDays(config('ehealth.specimen.max_days_passed'));
 
         return [
             'specimen.registeredById' => [
@@ -121,7 +121,7 @@ class SpecimenForm extends BaseForm
                 'nullable',
                 'string',
                 new InDictionary('eHealth/ucum/units'),
-                Rule::in(config('ehealth.specimen_duration_allowed_codes'))
+                Rule::in(config('ehealth.specimen.duration_allowed_codes'))
             ],
             'specimen.quantityValue' => [
                 'nullable',

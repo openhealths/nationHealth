@@ -727,7 +727,7 @@ trait InteractsWithAuthenticationMethods
                         return;
                     }
 
-                    if ($person->age <= config('ehealth.no_self_auth_age') && in_array($value, [
+                    if ($person->age <= config('ehealth.system_global_parameters.no_self_auth_age') && in_array($value, [
                             AuthenticationMethod::OTP->value,
                             AuthenticationMethod::OFFLINE->value
                         ], true)) {

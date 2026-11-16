@@ -11,7 +11,7 @@
         x-data="{
              names: $wire.entangle('form.person.names'),
              documents: $wire.entangle('form.person.documents'),
-             foreignDocumentTypes: @js(config('ehealth.identity_document_types_foreign')),
+             foreignDocumentTypes: @js(config('ehealth.person_documents.identity_document_types_foreign')),
              nameErrors: {},
              init() {
                  this.nameErrors = JSON.parse(this.$root.dataset.nameErrors);
@@ -60,9 +60,7 @@
                             class="form-toggle-input"
                         />
                         <div class="form-toggle-track" aria-hidden="true"></div>
-                        <span class="form-toggle-label">
-                            {{ __('patients.has_last_name') }}
-                        </span>
+                        <span class="form-toggle-label"> {{ __('patients.has_last_name') }} </span>
                     </label>
                 </div>
 
@@ -207,9 +205,7 @@
                         autocomplete="off"
                     />
                     <label for="unzr" class="label"> {{ __('patients.unzr') }} </label>
-                    <p id="unzr-format" class="text-note">
-                        {{ __('patients.unzr_format') }}
-                    </p>
+                    <p id="unzr-format" class="text-note">{{ __('patients.unzr_format') }}</p>
                     @error('form.person.unzr')
                         <p class="text-error">{{ $message }}</p>
                     @enderror
@@ -269,9 +265,7 @@
                                     class="form-toggle-input"
                                 />
                                 <div class="form-toggle-track" aria-hidden="true"></div>
-                                <span class="form-toggle-label">
-                                    {{ __('patients.has_last_name') }}
-                                </span>
+                                <span class="form-toggle-label"> {{ __('patients.has_last_name') }} </span>
                             </label>
                         </div>
 

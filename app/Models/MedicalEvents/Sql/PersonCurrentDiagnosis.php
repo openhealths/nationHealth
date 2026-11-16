@@ -64,7 +64,7 @@ class PersonCurrentDiagnosis extends Model
             'code.coding',
             static fn (Builder $coding): Builder => $coding->whereIn(
                 'code',
-                config('ehealth.summary_conditions_allowed')
+                config('ehealth.condition.summary_conditions_allowed')
             )
         );
     }

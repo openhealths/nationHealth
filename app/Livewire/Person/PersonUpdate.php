@@ -172,7 +172,7 @@ class PersonUpdate extends PersonComponent
         );
         $this->form->person['confidantPersons'] = $this->loadConfidantPersons($person);
 
-        $uaOnlyTypes = config('ehealth.document_types_issuing_country_ua_only');
+        $uaOnlyTypes = config('ehealth.person_documents.document_types_issuing_country_ua_only');
 
         // Fix cases where the issuing country is not set for document types that require it to be 'UA'
         foreach ($this->form->person['documents'] as &$document) {

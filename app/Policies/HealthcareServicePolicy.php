@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
-use App\Models\User;
-use App\Enums\Status as DivisionStatus;
 use App\Enums\HealthcareService\Status;
+use App\Enums\Status as DivisionStatus;
 use App\Models\HealthcareService;
+use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
 class HealthcareServicePolicy
@@ -63,7 +63,7 @@ class HealthcareServicePolicy
         }
 
         // Check that legal entity type exists in HEALTHCARE_SERVICE_LEGAL_ENTITIES_ALLOWED_TYPES chart parameter.
-        $allowedTypes = config('ehealth.healthcare_service_legal_entities_allowed_types', []);
+        $allowedTypes = config('ehealth.healthcare_service.legal_entities_allowed_types', []);
         if (!in_array(legalEntity()->type->name, $allowedTypes, true)) {
             return Response::denyWithStatus(404);
         }

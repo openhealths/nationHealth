@@ -19,7 +19,7 @@ class PrepersonPolicyConfigurationTest extends TestCase
     public function missingAllowedTypesDenyAccessWithoutBreakingThePage(): void
     {
         $ehealthConfig = config('ehealth');
-        unset($ehealthConfig['preperson_legal_entities_allowed_types']);
+        unset($ehealthConfig['preperson']['legal_entities_allowed_types']);
         config(['ehealth' => $ehealthConfig]);
 
         $response = $this->checkLegalEntityType('OUTPATIENT');
@@ -33,7 +33,7 @@ class PrepersonPolicyConfigurationTest extends TestCase
     #[DataProvider('configuredTypes')]
     public function configuredTypesPreserveLegalEntityRestrictions(array $allowedTypes, string $type, bool $passes): void
     {
-        config(['ehealth.preperson_legal_entities_allowed_types' => $allowedTypes]);
+        config(['ehealth.preperson.legal_entities_allowed_types' => $allowedTypes]);
 
         $response = $this->checkLegalEntityType($type);
 
@@ -64,6 +64,6 @@ class PrepersonPolicyConfigurationTest extends TestCase
         $legalEntity->setRelation('type', new LegalEntityType(['name' => $type]));
         $this->app->instance('legalEntity', $legalEntity);
 
-        return (new PrepersonPolicy())->before(new User(), 'viewAny');
+        return new PrepersonPolicy()->before(new User(), 'viewAny');
     }
 }

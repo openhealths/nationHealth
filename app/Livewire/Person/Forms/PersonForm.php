@@ -14,12 +14,12 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\Person\Person;
 use App\Models\Relations\AuthenticationMethod as AuthenticationMethodModel;
 use App\Rules\AlphaNumericWithSymbols;
+use App\Rules\EightDigitsHyphenFiveDigits;
 use App\Rules\InDictionary;
 use App\Rules\NameFields;
 use App\Rules\PhoneNumber;
 use App\Rules\TwoLettersFourToSixDigitsOrComplex;
 use App\Rules\TwoLettersSixDigits;
-use App\Rules\EightDigitsHyphenFiveDigits;
 use App\Rules\Zip;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -29,6 +29,14 @@ use Illuminate\Validation\ValidationException;
 
 class PersonForm extends BaseForm
 {
+    private const array EXPIRATION_DATE_REQUIRED_DOCUMENT_TYPES = [
+        'NATIONAL_ID',
+        'COMPLEMENTARY_PROTECTION_CERTIFICATE',
+        'PERMANENT_RESIDENCE_PERMIT',
+        'REFUGEE_CERTIFICATE',
+        'TEMPORARY_CERTIFICATE',
+        'TEMPORARY_PASSPORT'
+    ];
     private const string EXPIRATION_DATE_ISSUED_AT_CONDITIONAL_TYPE = 'PERMANENT_RESIDENCE_PERMIT';
     private const string EXPIRATION_DATE_ISSUED_AT_REQUIRED_FROM = '2018-06-01';
 
@@ -176,9 +184,9 @@ class PersonForm extends BaseForm
      */
     protected function basicRules(): array
     {
-        $expirationDateAfter = config('ehealth.person_documents_use_specific_expiration_date')
-        && config('ehealth.person_documents_specific_expiration_date')
-            ? config('ehealth.person_documents_specific_expiration_date')
+        $expirationDateAfter = config('ehealth.person_documents.use_specific_expiration_date')
+        && config('ehealth.person_documents.specific_expiration_date')
+            ? config('ehealth.person_documents.specific_expiration_date')
             : 'today';
 
         $rules = [
@@ -197,7 +205,7 @@ class PersonForm extends BaseForm
                         ->contains(static fn (array $document) => $document['type'] === 'NATIONAL_ID');
                 }),
                 Rule::prohibitedIf(function () {
-                    $foreignTypes = config('ehealth.identity_document_types_foreign');
+                    $foreignTypes = config('ehealth.person_documents.identity_document_types_foreign');
 
                     return collect($this->person['documents'])
                         ->contains(
@@ -304,7 +312,6 @@ class PersonForm extends BaseForm
         }
 
         $this->validateNoTaxIdFlag();
-        $this->addTaxIdUniquenessValidation($rules);
         $this->addNamesLastNameValidation($rules);
         $this->addNamesAlphabetValidation($rules);
         $this->addEmergencyContactNameValidation($rules);
@@ -546,7 +553,7 @@ class PersonForm extends BaseForm
      */
     public function confidantRejectionReason(array $personData, bool $requiresVerification = true): ?string
     {
-        if (CarbonImmutable::parse($personData['birthDate'])->age < config('ehealth.no_self_registration_age')) {
+        if (CarbonImmutable::parse($personData['birthDate'])->age < config('ehealth.system_global_parameters.no_self_registration_age')) {
             return __('patients.age_insufficient_for_confidant_person');
         }
 
@@ -602,7 +609,7 @@ class PersonForm extends BaseForm
     {
         return !empty(array_intersect(
             array_column($this->person['documents'] ?? [], 'type'),
-            config('ehealth.person_legal_capacity_document_types')
+            config('ehealth.person_documents.person_legal_capacity_document_types')
         ));
     }
 
@@ -617,7 +624,7 @@ class PersonForm extends BaseForm
             return true;
         }
 
-        $documentType = $this->personAge < config('ehealth.no_self_auth_age')
+        $documentType = $this->personAge < config('ehealth.system_global_parameters.no_self_auth_age')
             ? 'BIRTH_CERTIFICATE_FOREIGN'
             : 'PERMANENT_RESIDENCE_PERMIT';
 
@@ -682,7 +689,6 @@ class PersonForm extends BaseForm
         $messages = [
             'person.unzr.required' => __('validation.custom.person.unzr_required_for_national_id'),
             'person.unzr.prohibited' => __('validation.custom.person.unzr_prohibited_for_foreign'),
-            'person.taxId.unique' => __('validation.custom.person.tax_id_already_used'),
             'person.secret.regex' => __('validation.custom.person.secret_format'),
             'person.documents.*.issuedAt.after_or_equal' => __('validation.custom.person.issued_at_before_birth_date'),
             'person.confidantPerson.documentsRelationship.*.issuedAt.after_or_equal' => __(
@@ -716,8 +722,8 @@ class PersonForm extends BaseForm
      */
     private function getIssuingCountryMessages(): array
     {
-        $uaOnlyTypes = config('ehealth.document_types_issuing_country_ua_only');
-        $notUaTypes = config('ehealth.document_types_issuing_country_not_ua');
+        $uaOnlyTypes = config('ehealth.person_documents.document_types_issuing_country_ua_only');
+        $notUaTypes = config('ehealth.person_documents.document_types_issuing_country_not_ua');
 
         $documentTypes = dictionary()->basics()->byName('DOCUMENT_TYPE', false)->asCodeDescription();
         $messages = [];
@@ -749,10 +755,8 @@ class PersonForm extends BaseForm
      */
     private function addExpirationDateRuleIfRequired(array &$rules): void
     {
-        $requiredTypes = config('ehealth.expiration_date_exists');
-
         foreach ($this->person['documents'] as $index => $document) {
-            if ($this->isExpirationDateRequiredForDocument($document, $requiredTypes)) {
+            if ($this->isExpirationDateRequiredForDocument($document)) {
                 $rules["person.documents.$index.expirationDate"][] = 'required';
             }
         }
@@ -766,11 +770,11 @@ class PersonForm extends BaseForm
     private function getExpirationDateFutureMessage(): string
     {
         if (
-            config('ehealth.person_documents_use_specific_expiration_date')
-            && config('ehealth.person_documents_specific_expiration_date')
+            config('ehealth.person_documents.use_specific_expiration_date')
+            && config('ehealth.person_documents.specific_expiration_date')
         ) {
             return __('validation.custom.person.expiration_date_after_specific', [
-                'date' => config('ehealth.person_documents_specific_expiration_date')
+                'date' => config('ehealth.person_documents.specific_expiration_date')
             ]);
         }
 
@@ -785,12 +789,10 @@ class PersonForm extends BaseForm
     private function getExpirationDateRequiredMessage(): string
     {
         if (!empty($this->person['documents'])) {
-            $requiredTypes = config('ehealth.expiration_date_exists', []);
-
             foreach ($this->person['documents'] as $document) {
                 if (
                     empty($document['expirationDate'])
-                    && $this->isExpirationDateRequiredForDocument($document, $requiredTypes)
+                    && $this->isExpirationDateRequiredForDocument($document)
                 ) {
                     return __(
                         'validation.custom.person.expiration_date_required_for_type',
@@ -812,14 +814,13 @@ class PersonForm extends BaseForm
      * Determine whether a person document must have an expiration date.
      *
      * @param  array  $document
-     * @param  array  $requiredTypes
      * @return bool
      */
-    private function isExpirationDateRequiredForDocument(array $document, array $requiredTypes): bool
+    private function isExpirationDateRequiredForDocument(array $document): bool
     {
         $documentType = $document['type'];
 
-        if (!in_array($documentType, $requiredTypes, true)) {
+        if (!in_array($documentType, self::EXPIRATION_DATE_REQUIRED_DOCUMENT_TYPES, true)) {
             return false;
         }
 
@@ -858,7 +859,7 @@ class PersonForm extends BaseForm
      */
     private function addNumberDocumentsValidation(array &$rules): void
     {
-        $foreignTypes = config('ehealth.identity_document_types_foreign');
+        $foreignTypes = config('ehealth.person_documents.identity_document_types_foreign');
 
         foreach ($this->person['documents'] as $key => $document) {
             $rules["person.documents.$key.number"] = ['required', 'string', 'max:100'];
@@ -927,7 +928,7 @@ class PersonForm extends BaseForm
         $personAge = CarbonImmutable::parse($this->person['birthDate'])->age;
 
         foreach ($this->person['confidantPerson']['documentsRelationship'] as $document) {
-            if ($personAge >= config('ehealth.person_full_legal_capacity_age') &&
+            if ($personAge >= config('ehealth.system_global_parameters.person_full_legal_capacity_age') &&
                 in_array(
                     $document['type'],
                     ['BIRTH_CERTIFICATE', 'BIRTH_CERTIFICATE_FOREIGN'],
@@ -973,7 +974,7 @@ class PersonForm extends BaseForm
             ]);
         }
 
-        $thirdPersonLimit = config('ehealth.third_person_limit');
+        $thirdPersonLimit = config('ehealth.person_confidant_relationship.third_person_limit');
 
         $thirdPersonCount = AuthenticationMethodModel::query()
             ->whereType(AuthenticationMethod::THIRD_PERSON)
@@ -1044,7 +1045,7 @@ class PersonForm extends BaseForm
         if ($noTaxId === false && !$taxIdFilled && !empty($this->person['birthDate'])) {
             $personAge = CarbonImmutable::parse($this->person['birthDate'])->age;
 
-            if ($personAge > config('ehealth.no_self_auth_age')) {
+            if ($personAge > config('ehealth.system_global_parameters.no_self_auth_age')) {
                 throw ValidationException::withMessages([
                     'person.taxId' => __('validation.custom.person.no_tax_id_false_requires_tax_id')
                 ]);
@@ -1077,8 +1078,8 @@ class PersonForm extends BaseForm
      */
     private function addIssuingCountryValidation(array &$rules): void
     {
-        $uaOnlyTypes = config('ehealth.document_types_issuing_country_ua_only');
-        $notUaTypes = config('ehealth.document_types_issuing_country_not_ua');
+        $uaOnlyTypes = config('ehealth.person_documents.document_types_issuing_country_ua_only');
+        $notUaTypes = config('ehealth.person_documents.document_types_issuing_country_not_ua');
 
         foreach ($this->person['documents'] as $key => $document) {
             $type = $document['type'] ?? null;
@@ -1099,7 +1100,7 @@ class PersonForm extends BaseForm
      */
     private function validateForeignDocumentsExclusivity(): void
     {
-        $foreignTypes = config('ehealth.identity_document_types_foreign');
+        $foreignTypes = config('ehealth.person_documents.identity_document_types_foreign');
         $submittedTypes = array_column($this->person['documents'], 'type');
 
         if (empty(array_intersect($submittedTypes, $foreignTypes))) {
@@ -1174,30 +1175,10 @@ class PersonForm extends BaseForm
      */
     private function hasForeignDocument(): bool
     {
-        $foreignTypes = config('ehealth.identity_document_types_foreign');
+        $foreignTypes = config('ehealth.person_documents.identity_document_types_foreign');
 
         return collect($this->person['documents'] ?? [])
             ->contains(static fn (array $document): bool => in_array($document['type'] ?? null, $foreignTypes, true));
-    }
-
-    /**
-     * When enabled by the VALIDATE_PERSON_TAX_ID_UNIQUENESS chart parameter, tax_id must be unique among existing
-     * persons (ignoring the person currently being updated).
-     *
-     * @param  array  $rules
-     * @return void
-     */
-    private function addTaxIdUniquenessValidation(array &$rules): void
-    {
-        if (!config('ehealth.validate_person_tax_id_uniqueness')) {
-            return;
-        }
-
-        $rules['person.taxId'][] = Rule::unique('persons', 'tax_id')
-            ->when(
-                !empty($this->person['uuid']),
-                fn ($rule) => $rule->ignore($this->person['uuid'], 'uuid')
-            );
     }
 
     /**
@@ -1226,7 +1207,7 @@ class PersonForm extends BaseForm
     private function addNamesLanguagePresenceValidation(array &$rules): void
     {
         $rules['person.names'][] = function (string $attribute, mixed $value, Closure $fail): void {
-            $foreignTypes = config('ehealth.identity_document_types_foreign');
+            $foreignTypes = config('ehealth.person_documents.identity_document_types_foreign');
             $submittedTypes = array_column($this->person['documents'] ?? [], 'type');
             $hasForeignDocument = (bool)array_intersect($submittedTypes, $foreignTypes);
 
@@ -1258,17 +1239,17 @@ class PersonForm extends BaseForm
     private function validateNecessityOfConfidantPerson(): void
     {
         // Below the self-registration age a confidant person is mandatory
-        if ($this->personAge < config('ehealth.no_self_registration_age')
-            && empty($this->person['confidantPerson']['personId'])) {
+        if (empty($this->person['confidantPerson']['personId'])
+            && $this->personAge < config('ehealth.system_global_parameters.no_self_registration_age')) {
             throw ValidationException::withMessages([
                 'person.confidantPerson' => __('validation.custom.person.confidant_person_required_for_children')
             ]);
         }
 
         // Between the self-registration age and the full legal capacity age
-        if ($this->personAge >= config('ehealth.no_self_registration_age')
-            && $this->personAge < config('ehealth.person_full_legal_capacity_age')) {
-            $personLegalCapacityDocumentTypes = config('ehealth.person_legal_capacity_document_types');
+        if ($this->personAge >= config('ehealth.system_global_parameters.no_self_registration_age')
+            && $this->personAge < config('ehealth.system_global_parameters.person_full_legal_capacity_age')) {
+            $personLegalCapacityDocumentTypes = config('ehealth.person_documents.person_legal_capacity_document_types');
             $hasLegalCapacityDocument = false;
 
             foreach ($this->person['documents'] as $document) {
@@ -1301,7 +1282,7 @@ class PersonForm extends BaseForm
      */
     private function validateDocumentsForMinorPerson(): void
     {
-        if ($this->personAge < config('ehealth.no_self_auth_age')) {
+        if ($this->personAge < config('ehealth.system_global_parameters.no_self_auth_age')) {
             $requiredDocumentTypes = ['BIRTH_CERTIFICATE', 'BIRTH_CERTIFICATE_FOREIGN'];
             $hasRequiredDocument = false;
 
@@ -1327,10 +1308,10 @@ class PersonForm extends BaseForm
      */
     private function validatePersonDocuments(): void
     {
-        $personLegalCapacityDocumentTypes = config('ehealth.person_legal_capacity_document_types');
-        $personRegistrationDocumentTypes = config('ehealth.person_registration_document_types');
-        $selfAuthAgeDocumentTypes = config('ehealth.self_auth_age_document_types');
-        $noSelfAuthAgeDocumentTypes = config('ehealth.no_self_auth_age_document_types');
+        $personLegalCapacityDocumentTypes = config('ehealth.person_documents.person_legal_capacity_document_types');
+        $personRegistrationDocumentTypes = config('ehealth.person_documents.person_registration_document_types');
+        $selfAuthAgeDocumentTypes = config('ehealth.person_documents.self_auth_age_document_types');
+        $noSelfAuthAgeDocumentTypes = config('ehealth.person_documents.no_self_auth_age_document_types');
         $documentTypes = dictionary()->basics()->byName('DOCUMENT_TYPE', false)->asCodeDescription();
 
         // Check submitted person document types exist in PERSON_REGISTRATION_DOCUMENT_TYPES config parameter
@@ -1350,8 +1331,8 @@ class PersonForm extends BaseForm
 
         // Check document types from PERSON_LEGAL_CAPACITY_DOCUMENT_TYPES config parameter (that prove persons legal capacity) are not submitted
         // if persons age is less than no_self_registration_age global parameter or greater than person_full_legal_capacity_age global parameter
-        if ($this->personAge < config('ehealth.no_self_registration_age')
-            || $this->personAge > config('ehealth.person_full_legal_capacity_age')) {
+        if ($this->personAge < config('ehealth.system_global_parameters.no_self_registration_age')
+            || $this->personAge > config('ehealth.system_global_parameters.person_full_legal_capacity_age')) {
             foreach ($this->person['documents'] as $document) {
                 if (in_array($document['type'], $personLegalCapacityDocumentTypes, true)) {
                     throw ValidationException::withMessages([
@@ -1404,7 +1385,7 @@ class PersonForm extends BaseForm
         }
 
         // Check if person age is below the self-authentication age every document type is in NO_SELF_AUTH_AGE_DOCUMENT_TYPES
-        if ($this->personAge < config('ehealth.no_self_auth_age')) {
+        if ($this->personAge < config('ehealth.system_global_parameters.no_self_auth_age')) {
             $invalidTypes = array_diff($submittedTypes, $noSelfAuthAgeDocumentTypes);
 
             if (!empty($invalidTypes)) {
@@ -1423,7 +1404,7 @@ class PersonForm extends BaseForm
         }
 
         // Check if person age is above the self-authentication age check existence SELF_AUTH_AGE_DOCUMENT_TYPES
-        if ($this->personAge > config('ehealth.no_self_auth_age')) {
+        if ($this->personAge > config('ehealth.system_global_parameters.no_self_auth_age')) {
             $hasSelfAuthType = (bool)array_intersect($submittedTypes, $selfAuthAgeDocumentTypes);
 
             if (!$hasSelfAuthType) {
