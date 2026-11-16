@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Session;
+use Symfony\Component\HttpFoundation\Response;
 
 class CheckSessionToken
 {
@@ -57,7 +58,7 @@ class CheckSessionToken
         if ($isEHealthSession && !$this->tokenStorage->hasBearerToken()) {
             $this->terminateSession();
 
-            return Redirect::route('login')->with('error', __('auth.login.error.legal_entity.invalid_session'));
+            return $this->sessionEndedResponse($request, __('auth.login.error.legal_entity.invalid_session'));
         }
 
         if ($isEHealthSession || Auth::guard('web')->check()) {
@@ -79,8 +80,7 @@ class CheckSessionToken
 
                 $this->terminateSession();
 
-                return Redirect::route('login')
-                    ->with('error', __('auth.session_expired'));
+                return $this->sessionEndedResponse($request, __('auth.session_expired'));
             }
 
             // Extend the token lifetime if the lifetime is 20 minutes or less
@@ -90,7 +90,7 @@ class CheckSessionToken
                 if (!$refreshed) {
                     $this->terminateSession();
 
-                    return Redirect::route('login')->with('error', __('auth.session_refresh_failed'));
+                    return $this->sessionEndedResponse($request, __('auth.session_refresh_failed'));
                 }
             }
 
@@ -99,6 +99,22 @@ class CheckSessionToken
         }
 
         return $next($request);
+    }
+
+    /**
+     * Tell the client its session has ended: the frontend's API calls get 401 to handle themselves, pages go to the login form.
+     *
+     * @param  Request  $request
+     * @param  string  $message
+     * @return Response
+     */
+    private function sessionEndedResponse(Request $request, string $message): Response
+    {
+        if ($request->is('api/*')) {
+            return response()->json(['message' => $message], Response::HTTP_UNAUTHORIZED);
+        }
+
+        return Redirect::route('login')->with('error', $message);
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Policies\DrugPolicy;
 use App\Policies\ServiceCatalogPolicy;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Laravel\Passport\Passport;
 use App\Auth\EHealth\Guards\EHealthGuard;
 use App\Auth\EHealth\Services\TokenStorage;
 use Illuminate\Contracts\Foundation\Application;
@@ -18,6 +19,22 @@ use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvid
 
 class AuthServiceProvider extends ServiceProvider
 {
+    /**
+     * Register any authentication / authorization services.
+     *
+     * The API is consumed by the application's own frontend only: the token cookie is read on routes that run
+     * the web middleware, whose EncryptCookies has already decrypted it, and no OAuth endpoints are exposed.
+     *
+     * @return void
+     */
+    public function register(): void
+    {
+        parent::register();
+
+        Passport::withoutCookieEncryption();
+        Passport::ignoreRoutes();
+    }
+
     /**
      * Register any authentication / authorization services.
      */

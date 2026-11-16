@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
+use Laravel\Passport\Passport;
 
 /**
  * Keeps a single active session per user and ties that session to the client it was issued to.
@@ -114,7 +115,7 @@ class SessionBinder
     }
 
     /**
-     * Drop the binding on logout so the cookies left in the browser cannot be replayed.
+     * Drop the binding and the API token cookie on logout so the cookies left in the browser cannot be replayed.
      *
      * @param  User|null  $user
      * @return void
@@ -127,6 +128,7 @@ class SessionBinder
         }
 
         Cookie::expire($this->cookieName(), config('session.path'), config('session.domain'));
+        Cookie::expire(Passport::cookie(), config('session.path'), config('session.domain'));
     }
 
     /**

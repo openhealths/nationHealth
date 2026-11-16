@@ -26,6 +26,8 @@ use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\Employee\EmployeeRequest;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Passport\HasApiTokens;
+use Laravel\Passport\Contracts\OAuthenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Spatie\Permission\PermissionRegistrar;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -37,10 +39,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable implements MustVerifyEmail, OAuthenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory;
+    use HasApiTokens;
     use Notifiable,
         HasCamelCasing,
         HasRoles {
