@@ -469,7 +469,8 @@ class LegalEntityDetails extends LegalEntityComponent
 
         session()->flash('success', implode(PHP_EOL, $messages));
 
-        return;
+        // Reload the full page so the layout and sidebar use the synchronized legal entity.
+        $this->redirectRoute('legal-entity.details', [$this->legalEntity], navigate: false);
     }
 
     /**

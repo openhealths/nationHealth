@@ -86,11 +86,14 @@ class DeclarationRequestPolicy
     }
 
     /**
-     * Determine whether the user can create declaration request.
+     * Determine whether the user can approve a declaration request.
+     * V3 approval uses the same write scope as creation.
+     *
+     * @see https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/17570332759
      */
     public function approve(User $user, ?DeclarationRequest $declarationRequest = null): Response
     {
-        if ($user->cannot('declaration_request:approve')) {
+        if ($user->cannot('declaration_request:write')) {
             return Response::denyWithStatus(404);
         }
 
