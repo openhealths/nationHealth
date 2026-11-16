@@ -9,6 +9,8 @@ use Tests\TestCase;
 
 class PartyVerificationScopesTest extends TestCase
 {
+    protected const array ROLES_WITH_BULK_READ = ['HR', 'ADMIN', 'OWNER', 'REORGANIZATION_OWNER'];
+
     #[Test]
     public function legal_entity_type_scopes_include_party_verification_read(): void
     {
@@ -36,26 +38,27 @@ class PartyVerificationScopesTest extends TestCase
     }
 
     #[Test]
-    public function hr_role_includes_party_verification_read(): void
+    public function management_roles_include_party_verification_read(): void
     {
-        $scopes = config('ehealth.roles.HR');
+        foreach (self::ROLES_WITH_BULK_READ as $role) {
+            $scopes = config("ehealth.roles.{$role}");
 
-        $this->assertIsArray($scopes, 'Role HR must be configured');
-        $this->assertContains(
-            'party_verification:read',
-            $scopes,
-            'party_verification:read must be present for HR role'
-        );
+            $this->assertIsArray($scopes, "Role {$role} must be configured");
+            $this->assertContains(
+                'party_verification:read',
+                $scopes,
+                "party_verification:read must be present for role {$role}"
+            );
+        }
     }
 
     #[Test]
-    public function non_hr_roles_except_owner_do_not_include_party_verification_read(): void
+    public function other_roles_do_not_include_party_verification_read(): void
     {
-        // OWNER / REORGANIZATION_OWNER may carry party_verification:read in upstream scopes;
-        // bulk sync is gated by token scope, not by HR role (see PartyVerificationBulkAccess / login listener).
+        // Bulk sync still requires the scope in the token, regardless of the assigned role.
         $rolesWithoutBulkRead = collect(config('ehealth.roles'))
             ->keys()
-            ->diff(['HR', 'OWNER', 'REORGANIZATION_OWNER']);
+            ->diff(self::ROLES_WITH_BULK_READ);
 
         foreach ($rolesWithoutBulkRead as $role) {
             $scopes = config("ehealth.roles.{$role}");

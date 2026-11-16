@@ -68,8 +68,15 @@ class EquipmentPolicy
     /**
      * User allowed to synchronize equipments.
      */
-    public function sync(User $user): Response
+    public function sync(User $user, ?array $tokenScopes = null): Response
     {
+        // First-login synchronization uses granted token scopes without web permissions or roles.
+        if ($tokenScopes !== null) {
+            return \in_array('equipment:read', $tokenScopes, true)
+                ? Response::allow()
+                : Response::denyWithStatus(404);
+        }
+
         if ($user->cannot('equipment:write') && $user->cannot('equipment:read')) {
             return Response::denyWithStatus(404);
         }

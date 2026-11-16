@@ -144,7 +144,7 @@ class PartyVerificationSyncStatusOnLoginTest extends TestCase
     {
         Bus::fake();
 
-        // ADMIN in config has no party_verification:read — must not queue bulk list sync.
+        // An ADMIN token can omit party_verification:read even when its role supports the scope.
         ['legalEntity' => $legalEntity, 'user' => $user] = $this->createFixture('ADMIN');
 
         Cache::forget(PartyVerificationBulkAccess::cacheKey($legalEntity->id));
