@@ -9,6 +9,28 @@ use Tests\TestCase;
 
 class EHealthValidationExceptionCarePlanMessageTest extends TestCase
 {
+    public function test_rule_parameters_are_used_for_a_second_rule_without_a_description(): void
+    {
+        $exception = new EHealthValidationException(['error' => [
+            'type' => 'validation_failed',
+            'message' => 'Invalid signature',
+            'invalid' => [[
+                'entry' => '$.drfo',
+                'rules' => [
+                    ['description' => 'has invalid format'],
+                    ['rule' => 'oneOf', 'params' => ['$.drfo', '$.owner.tax_id']],
+                ],
+            ]],
+        ]]);
+
+        $expected = __('errors.ehealth.messages.one_of', ['fields' => __('forms.tax_id') . ', РНОКПП']);
+
+        foreach ([$exception->getFormattedMessage(), $exception->getTranslatedMessage()] as $message) {
+            $this->assertStringContainsString(__('errors.ehealth.messages.invalid_format'), $message);
+            $this->assertStringContainsString($expected, $message);
+        }
+    }
+
     public function test_referral_start_in_past_is_translated_with_a_field_label(): void
     {
         app()->setLocale('uk');
@@ -217,6 +239,7 @@ class EHealthValidationExceptionCarePlanMessageTest extends TestCase
                         'entry' => '$.encounter.identifier.value',
                         'entry_type' => 'json_data_property',
                         'rules' => [
+                            ['description' => 'has invalid format'],
                             [
                                 'description' => 'Primary diagnosis condition codes and care plan category mismatch',
                                 'params' => [],

@@ -57,9 +57,21 @@ use App\Classes\eHealth\Api\Patient\MedicationRequest;
 use App\Classes\eHealth\Api\Patient\MedicationDispense;
 use App\Classes\eHealth\Api\Patient\ServiceRequest;
 use App\Classes\eHealth\Api\Patient\DeviceRequest;
+use App\Classes\eHealth\Errors\ErrorHandler;
+use App\Contracts\ApiErrorTranslator;
 
 final class EHealth
 {
+    /**
+     * Resolve the shared error handler with the resource's translator when supplied,
+     * so each API resource can use its own translations for eHealth errors.
+     * The handler uses the base translator by default.
+     */
+    public static function errorHandler(?ApiErrorTranslator $errorTranslator = null): ErrorHandler
+    {
+        return app(ErrorHandler::class, $errorTranslator !== null ? ['errorTranslator' => $errorTranslator] : []);
+    }
+
     public static function approval(): Approval
     {
         return app(Approval::class);
