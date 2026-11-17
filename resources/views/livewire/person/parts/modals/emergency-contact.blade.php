@@ -24,42 +24,42 @@
 
                         @if (empty($emergencyContactEvidences))
                             <p class="py-8 text-center text-gray-500 dark:text-gray-400">
-                                {{ trans_choice('patients.emergency_contact_request.no_evidences', config('ehealth.emergency_contact_medical_event_max_days_passed') + 1) }}
+                                {{ trans_choice('patients.emergency_contact_request.no_evidences', $this::EMERGENCY_CONTACT_MEDICAL_EVENT_MAX_DAYS_PASSED + 1) }}
                             </p>
                         @else
                             <div class="table-scroll">
-                            <table class="table-input w-full">
-                                <thead class="thead-input">
-                                    <tr>
-                                        <th scope="col" class="th-input">
-                                            {{ __('patients.emergency_contact_request.evidence_type') }}
-                                        </th>
-                                        <th scope="col" class="th-input">{{ __('forms.description') }}</th>
-                                        <th scope="col" class="th-input">
-                                            {{ __('patients.emergency_contact_request.created_at') }}
-                                        </th>
-                                        <th scope="col" class="th-input text-center">{{ __('forms.action') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($emergencyContactEvidences as $evidence)
-                                        <tr wire:key="evidence-{{ $evidence['uuid'] }}">
-                                            <td class="td-input">{{ $evidence['label'] }}</td>
-                                            <td class="td-input">{{ $evidence['description'] }}</td>
-                                            <td class="td-input">{{ $evidence['insertedAt'] }}</td>
-                                            <td class="td-input text-center">
-                                                <button
-                                                    type="button"
-                                                    class="button-primary text-sm"
-                                                    wire:click.prevent="getEmergencyContact('{{ $evidence['type'] }}', '{{ $evidence['uuid'] }}')"
-                                                >
-                                                    {{ __('forms.select') }}
-                                                </button>
-                                            </td>
+                                <table class="table-input w-full">
+                                    <thead class="thead-input">
+                                        <tr>
+                                            <th scope="col" class="th-input">
+                                                {{ __('patients.emergency_contact_request.evidence_type') }}
+                                            </th>
+                                            <th scope="col" class="th-input">{{ __('forms.description') }}</th>
+                                            <th scope="col" class="th-input">
+                                                {{ __('patients.emergency_contact_request.created_at') }}
+                                            </th>
+                                            <th scope="col" class="th-input text-center">{{ __('forms.action') }}</th>
                                         </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($emergencyContactEvidences as $evidence)
+                                            <tr wire:key="evidence-{{ $evidence['uuid'] }}">
+                                                <td class="td-input">{{ $evidence['label'] }}</td>
+                                                <td class="td-input">{{ $evidence['description'] }}</td>
+                                                <td class="td-input">{{ $evidence['insertedAt'] }}</td>
+                                                <td class="td-input text-center">
+                                                    <button
+                                                        type="button"
+                                                        class="button-primary text-sm"
+                                                        wire:click.prevent="getEmergencyContact('{{ $evidence['type'] }}', '{{ $evidence['uuid'] }}')"
+                                                    >
+                                                        {{ __('forms.select') }}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
                             </div>
                         @endif
                     @else

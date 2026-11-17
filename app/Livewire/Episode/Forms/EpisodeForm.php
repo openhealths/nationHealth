@@ -92,7 +92,7 @@ class EpisodeForm extends Form
      */
     protected function validateTypeForLegalEntityType(string $attribute, mixed $value, Closure $fail): void
     {
-        $allowedTypes = config('ehealth.legal_entity_episode_types.' . legalEntity()->type->name, []);
+        $allowedTypes = config('ehealth.episode.legal_entity_episode_types.' . legalEntity()->type->name, []);
 
         if (!in_array($value, $allowedTypes, true)) {
             $fail(
@@ -113,7 +113,7 @@ class EpisodeForm extends Form
     protected function validateTypeForEmployeeType(string $attribute, mixed $value, Closure $fail): void
     {
         $allowedTypes = config(
-            'ehealth.employee_episode_types.' . $this->careManagerEmployee()?->employeeType,
+            'ehealth.episode.employee_episode_types.' . $this->careManagerEmployee()?->employeeType,
             []
         );
 
@@ -135,7 +135,7 @@ class EpisodeForm extends Form
     protected function validateCareManager(string $attribute, mixed $value, Closure $fail): void
     {
         $careManager = $this->careManagerEmployee();
-        $allowedTypes = config('ehealth.allowed_episode_care_manager_employee_types', []);
+        $allowedTypes = config('ehealth.episode.allowed_episode_care_manager_employee_types', []);
 
         if ($careManager === null) {
             $fail(__('episodes.validation.care_manager_not_in_legal_entity'));

@@ -24,6 +24,11 @@ trait InteractsWithEmergencyContact
      */
     private const array EMERGENCY_CONTACT_EVIDENCE_TYPES = ['conditions', 'diagnostic_reports'];
 
+    /**
+     * Age limit, in days from creation, of a medical event used as the evidence; 0 admits the events created within the last day.
+     */
+    public const int EMERGENCY_CONTACT_MEDICAL_EVENT_MAX_DAYS_PASSED = 0;
+
     public bool $showEmergencyContactModal = false;
 
     /**
@@ -96,7 +101,7 @@ trait InteractsWithEmergencyContact
 
         // A configured value of 0 still admits the events created within the last day, hence the extra day
         $earliestInsertedAt = CarbonImmutable::now('UTC')
-            ->subDays(config('ehealth.emergency_contact_medical_event_max_days_passed') + 1)
+            ->subDays(self::EMERGENCY_CONTACT_MEDICAL_EVENT_MAX_DAYS_PASSED + 1)
             ->format('Y-m-d H:i:s');
 
         $conditions = Condition::forPatient($patient)
@@ -126,7 +131,7 @@ trait InteractsWithEmergencyContact
                 'insertedAt' => $report->ehealthInsertedAt
             ]);
 
-        return $conditions->concat($diagnosticReports)->values()->toArray();
+        return $conditions->concat($diagnosticReports->all())->values()->toArray();
     }
 
     /**

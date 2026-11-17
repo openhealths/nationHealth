@@ -38,9 +38,9 @@ use Throwable;
 
 class PersonComponent extends Component
 {
+    use BaseAddress;
     use FormTrait;
     use WithFileUploads;
-    use BaseAddress;
 
     private const int SMS_RESEND_LIMIT = 1;
 
@@ -209,7 +209,7 @@ class PersonComponent extends Component
     {
         return array_intersect_key(
             $this->dictionaries['DOCUMENT_TYPE'],
-            array_flip(config('ehealth.person_registration_document_types'))
+            array_flip(config('ehealth.person_documents.person_registration_document_types'))
         );
     }
 
@@ -224,7 +224,7 @@ class PersonComponent extends Component
     {
         return array_intersect_key(
             $this->dictionaries['DOCUMENT_TYPE'],
-            array_flip(config('ehealth.person_legal_capacity_document_types'))
+            array_flip(config('ehealth.person_documents.person_legal_capacity_document_types'))
         );
     }
 

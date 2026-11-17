@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
-use App\Enums\Person\EncounterStatus;
 use App\Casts\EHealthDateCast;
 use App\Casts\EHealthTimestampCast;
 use App\Enums\ClinicalImpression\Status;
+use App\Enums\Person\EncounterStatus;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use Carbon\CarbonImmutable;
@@ -213,7 +213,7 @@ class ClinicalImpression extends Model
             'code.coding',
             static fn (Builder $coding): Builder => $coding->whereIn(
                 'code',
-                config('ehealth.summary_clinical_impressions_allowed')
+                config('ehealth.clinical_impression.summary_clinical_impressions_allowed')
             )
         );
     }

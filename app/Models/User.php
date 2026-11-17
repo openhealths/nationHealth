@@ -4,54 +4,54 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use BackedEnum;
-use Exception;
-use App\Enums\Status;
-use App\Enums\User\Role;
-use InvalidArgumentException;
-use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
 use App\Enums\Composition\CompositionCategory;
 use App\Enums\Composition\CompositionType;
+use App\Enums\EmployeeRole\Status as EmployeeRoleStatus;
+use App\Enums\Status;
+use App\Enums\User\Role;
+use App\Models\Employee\Employee;
+use App\Models\Employee\EmployeeRequest;
 use App\Models\Person\Person;
 use App\Models\Relations\Party;
-use App\Models\Employee\Employee;
 use App\Models\Role as ModelsRole;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
-use Spatie\Permission\Traits\HasRoles;
+use BackedEnum;
 use Database\Factories\UserFactory;
 use Eloquence\Behaviours\HasCamelCasing;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Models\Employee\EmployeeRequest;
-use Illuminate\Notifications\Notifiable;
-use Laravel\Passport\HasApiTokens;
-use Laravel\Passport\Contracts\OAuthenticatable;
-use Illuminate\Database\Eloquent\Builder;
-use Spatie\Permission\PermissionRegistrar;
+use Exception;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Spatie\Permission\Models\Role as SpatieRole;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
+use Laravel\Passport\Contracts\OAuthenticatable;
+use Laravel\Passport\HasApiTokens;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Spatie\Permission\Models\Role as SpatieRole;
+use Spatie\Permission\PermissionRegistrar;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements MustVerifyEmail, OAuthenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory;
-    use HasApiTokens;
-    use Notifiable,
+    use HasApiTokens,
         HasCamelCasing,
-        HasRoles {
+        HasRoles,
+        Notifiable {
             HasRoles::assignRole as assignRoleParent;                // Aliasing original assignRole
             HasRoles::syncPermissions as syncPermissionsParent;      // Aliasing original syncPermissions
             HasRoles::givePermissionTo as givePermissionToParent;    // Aliasing original givePermissionTo
             HasRoles::getAllPermissions as getAllPermissionsParent;  // Alias original getAllPermissions
         }
+    /** @use HasFactory<UserFactory> */
+    use HasFactory;
 
     /**
      * Track if email verification was already sent
@@ -408,7 +408,7 @@ class User extends Authenticatable implements MustVerifyEmail, OAuthenticatable
     public function isAssistantOnly(): bool
     {
         $recordingRoles = $this->allowedRoles->intersect(
-            array_keys(config('ehealth.performer_employee_encounter_types', []))
+            array_keys(config('ehealth.encounter.performer_employee_types', []))
         );
 
         return $recordingRoles->count() === 1 && $recordingRoles->first() === Role::ASSISTANT->value;
@@ -426,7 +426,7 @@ class User extends Authenticatable implements MustVerifyEmail, OAuthenticatable
         $roles = [Role::DOCTOR, Role::SPECIALIST, Role::ASSISTANT, Role::MED_COORDINATOR];
 
         if ($encounterClass !== null) {
-            $allowedTypes = collect(config('ehealth.performer_employee_encounter_classes'))
+            $allowedTypes = collect(config('ehealth.encounter.performer_employee_classes'))
                 ->filter(fn (array $classes) => in_array($encounterClass, $classes, true))
                 ->keys()
                 ->all();

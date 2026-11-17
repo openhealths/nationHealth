@@ -9,8 +9,8 @@ use App\Enums\User\Role;
 use App\Models\Employee\Employee;
 use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
-use App\Rules\PrimarySourceRequiredForAssistant;
 use App\Rules\PastDateTime;
+use App\Rules\PrimarySourceRequiredForAssistant;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Validation\Rule;
@@ -174,7 +174,10 @@ class ConditionForm extends Form
                 'required_with:conditions',
                 'before:tomorrow',
                 'date',
-                'before_or_equal:' . (($this->encounter()['periodDate'] ?? '') ?: 'today')
+                'before_or_equal:' . (($this->encounter()['periodDate'] ?? '') ?: 'today'),
+                'after_or_equal:' . CarbonImmutable::today()
+                    ->subDays(config('ehealth.condition.max_days_passed'))
+                    ->format(config('app.date_format'))
             ],
             'conditions.*.onsetTime' => Rule::forEach(
                 function (mixed $value, string $attribute): array {
@@ -279,7 +282,7 @@ class ConditionForm extends Form
             }
 
             $codeCode = data_get($value, 'codeCode');
-            $psychiatryCodes = config('ehealth.psychiatry_icpc2_diagnoses_evidence_check', []);
+            $psychiatryCodes = config('ehealth.condition.psychiatry_icpc2_diagnoses_evidence_check', []);
 
             if (!in_array($codeCode, $psychiatryCodes, true)) {
                 return;
@@ -294,7 +297,7 @@ class ConditionForm extends Form
                 return;
             }
 
-            $allowedCodes = config('ehealth.icd10am_speciality_conditions_allowed.PSYCHIATRY', []);
+            $allowedCodes = config('ehealth.condition.icd10_am_speciality_conditions_allowed.PSYCHIATRY', []);
 
             if (!in_array(data_get($conditionEvidence, 'codeCode'), $allowedCodes, true)) {
                 $fail(__('conditions.validation.psychiatry_evidence_code_forbidden', ['code' => $codeCode]));
@@ -327,7 +330,7 @@ class ConditionForm extends Form
                 return;
             }
 
-            $allowedEmployeeTypes = config('ehealth.encounter_package_allowed_condition_asserter_employee_types', []);
+            $allowedEmployeeTypes = config('ehealth.encounter.package_allowed_condition_asserter_employee_types', []);
 
             if (!in_array($asserter->employeeType, $allowedEmployeeTypes, true)) {
                 $fail(__('conditions.validation.asserter_employee_invalid_type'));
@@ -377,7 +380,7 @@ class ConditionForm extends Form
                 return;
             }
 
-            $allowedByCodeSystem = config("ehealth.employee_type_conditions_allowed.$employeeType", []);
+            $allowedByCodeSystem = config("ehealth.condition.employee_type_conditions_allowed.$employeeType", []);
             $codeSystem = data_get($value, 'codeSystem');
             $codeCode = data_get($value, 'codeCode');
             $allowedCodes = $allowedByCodeSystem[$codeSystem] ?? [];

@@ -6,18 +6,18 @@ namespace App\Livewire\EncounterPackage\Forms;
 
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Equipment\Status as EquipmentStatus;
+use App\Enums\User\Role;
 use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
 use App\Rules\MedicalEvents\ObservationComponents;
 use App\Rules\MedicalEvents\ObservationValue;
-use App\Rules\PrimarySourceRequiredForAssistant;
 use App\Rules\PastDateTime;
+use App\Rules\PrimarySourceRequiredForAssistant;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
-use App\Enums\User\Role;
 use Illuminate\Validation\Rule;
 use Livewire\Form;
 
@@ -155,7 +155,14 @@ class ObservationForm extends Form
                     $this->notAfterEncounterEnd($endDate)
                 ];
             }),
-            'observations.*.issuedDate' => ['required_with:observations', 'date', 'before_or_equal:today'],
+            'observations.*.issuedDate' => [
+                'required_with:observations',
+                'date',
+                'before_or_equal:today',
+                'after_or_equal:' . CarbonImmutable::today()
+                    ->subDays(config('ehealth.observation.max_days_passed'))
+                    ->format(config('app.date_format'))
+            ],
             'observations.*.issuedTime' => Rule::forEach(function (mixed $value, string $attribute): array {
                 $issuedDate = $this->observations[(int)explode('.', $attribute)[1]]['issuedDate'] ?? '';
                 $encounter = $this->component->form->encounter ?? [];
@@ -340,7 +347,7 @@ class ObservationForm extends Form
             return;
         }
 
-        $allowedEmployeeTypes = config('ehealth.encounter_package_allowed_observation_performer_employee_types', []);
+        $allowedEmployeeTypes = config('ehealth.encounter.package_allowed_observation_performer_employee_types', []);
 
         if (!in_array($performer->employeeType, $allowedEmployeeTypes, true)) {
             $fail(__('observations.validation.performer_employee_invalid_type'));

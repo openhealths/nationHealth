@@ -13,10 +13,10 @@
                   item: 0,
                   dictionary: $wire.dictionaries['DOCUMENT_TYPE'],
                   issuingCountryDictionary: $wire.dictionaries['ISSUING_COUNTRY'],
-                  uaOnlyTypes: ['{{ implode("', '", config('ehealth.document_types_issuing_country_ua_only') ?? []) }}'],
-                  notUaTypes: ['{{ implode("', '", config('ehealth.document_types_issuing_country_not_ua') ?? []) }}'],
-                  noSelfRegistrationAge: {{ config('ehealth.no_self_registration_age') }},
-                  fullLegalCapacityAge: {{ config('ehealth.person_full_legal_capacity_age') }},
+                  uaOnlyTypes: ['{{ implode("', '", config('ehealth.person_documents.document_types_issuing_country_ua_only') ?? []) }}'],
+                  notUaTypes: ['{{ implode("', '", config('ehealth.person_documents.document_types_issuing_country_not_ua') ?? []) }}'],
+                  noSelfRegistrationAge: {{ config('ehealth.system_global_parameters.no_self_registration_age') }},
+                  fullLegalCapacityAge: {{ config('ehealth.system_global_parameters.person_full_legal_capacity_age') }},
                   {{-- Documents proving legal capacity are accepted only for a minor who is old enough to register on their own --}}
                   get isLegalCapacityAge() {
                       const [day, month, year] = ($wire.form.person?.birthDate ?? '').split('.');
@@ -58,110 +58,110 @@
         </legend>
 
         <div class="table-scroll">
-        <table class="table-input w-inherit">
-            <thead class="thead-input">
-                <tr>
-                    <th scope="col" class="th-input">{{ __('forms.type') }}</th>
-                    <th scope="col" class="th-input">{{ __('forms.number') }}</th>
-                    <th scope="col" class="th-input">{{ __('patients.issuing_country') }}</th>
-                    <th scope="col" class="th-input">{{ __('forms.issued_by') }}</th>
-                    <th scope="col" class="th-input">{{ __('forms.issued_at') }}</th>
-                    <th scope="col" class="th-input">{{ __('forms.valid_until') }}</th>
-                    <th scope="col" class="th-input">{{ __('forms.actions') }}</th>
-                </tr>
-            </thead>
-            <tbody>
-                <template x-for="(document, index) in documents">
+            <table class="table-input w-inherit">
+                <thead class="thead-input">
                     <tr>
-                        <td class="td-input" x-text="dictionary[document.type]"></td>
-                        <td class="td-input" x-text="document.number"></td>
-                        <td class="td-input" x-text="issuingCountryDictionary[document.issuingCountry]"></td>
-                        <td class="td-input" x-text="document.issuedBy"></td>
-                        <td class="td-input" x-text="document.issuedAt"></td>
-                        <td class="td-input" x-text="document.expirationDate"></td>
-                        <td class="td-input">
-                            {{-- That all that is needed for the dropdown --}}
-                            <div
-                                x-data="{
-                                    openDropdown: false,
-                                    toggle() {
-                                        if (this.openDropdown) {
-                                            return this.close();
-                                        }
+                        <th scope="col" class="th-input">{{ __('forms.type') }}</th>
+                        <th scope="col" class="th-input">{{ __('forms.number') }}</th>
+                        <th scope="col" class="th-input">{{ __('patients.issuing_country') }}</th>
+                        <th scope="col" class="th-input">{{ __('forms.issued_by') }}</th>
+                        <th scope="col" class="th-input">{{ __('forms.issued_at') }}</th>
+                        <th scope="col" class="th-input">{{ __('forms.valid_until') }}</th>
+                        <th scope="col" class="th-input">{{ __('forms.actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="(document, index) in documents">
+                        <tr>
+                            <td class="td-input" x-text="dictionary[document.type]"></td>
+                            <td class="td-input" x-text="document.number"></td>
+                            <td class="td-input" x-text="issuingCountryDictionary[document.issuingCountry]"></td>
+                            <td class="td-input" x-text="document.issuedBy"></td>
+                            <td class="td-input" x-text="document.issuedAt"></td>
+                            <td class="td-input" x-text="document.expirationDate"></td>
+                            <td class="td-input">
+                                {{-- That all that is needed for the dropdown --}}
+                                <div
+                                    x-data="{
+                                        openDropdown: false,
+                                        toggle() {
+                                            if (this.openDropdown) {
+                                                return this.close();
+                                            }
 
-                                        this.$refs.button.focus();
+                                            this.$refs.button.focus();
 
-                                        this.openDropdown = true;
-                                    },
-                                    close(focusAfter) {
-                                        if (! this.openDropdown) return;
+                                            this.openDropdown = true;
+                                        },
+                                        close(focusAfter) {
+                                            if (! this.openDropdown) return;
 
-                                        this.openDropdown = false;
+                                            this.openDropdown = false;
 
-                                        focusAfter && focusAfter.focus();
-                                    },
-                                }"
-                                @keydown.escape.prevent.stop="close($refs.button)"
-                                @focusin.window="! $refs.panel.contains($event.target) && close()"
-                                x-id="['dropdown-button']"
-                                class="relative"
-                            >
-                                {{-- Dropdown Button --}}
-                                <button
-                                    x-ref="button"
-                                    @click="toggle()"
-                                    :aria-expanded="openDropdown"
-                                    :aria-controls="$id('dropdown-button')"
-                                    type="button"
-                                    class="cursor-pointer"
+                                            focusAfter && focusAfter.focus();
+                                        },
+                                    }"
+                                    @keydown.escape.prevent.stop="close($refs.button)"
+                                    @focusin.window="! $refs.panel.contains($event.target) && close()"
+                                    x-id="['dropdown-button']"
+                                    class="relative"
                                 >
-                                    @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
-                                </button>
-
-                                {{-- Dropdown Panel --}}
-                                <div class="absolute" style="left: 50%">
-                                    {{-- Center a dropdown panel --}}
-                                    <div
-                                        x-ref="panel"
-                                        x-show="openDropdown"
-                                        x-transition.origin.top.left
-                                        @click.outside="close($refs.button)"
-                                        :id="$id('dropdown-button')"
-                                        x-cloak
-                                        class="dropdown-panel relative"
-                                        style="left: -50%"
-                                        {{-- Center a dropdown panel --}}
+                                    {{-- Dropdown Button --}}
+                                    <button
+                                        x-ref="button"
+                                        @click="toggle()"
+                                        :aria-expanded="openDropdown"
+                                        :aria-controls="$id('dropdown-button')"
+                                        type="button"
+                                        class="cursor-pointer"
                                     >
-                                        <button
-                                            @click.prevent="
+                                        @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
+                                    </button>
+
+                                    {{-- Dropdown Panel --}}
+                                    <div class="absolute" style="left: 50%">
+                                        {{-- Center a dropdown panel --}}
+                                        <div
+                                            x-ref="panel"
+                                            x-show="openDropdown"
+                                            x-transition.origin.top.left
+                                            @click.outside="close($refs.button)"
+                                            :id="$id('dropdown-button')"
+                                            x-cloak
+                                            class="dropdown-panel relative"
+                                            style="left: -50%"
+                                            {{-- Center a dropdown panel --}}
+                                        >
+                                            <button
+                                                @click.prevent="
                                                 openModal = true; {{-- Open the modal --}}
                                                 item = index; {{-- Identify the item we are corrently editing --}}
                                                 {{-- Replace the previous document with the current, don't assign object directly (modalDocument = document) to avoid reactiveness --}}
                                                 modalDocument = new Document(document);
                                                 newDocument = false; {{-- This document is already created --}}
                                             "
-                                            class="dropdown-button"
-                                        >
-                                            {{ __('forms.edit') }}
-                                        </button>
+                                                class="dropdown-button"
+                                            >
+                                                {{ __('forms.edit') }}
+                                            </button>
 
-                                        <button
-                                            @click.prevent="
-                                                documents.splice(index, 1);
-                                                close($refs.button);
-                                            "
-                                            class="dropdown-button dropdown-delete"
-                                        >
-                                            {{ __('forms.delete') }}
-                                        </button>
+                                            <button
+                                                @click.prevent="
+                                                    documents.splice(index, 1);
+                                                    close($refs.button);
+                                                "
+                                                class="dropdown-button dropdown-delete"
+                                            >
+                                                {{ __('forms.delete') }}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </td>
-                    </tr>
-                </template>
-            </tbody>
-        </table>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
         </div>
 
         <div>

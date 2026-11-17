@@ -10,8 +10,8 @@ use App\Enums\User\Role;
 use App\Models\Employee\Employee;
 use App\Models\Person\Person;
 use Closure;
-use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 
@@ -135,7 +135,7 @@ class DeclarationForm extends BaseForm
                 ->where('speciality_officio', true)
                 ->value('speciality');
             $patient = Person::whereUuid($this->personId)->firstOrFail();
-            $adultAge = config('ehealth.adult_age');
+            $adultAge = config('ehealth.system_global_parameters.adult_age');
 
             // https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/18000740491/RC_+CSI-1323+_Create+declaration+request+v3#Check-that-doctor-speciality-meets-the-patient-age-requirements
             if ($speciality === 'THERAPIST' && $patient->age < $adultAge) {
@@ -163,9 +163,9 @@ class DeclarationForm extends BaseForm
                 return;
             }
 
-            $allowedTypes = $patient->age < config('ehealth.no_self_auth_age')
-                ? config('ehealth.declaration_no_self_auth_age_document_types')
-                : config('ehealth.declaration_self_auth_age_document_types');
+            $allowedTypes = $patient->age < config('ehealth.system_global_parameters.no_self_auth_age')
+                ? config('ehealth.person_documents.declaration_no_self_auth_age_document_types')
+                : config('ehealth.person_documents.declaration_self_auth_age_document_types');
 
             if (!$patient->documents()->whereIn('type', $allowedTypes)->exists()) {
                 $fail(__('declarations.validation.document_type_not_allowed', [

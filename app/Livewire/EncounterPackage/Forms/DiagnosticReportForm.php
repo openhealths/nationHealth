@@ -12,8 +12,8 @@ use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Rules\InDictionary;
 use App\Rules\MedicalEvents\PaperReferralRules;
-use App\Rules\PrimarySourceRequiredForAssistant;
 use App\Rules\PastDateTime;
+use App\Rules\PrimarySourceRequiredForAssistant;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Support\Facades\Auth;
@@ -277,7 +277,10 @@ class DiagnosticReportForm extends Form
             'diagnosticReports.*.issuedDate' => [
                 'required_with:diagnosticReports',
                 'date_format:' . config('app.date_format'),
-                'before_or_equal:today'
+                'before_or_equal:today',
+                'after_or_equal:' . CarbonImmutable::today()
+                    ->subDays(config('ehealth.diagnostic_report.max_days_passed'))
+                    ->format(config('app.date_format'))
             ],
             'diagnosticReports.*.issuedTime' => Rule::forEach(
                 function (mixed $value, string $attribute): array {
@@ -409,7 +412,7 @@ class DiagnosticReportForm extends Form
         }
 
         $allowedEmployeeTypes = config(
-            'ehealth.encounter_package_allowed_diagnostic_report_performer_employee_types',
+            'ehealth.encounter.package_allowed_diagnostic_report_performer_employee_types',
             []
         );
 

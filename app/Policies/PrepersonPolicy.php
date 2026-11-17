@@ -18,7 +18,7 @@ class PrepersonPolicy
      */
     public function before(User $user, string $ability): ?Response
     {
-        if (!in_array(legalEntity()->type->name, config('ehealth.preperson_legal_entities_allowed_types', []), true)) {
+        if (!in_array(legalEntity()->type->name, config('ehealth.preperson.legal_entities_allowed_types', []), true)) {
             return Response::denyWithStatus(404);
         }
 
@@ -85,7 +85,7 @@ class PrepersonPolicy
             ->whereStatus(Status::ACTIVE)
             ->whereProvidingCondition('INPATIENT');
 
-        $allowedSpecialityTypes = config('ehealth.preperson_healthcare_services_speciality_types', []);
+        $allowedSpecialityTypes = config('ehealth.preperson.healthcare_services_speciality_types', []);
         if (!empty($allowedSpecialityTypes)) {
             $healthcareServicesQuery->whereIn('speciality_type', $allowedSpecialityTypes);
         }

@@ -7,14 +7,14 @@ namespace App\Livewire\Division\HealthcareService;
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Dto\HealthcareService\Ehealth as EhealthData;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Division\Forms\HealthcareServiceForm as Form;
 use App\Models\Division;
 use App\Models\LegalEntity;
 use App\Traits\FormTrait;
 use App\Traits\WorkTimeUtilities;
 use GuzzleHttp\Promise\PromiseInterface;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
@@ -65,7 +65,7 @@ class HealthcareServiceComponent extends Component
         $this->getDictionary();
 
         $this->dictionaries['HEALTHCARE_SERVICE_CATEGORIES'] = $this->getDictionariesFields(
-            config('ehealth.healthcare_service_' . strtolower(legalEntity()->type->name) . '_categories', []),
+            config('ehealth.healthcare_service.categories.' . legalEntity()->type->name, []),
             'HEALTHCARE_SERVICE_CATEGORIES'
         );
         $this->dictionaries['PROVIDING_CONDITION'] = $this->getDictionariesFields(
@@ -91,14 +91,14 @@ class HealthcareServiceComponent extends Component
         $categoryCodes = array_keys($this->dictionaries['HEALTHCARE_SERVICE_CATEGORIES'] ?? []);
 
         return [
-            'speciality' => config('ehealth.healthcare_service_speciality_type_field_required_for_categories', []),
-            'providingCondition' => config('ehealth.healthcare_service_providing_condition_field_required_for_categories', []),
-            'type' => config('ehealth.healthcare_service_type_field_required_for_categories', []),
+            'speciality' => config('ehealth.healthcare_service.speciality_type_field_required_for_categories', []),
+            'providingCondition' => config('ehealth.healthcare_service.providing_condition_field_required_for_categories', []),
+            'type' => config('ehealth.healthcare_service.type_field_required_for_categories', []),
             'license' => array_values(
                 array_filter(
                     $categoryCodes,
                     static fn (string $categoryCode): bool => filled(
-                        config('ehealth.healthcare_service_' . strtolower($categoryCode) . '_license_type')
+                        config("ehealth.healthcare_service.license_type.$categoryCode")
                     )
                 )
             )

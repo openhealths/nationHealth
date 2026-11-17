@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
-use App\Enums\Person\EncounterStatus;
 use App\Casts\EHealthTimestampCast;
 use App\Enums\Person\ConditionClinicalStatus;
 use App\Enums\Person\ConditionVerificationStatus;
+use App\Enums\Person\EncounterStatus;
 use App\Models\Icd10;
 use App\Models\Person\Person;
 use App\Models\Preperson;
@@ -361,7 +361,7 @@ class Condition extends Model
             'code.coding',
             static fn (Builder $coding): Builder => $coding->whereIn(
                 'code',
-                config('ehealth.summary_conditions_allowed')
+                config('ehealth.condition.summary_conditions_allowed')
             )
         );
     }

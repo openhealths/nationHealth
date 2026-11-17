@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\EncounterPackage\Forms;
 
 use App\Enums\Specimen\Status;
+use App\Enums\User\Role;
 use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
 use App\Rules\PastDateTime;
 use Carbon\CarbonImmutable;
 use Closure;
-use App\Enums\User\Role;
 use Illuminate\Validation\Rule;
 use Livewire\Form;
 
@@ -99,7 +99,7 @@ class SpecimenForm extends Form
                 Rule::requiredIf(($this->specimens[(int) explode('.', $attribute)[1]]['collectedType'] ?? '') === 'date_time'),
                 'nullable',
                 'date',
-                'after:' . CarbonImmutable::today()->subDays(config('ehealth.specimen_max_days_passed'))->format(config('app.date_format')),
+                'after:' . CarbonImmutable::today()->subDays(config('ehealth.specimen.max_days_passed'))->format(config('app.date_format')),
                 'before_or_equal:today'
             ]),
             'specimens.*.collectedTime' => Rule::forEach(fn (mixed $value, string $attribute): array => [
@@ -121,7 +121,7 @@ class SpecimenForm extends Form
                         config('app.date_format'),
                         trim(explode('—', $value)[0])
                     )->startOfDay();
-                    $minDate = CarbonImmutable::today()->subDays(config('ehealth.specimen_max_days_passed'));
+                    $minDate = CarbonImmutable::today()->subDays(config('ehealth.specimen.max_days_passed'));
 
                     if ($periodStart->lessThanOrEqualTo($minDate)) {
                         $fail(__('validation.after', ['date' => $minDate->format(config('app.date_format'))]));
@@ -172,7 +172,7 @@ class SpecimenForm extends Form
                 'nullable',
                 'string',
                 new InDictionary('eHealth/ucum/units'),
-                Rule::in(config('ehealth.specimen_duration_allowed_codes'))
+                Rule::in(config('ehealth.specimen.duration_allowed_codes'))
             ],
             'specimens.*.quantityValue' => [
                 'nullable',

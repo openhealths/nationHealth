@@ -5,23 +5,23 @@ declare(strict_types=1);
 namespace App\Livewire\DiagnosticReport\Forms;
 
 use App\Core\BaseForm;
-use App\Enums\User\Role;
-use App\Enums\Status;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Equipment\Status as EquipmentStatus;
 use App\Enums\Specimen\Status as SpecimenStatus;
+use App\Enums\Status;
+use App\Enums\User\Role;
+use App\Models\Employee\Employee;
+use App\Models\Equipment;
 use App\Rules\AfterOrEqualDateTime;
 use App\Rules\InDictionary;
 use App\Rules\MedicalEvents\ObservationComponents;
 use App\Rules\MedicalEvents\ObservationValue;
-use App\Rules\PrimarySourceRequiredForAssistant;
 use App\Rules\PastDateTime;
-use App\Models\Employee\Employee;
-use App\Models\Equipment;
+use App\Rules\PrimarySourceRequiredForAssistant;
 use Carbon\CarbonImmutable;
 use Closure;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class DiagnosticReportForm extends BaseForm
 {
@@ -245,6 +245,9 @@ class DiagnosticReportForm extends BaseForm
                 'required',
                 'date_format:' . config('app.date_format'),
                 'before_or_equal:today',
+                'after_or_equal:' . CarbonImmutable::today()
+                    ->subDays(config('ehealth.diagnostic_report.max_days_passed'))
+                    ->format(config('app.date_format'))
             ],
             'diagnosticReport.issuedTime' => [
                 'required',
@@ -406,7 +409,14 @@ class DiagnosticReportForm extends BaseForm
                 ]),
             ],
 
-            'observations.*.issuedDate' => ['required_with:observations', 'date', 'before_or_equal:today'],
+            'observations.*.issuedDate' => [
+                'required_with:observations',
+                'date',
+                'before_or_equal:today',
+                'after_or_equal:' . CarbonImmutable::today()
+                    ->subDays(config('ehealth.observation.max_days_passed'))
+                    ->format(config('app.date_format'))
+            ],
             'observations.*.issuedTime' => ['required_with:observations', 'date_format:H:i'],
             'observations.*.effectiveDate' => ['nullable', 'date', 'before_or_equal:today'],
             'observations.*.effectiveTime' => ['nullable', 'date_format:H:i'],

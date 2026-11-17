@@ -132,7 +132,7 @@ abstract class BaseEpisodeComponent extends BasePatientComponent
     {
         $this->episodeTypes = Arr::only(
             $this->dictionaries['eHealth/episode_types'],
-            config('ehealth.legal_entity_episode_types.' . legalEntity()->type->name, [])
+            config('ehealth.episode.legal_entity_episode_types.' . legalEntity()->type->name, [])
         );
 
         $legalEntityTypes = array_keys($this->episodeTypes);
@@ -141,7 +141,7 @@ abstract class BaseEpisodeComponent extends BasePatientComponent
             ->mapWithKeys(static fn (array $employee): array => [
                 $employee['uuid'] => array_values(array_intersect(
                     $legalEntityTypes,
-                    config('ehealth.employee_episode_types.' . $employee['employeeType'], [])
+                    config('ehealth.episode.employee_episode_types.' . $employee['employeeType'], [])
                 ))
             ])
             ->toArray();
@@ -157,7 +157,7 @@ abstract class BaseEpisodeComponent extends BasePatientComponent
     {
         $this->employees = Auth::user()->party->employees()
             ->whereLegalEntityId(legalEntity()->id)
-            ->whereIn('employee_type', config('ehealth.allowed_episode_care_manager_employee_types', []))
+            ->whereIn('employee_type', config('ehealth.episode.allowed_episode_care_manager_employee_types', []))
             ->whereStatus(EmployeeStatus::APPROVED)
             ->whereIsActive(true)
             ->select(['uuid', 'position', 'party_id', 'employee_type'])

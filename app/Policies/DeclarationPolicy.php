@@ -46,7 +46,7 @@ class DeclarationPolicy
         if (
             !$legalEntity
             || ($legalEntity->status !== LegalEntityStatus::ACTIVE->value && $legalEntity->status !== LegalEntityStatus::REORGANIZED->value)
-            || !\in_array($legalEntity->type->name, config('ehealth.declaration_request_legal_entity_types'), true)
+            || !\in_array($legalEntity->type->name, config('ehealth.declaration_request.legal_entity_types'), true)
         ) {
             return Response::denyWithStatus(404);
         }

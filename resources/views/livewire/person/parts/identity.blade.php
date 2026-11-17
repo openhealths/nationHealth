@@ -5,7 +5,7 @@
     x-data="{
         noTaxId: $wire.entangle('form.person.noTaxId'),
         documents: $wire.entangle('form.person.documents'),
-        foreignDocumentTypes: ['{{ implode("', '", config('ehealth.identity_document_types_foreign') ?? []) }}'],
+        foreignDocumentTypes: ['{{ implode("', '", config('ehealth.person_documents.identity_document_types_foreign') ?? []) }}'],
 
         get hasForeignDocument() {
             return (this.documents ?? []).some(document => this.foreignDocumentTypes.includes(document.type));

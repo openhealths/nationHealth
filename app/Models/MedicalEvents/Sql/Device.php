@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\MedicalEvents\Sql;
 
-use App\Enums\Person\EncounterStatus;
 use App\Casts\EHealthTimestampCast;
 use App\Enums\Device\Status;
+use App\Enums\Person\EncounterStatus;
 use App\Models\Employee\Employee;
 use App\Models\Person\Person;
 use App\Models\Preperson;
@@ -311,7 +311,7 @@ class Device extends Model
             'type.coding',
             static fn (Builder $coding): Builder => $coding->whereIn(
                 'code',
-                config('ehealth.summary_device_types_allowed')
+                config('ehealth.device.summary_device_types_allowed')
             )
         );
     }
