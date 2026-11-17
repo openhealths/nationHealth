@@ -428,6 +428,7 @@ return [
                 'number' => 'Серія/номер документа'
             ]
         ],
+        'license.whatLicensed' => __('licenses.what_licensed'),
         'beneficiary' => 'Бенефіціар',
         // Party
         'party.lastName' => __('forms.last_name'),
@@ -488,6 +489,7 @@ return [
         'birthDate' => 'дата народження',
         'deathDate' => 'дата смерті',
         'taxId' => 'РНОКПП',
+        'drfo' => __('forms.tax_id'),
         'phoneNumber' => 'номер телефону',
         'documentType' => 'тип документа',
         'documentNumber' => 'серія/номер документа',

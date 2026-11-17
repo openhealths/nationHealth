@@ -4,43 +4,27 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Errors;
 
+use App\Contracts\ApiErrorTranslator;
+use App\Dto\Ehealth\Error\ErrorResponseData;
+use App\Dto\Ehealth\Error\Messages;
+use Symfony\Component\ObjectMapper\ObjectMapper;
+
 class ErrorHandler
 {
-    public function handleError(array $error)
+    protected readonly ApiErrorTranslator $errorTranslator;
+
+    public function __construct($errorTranslator = new BaseErrorTranslator())
     {
-        $errorMessages = [];
-
-        if (isset($error['error']['invalid']) && is_array($error['error']['invalid'])) {
-            foreach ($error['error']['invalid'] as $invalidEntry) {
-                $entry = $invalidEntry['entry'] ?? 'Unknown';
-                $entryType = $invalidEntry['entry_type'] ?? 'Unknown';
-                $rules = $invalidEntry['rules'] ?? [];
-                foreach ($rules as $rule) {
-                    if (!isset($rule['description']) && isset($error['error']['message'])) {
-                        continue;
-                    }
-
-                    $description = $rule['description'] ?? 'No description';
-                    $errorMessages[] = "Error in entry '{$entry}' (Type: {$entryType}): {$description}";
-                }
-            }
-        }
-
-        if ($errorMessages === []) {
-            $message = $error['error']['message'] ?? 'No valid error information provided.';
-
-            $errorMessages[] = $this->translateMessage($message);
-        }
-
-        return (['errors' => $errorMessages]);
+        $this->errorTranslator = $errorTranslator;
     }
 
-    private function translateMessage(string $message): string
+    public function handleError(array $error): array
     {
-        $translations = [
-            'Does not match the signer last name' => 'errors.ehealth.messages.signer_last_name_mismatch',
-        ];
+        $messages = new ObjectMapper()->map(
+            new ErrorResponseData(payload: $error, translator: $this->errorTranslator),
+            Messages::class
+        );
 
-        return isset($translations[$message]) ? __($translations[$message]) : $message;
+        return ['errors' => $messages->toArray()];
     }
 }
