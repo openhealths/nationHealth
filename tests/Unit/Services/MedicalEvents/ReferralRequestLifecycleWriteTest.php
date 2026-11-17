@@ -135,7 +135,6 @@ class ReferralRequestLifecycleWriteTest extends TestCase
     {
         $service = app(ReferralRequestLifecycleService::class);
         $method = new \ReflectionMethod(ReferralRequestLifecycleService::class, 'extractSignedCreateEntity');
-        $method->setAccessible(true);
 
         $entity = $method->invoke($service, [
             'status' => 'processed',

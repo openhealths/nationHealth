@@ -15,7 +15,7 @@
 
                 @if (!$this instanceof PersonUpdate)
                     <div x-show="patientType === 'preperson'" x-cloak>
-                        <livewire:preperson.preperson-create />
+                        <livewire:preperson.preperson-create :key="'preperson-create'" />
                     </div>
                 @endif
 

@@ -14,7 +14,6 @@ use App\Models\Person\Person;
 use App\Models\Relations\Party;
 use App\Models\User;
 use GuzzleHttp\Psr7\Response;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Session;
@@ -106,12 +105,11 @@ class DeviceDispensePatientViewTest extends TestCase
             'status' => 'completed',
         ]);
         $this->api->shouldNotReceive('getById');
-        $this->expectException(ModelNotFoundException::class);
-        try {
-            $this->patientComponent()->call('openDeviceDispenseView', $dispense->uuid);
-        } finally {
-            $this->assertSame($otherPerson->id, $dispense->fresh()->personId);
-        }
+
+        $this->patientComponent()->call('openDeviceDispenseView', $dispense->uuid)
+            ->assertNotFound();
+
+        $this->assertSame($otherPerson->id, $dispense->fresh()->personId);
     }
 
     public function testInvalidUuidIsRejectedBeforeFetching(): void

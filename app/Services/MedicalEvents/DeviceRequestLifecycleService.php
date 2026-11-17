@@ -16,6 +16,7 @@ use App\Policies\DeviceRequestRequestPolicy;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
 use App\Services\Dictionary\Collections\BasicDictionaryCollection;
+use Brick\Math\BigDecimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -301,7 +302,7 @@ class DeviceRequestLifecycleService extends EHealthRequestLifecycleService imple
     private function propertyValueForComparison(mixed $value): mixed
     {
         if (is_int($value) || is_float($value)) {
-            return (string) \Brick\Math\BigDecimal::of(is_float($value) ? json_encode($value, JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR) : $value)->stripTrailingZeros();
+            return (string) BigDecimal::of(is_float($value) ? json_encode($value, JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR) : $value)->strippedOfTrailingZeros();
         }
         if (!is_array($value)) {
             return $value;

@@ -503,30 +503,37 @@ function isBackgroundLivewireRequest(payload) {
     return onlyBackgroundActions && hasBackgroundAction;
 }
 
-function registerLivewireHooks() {
-    // JSON.stringify($wire) (Boost browser logger, DevTools, Alpine clones) looks up
-    // toJSON on the proxy and Livewire POSTs it as a real method call. Drop those calls.
-    Livewire.hook('commit', ({ commit }) => {
-        if (!Array.isArray(commit.calls)) {
-            return;
-        }
+// Messages of requests that carry only status polls; they must not show the preloader.
+const backgroundMessages = new WeakSet();
 
-        commit.calls = commit.calls.filter((call) => call.method !== 'toJSON');
+function registerLivewireHooks() {
+    Livewire.interceptRequest(({ request }) => {
+        if (isBackgroundLivewireRequest(request.payload)) {
+            request.messages.forEach((message) => backgroundMessages.add(message));
+        }
     });
 
-    Livewire.hook('request', ({ payload, succeed, fail }) => {
-        if (isBackgroundLivewireRequest(payload)) {
-            return;
-        }
-        activeRequests++;
-        updatePreloader();
+    // Count messages, not requests: Livewire drops a cancelled request (a poll interrupted by
+    // a user action) without finishing it, while every message finishes, cancelled ones included.
+    Livewire.interceptMessage(({ message, onSend, onFinish }) => {
+        let isCounted = false;
+        let isFinished = false;
 
-        succeed(() => {
-            activeRequests = Math.max(0, activeRequests - 1);
+        onSend(() => {
+            if (isFinished || backgroundMessages.has(message)) {
+                return;
+            }
+            isCounted = true;
+            activeRequests++;
             updatePreloader();
         });
 
-        fail(() => {
+        onFinish(() => {
+            isFinished = true;
+            if (!isCounted) {
+                return;
+            }
+            isCounted = false;
             activeRequests = Math.max(0, activeRequests - 1);
             updatePreloader();
         });

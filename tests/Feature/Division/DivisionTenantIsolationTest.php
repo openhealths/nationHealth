@@ -59,7 +59,7 @@ class DivisionTenantIsolationTest extends TestCase
         {
             public \Closure $selectRows;
 
-            public function select($query, $bindings = [], $useReadPdo = true): array
+            public function select($query, $bindings = [], $useReadPdo = true, array $fetchUsing = []): array
             {
                 return ($this->selectRows)($query, $bindings);
             }
