@@ -10,7 +10,7 @@ GPT-рев'ю запускається окремо: його завершенн
 
 ## Середовище і набір тестів
 
-- PHP 8.4, залежності з `composer.lock`, локальний PostgreSQL на окремому hosted runner.
+- PHP 8.5, залежності з `composer.lock`, локальний PostgreSQL на окремому hosted runner.
 - БД має назву `testing`; скрипти підготовки та bootstrap тестів перевіряють цю назву.
 - `scripts/ci/prepare-testing-db.sh` застосовує install і update/0_1 міграції.
 - Завантаження ICD-10 через eHealth вимкнене лише під час підготовки схеми CI.

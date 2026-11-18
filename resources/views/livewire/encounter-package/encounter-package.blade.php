@@ -316,6 +316,7 @@
             <div class="flex-1 space-y-4">
                 @if ($this instanceof EncounterPackageView)
                     <livewire:components.submission-status
+                        :key="'submission-status'"
                         :recordType="Encounter::class"
                         :recordId="$encounterId"
                         :recordStatusLabel="$this->statusLabel"

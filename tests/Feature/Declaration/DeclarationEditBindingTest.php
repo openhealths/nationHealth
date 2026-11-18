@@ -32,7 +32,7 @@ class DeclarationEditBindingTest extends TestCase
             'testing'
         ) extends PostgresConnection
         {
-            public function select($query, $bindings = [], $useReadPdo = true): array
+            public function select($query, $bindings = [], $useReadPdo = true, array $fetchUsing = []): array
             {
                 preg_match('/from "([a-z_]+)"/', $query, $table);
                 $rows = match ($table[1] ?? '') {

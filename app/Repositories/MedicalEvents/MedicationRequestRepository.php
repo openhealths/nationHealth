@@ -15,6 +15,7 @@ use App\Models\Division;
 use App\Models\MedicalEvents\Sql\Coding;
 use App\Services\MedicalEvents\Mappers\MedicationRequestMapper;
 use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -301,7 +302,7 @@ class MedicationRequestRepository extends BaseRepository
             if (!$quantity->isEqualTo(json_encode((float) $value, JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR))) {
                 throw new InvalidArgumentException('Medication quantity cannot round-trip through the JSON numeric contract.');
             }
-            if (!$quantity->isEqualTo($quantity->toScale(10, \Brick\Math\RoundingMode::DOWN)) || $quantity->abs()->isGreaterThanOrEqualTo('100000000000000')) {
+            if (!$quantity->isEqualTo($quantity->toScale(10, RoundingMode::Down)) || $quantity->abs()->isGreaterThanOrEqualTo('100000000000000')) {
                 throw new InvalidArgumentException('Medication quantity exceeds decimal(24,10) storage precision.');
             }
         }

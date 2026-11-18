@@ -28,7 +28,7 @@ class QuantityRepository extends BaseRepository
         }
         $numeric = is_float($value) ? json_encode($value, JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR) : (string) $value;
         try {
-            $decimal = BigDecimal::of($numeric)->toScale(10, RoundingMode::UNNECESSARY);
+            $decimal = BigDecimal::of($numeric)->toScale(10, RoundingMode::Unnecessary);
         } catch (MathException $exception) {
             throw new InvalidArgumentException('Quantity exceeds the supported decimal scale; rounding is not permitted.', previous: $exception);
         }
@@ -40,7 +40,7 @@ class QuantityRepository extends BaseRepository
         }
         $quantity ??= new Quantity();
         $quantity->fill([
-            'value' => (string) $decimal->stripTrailingZeros(),
+            'value' => (string) $decimal->strippedOfTrailingZeros(),
             'comparator' => $data['comparator'] ?? null,
             'unit' => $data['unit'] ?? null,
             'system' => $data['system'] ?? null,

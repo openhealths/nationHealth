@@ -23,12 +23,12 @@ use Illuminate\Support\Str;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Mockery;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
-use PHPUnit\Framework\Attributes\RunClassInSeparateProcess;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\Concerns\CreatesFhirRequestIdentifiers;
 use Tests\TestCase;
 
-#[RunClassInSeparateProcess]
+#[RunTestsInSeparateProcesses]
 #[PreserveGlobalState(false)]
 class MedicationRequestLifecycleServiceTest extends TestCase
 {

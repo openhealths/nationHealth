@@ -5,18 +5,18 @@
     "keywords": ["open", "nation", "health", "laravel", "framework"],
     "license": "GPL-3.0-or-later",
     "require": {
-        "php": "^8.4",
+        "php": "^8.5",
         "ext-openssl": "*",
         "guzzlehttp/guzzle": "^7.15.2",
-        "kirkbushell/eloquence": "^12.0.1",
+        "kirkbushell/eloquence": "^13.0.0",
         "laravel/fortify": "^1.37.3",
-        "laravel/framework": "^12.64.0",
+        "laravel/framework": "^13.42.0",
         "laravel/jetstream": "^5.5.3",
         "laravel/passport": "^13.10",
-        "laravel/tinker": "^2.11.1",
-        "livewire/livewire": "^3.8.3",
+        "laravel/tinker": "^3.1.0",
+        "livewire/livewire": "^4.4.8",
         "picqer/php-barcode-generator": "^3.2.4",
-        "spatie/laravel-permission": "^6.25.0",
+        "spatie/laravel-permission": "^8.5.0",
         "symfony/object-mapper": "^8.1",
         "symfony/serializer": "^8.1"
     },
@@ -29,7 +29,7 @@
         "laravel/sail": "^1.64.0",
         "mockery/mockery": "^1.6.12",
         "nunomaduro/collision": "^8.9.5",
-        "phpunit/phpunit": "^12.5.33",
+        "phpunit/phpunit": "^13.4.7",
         "spatie/laravel-ignition": "^2.12.0"
     },
     "autoload": {
