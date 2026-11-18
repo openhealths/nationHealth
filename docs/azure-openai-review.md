@@ -1,6 +1,6 @@
 # Автоматичне рев’ю через Azure OpenAI
 
-Workflow `.github/workflows/azure-openai-review.yml` надсилає текст змін із PR до нашого deployment `gpt-6.1-sol` у Azure Foundry та публікує один коментар від `github-actions[bot]`. При оновленні PR цей коментар оновлюється.
+Workflow `.github/workflows/azure-openai-review.yml` надсилає текст змін із PR до Azure Foundry для рев’ю коду. Бот `github-actions[bot]` публікує результат у коментарі й оновлює його після нових змін у PR.
 
 ## Коли запускається
 
@@ -35,7 +35,7 @@ Repository variables в `openhealths/nationHealth`:
 - `AZURE_CLIENT_ID`: Client ID identity.
 - `AZURE_TENANT_ID`: Tenant ID.
 - `AZURE_OPENAI_ENDPOINT`: HTTPS base URL ресурсу, без `/openai/v1`.
-- `AZURE_OPENAI_DEPLOYMENT`: `gpt-6.1-sol`.
+- `AZURE_OPENAI_DEPLOYMENT` — назва розгортання моделі в Azure Foundry. Для рев’ю коду й технічних вимог використовується `gpt-6.2-astra`.
 
 Identity має роль `Cognitive Services OpenAI User` на Foundry account із моделлю. Federated credential має issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange` і subject `repo:openhealths/nationHealth:ref:refs/heads/main`.
 
@@ -52,6 +52,6 @@ php -l .github/scripts/azure-openai-review.php
 php .github/tests/azure-openai-review-test.php
 ```
 
-Після злиття workflow у `main` запустити його вручну на відкритому PR. Перевірити зелений run і коментар бота з правильним commit.
+Після зміни `AZURE_OPENAI_DEPLOYMENT` запустити **Actions → Azure OpenAI connection test → Run workflow** на `main`. Ця перевірка входить в Azure через OIDC і надсилає короткий запит до вибраного розгортання. Для перевірки повного рев’ю запустити **Azure OpenAI PR review** на відкритому PR і звірити модель та коміт у коментарі бота.
 
 При помилці workflow не публікує повідомлення про успішне рев’ю. HTTP 401/403: перевірити OIDC, роль identity і workflow permissions. HTTP 429: перевірити квоту Azure. Помилка незавершеної/невалідної відповіді: переглянути output limit, content filter і доступні параметри моделі. Не копіювати access tokens або API keys у логи чи коментарі.

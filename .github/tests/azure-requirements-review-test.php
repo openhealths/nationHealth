@@ -79,7 +79,7 @@ function simulateRequirements(array $options = []): array
     putenv('PR_NUMBER=123');
     putenv('GITHUB_RUN_ID=456');
     putenv('AZURE_OPENAI_ENDPOINT=https://test-resource.cognitiveservices.azure.com');
-    putenv('AZURE_OPENAI_DEPLOYMENT=gpt-6.1-sol');
+    putenv('AZURE_OPENAI_DEPLOYMENT=gpt-6.2-astra');
     putenv('EXPECTED_HEAD_SHA');
     putenv('AZURE_REVIEW_HEAD_SHA');
     putenv('AZURE_REVIEW_CHECK_ID=42');
@@ -125,6 +125,7 @@ function simulateRequirements(array $options = []): array
         }
         if (str_contains($url, '/chat/completions')) {
             $models++;
+            requirementsCheck($payload['model'] === getenv('AZURE_OPENAI_DEPLOYMENT'), 'Requirements review used the wrong Azure deployment');
             requirementsCheck($payload['store'] === false && $payload['max_completion_tokens'] === 6000, 'Missing bounded request');
             $isSelection = str_starts_with($payload['messages'][0]['content'], 'Select relevant');
             if ($isSelection) {

@@ -17,7 +17,7 @@ function simulateReview(array $options = []): array
     putenv('GITHUB_REF='.($options['ref'] ?? 'refs/heads/main'));
     putenv('PR_NUMBER='.($options['number'] ?? '123'));
     putenv('AZURE_OPENAI_ENDPOINT=https://test-resource.cognitiveservices.azure.com/');
-    putenv('AZURE_OPENAI_DEPLOYMENT=gpt-6.1-sol');
+    putenv('AZURE_OPENAI_DEPLOYMENT=gpt-6.2-astra');
     putenv('EXPECTED_HEAD_SHA='.($options['expectedSha'] ?? ''));
     putenv('GITHUB_STEP_SUMMARY');
     putenv('GITHUB_RUN_ID=456');
@@ -54,6 +54,7 @@ function simulateReview(array $options = []): array
             if (!empty($options['modelFailure'])) {
                 throw new RuntimeException('Synthetic model failure');
             }
+            check($payload['model'] === getenv('AZURE_OPENAI_DEPLOYMENT'), 'Code review used the wrong Azure deployment');
             check($payload['store'] === false && $payload['max_completion_tokens'] === 6000, 'Cost/storage settings are missing');
 
             return ['choices' => [['finish_reason' => 'stop', 'message' => [
