@@ -49,8 +49,10 @@ return new class extends Migration
         $this->backfillMergedUuids();
 
         Schema::table('merged_persons', static function (Blueprint $table) {
-            $table->uuid('merged_uuid')->nullable(false)->change();
-            $table->foreignId('merged_preperson_id')->nullable()->change();
+            $table->uuid('merged_uuid')->nullable(false)
+                ->comment('eHealth identifier of the person or preperson merged into the identified patient')->change();
+            $table->foreignId('merged_preperson_id')->nullable()
+                ->comment('Preperson merged into the patient, when their record is known locally')->change();
         });
     }
 

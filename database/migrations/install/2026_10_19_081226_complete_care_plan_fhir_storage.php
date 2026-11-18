@@ -49,12 +49,12 @@ return new class extends Migration
             'care_plan_activity_reason_codes' => ['activity_id', 'care_plan_activities', 'concept_id', 'codeable_concepts'],
             'care_plan_activity_goal_concepts' => ['activity_id', 'care_plan_activities', 'concept_id', 'codeable_concepts'],
             'care_plan_activity_outcome_concepts' => ['activity_id', 'care_plan_activities', 'concept_id', 'codeable_concepts']] as $name => [$ownerColumn, $ownerTable, $valueColumn, $valueTable]) {
-            Schema::create($name, static function (Blueprint $table) use ($ownerColumn, $ownerTable, $valueColumn, $valueTable): void {
+            Schema::create($name, static function (Blueprint $table) use ($name, $ownerColumn, $ownerTable, $valueColumn, $valueTable): void {
                 $table->id();
                 $table->foreignId($ownerColumn)->constrained($ownerTable)->cascadeOnDelete();
                 $table->foreignId($valueColumn)->constrained($valueTable);
                 $table->unsignedInteger('position');
-                $table->unique([$ownerColumn, $valueColumn]);
+                $table->unique([$ownerColumn, $valueColumn], $name.'_owner_value_unique');
             });
         }
     }

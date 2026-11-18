@@ -48,7 +48,6 @@ return new class extends Migration
             $table->enum('license_sync_status', JobStatus::values())->nullable();
             $table->enum('document_sync_status', JobStatus::values())->nullable();
             $table->enum('declaration_sync_status', JobStatus::values())->nullable();
-            $table->enum('declaration_request_sync_status', JobStatus::values())->nullable();
             $table->enum('equipment_sync_status', JobStatus::values())->nullable();
             $table->enum('contract_sync_status', JobStatus::values())->nullable();
             $table->enum('contract_request_sync_status', JobStatus::values())->nullable();

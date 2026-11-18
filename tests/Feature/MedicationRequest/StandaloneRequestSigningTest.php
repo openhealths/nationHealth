@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\MedicationRequest;
 
+use App\Contracts\SignatureProvider;
 use App\Livewire\DeviceRequest\DeviceRequestForm;
 use App\Livewire\MedicationRequest\MedicationRequestForm;
 use App\Models\Employee\Employee;
@@ -14,7 +15,6 @@ use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Services\Dictionary\Dictionaries\MedicalProgramDictionary;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use App\Services\MedicalEvents\MedicationRequestLifecycleService;
-use App\Contracts\SignatureProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Cache;
@@ -25,6 +25,7 @@ use Livewire\Livewire;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\MocksBasicDictionaries;
+use Tests\Concerns\UsesUtcDatabaseTimeZone;
 use Tests\TestCase;
 
 /**
@@ -36,6 +37,7 @@ class StandaloneRequestSigningTest extends TestCase
 {
     use DatabaseTransactions;
     use MocksBasicDictionaries;
+    use UsesUtcDatabaseTimeZone;
 
     protected User $user;
 
@@ -58,7 +60,7 @@ class StandaloneRequestSigningTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        DB::statement("SET LOCAL TIME ZONE 'UTC'");
+        $this->useUtcDatabaseTimeZone();
         $this->travelTo(CarbonImmutable::parse('2026-10-29 23:30:00', (string) config('app.timezone')));
         $this->mockBasicDictionaries(['device_unit' => ['piece' => 'Штука', 'pair' => 'Пара']]);
         Cache::put(MedicalProgramDictionary::KEY, [], now()->addDay());
@@ -465,7 +467,7 @@ class StandaloneRequestSigningTest extends TestCase
         ];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('deniedDeviceRoutes')]
+    #[DataProvider('deniedDeviceRoutes')]
     public function testDeviceRouteRejectsMissingPermissionBeforeMountAndApi(string $routeName, string $scope): void
     {
         $this->withoutVite();

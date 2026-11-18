@@ -25,9 +25,14 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::table('episodes')
-            ->where('status', Status::DRAFT->value)
-            ->update(['status' => Status::ACTIVE->value]);
+        foreach (['episodes', 'episode_status_history'] as $table) {
+            if ($table === 'episode_status_history' && !Schema::hasTable($table)) {
+                continue;
+            }
+            DB::table($table)
+                ->where('status', Status::DRAFT->value)
+                ->update(['status' => Status::ACTIVE->value]);
+        }
 
         $this->setStatusConstraint(array_filter(
             Status::values(),
@@ -44,14 +49,27 @@ return new class extends Migration
      * @param  array<int, string>  $values
      * @return void
      */
-    private function setStatusConstraint(array $values): void
+    protected function setStatusConstraint(array $values): void
     {
-        Schema::table('episodes', static function (Blueprint $table): void {
-            $table->dropForeign('episodes_status_check');
-        });
+        foreach (['episodes', 'episode_status_history'] as $name) {
+            if ($name === 'episode_status_history' && !Schema::hasTable($name)) {
+                continue;
+            }
+            if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+                Schema::table($name, static function (Blueprint $table) use ($values): void {
+                    $table->enum('status', $values)->change();
+                });
 
-        $list = implode("', '", $values);
+                continue;
+            }
 
-        DB::statement("ALTER TABLE episodes ADD CONSTRAINT episodes_status_check CHECK (status IN ('$list'))");
+            Schema::table($name, static function (Blueprint $table) use ($name): void {
+                $table->dropForeign($name.'_status_check');
+            });
+
+            $list = implode("', '", $values);
+
+            DB::statement("ALTER TABLE {$name} ADD CONSTRAINT {$name}_status_check CHECK (status IN ('$list'))");
+        }
     }
 };

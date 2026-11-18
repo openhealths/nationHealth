@@ -74,12 +74,6 @@ jobs:
           chmod +x scripts/ci/install-postgres.sh scripts/ci/prepare-testing-db.sh scripts/ci/run-domain-tests.sh
           scripts/ci/install-postgres.sh
 
-      - name: Bootstrap .env for testing
-        run: |
-          set -euo pipefail
-          cp -n .env.example .env || true
-          php artisan config:clear --no-interaction
-
       - name: Install and update testing DB
         run: scripts/ci/prepare-testing-db.sh
 

@@ -17,7 +17,7 @@ return new class extends Migration
     {
         Schema::create('persons', static function (Blueprint $table) {
             $table->id();
-            $table->uuid()->unique()->nullable();
+            $table->string('uuid')->unique()->nullable();
             $table->enum('verification_status', VerificationStatus::values())
                 ->default(VerificationStatus::IN_REVIEW->value);
             $table->date('birth_date')->nullable();

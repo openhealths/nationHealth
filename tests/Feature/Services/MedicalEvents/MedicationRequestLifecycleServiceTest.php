@@ -25,15 +25,17 @@ use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\Concerns\CreatesFhirRequestIdentifiers;
+use Tests\Concerns\UsesUtcDatabaseTimeZone;
 use Tests\TestCase;
 
 #[RunTestsInSeparateProcesses]
 #[PreserveGlobalState(false)]
 class MedicationRequestLifecycleServiceTest extends TestCase
 {
+    use CreatesFhirCarePlans;
     use CreatesFhirRequestIdentifiers;
     use DatabaseTransactions;
-    use CreatesFhirCarePlans;
+    use UsesUtcDatabaseTimeZone;
 
     protected Person $person;
 
@@ -50,7 +52,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        DB::statement("SET LOCAL TIME ZONE 'UTC'");
+        $this->useUtcDatabaseTimeZone();
         $this->travelTo(CarbonImmutable::parse('2026-10-29 23:30:00', (string) config('app.timezone')));
 
         $this->person = Person::create([
@@ -61,8 +63,8 @@ class MedicationRequestLifecycleServiceTest extends TestCase
             'process_disclosure_data_consent' => true,
         ]);
 
-        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -446,7 +448,7 @@ class MedicationRequestLifecycleServiceTest extends TestCase
         $period->update(['end' => $nextStartUtc]);
         $this->assertFalse($repository->eligibleEncounters($this->person->id, $this->employee->uuid)
             ->contains('id', $this->encounter->id));
-        $period->update(['end' => \Carbon\CarbonImmutable::parse($startUtc, 'UTC')->subSecond()->format('Y-m-d H:i:s')]);
+        $period->update(['end' => CarbonImmutable::parse($startUtc, 'UTC')->subSecond()->format('Y-m-d H:i:s')]);
         $this->assertFalse($repository->eligibleEncounters($this->person->id, $this->employee->uuid)
             ->contains('id', $this->encounter->id));
     }

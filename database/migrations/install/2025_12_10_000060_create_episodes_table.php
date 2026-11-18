@@ -55,7 +55,8 @@ return new class extends Migration
         Schema::create('episode_diagnoses_history_items', static function (Blueprint $table) {
             $table->id();
             $table->foreignId('episode_diagnoses_history_id')->constrained(
-                'episode_diagnoses_history'
+                'episode_diagnoses_history',
+                indexName: 'episode_diagnoses_history_items_history_fk'
             )->cascadeOnDelete();
             $table->foreignId('condition_id')->constrained('identifiers');
             $table->foreignId('code_id')->constrained('codeable_concepts');

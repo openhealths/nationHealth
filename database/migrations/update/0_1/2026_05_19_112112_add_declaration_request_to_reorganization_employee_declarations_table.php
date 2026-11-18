@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -15,11 +15,15 @@ return new class extends Migration
     {
         Schema::table('reorganization_employee_declarations', function (Blueprint $table) {
             if (!Schema::hasColumn('reorganization_employee_declarations', 'id')) {
+                // FIRST belongs to ALTER TABLE; the install migration already declares id first.
                 $table->id()->first();
             }
 
             if (!Schema::hasColumn('reorganization_employee_declarations', 'declaration_request_id')) {
-                $table->foreignId('declaration_request_id')->nullable()->constrained('declaration_requests')->cascadeOnDelete();
+                $table->foreignId('declaration_request_id')->nullable()->constrained(
+                    'declaration_requests',
+                    indexName: 'reorg_employee_declarations_request_fk'
+                )->cascadeOnDelete();
             }
 
             if (!Schema::hasColumn('reorganization_employee_declarations', 'declaration_request_uuid')) {
@@ -39,7 +43,13 @@ return new class extends Migration
             }
 
             if (Schema::hasColumn('reorganization_employee_declarations', 'declaration_request_id')) {
-                $table->dropForeign(['declaration_request_id']);
+                foreach (Schema::getForeignKeys('reorganization_employee_declarations') as $foreignKey) {
+                    if ($foreignKey['columns'] === ['declaration_request_id']) {
+                        $table->dropForeign($foreignKey['name']);
+
+                        break;
+                    }
+                }
             }
 
             if (Schema::hasColumn('reorganization_employee_declarations', 'declaration_request_uuid')) {

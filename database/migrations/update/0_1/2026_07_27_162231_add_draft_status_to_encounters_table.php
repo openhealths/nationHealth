@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Enums\Person\EncounterStatus;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -30,8 +32,16 @@ return new class extends Migration
     /**
      * @param  array<int, string>  $values
      */
-    private function setStatusConstraint(array $values): void
+    protected function setStatusConstraint(array $values): void
     {
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            Schema::table('encounters', static function (Blueprint $table) use ($values): void {
+                $table->enum('status', $values)->change();
+            });
+
+            return;
+        }
+
         DB::statement('ALTER TABLE encounters ' . 'DROP CONSTRAINT IF EXISTS encounters_status_check');
         $statuses = implode("', '", $values);
         DB::statement("ALTER TABLE encounters " . "ADD CONSTRAINT encounters_status_check " . "CHECK (status IN ('$statuses'))");
