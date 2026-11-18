@@ -3,14 +3,26 @@
 # Azure cloud agents in this project have no Docker, so a postgres service image is not available.
 set -euo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/assert-not-production.sh"
+
+if [[ "${GITHUB_ACTIONS:-}" != "true" && "${TF_BUILD:-}" != "True" ]]; then
+  echo "PostgreSQL installation requires a CI job." >&2
+  exit 1
+fi
+
 DB_USERNAME="${DB_USERNAME:?DB_USERNAME must be provided}"
 DB_PASSWORD="${DB_PASSWORD:?DB_PASSWORD must be provided}"
 DB_DATABASE="${DB_DATABASE:-testing}"
 DB_HOST="${DB_HOST:-127.0.0.1}"
 DB_PORT="${DB_PORT:-5432}"
 
-if [[ "${DB_DATABASE}" != "testing" ]]; then
-  echo "Refusing to create database '${DB_DATABASE}'. This script only prepares 'testing'." >&2
+if [[ "$DB_USERNAME" != "ci_test" || "$DB_DATABASE" != "testing" || "$DB_HOST" != "127.0.0.1" || "$DB_PORT" != "5432" ]]; then
+  echo "Expected the CI role ci_test and database testing on the local CI PostgreSQL server." >&2
+  exit 1
+fi
+# The job initializer generates 32 random bytes as hex. Only that format enters the creation statement.
+if [[ ! "$DB_PASSWORD" =~ ^[[:xdigit:]]{64}$ ]]; then
+  echo "Expected the password from the CI environment initializer." >&2
   exit 1
 fi
 
@@ -21,21 +33,22 @@ if ! pg_isready -h "${DB_HOST}" -p "${DB_PORT}" >/dev/null 2>&1; then
   sudo service postgresql start
 fi
 
-echo "==> Ensuring role '${DB_USERNAME}' and database '${DB_DATABASE}'"
-sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
-DO \$\$
-BEGIN
-  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${DB_USERNAME}') THEN
-    CREATE ROLE ${DB_USERNAME} LOGIN PASSWORD '${DB_PASSWORD}' SUPERUSER;
-  ELSE
-    ALTER ROLE ${DB_USERNAME} WITH LOGIN PASSWORD '${DB_PASSWORD}' SUPERUSER;
-  END IF;
-END
-\$\$;
+admin=(sudo -u postgres psql -X -p "$DB_PORT" -d postgres -v ON_ERROR_STOP=1)
+owner="$("${admin[@]}" -Atc "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname='testing'")"
+if [[ -n "$owner" && "$owner" != "ci_test" ]]; then
+  echo "The existing testing database belongs to a different role." >&2
+  exit 1
+fi
+role="$("${admin[@]}" -Atc "SELECT rolname FROM pg_roles WHERE rolname='ci_test'")"
+if [[ -z "$role" ]]; then
+  "${admin[@]}" <<SQL
+CREATE ROLE ci_test LOGIN PASSWORD '${DB_PASSWORD}';
 SQL
-
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_DATABASE}'" | grep -q 1; then
-  sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${DB_DATABASE} OWNER ${DB_USERNAME};"
+fi
+# On retry, authenticate with the existing role without changing its password or permissions.
+PGPASSWORD="$DB_PASSWORD" psql -X -w -h "$DB_HOST" -p "$DB_PORT" -U ci_test -d postgres -c 'SELECT 1' >/dev/null
+if [[ -z "$owner" ]]; then
+  "${admin[@]}" -c "CREATE DATABASE testing OWNER ci_test"
 fi
 
 echo "==> PostgreSQL ready on ${DB_HOST}:${DB_PORT}/${DB_DATABASE}"

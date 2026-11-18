@@ -62,7 +62,7 @@ class PatientApprovalConfirmationTest extends TestCase
 
     public function createApplication(): Application
     {
-        $app = require dirname(__DIR__, 3).'/bootstrap/app.php';
+        $app = require dirname(__DIR__, 2).'/application.php';
 
         // Isolate the test before providers boot, even when development config is cached.
         $app->afterBootstrapping(LoadConfiguration::class, static function (Application $app): void {

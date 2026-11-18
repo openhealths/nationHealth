@@ -81,21 +81,8 @@ stages:
               DB_USERNAME: $(DB_USERNAME)
               DB_PASSWORD: $(DB_PASSWORD)
 
-          - script: |
-              set -euo pipefail
-              cp -n .env.example .env || true
-              printf '\nAPP_ENV=testing\nDB_CONNECTION=%s\nDB_HOST=%s\nDB_PORT=%s\nDB_DATABASE=%s\nDB_USERNAME=%s\nDB_PASSWORD=%s\nAPP_KEY=%s\n' \
-                "$DB_CONNECTION" "$DB_HOST" "$DB_PORT" "$DB_DATABASE" "$DB_USERNAME" "$DB_PASSWORD" "$APP_KEY" >> .env
-              php artisan config:clear --no-interaction
-            displayName: Bootstrap .env for testing
-            env:
-              DB_CONNECTION: $(DB_CONNECTION)
-              DB_HOST: $(DB_HOST)
-              DB_PORT: $(DB_PORT)
-              DB_DATABASE: $(DB_DATABASE)
-              DB_USERNAME: $(DB_USERNAME)
-              DB_PASSWORD: $(DB_PASSWORD)
-              APP_KEY: $(APP_KEY)
+          - script: cp -n .env.testing.example .env.testing
+            displayName: Configure testing
 
           - script: |
               set -euo pipefail

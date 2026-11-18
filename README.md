@@ -198,3 +198,117 @@ After successful authentication, the user is automatically redirected to the app
 > **Note:** For eHealth login to work properly, the `EHEALTH_REDIRECT_URI` in your `.env` must point to a real, accessible URL of your application. For local development, you may set `EHEALTH_CALLBACK_PROD=true` and configure `EHEALTH_URL_DEV` to `http://localhost:8000`.
 ## Code Style
 See [docs/CODE_STYLE.md](docs/CODE_STYLE.md) for the project code style conventions.
+
+## Local PostgreSQL tests
+
+The testing setup and CI scripts check the original `APP_ENV`, the project's `.env`, and
+cached application configuration before doing any work. If any declares `production`, they exit with a message before
+creating a database, clearing caches, applying migrations, or running tests. A separate `.env.testing` does not bypass this check. If the environment cannot be determined, setup is also refused.
+
+Use a database named `testing` on your existing local PostgreSQL server. The steps below assume the development application is already configured and `testing` does not exist.
+Run all commands from the project root. `db_owner` is an example of an existing local
+application database role; replace it with your role in both the command and `.env.testing`.
+
+1. Check that the working `.env` contains `APP_ENV=local`, then verify the environment:
+
+   ```sh
+   php scripts/ci/assert-not-production.php
+   ```
+
+   Continue only if the check succeeds.
+
+2. Configure `.env.testing`. If it already exists, keep it and check its settings. Otherwise,
+   create it from the template:
+
+   ```sh
+   cp .env.testing.example .env.testing
+   ```
+
+   Set the connection values for your local PostgreSQL server, for example:
+
+   ```dotenv
+   APP_ENV=testing
+   DB_CONNECTION=pgsql
+   DB_HOST=127.0.0.1
+   DB_PORT=5432
+   DB_DATABASE=testing
+   DB_USERNAME=db_owner
+   DB_PASSWORD=
+   DATABASE_URL=
+   ```
+
+   Fill in `DB_PASSWORD` with the password for that role, if required. Keep `DATABASE_URL`
+   empty and retain the other testing settings from the template. `.env.testing` is gitignored
+   and must not be committed.
+
+   For a new file with an empty `APP_KEY`, generate a separate testing key:
+
+   ```sh
+   php scripts/dev/testing-artisan.php key:generate
+   ```
+
+3. Create the empty database with the same role as `DB_USERNAME`:
+
+   ```sh
+   php scripts/ci/assert-not-production.php &&
+       sudo -u postgres createdb --owner=db_owner testing
+   ```
+
+   This administrative step is needed when the application role cannot create databases.
+   Skip it if `testing` already exists.
+
+   If `sudo` prompts, enter your operating system password. If PostgreSQL also prompts,
+   enter the database password for the `postgres` role. `--owner` sets the owner of the
+   new database. If another role administers your local cluster, connect with that role
+   to create `testing` and assign ownership to the role in `DB_USERNAME`.
+
+4. Prepare the database schema:
+
+   ```sh
+   php scripts/dev/prepare-testing-db.php
+   ```
+
+5. Verify that a database test runs successfully:
+
+   ```sh
+   ./vendor/bin/phpunit tests/Feature/SharedCodingPersistenceTest.php
+   ```
+
+If you delete only the `testing` database and keep the configured `.env.testing`, repeat
+steps 3–5. You do not need to copy the template or generate a new key again.
+
+The preparation command loads `.env.testing`, applies the project's install and update migrations, and skips the external ICD-10 download. Run it again after pulling new migrations;
+it keeps the database and applies pending migrations. Test configuration uses a separate storage directory, including
+Laravel caches, compiled views, logs, and Passport keys under `storage/cli-testing`. Tests use in-memory cache, sessions, and mail, a synchronous queue, and local files.
+The PostgreSQL installer in `scripts/ci` is for hosted CI jobs only.
+
+Keep the PostgreSQL connection timezone consistent with the development database. On the same local server, a new database inherits the server timezone. The preparation command
+leaves that setting in place; timezone-related test failures should remain visible.
+
+Run all PHP tests from the `Unit` and `Feature` suites configured in `phpunit.xml`:
+
+```sh
+php scripts/dev/testing-artisan.php test
+```
+
+Alternatively, run the same suites directly with PHPUnit:
+
+```sh
+./vendor/bin/phpunit
+```
+
+To run only one module, pass its test directory. `Division` below is an example;
+replace the path with the directory or individual test file you need:
+
+```sh
+./vendor/bin/phpunit tests/Feature/Division
+```
+
+To run the selected domain tests used by CI, use the project script. This runs the paths listed in `scripts/ci/run-domain-tests.sh`, rather than the complete PHP test suite:
+
+```sh
+bash scripts/ci/run-domain-tests.sh
+```
+
+The test bootstrap validates SQL connections created by Laravel's connection factory before opening PDO, including named connections, dynamically built connections, connection URLs, and read, write, and direct PostgreSQL targets. It permits only SQL databases named `testing` and SQLite `:memory:` fixtures. Additional test databases
+require an explicit update to this guard. Tests writing through multiple connections must also include those names in `connectionsToTransact` when using Laravel's  `DatabaseTransactions` trait.
