@@ -67,7 +67,7 @@ class ClinicalReferralCompletionTest extends TestCase
 
     private function context(array $scopes = ['service_request:read', 'service_request:complete', 'encounter:read']): array
     {
-        $context = $this->compositionFixture(scopes: $scopes);
+        $context = $this->compositionFixture(scopes: [...$scopes, 'patient_summary:read']);
         $resource = json_decode(file_get_contents(base_path('tests/Fixtures/ServiceRequest/resource.json')), true, flags: JSON_THROW_ON_ERROR);
         $resource['id'] = (string) Str::uuid();
         $resource['subject']['identifier']['value'] = $context['person']->uuid;

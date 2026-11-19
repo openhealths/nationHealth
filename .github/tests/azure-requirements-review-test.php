@@ -98,6 +98,9 @@ function simulateRequirements(array $options = []): array
             return ['data' => ['repository' => ['pullRequest' => ['closingIssuesReferences' => ['nodes' => [], 'pageInfo' => ['hasNextPage' => false]]]]]];
         }
         if (str_contains($url, '/check-runs/')) {
+            if ($method === 'GET') {
+                return ['status' => $options['checkStatus'] ?? 'in_progress'];
+            }
             $updates[] = $payload;
             return [];
         }
@@ -158,6 +161,10 @@ function simulateRequirements(array $options = []): array
         runRequirementsReview($request);
     } catch (Throwable $failure) {
         $error = $failure->getMessage();
+    } finally {
+        if (isset($options['finishStatus'])) {
+            finishAzureReview($request, $options['finishStatus']);
+        }
     }
 
     return compact('models', 'comments', 'updates', 'error', 'selections', 'selectionData', 'sourceUrls', 'sourceReads');
@@ -178,8 +185,12 @@ $truncated = simulateRequirements(['truncated' => true]);
 requirementsCheck($truncated['error'] === null && str_contains($truncated['comments'][0], 'потребують перевірки: 1'), 'Incomplete context incorrectly certified');
 $staleRequirements = simulateRequirements(['staleRequirements' => true]);
 requirementsCheck($staleRequirements['comments'] === [] && $staleRequirements['updates'][count($staleRequirements['updates']) - 1]['conclusion'] === 'neutral', 'Changed requirements result published');
-$none = simulateRequirements(['body' => 'No requirements declared']);
-requirementsCheck($none['models'] === 0 && $none['comments'] === [] && $none['updates'][0]['conclusion'] === 'neutral', 'No-requirements flow was not neutral');
+$none = simulateRequirements(['body' => 'No requirements declared', 'finishStatus' => 'success']);
+requirementsCheck($none['models'] === 0 && $none['comments'] === [] && count($none['updates']) === 1
+    && $none['updates'][0]['conclusion'] === 'neutral', 'Successful cleanup overwrote the neutral no-requirements result');
+$finished = simulateRequirements(['finishStatus' => 'success']);
+requirementsCheck($finished['error'] === null && $finished['models'] === 2
+    && end($finished['updates'])['conclusion'] === 'success', 'Successful cleanup overwrote the completed requirements review');
 foreach ([['line' => 900], ['body' => 'ТВ: 3.999.1']] as $option) {
     $bad = simulateRequirements($option);
     requirementsCheck($bad['error'] !== null && $bad['comments'] === [], 'Unsafe or invalid result published');
