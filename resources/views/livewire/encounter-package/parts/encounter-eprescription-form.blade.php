@@ -228,43 +228,25 @@
                                 <p class="text-error">{{ $message }}</p>
                             @enderror
                         </div>
-                        <div class="form-group datepicker-wrapper relative w-full">
-                            <input
+                        <div class="form-group">
+                            <x-forms.date
                                 wire:model="encounterEPrescriptionForm.started_at"
-                                datepicker-format="{{ frontendDateFormat() }}"
-                                type="text"
                                 name="encounterEPrescriptionStartedAt"
                                 id="encounterEPrescriptionStartedAt"
-                                class="peer input datepicker-input appearance-none pl-10 text-gray-500 dark:text-gray-400"
-                                placeholder=" "
-                                autocomplete="off"
                                 required
-                                datepicker-autohide
-                                datepicker-button="false"
+                                :label="__('encounters.eprescription.course_start')"
+                                error="encounterEPrescriptionForm.started_at"
                             />
-                            <label for="encounterEPrescriptionStartedAt" class="wrapped-label">{{ __('encounters.eprescription.course_start') }}</label>
-                            @error ('encounterEPrescriptionForm.started_at')
-                                <p class="text-error">{{ $message }}</p>
-                            @enderror
                         </div>
-                        <div class="form-group datepicker-wrapper relative w-full">
-                            <input
+                        <div class="form-group">
+                            <x-forms.date
                                 wire:model="encounterEPrescriptionForm.ended_at"
-                                datepicker-format="{{ frontendDateFormat() }}"
-                                type="text"
                                 name="encounterEPrescriptionEndedAt"
                                 id="encounterEPrescriptionEndedAt"
-                                class="peer input datepicker-input appearance-none pl-10 text-gray-500 dark:text-gray-400"
-                                placeholder=" "
-                                autocomplete="off"
                                 required
-                                datepicker-autohide
-                                datepicker-button="false"
+                                :label="__('encounters.eprescription.course_end')"
+                                error="encounterEPrescriptionForm.ended_at"
                             />
-                            <label for="encounterEPrescriptionEndedAt" class="wrapped-label">{{ __('encounters.eprescription.course_end') }}</label>
-                            @error ('encounterEPrescriptionForm.ended_at')
-                                <p class="text-error">{{ $message }}</p>
-                            @enderror
                         </div>
                     </div>
                 </fieldset>

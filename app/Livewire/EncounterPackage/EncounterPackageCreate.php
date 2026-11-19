@@ -404,7 +404,7 @@ class EncounterPackageCreate extends EncounterPackageComponent
      *
      * @return void
      */
-    private function setDefaultDate(): void
+    protected function setDefaultDate(): void
     {
         $now = CarbonImmutable::now();
 

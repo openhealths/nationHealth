@@ -286,21 +286,13 @@
 
                     <div class="form-row-2">
                         <div class="form-group group">
-                            <div class="datepicker-wrapper">
-                                <input
-                                    x-model="modalAssociation.associationDate"
-                                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                                    type="text"
-                                    name="associationDate"
-                                    id="associationDate"
-                                    class="datepicker-input with-leading-icon input peer"
-                                    placeholder=" "
-                                    autocomplete="off"
-                                />
-                                <label for="associationDate" class="wrapped-label">
-                                    {{ __('device-associations.association_date') }}
-                                </label>
-                            </div>
+                            <x-forms.date
+                                x-model="modalAssociation.associationDate"
+                                datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                                name="associationDate"
+                                id="associationDate"
+                                :label="__('device-associations.association_date')"
+                            />
                         </div>
                         <div class="form-group group">
                             <select

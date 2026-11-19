@@ -4,16 +4,23 @@ declare(strict_types=1);
 
 namespace App\Livewire\Episode;
 
+use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Episode\Status;
 use App\Enums\Status as EmployeeStatus;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
+use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Livewire\Episode\Forms\EpisodeForm as Form;
 use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\Employee\Employee;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Services\MedicalEvents\Fhir;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 abstract class BaseEpisodeComponent extends BasePatientComponent
 {
@@ -100,6 +107,79 @@ abstract class BaseEpisodeComponent extends BasePatientComponent
     public function cancel(): void
     {
         $this->redirectToEpisodes();
+    }
+
+    /**
+     * Submit the stored draft to eHealth and follow the job it is processed with.
+     * The episode stays a draft until the job is processed, so a rejected one can be fixed and submitted again.
+     *
+     * @param  Episode  $episode
+     * @param  array  $formattedData
+     * @return void
+     */
+    protected function submitToEHealth(Episode $episode, array $formattedData): void
+    {
+        $requestData = Arr::toSnakeCase($formattedData);
+
+        try {
+            $submission = RemoteEHealthLinksProcessing::startSubmission($episode, $requestData);
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Error while starting episode submission');
+            $this->redirectToEpisode($episode->id);
+
+            return;
+        }
+
+        try {
+            $response = EHealth::episode()->create($this->uuid, $requestData);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while creating episode');
+            RemoteEHealthLinksProcessing::markSubmissionFailed($submission);
+            $this->redirectToEpisode($episode->id);
+
+            return;
+        }
+
+        // The request is received already, so the episode stays submitted and locked even if following the job fails
+        try {
+            RemoteEHealthLinksProcessing::track($submission, $response->validate());
+
+            Session::flash('success', __('episodes.messages.create_request_sent'));
+        } catch (Throwable $exception) {
+            Log::channel('e_health_errors')->error('Submitted episode is not tracked', [
+                'episodeId' => $episode->id,
+                'statusCode' => $response->getStatusCode(),
+                'exception' => $exception->getMessage()
+            ]);
+            Session::flash('error', __('errors.ehealth.messages.submission_not_tracked'));
+        }
+
+        $this->redirectToEpisode($episode->id);
+    }
+
+    /**
+     * Open the view page of the stored episode.
+     *
+     * @param  int  $episodeId
+     * @return void
+     */
+    protected function redirectToEpisode(int $episodeId): void
+    {
+        if ($this->prepersonId !== null) {
+            $this->redirectRoute(
+                'prepersons.episodes.view',
+                [legalEntity(), 'preperson' => $this->prepersonId, 'episode' => $episodeId],
+                navigate: true
+            );
+
+            return;
+        }
+
+        $this->redirectRoute(
+            'persons.episodes.view',
+            [legalEntity(), 'person' => $this->personId, 'episode' => $episodeId],
+            navigate: true
+        );
     }
 
     /**

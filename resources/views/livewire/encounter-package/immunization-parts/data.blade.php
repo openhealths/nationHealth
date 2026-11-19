@@ -5,20 +5,15 @@
         {{-- Fix autofocus that was on date --}}
         <button class="sr-only" autofocus tabindex="-1"></button>
         <div>
-            <label for="immunizationDate" class="label-modal"> {{ __('immunizations.date') }} </label>
-            <div class="relative flex items-center">
-                @icon('calendar-week', 'svg-input absolute left-2.5 pointer-events-none')
-                <input
-                    x-model="modalImmunization.date"
-                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                    type="text"
-                    name="immunizationDate"
-                    id="immunizationDate"
-                    class="datepicker-input input-modal !pl-10"
-                    autocomplete="off"
-                    required
-                />
-            </div>
+            <x-forms.date
+                modal
+                x-model="modalImmunization.date"
+                datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                name="immunizationDate"
+                id="immunizationDate"
+                required
+                :label="__('immunizations.date')"
+            />
 
             <p class="text-error text-xs" x-show="modalImmunization.date.trim() === ''">
                 {{ __('forms.field_empty') }}
@@ -37,7 +32,7 @@
                     type="time"
                     name="immunizationTime"
                     id="immunizationTime"
-                    class="input-modal !pl-10"
+                    class="input-modal pl-10!"
                     autocomplete="off"
                     required
                 />
@@ -149,7 +144,7 @@
                 </template>
             </div>
 
-            <div x-show="modalImmunization.notGiven === true" class="form-group group !w-1/2">
+            <div x-show="modalImmunization.notGiven === true" class="form-group group w-1/2!">
                 <label for="reasonsNotGiven" class="label-modal"> {{ __('immunizations.reasons') }} </label>
                 <select
                     type="text"

@@ -1,3 +1,5 @@
+@use('App\Models\MedicalEvents\Sql\Episode')
+
 <x-layouts.patient
     :personId="$personId"
     :prepersonId="$prepersonId"
@@ -17,6 +19,18 @@
     </x-slot>
 
     <div class="shift-content mt-8 max-w-6xl pl-3.5">
+        @if ($isSubmitted)
+            <div class="mb-4">
+                <livewire:components.submission-status
+                    :recordType="Episode::class"
+                    :recordId="$episodeId"
+                    :recordStatusLabel="$episode->status->label()"
+                    :editUrl="$editUrl"
+                    :key="'submission-status'"
+                />
+            </div>
+        @endif
+
         <fieldset class="fieldset">
             <div class="form-row-2">
                 <div class="form-group group">

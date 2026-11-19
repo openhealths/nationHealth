@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Enums\Episode\Status;
+use App\Enums\JobStatus;
 use App\Models\Declaration;
 use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\Approval;
@@ -61,7 +62,8 @@ readonly class EpisodePolicy
     }
 
     /**
-     * Determine whether the user can edit the episode. Closed and cancelled episodes are read-only.
+     * Determine whether the user can edit the episode. Closed and cancelled episodes are read-only,
+     * as is a draft waiting for eHealth to process its submission.
      * An episode without a managing organization came from the short sync and is treated as our own.
      */
     public function update(User $user, Episode $episode): Response
@@ -70,7 +72,8 @@ readonly class EpisodePolicy
 
         if ($user->cannot('episode:write')
             || ($managingOrganization !== null && $managingOrganization !== legalEntity()->uuid)
-            || !Employee::managedByUser($user, $episode->careManager?->value)) {
+            || !Employee::managedByUser($user, $episode->careManager?->value)
+            || $episode->ehealthLinks()->latest('id')->value('status') === JobStatus::PENDING->value) {
             return Response::denyWithStatus(404);
         }
 
@@ -120,7 +123,8 @@ readonly class EpisodePolicy
     }
 
     /**
-     * Determine whether the user can delete the episode. Only a draft that never reached eHealth can be deleted.
+     * Determine whether the user can delete the episode. Only a draft that never reached eHealth can be deleted,
+     * so not one waiting for eHealth to process its submission.
      * An episode without a managing organization came from the short sync and is treated as our own.
      * A draft opened along with an encounter draft goes together with that encounter, so it is not deleted on its own.
      */
@@ -134,8 +138,15 @@ readonly class EpisodePolicy
             return Response::denyWithStatus(404);
         }
 
-        return $episode->status === Status::DRAFT
-            ? Response::allow()
-            : Response::denyWithStatus(404);
+        if ($episode->status !== Status::DRAFT) {
+            return Response::denyWithStatus(404);
+        }
+
+        // The episode list loads the pending flag for the whole page, so the submission is not queried for each draft
+        $hasPendingSubmission = array_key_exists('has_pending_submission', $episode->getAttributes())
+            ? (bool) $episode->getAttribute('has_pending_submission')
+            : $episode->ehealthLinks()->latest('id')->value('status') === JobStatus::PENDING->value;
+
+        return $hasPendingSubmission ? Response::denyWithStatus(404) : Response::allow();
     }
 }

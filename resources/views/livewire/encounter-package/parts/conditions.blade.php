@@ -539,7 +539,7 @@
                                     for="codingSystem"
                                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                 >
-                                    {{ __('conditions.coding_system') }}<span class="text-red-600"> *</span>
+                                    {{ __('conditions.coding_system') }} *
                                 </label>
                                 <div class="relative">
                                     <select
@@ -550,7 +550,7 @@
                                         required
                                     >
                                         <option value="">
-                                            {{ __('forms.select') }} {{ __('conditions.coding_system') }}*
+                                            {{ __('forms.select') }} {{ __('conditions.coding_system') }}
                                         </option>
                                         <option
                                             value="eHealth/ICPC2/condition_codes"
@@ -610,7 +610,7 @@
                                         for="conditionReasonCode"
                                         class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                     >
-                                        {{ __('medical-events.icpc2_status_code') }}<span class="text-red-600"> *</span>
+                                        {{ __('medical-events.icpc2_status_code') }} *
                                     </label>
                                     <div class="relative">
                                         <x-select2
@@ -633,7 +633,7 @@
                                         for="icd10Code"
                                         class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                     >
-                                        {{ __('medical-events.icd_10') }}<span class="text-red-600"> *</span>
+                                        {{ __('medical-events.icd_10') }} *
                                     </label>
                                     <input
                                         type="text"
@@ -686,7 +686,7 @@
                                         for="conditionCodePlaceholder"
                                         class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                     >
-                                        {{ __('conditions.code') }}<span class="text-red-600"> *</span>
+                                        {{ __('conditions.code') }} *
                                     </label>
                                     <div class="relative">
                                         <input
@@ -706,7 +706,7 @@
                                     for="diagnoseCode"
                                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                 >
-                                    {{ __('conditions.role') }}<span class="text-red-600"> *</span>
+                                    {{ __('conditions.role') }} *
                                 </label>
                                 <div class="relative">
                                     <select
@@ -730,7 +730,7 @@
                                     for="verificationStatus"
                                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                 >
-                                    {{ __('conditions.verification_status') }}<span class="text-red-600"> *</span>
+                                    {{ __('conditions.verification_status') }} *
                                 </label>
                                 <div class="relative">
                                     <select
@@ -770,7 +770,7 @@
                                     for="clinicalStatus"
                                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                 >
-                                    {{ __('conditions.clinical_status') }}<span class="text-red-600"> *</span>
+                                    {{ __('conditions.clinical_status') }} *
                                 </label>
                                 <div class="relative">
                                     <select
@@ -792,35 +792,20 @@
                             <div></div>
 
                             <div>
-                                <label
-                                    for="onsetDate"
-                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                >
-                                    {{ __('conditions.onset_date') }}<span class="text-red-600"> *</span>
-                                </label>
-                                <div class="relative">
-                                    <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center pl-1">
-                                        @icon('calendar-week', 'w-4 h-4 text-gray-400')
-                                    </div>
-                                    <input
-                                        x-model="modalCondition.onsetDate"
-                                        :datepicker-max-date="encounter.periodDate"
-                                        type="text"
-                                        name="onsetDate"
-                                        id="onsetDate"
-                                        class="datepicker-input input w-full pl-7"
-                                        autocomplete="off"
-                                        required
-                                    />
-                                </div>
+                                <x-forms.date
+                                    x-model="modalCondition.onsetDate"
+                                    x-bind:datepicker-max-date="encounter.periodDate"
+                                    name="onsetDate"
+                                    id="onsetDate"
+                                    required
+                                    :label="__('conditions.onset_date')"
+                                />
                             </div>
 
                             <div>
-                                <label for="onsetTime" class="mb-1 block text-xs">
-                                    &nbsp;<span class="sr-only">{{ __('forms.time') }}</span>
-                                </label>
+                                <label for="onsetTime" class="sr-only">{{ __('forms.time') }}</label>
                                 <div class="relative">
-                                    <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center pl-1">
+                                    <div class="pointer-events-none absolute inset-y-0 inset-s-0 flex items-center pl-1">
                                         @icon('mingcute-time-fill', 'w-4 h-4 text-gray-400')
                                     </div>
                                     <input
@@ -839,36 +824,21 @@
                             </div>
 
                             <div>
-                                <label
-                                    for="assertedDate"
-                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                >
-                                    {{ __('conditions.entry_date') }}<span class="text-red-600"> *</span>
-                                </label>
-                                <div class="relative">
-                                    <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center pl-1">
-                                        @icon('calendar-week', 'w-4 h-4 text-gray-400')
-                                    </div>
-                                    <input
-                                        x-model="modalCondition.assertedDate"
-                                        :datepicker-min-date="encounter.periodDate"
-                                        :datepicker-max-date="encounter.periodDate"
-                                        type="text"
-                                        name="assertedDate"
-                                        id="assertedDate"
-                                        class="datepicker-input input w-full pl-7"
-                                        autocomplete="off"
-                                        required
-                                    />
-                                </div>
+                                <x-forms.date
+                                    x-model="modalCondition.assertedDate"
+                                    x-bind:datepicker-min-date="encounter.periodDate"
+                                    x-bind:datepicker-max-date="encounter.periodDate"
+                                    name="assertedDate"
+                                    id="assertedDate"
+                                    required
+                                    :label="__('conditions.entry_date')"
+                                />
                             </div>
 
                             <div>
-                                <label for="assertedTime" class="mb-1 block text-xs">
-                                    &nbsp;<span class="sr-only">{{ __('forms.time') }}</span>
-                                </label>
+                                <label for="assertedTime" class="sr-only">{{ __('forms.time') }}</label>
                                 <div class="relative">
-                                    <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center pl-1">
+                                    <div class="pointer-events-none absolute inset-y-0 inset-s-0 flex items-center pl-1">
                                         @icon('mingcute-time-fill', 'w-4 h-4 text-gray-400')
                                     </div>
                                     <input
@@ -905,7 +875,7 @@
                                                 <x-select2
                                                     modelPath="bodySite.code"
                                                     dictionaryName="eHealth/body_sites"
-                                                    ::id="`conditionBodySite${bsIndex}`"
+                                                    x-bind:id="`conditionBodySite${bsIndex}`"
                                                     class="input w-full"
                                                 />
                                                 @icon('chevron-down', 'w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none')
@@ -940,7 +910,7 @@
                                         if (! modalCondition.bodySites) modalCondition.bodySites = [];
                                         modalCondition.bodySites.push({ code: '' });
                                     "
-                                    class="mt-3 flex items-center gap-1.5 text-xs font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                    class="cursor-pointer mt-3 flex items-center gap-1.5 text-xs font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                                 >
                                     <span>{{ __('conditions.add_body_part') }}</span>
                                 </button>
@@ -1098,7 +1068,7 @@
                                     for="conditionReportOrigin"
                                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                 >
-                                    {{ __('medical-events.information_source') }}<span class="text-red-600"> *</span>
+                                    {{ __('medical-events.information_source') }} *
                                 </label>
                                 <div class="relative">
                                     <select
@@ -1233,7 +1203,7 @@
                                     for="diagnoseCodeSelect"
                                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                 >
-                                    {{ __('conditions.role') }}<span class="text-red-600"> *</span>
+                                    {{ __('conditions.role') }} *
                                 </label>
                                 <div class="relative">
                                     <select

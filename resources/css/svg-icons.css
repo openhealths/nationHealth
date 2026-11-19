@@ -25,7 +25,7 @@ button.item-remove {
     @apply relative before:bg-gray-500 dark:before:bg-gray-400;
 
     &:before {
-        @apply content-[''] absolute top-2.5 w-5 h-5;
+        @apply content-[''] absolute top-2.5 w-5 h-5 pointer-events-none;
     }
 }
 

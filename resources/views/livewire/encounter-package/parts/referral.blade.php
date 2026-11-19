@@ -331,23 +331,13 @@
 
                     <div class="form-row-2">
                         <div class="form-group group">
-                            <div class="datepicker-wrapper">
-                                <input
-                                    wire:model="form.encounter.paperReferral.serviceRequestDate"
-                                    type="text"
-                                    id="paperReferralDate"
-                                    class="datepicker-input with-leading-icon input peer @error('form.encounter.paperReferral.serviceRequestDate') input-error @enderror"
-                                    placeholder=" "
-                                    autocomplete="off"
-                                    required
-                                />
-                                <label for="paperReferralDate" class="wrapped-label required">
-                                    {{ __('encounters.paper_referral_date') }}
-                                </label>
-                            </div>
-                            @error('form.encounter.paperReferral.serviceRequestDate')
-                                <p class="text-error">{{ $message }}</p>
-                            @enderror
+                            <x-forms.date
+                                wire:model="form.encounter.paperReferral.serviceRequestDate"
+                                id="paperReferralDate"
+                                required
+                                :label="__('encounters.paper_referral_date')"
+                                error="form.encounter.paperReferral.serviceRequestDate"
+                            />
                         </div>
 
                         <div class="form-group group">

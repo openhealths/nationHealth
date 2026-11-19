@@ -410,27 +410,16 @@
     {{-- Issued datetime --}}
     <div class="form-row-3">
         <div class="form-group group">
-            <div class="datepicker-wrapper">
-                <input
-                    x-model="modalDiagnosticReport.issuedDate"
-                    @if ($isEncounterContext)
-                        @input="validateIssuedDateTime()"
-                    @endif
-                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                    type="text"
-                    name="issuedDate"
-                    id="issuedDate"
-                    class="datepicker-input with-leading-icon input peer"
-                    placeholder=" "
-                    required
-                    autocomplete="off"
-                />
-                <label for="issuedDate" class="wrapped-label"> {{ __('diagnostic-reports.issued') }} </label>
-
-                @error($diagnosticReportErrorPath . '.issuedDate')
-                    <p class="text-error">{{ $message }}</p>
-                @enderror
-            </div>
+            <x-forms.date
+                x-model="modalDiagnosticReport.issuedDate"
+                :x-on:input="$isEncounterContext ? 'validateIssuedDateTime()' : null"
+                datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                name="issuedDate"
+                id="issuedDate"
+                required
+                :label="__('diagnostic-reports.issued')"
+                :error="$diagnosticReportErrorPath . '.issuedDate'"
+            />
         </div>
 
         <div class="form-group group !w-1/2" onclick="document.getElementById('issuedTime').showPicker()">
@@ -497,27 +486,15 @@
     {{-- Effective date and time --}}
     <div class="form-row-3" x-show="modalDiagnosticReport.effectiveType === 'date_time'" x-cloak>
         <div class="form-group group">
-            <div class="datepicker-wrapper">
-                <input
-                    x-model="modalDiagnosticReport.effectiveDate"
-                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                    type="text"
-                    name="effectiveDate"
-                    id="diagnosticReportEffectiveDate"
-                    class="datepicker-input with-leading-icon input peer"
-                    placeholder=" "
-                    autocomplete="off"
-                    :required="modalDiagnosticReport.effectiveType === 'date_time'"
-                />
-
-                <label for="diagnosticReportEffectiveDate" class="wrapped-label">
-                    {{ __('diagnostic-reports.effective_date_time') }}
-                </label>
-
-                @error($diagnosticReportErrorPath . '.effectiveDate')
-                    <p class="text-error">{{ $message }}</p>
-                @enderror
-            </div>
+            <x-forms.date
+                x-model="modalDiagnosticReport.effectiveDate"
+                datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                name="effectiveDate"
+                id="diagnosticReportEffectiveDate"
+                x-bind:required="modalDiagnosticReport.effectiveType === 'date_time'"
+                :label="__('diagnostic-reports.effective_date_time')"
+                :error="$diagnosticReportErrorPath . '.effectiveDate'"
+            />
         </div>
 
         <div
@@ -554,27 +531,15 @@
         <div x-show="modalDiagnosticReport.effectiveType === 'period'" x-cloak>
             <div class="form-row-3">
                 <div class="form-group group">
-                    <div class="datepicker-wrapper">
-                        <input
-                            x-model="modalDiagnosticReport.effectivePeriodStartDate"
-                            datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                            type="text"
-                            name="effectivePeriodStartDate"
-                            id="effectivePeriodStartDate"
-                            class="datepicker-input with-leading-icon input peer"
-                            placeholder=" "
-                            autocomplete="off"
-                            :required="modalDiagnosticReport.effectiveType === 'period'"
-                        />
-
-                        <label for="effectivePeriodStartDate" class="wrapped-label">
-                            {{ __('diagnostic-reports.effective_period_start') }}
-                        </label>
-
-                        @error($diagnosticReportErrorPath . '.effectivePeriodStartDate')
-                            <p class="text-error">{{ $message }}</p>
-                        @enderror
-                    </div>
+                    <x-forms.date
+                        x-model="modalDiagnosticReport.effectivePeriodStartDate"
+                        datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                        name="effectivePeriodStartDate"
+                        id="effectivePeriodStartDate"
+                        x-bind:required="modalDiagnosticReport.effectiveType === 'period'"
+                        :label="__('diagnostic-reports.effective_period_start')"
+                        :error="$diagnosticReportErrorPath . '.effectivePeriodStartDate'"
+                    />
                 </div>
 
                 <div
@@ -605,27 +570,15 @@
 
             <div class="form-row-3">
                 <div class="form-group group">
-                    <div class="datepicker-wrapper">
-                        <input
-                            x-model="modalDiagnosticReport.effectivePeriodEndDate"
-                            datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                            type="text"
-                            name="effectivePeriodEndDate"
-                            id="effectivePeriodEndDate"
-                            class="datepicker-input with-leading-icon input peer"
-                            placeholder=" "
-                            autocomplete="off"
-                            :required="Boolean(modalDiagnosticReport.effectivePeriodEndTime)"
-                        />
-
-                        <label for="effectivePeriodEndDate" class="wrapped-label">
-                            {{ __('diagnostic-reports.effective_period_end') }}
-                        </label>
-
-                        @error($diagnosticReportErrorPath . '.effectivePeriodEndDate')
-                            <p class="text-error">{{ $message }}</p>
-                        @enderror
-                    </div>
+                    <x-forms.date
+                        x-model="modalDiagnosticReport.effectivePeriodEndDate"
+                        datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                        name="effectivePeriodEndDate"
+                        id="effectivePeriodEndDate"
+                        x-bind:required="Boolean(modalDiagnosticReport.effectivePeriodEndTime)"
+                        :label="__('diagnostic-reports.effective_period_end')"
+                        :error="$diagnosticReportErrorPath . '.effectivePeriodEndDate'"
+                    />
                 </div>
 
                 <div

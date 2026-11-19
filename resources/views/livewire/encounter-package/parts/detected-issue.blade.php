@@ -414,24 +414,13 @@
                     {{-- Date + time --}}
                     <div class="form-row-2">
                         <div class="form-group group relative flex justify-between">
-                            <div class="datepicker-wrapper flex-1">
-                                <input
+                            <div class="flex-1">
+                                <x-forms.date
                                     x-model="modalDetectedIssue.identifiedDate"
-                                    type="text"
                                     id="detectedIssueDate"
-                                    autocomplete="off"
-                                    datepicker-max-date="{{
-                                        now()->format(
-                                            config('app.date_format')
-                                        )
-                                    }}"
-                                    class="datepicker-input with-leading-icon input peer rounded-r-none border-r-0"
-                                    placeholder=" "
+                                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                                    :label="__('detected-issues.identified_at')"
                                 />
-
-                                <label for="detectedIssueDate" class="wrapped-label">
-                                    {{ __('detected-issues.identified_at') }}
-                                </label>
                             </div>
 
                             <div class="relative -ml-px w-32">
@@ -440,14 +429,11 @@
                                     x-model="modalDetectedIssue.identifiedTime"
                                     type="time"
                                     id="detectedIssueTime"
-                                    class="input peer rounded-l-none pl-10"
+                                    class="input peer pl-10"
                                     placeholder=" "
                                 />
 
-                                @icon(
-                                    'clock',
-                                    'svg-input left-2.5 text-gray-400'
-)
+                                @icon('clock', 'svg-input left-2.5 text-gray-400')
                             </div>
                         </div>
                     </div>

@@ -54,8 +54,8 @@
                             id="codeValue"
                             name="codeValue"
                             class="input peer"
-                            ::disabled="modalDiagnosticReport.referralType === 'electronic'"
-                            ::class="modalDiagnosticReport.referralType === 'electronic' ? 'text-gray-400 cursor-not-allowed pointer-events-none dark:text-gray-500' : ''"
+                            x-bind:disabled="modalDiagnosticReport.referralType === 'electronic'"
+                            x-bind:class="modalDiagnosticReport.referralType === 'electronic' ? 'text-gray-400 cursor-not-allowed pointer-events-none dark:text-gray-500' : ''"
                         />
 
                         <label for="codeValue" class="label">
@@ -466,25 +466,14 @@
 
                                 <div class="form-row-2">
                                     <div class="form-group group">
-                                        <div class="datepicker-wrapper">
-                                            <input
-                                                x-model="modalDiagnosticReport.paperReferralServiceRequestDate"
-                                                type="text"
-                                                name="serviceRequestDate"
-                                                id="serviceRequestDate"
-                                                class="datepicker-input with-leading-icon input peer"
-                                                placeholder=" "
-                                                required
-                                                autocomplete="off"
-                                            />
-                                            <label for="serviceRequestDate" class="wrapped-label">
-                                                {{ __('medical-events.referral.date') }}
-                                            </label>
-
-                                            @error($diagnosticReportErrorPath . '.paperReferralServiceRequestDate')
-                                                <p class="text-error">{{ $message }}</p>
-                                            @enderror
-                                        </div>
+                                        <x-forms.date
+                                            x-model="modalDiagnosticReport.paperReferralServiceRequestDate"
+                                            name="serviceRequestDate"
+                                            id="serviceRequestDate"
+                                            required
+                                            :label="__('medical-events.referral.date')"
+                                            :error="$diagnosticReportErrorPath . '.paperReferralServiceRequestDate'"
+                                        />
                                     </div>
 
                                     <div class="form-group group">

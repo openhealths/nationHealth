@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Models\MedicalEvents\Sql;
 
 use App\Casts\EHealthTimestampCast;
+use App\Contracts\SubmittedToEHealth;
 use App\Enums\Episode\Status;
+use App\Models\EhealthLink;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use Eloquence\Behaviours\HasCamelCasing;
@@ -15,10 +17,11 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Str;
 
-class Episode extends Model
+class Episode extends Model implements SubmittedToEHealth
 {
     use HasCamelCasing;
 
@@ -139,6 +142,16 @@ class Episode extends Model
     public function statusHistory(): HasMany
     {
         return $this->hasMany(EpisodeStatusHistory::class);
+    }
+
+    /**
+     * eHealth jobs the episode was submitted with, the latest one telling how the last submission went.
+     *
+     * @return MorphMany
+     */
+    public function ehealthLinks(): MorphMany
+    {
+        return $this->morphMany(EhealthLink::class, 'linkable');
     }
 
     /**

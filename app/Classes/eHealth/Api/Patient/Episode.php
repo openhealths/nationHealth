@@ -31,6 +31,8 @@ class Episode extends PatientApiBase
      */
     public function create(string $id, array $data): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateSubmittedJob(...));
+
         return $this->post(self::URL . "/$id/episodes", $data);
     }
 

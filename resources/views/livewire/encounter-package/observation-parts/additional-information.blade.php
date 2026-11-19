@@ -89,20 +89,15 @@
 
     <div class="form-row-4">
         <div>
-            <label for="observationIssuedDate" class="label-modal"> {{ __('observations.result_received_at') }} </label>
-            <div class="relative flex items-center">
-                @icon('calendar-week', 'w-5 h-5 svg-input absolute left-2.5 pointer-events-none')
-                <input
-                    x-model="modalObservation.issuedDate"
-                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                    type="text"
-                    name="issuedDate"
-                    id="observationIssuedDate"
-                    class="datepicker-input input-modal pl-10!"
-                    autocomplete="off"
-                    required
-                />
-            </div>
+            <x-forms.date
+                modal
+                x-model="modalObservation.issuedDate"
+                datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                name="issuedDate"
+                id="observationIssuedDate"
+                required
+                :label="__('observations.result_received_at')"
+            />
 
             <p class="text-error text-xs" x-show="modalObservation.issuedDate.trim() === ''">
                 {{ __('forms.field_empty') }}
@@ -167,22 +162,15 @@
 
     <div class="form-row-4" x-show="modalObservation.effectiveType === 'date_time'" x-cloak>
         <div>
-            <label for="effectiveDate" class="label-modal">
-                {{ __('observations.date_and_time_of_receiving_the_indicators') }}
-            </label>
-            <div class="relative flex items-center">
-                @icon('calendar-week', 'w-5 h-5 svg-input absolute left-2.5 pointer-events-none')
-                <input
-                    x-model="modalObservation.effectiveDate"
-                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                    type="text"
-                    name="effectiveDate"
-                    id="effectiveDate"
-                    class="datepicker-input input-modal pl-10!"
-                    autocomplete="off"
-                    :required="modalObservation.effectiveType === 'date_time'"
-                />
-            </div>
+            <x-forms.date
+                modal
+                x-model="modalObservation.effectiveDate"
+                datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                name="effectiveDate"
+                id="effectiveDate"
+                x-bind:required="modalObservation.effectiveType === 'date_time'"
+                :label="__('observations.date_and_time_of_receiving_the_indicators')"
+            />
         </div>
 
         <div class="w-3/5" onclick="document.getElementById('effectiveTime').showPicker()">

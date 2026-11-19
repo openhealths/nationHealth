@@ -581,20 +581,14 @@
 
                 <div class="form-row-2 mt-6">
                     <div class="form-group group relative flex justify-between">
-                        <div class="datepicker-wrapper flex-1">
-                            <input
+                        <div class="flex-1">
+                            <x-forms.date
                                 x-model="modalDeviceDispense.whenHandedOverDate"
-                                :datepicker-max-date="$wire.form.encounter.periodDate"
-                                type="text"
+                                x-bind:datepicker-max-date="$wire.form.encounter.periodDate"
                                 id="deviceDispenseWhenHandedOverDate"
-                                autocomplete="off"
-                                class="datepicker-input with-leading-icon input peer rounded-r-none border-r-0"
-                                placeholder=" "
                                 required
+                                :label="__('device-dispenses.date_and_time')"
                             />
-                            <label for="deviceDispenseWhenHandedOverDate" class="wrapped-label">
-                                {{ __('device-dispenses.date_and_time') }}
-                            </label>
                         </div>
 
                         <div class="relative -ml-px w-32">
@@ -602,7 +596,7 @@
                                 x-model="modalDeviceDispense.whenHandedOverTime"
                                 type="time"
                                 id="deviceDispenseWhenHandedOverTime"
-                                class="input peer rounded-l-none pl-10"
+                                class="input peer pl-10"
                                 placeholder=" "
                                 required
                             />

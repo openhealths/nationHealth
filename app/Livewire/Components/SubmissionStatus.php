@@ -166,7 +166,7 @@ class SubmissionStatus extends Component
         $this->statusLabel = $this->job['status'];
         $this->showDetails = true;
 
-        if (in_array(strtolower($job['status']), ['pending', 'processing', 'accepted'], true)) {
+        if (in_array(strtolower($job['status']), ['pending', 'processing', 'accepted', 'queued'], true)) {
             return;
         }
 

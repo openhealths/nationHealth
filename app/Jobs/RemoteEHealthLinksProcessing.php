@@ -20,6 +20,7 @@ use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Approval;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\User;
@@ -174,7 +175,9 @@ class RemoteEHealthLinksProcessing extends EHealthJob
         ]);
 
         if ($status === 'processed') {
-            $record->update(['status' => $signedStatus]);
+            // A sync can store a newer status before the job is finished, so the signed one is set only while the stored record
+            // is still a draft, checked by the same query that writes it
+            $record->newQuery()->whereKey($record->getKey())->whereStatus('draft')->update(['status' => $signedStatus]);
 
             // Marked only once the status is set, so a record eHealth accepted is never signed again as a draft
             $link->update(['status' => JobStatus::PROCESSED->value]);
@@ -496,6 +499,11 @@ class RemoteEHealthLinksProcessing extends EHealthJob
                 $signedData['diagnostic_report']['status'],
                 'diagnostic-reports.messages.create_processed',
                 'diagnostic-reports.messages.create_rejected'
+            ],
+            Episode::class => [
+                $signedData['status'],
+                'episodes.messages.create_processed',
+                'episodes.messages.create_rejected'
             ]
         };
     }
@@ -504,6 +512,11 @@ class RemoteEHealthLinksProcessing extends EHealthJob
     {
         if ($this->eHealthLink->linkable instanceof ServiceRequestRequest) {
             return $this->eHealthLink->job->request_data['requiredScope'] ?? 'service_request:write';
+        }
+
+        // The job of a submitted episode is only read, so any session allowed to read jobs can follow it
+        if ($this->eHealthLink->linkable instanceof Episode) {
+            return 'job:read';
         }
 
         return $this->eHealthLink->linkable instanceof CarePlan
