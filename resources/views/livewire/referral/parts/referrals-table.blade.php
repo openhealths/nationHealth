@@ -25,7 +25,7 @@
 @endphp
 
 <div class="index-table-wrapper w-full min-w-0 overflow-x-auto" x-show="visibleCount > 0" data-referrals-scroll>
-    <table class="index-table">
+    <table class="index-table table-auto! [&_th]:break-normal! [&_td]:break-normal!">
         <thead class="index-table-thead">
             <tr>
                 <th scope="col" class="index-table-th w-[12%]">{{ __('referrals.table.created_at') }}</th>
@@ -110,7 +110,7 @@
                             <div>{{ __('referrals.search_age', ['age' => $identity['age']]) }}</div>
                         @endif
                     </td>
-                    <td class="index-table-td">
+                    <td class="index-table-td whitespace-nowrap!">
                         {{ __('referrals.priorities.' . ($referral['priority'] ?? 'unknown')) }}
                     </td>
                     <td class="index-table-td">{{ $programName }}</td>
@@ -125,7 +125,7 @@
                             @endif
                         </td>
                     @endforeach
-                    <td class="index-table-td">
+                    <td class="index-table-td whitespace-nowrap!">
                         {{ $referral['requisition'] ?? $referral['request_number'] ?? $referral['id'] ?? '—' }}
                         @if ($referral['hasCompletion'] ?? false)
                             <button

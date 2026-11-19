@@ -13,6 +13,7 @@
     'hasClose' => false,
     'onCloseClick' => null,
     'title' => null,
+    'header' => null,
 ])
 
 @php

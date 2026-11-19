@@ -58,6 +58,8 @@ DOMAIN_PATHS=(
   tests/Unit/eHealth/Api/ConfigurationQueryTest.php
   tests/Feature/Employee
   tests/Feature/Party
+  tests/Feature/Dictionary/ServiceCatalogSearchTest.php
+  tests/Feature/Dictionary/SharedUiComponentsTest.php
   tests/Feature/Declaration
   tests/Feature/CarePlan
   tests/Feature/CarePlanActivityPayloadTest.php
