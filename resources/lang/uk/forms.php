@@ -5,6 +5,7 @@ declare(strict_types=1);
 $uuid = 'Унікальний ідентифікатор';
 
 return [
+    'show_more' => 'Показати ще',
     'create_and_sign' => 'Створити та підписати',
     // General Actions & Navigation
     'home' => 'Головна',
@@ -406,6 +407,7 @@ return [
     'key_file_extension_hint' => '(зазвичай його назва "Key-6.dat" або *.pfx, *.pk8, *.zs2, *.jks)',
     'key_file_invalid_extension' => 'Оберіть файл у форматі .dat, .pfx, .pk8, .zs2, .jks або .p7s.',
     'file_uploaded_success' => 'Файл :name успішно завантажено!',
+    'error' => 'Помилка',
     'password' => 'Пароль',
     'password_confirmation' => 'Підтвердження пароля',
     'first_login' => 'Перший вхід',

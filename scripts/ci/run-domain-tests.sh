@@ -61,6 +61,9 @@ DOMAIN_PATHS=(
   tests/Feature/Declaration
   tests/Feature/CarePlan
   tests/Feature/CarePlanActivityPayloadTest.php
+  tests/Feature/Encounter/EncounterReferralLegacyReferenceIntegrationTest.php
+  tests/Feature/Encounter/EncounterReferralLayoutTest.php
+  tests/Feature/Encounter/EncounterReferralStateTest.php
   tests/Feature/Encounter/EncounterDocumentPagesTest.php
   tests/Feature/Encounter/EncounterTransferDivisionLookupTest.php
   tests/Feature/MedicationRequest

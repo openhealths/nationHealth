@@ -516,13 +516,15 @@ class EncounterDocumentPagesTest extends TestCase
         ['legalEntity' => $legalEntity, 'person' => $person] = $this->fixture();
         $encounter = $this->encounter($person);
         $this->fakeEHealth(['*' => Http::response($this->eHealthBody([]))]);
-        $component = Livewire::test(EncounterReferralCreate::class, compact('legalEntity', 'person', 'encounter') + ['preperson' => null])
-            ->assertSeeHtml('<option value="routine">Планове</option>')
-            ->assertSeeHtml('<option value="urgent">Ургентне</option>')
-            ->assertDontSeeHtml('<option value="stat">')
-            ->assertDontSeeHtml('<option value="asap">')
-            ->assertDontSeeHtml('<option value="retired">')
-            ->set('encounterReferralForm.service_id', (string) Str::uuid())
+        $component = Livewire::test(EncounterReferralCreate::class, compact('legalEntity', 'person', 'encounter') + ['preperson' => null]);
+        $document = new \DOMDocument();
+        @$document->loadHTML('<?xml encoding="UTF-8">'.$component->html());
+        $options = [];
+        foreach ((new \DOMXPath($document))->query('//select[@id="encounterReferralPriority"]/option') as $option) {
+            $options[$option->getAttribute('value')] = trim($option->textContent);
+        }
+        $this->assertSame(['routine' => 'Планове', 'urgent' => 'Ургентне'], $options);
+        $component->set('encounterReferralForm.service_id', (string) Str::uuid())
             ->set('encounterReferralForm.program_id', '')
             ->set('encounterReferralForm.priority', $priority)
             ->call('validateEncounterReferral');
@@ -817,7 +819,8 @@ class EncounterDocumentPagesTest extends TestCase
         $component = $this->resumeReferralSigning($component, compact('legalEntity', 'person', 'encounter'));
         $uuid = $component->get('encounterReferralRequestIdToSign');
         $this->travel(31)->minutes();
-        $component->call('sign')->assertSet('showSignatureModal', false)
+        $component->call('sign')->assertHasErrors('encounterReferralForm.start_time')
+            ->assertSet('showSignatureModal', false)
             ->assertSee(__('errors.ehealth.messages.occurrence_start_in_past'));
         $this->assertSame('draft', \App\Models\MedicalEvents\Sql\ServiceRequestRequest::whereUuid($uuid)->sole()->status);
         Http::assertNotSent(static fn ($request): bool => $request->method() === 'POST');

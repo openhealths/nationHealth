@@ -28,10 +28,10 @@ use App\Livewire\DiagnosticReport\DiagnosticReportView;
 use App\Livewire\Encounter\EncounterIndex;
 use App\Livewire\Encounter\EncounterView;
 use App\Livewire\EncounterPackage\EncounterEPrescriptionCreate;
-use App\Livewire\EncounterPackage\EncounterReferralCreate;
 use App\Livewire\EncounterPackage\EncounterPackageCreate;
 use App\Livewire\EncounterPackage\EncounterPackageEdit;
 use App\Livewire\EncounterPackage\EncounterPackageView;
+use App\Livewire\EncounterPackage\EncounterReferralCreate;
 use App\Livewire\Episode\EpisodeCreate;
 use App\Livewire\Episode\EpisodeEdit;
 use App\Livewire\Episode\EpisodeIndex;
@@ -282,6 +282,12 @@ Route::prefix('persons')->whereNumber('person')
                 ->can('createServiceRequest', ['encounter', 'person', 'legalEntity'])
                 ->whereNumber('encounter')
                 ->name('referrals.create');
+            if (app()->environment('local') || app()->runningUnitTests()) {
+                Route::get('/encounters/{encounter}/referrals/preview', EncounterReferralCreate::class)
+                    ->can('createServiceRequest', ['encounter', 'person', 'legalEntity'])
+                    ->whereNumber('encounter')
+                    ->name('referrals.preview');
+            }
             Route::get('/encounters/{encounter}/referrals/{referral}/edit', EncounterReferralCreate::class)
                 ->can('createServiceRequest', ['encounter', 'person', 'legalEntity'])
                 ->whereNumber(['encounter', 'referral'])
