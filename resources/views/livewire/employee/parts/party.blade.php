@@ -227,7 +227,7 @@
                             <button
                                 type="button"
                                 @click="phones.splice(index, 1)"
-                                class="item-remove justify-self-start text-red-600 hover:text-red-800"
+                                class="item-remove justify-self-start"
                             >
                                 <span>{{ __('forms.remove_phone') }}</span>
                             </button>

@@ -7,7 +7,7 @@
     "require": {
         "php": "^8.5",
         "ext-openssl": "*",
-        "guzzlehttp/guzzle": "^7.15.2",
+        "guzzlehttp/guzzle": "^8.5.2",
         "kirkbushell/eloquence": "^13.0.0",
         "laravel/fortify": "^1.37.3",
         "laravel/framework": "^13.42.0",

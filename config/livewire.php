@@ -157,4 +157,23 @@ return [
     */
 
     'pagination_theme' => 'tailwind',
+
+    /*
+    |---------------------------------------------------------------------------
+    | Payload Guards
+    |---------------------------------------------------------------------------
+    |
+    | These settings protect against malicious or oversized payloads. Each can
+    | be set to null to disable the limit. The size limit is raised from the
+    | 1MB default because the encounter page keeps its dictionaries in public
+    | state and sends about 3MB with every request.
+    |
+    */
+
+    'payload' => [
+        'max_size' => 4 * 1024 * 1024,
+        'max_nesting_depth' => 10,
+        'max_calls' => 50,
+        'max_components' => 200
+    ],
 ];

@@ -1,7 +1,4 @@
 import { initFlowbite } from 'flowbite';
-import 'flowbite';
-import './bootstrap';
-import './common';
 import './index';
 import { bindReferralDateRange } from './referral-date-range';
 
@@ -561,10 +558,6 @@ function scrollToElement(selector) {
 }
 
 document.addEventListener('livewire:init', () => {
-    Livewire.on('employee-form-failed', (event) => {
-        scrollToElement('.input-error, .select-error');
-    });
-
     Livewire.on('scroll-to-element', (event) => {
         const selector = event.selector || (event.detail && event.detail.selector) || null;
         if (selector) {
@@ -805,22 +798,8 @@ document.addEventListener("DOMContentLoaded", () => {
     tpObserver.observe(document.body, { childList: true, subtree: true });
 });
 
-if (window.Livewire) {
-    document.addEventListener("livewire:load", () => {
-        Livewire.hook("message.processed", (message, component) => {
-            initUkTimepickers(component?.el || document);
-            initUkDateRangePickers(component?.el || document);
-            initFlowbite();
-        });
-    });
-
-    document.addEventListener("livewire:updated", () => {
-        initFlowbite();
-    });
-
-    document.addEventListener("livewire:navigated", () => {
-        initUkTimepickers();
-        initUkDateRangePickers();
-        initFlowbite();
-    });
-}
+document.addEventListener("livewire:navigated", () => {
+    initUkTimepickers();
+    initUkDateRangePickers();
+    initFlowbite();
+});
