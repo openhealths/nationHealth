@@ -6,7 +6,8 @@ namespace Tests;
 
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
-use RuntimeException;
+use Illuminate\Support\Facades\ParallelTesting;
+use Tests\Support\TestingDatabase;
 
 trait CreatesApplication
 {
@@ -41,9 +42,7 @@ trait CreatesApplication
         $connection = (string) $app['config']->get('database.default');
         $database = (string) $app['config']->get("database.connections.{$connection}.database");
 
-        if ($database !== 'testing') {
-            throw new RuntimeException("Refusing to run tests against database [{$database}]. Expected [testing].");
-        }
+        TestingDatabase::assertIsolated($database, ParallelTesting::token(), allowBase: true);
 
         return $app;
     }

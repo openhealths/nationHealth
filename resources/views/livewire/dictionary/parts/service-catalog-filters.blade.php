@@ -3,21 +3,28 @@
     $componentId = $this->getId();
 @endphp
 
-<div class="-my-4 flex flex-col" x-data="{ showFilter: false }">
+<div
+    class="-my-4 flex flex-col"
+    x-data="{ showFilter: @js($showAllSearchFilters ?? false) }"
+>
     <div class="mb-4 flex w-full flex-col">
         <div class="w-full lg:w-96">
             <label
                 for="serviceSearch{{ $componentId }}"
                 class="mb-2 block flex items-center gap-1 text-sm font-medium text-gray-900 dark:text-white"
             >
-                @icon('search-outline', 'w-4.5 h-4.5')
-                <span>{{ __('dictionaries.service_catalog.search_services') }}</span>
+                @icon ('search-outline', 'w-4.5 h-4.5')
+                <span
+                    >{{ __('dictionaries.service_catalog.search_services') }}</span
+                >
             </label>
 
             <div class="form-group group w-full">
                 <input
-                    type="text"
+                    type="search"
                     id="serviceSearch{{ $componentId }}"
+                    name="service_catalog_query"
+                    autocomplete="off"
                     class="input peer w-full"
                     placeholder=" "
                     wire:model="filterCodeOrName"
@@ -32,17 +39,29 @@
     </div>
 
     <div class="mt-6 mb-4 flex w-full flex-col gap-2 sm:flex-row">
-        <button type="button" wire:click="search" class="button-primary flex items-center gap-2">
-            @icon('search', 'w-4 h-4')
+        <button
+            type="button"
+            wire:click="search"
+            class="button-primary flex items-center gap-2"
+        >
+            @icon ('search', 'w-4 h-4')
             <span>{{ __('forms.search') }}</span>
         </button>
 
-        <button type="button" wire:click="resetFilters" class="button-primary-outline-red me-0">
+        <button
+            type="button"
+            wire:click="resetFilters"
+            class="button-primary-outline-red me-0"
+        >
             {{ __('forms.reset_all_filters') }}
         </button>
 
-        <button type="button" class="button-minor flex items-center gap-2" @click="showFilter = ! showFilter">
-            @icon('adjustments', 'w-4 h-4')
+        <button
+            type="button"
+            class="button-minor flex items-center gap-2"
+            @click="showFilter = !showFilter"
+        >
+            @icon ('adjustments', 'w-4 h-4')
             <span>{{ __('forms.additional_search_parameters') }}</span>
         </button>
     </div>
@@ -84,7 +103,10 @@
                 <option value="0">{{ __('forms.no') }}</option>
             </select>
 
-            <label for="filterServiceGroupActive{{ $componentId }}" class="label">
+            <label
+                for="filterServiceGroupActive{{ $componentId }}"
+                class="label"
+            >
                 {{ __('dictionaries.service_catalog.service_group_active') }}
             </label>
         </div>
@@ -106,7 +128,7 @@
         </div>
 
         {{-- Picking a service for a referral already keeps only the services allowed in it --}}
-        @unless ($requestAllowedOnly)
+        @unless ($requestAllowedOnly && !($showAllSearchFilters ?? false))
             <div class="form-group group">
                 <select
                     wire:model="filterRequestAllowed"

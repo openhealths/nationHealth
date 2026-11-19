@@ -16,8 +16,8 @@ use Livewire\WithPagination;
 
 class ServiceCatalog extends Component
 {
-    use WithPagination;
     use FormTrait;
+    use WithPagination;
 
     public string $filterCodeOrName = '';
     public string $filterCategory = '';
@@ -30,6 +30,7 @@ class ServiceCatalog extends Component
     public string $selectionEvent = 'service-selected';
     public array $allowedCategories = [];
     public bool $requestAllowedOnly = false;
+    public bool $showAllSearchFilters = false;
 
     public array $dictionaryNames = ['SERVICE_CATEGORY'];
 
@@ -39,13 +40,15 @@ class ServiceCatalog extends Component
         string $selectionEvent = 'service-selected',
         array $allowedCategories = [],
         bool $requestAllowedOnly = false,
-        bool $allowGroupSelection = false
+        bool $allowGroupSelection = false,
+        bool $showAllSearchFilters = false
     ): void {
         $this->selectionMode = $selectionMode;
         $this->allowGroupSelection = $allowGroupSelection;
         $this->selectionEvent = $selectionEvent;
         $this->allowedCategories = $allowedCategories;
         $this->requestAllowedOnly = $requestAllowedOnly;
+        $this->showAllSearchFilters = $showAllSearchFilters;
 
         $this->getDictionary();
     }
