@@ -68,8 +68,6 @@ DOMAIN_PATHS=(
   tests/Feature/MedicationRequestTest.php
   tests/Feature/Referral
   tests/Feature/ReferralTest.php
-  tests/Feature/Api/ReferralControllerTest.php
-  tests/Feature/Api/ReferralControllerProcessCancelUsageTest.php
   tests/Feature/EHealth/EHealthResponseExceptionPartyNotVerifiedTest.php
   tests/Feature/Models/UserGetCarePlanWriterEmployeeTest.php
   tests/Feature/Person/PatientMedicationRequestsPhase6Test.php
