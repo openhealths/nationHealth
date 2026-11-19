@@ -220,6 +220,12 @@ check($lastCheck['payload']['conclusion'] === 'success' && $lastCheck['published
 check(str_contains($result['published'][0]['body'], '**✅ Рев’ю завершено.**')
     && str_contains($result['published'][0]['body'], '/actions/runs/456'), 'The final comment needs an explicit completion status and run link');
 
+foreach ([['findings' => [], 'expected' => 'success'], ['files' => [], 'expected' => 'neutral']] as $case) {
+    $result = simulateReview(['checks' => true, 'checkStatus' => 'in_progress', 'finishStatus' => 'success', ...$case]);
+    check(end($result['checkUpdates'])['payload']['conclusion'] === $case['expected'],
+        'Successful cleanup must preserve the published result when a check read is stale');
+}
+
 $result = simulateReview(['start' => true, 'pr' => ['draft' => true]]);
 check($result['checkUpdates'] === [] && $result['modelCalls'] === 0, 'Drafts must not register or execute a review');
 
@@ -254,4 +260,4 @@ $result = simulateReview(['checks' => true, 'files' => [], 'findings' => []]);
 check($result['modelCalls'] === 0 && end($result['checkUpdates'])['payload']['conclusion'] === 'neutral',
     'No analyzable files must finish neutrally rather than claim successful analysis');
 
-echo "34 review safety and behavior checks passed.\n";
+echo "36 review safety and behavior checks passed.\n";
