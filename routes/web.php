@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\ReferralController;
 use App\Http\Controllers\Auth\EHealthLoginController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Controllers\CarePlanController;
 use App\Http\Controllers\EmailController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Icd10Controller;
@@ -84,7 +85,6 @@ use Illuminate\Support\Facades\Route;
 use App\Livewire\LegalEntity\Connections\LegalEntityConnectionShow;
 use App\Livewire\LegalEntity\Connections\LegalEntityConnectionIndex;
 use App\Livewire\LegalEntity\Connections\LegalEntityConnectionCreate;
-use App\Repositories\Repository;
 
 /*
 |--------------------------------------------------------------------------
@@ -337,16 +337,10 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
             Route::get('/care-plans/create/{personId?}', \App\Livewire\CarePlan\CarePlanCreate::class)
                 ->name('care-plans.create')
                 ->can('create', \App\Models\CarePlan::class);
-            $redirectEncounterCarePlan = static function (\App\Models\LegalEntity $legalEntity, \App\Models\MedicalEvents\Sql\Encounter $encounter) {
-                $person = Repository::carePlan()->findPatient((int) $encounter->person_id) ?? abort(404);
-                \Illuminate\Support\Facades\Gate::authorize('view', [$encounter, $person]);
-
-                return redirect()->route('persons.encounters.care-plans.create', ['legalEntity' => $legalEntity, 'person' => $person, 'encounter' => $encounter]);
-            };
-            Route::get('/encounters/{encounter}/care-plan/create', $redirectEncounterCarePlan)
+            Route::get('/encounters/{encounter}/care-plan/create', CarePlanController::class)
                 ->whereNumber('encounter')
                 ->can('create', \App\Models\CarePlan::class);
-            Route::get('/encounter/{encounter}/care-plan/create', $redirectEncounterCarePlan)
+            Route::get('/encounter/{encounter}/care-plan/create', CarePlanController::class)
                 ->whereNumber('encounter')
                 ->can('create', \App\Models\CarePlan::class);
             Route::get('/care-plans/{carePlan}', \App\Livewire\CarePlan\CarePlanShow::class)
