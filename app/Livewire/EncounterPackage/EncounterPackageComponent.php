@@ -43,6 +43,7 @@ use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Repositories\Repository;
+use App\Services\Dictionary\Dictionaries\DeviceDefinitionDictionary;
 use App\Services\Dictionary\Mappers\ImmunizationDictionaryMapper;
 use App\Services\MedData\MedData;
 use App\Services\MedicalEvents\Fhir;
@@ -50,6 +51,7 @@ use App\Traits\FormTrait;
 use App\Traits\SearchesElectronicReferrals;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
@@ -743,7 +745,24 @@ class EncounterPackageComponent extends Component
         try {
             RemoteEHealthLinksProcessing::track($submission, $response->validate());
 
-            Session::flash('success', __('encounters.messages.package_sent'));
+            $message = __('encounters.messages.package_sent');
+
+            if (!empty($formattedData['device_dispenses'])) {
+                try {
+                    $items = $this->deviceDispenseItems($formattedData['device_dispenses']);
+
+                    if ($items !== []) {
+                        $message .= "\n" . __('device-dispenses.messages.pending_dispenses') . "\n• " . implode("\n• ", $items);
+                    }
+                } catch (Throwable $exception) {
+                    Log::warning('Unable to build submitted device dispense message', [
+                        'encounterId' => $encounter->id,
+                        'exceptionType' => $exception::class,
+                    ]);
+                }
+            }
+
+            Session::flash('success', $message);
         } catch (Throwable $exception) {
             Log::channel('e_health_errors')->error('Submitted encounter package is not tracked', [
                 'encounterId' => $encounter->id,
@@ -1591,6 +1610,46 @@ class EncounterPackageComponent extends Component
             ])
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Build the additional notification from the accepted encounter package.
+     */
+    private function deviceDispenseItems(array $deviceDispenses): array
+    {
+        $definitions = collect(Cache::get(DeviceDefinitionDictionary::KEY, []))->keyBy('id');
+        $basics = dictionary()->basics();
+
+        $typeNames = $basics
+            ->byName('device_definition_classification_type', false)
+            ->asCodeDescription()
+            ->all();
+
+        $unitNames = $basics
+            ->byName('device_unit', false)
+            ->asCodeDescription()
+            ->all();
+
+        $items = collect($deviceDispenses)
+            ->flatMap(static fn (array $dispense): array => $dispense['details'] ?? [])
+            ->map(static function (array $detail) use ($definitions, $typeNames, $unitNames): string {
+                $modelId = data_get($detail, 'device.identifier.value');
+                $typeCode = data_get($detail, 'device_code.coding.0.code');
+                $name = $modelId ? (data_get($definitions->get($modelId), 'device_names.0.name') ?: __('device-dispenses.medical_device') . ' (' . $modelId . ')') : ($typeNames[$typeCode ?? ''] ?? $typeCode ?? __('device-dispenses.medical_device'));
+                $quantity = data_get($detail, 'quantity.value', '?');
+                $unitCode = data_get($detail, 'quantity.code', 'piece');
+                $unit = $unitCode === 'piece' ? __('device-dispenses.messages.piece') : ($unitNames[$unitCode] ?? $unitCode);
+
+                return __('device-dispenses.messages.processed_item', [
+                    'name' => $name,
+                    'quantity' => $quantity,
+                    'unit' => $unit,
+                ]);
+            })
+            ->values()
+            ->all();
+
+        return $items;
     }
 
     /**

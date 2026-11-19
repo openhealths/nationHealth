@@ -4,38 +4,39 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Models\CarePlanActivity;
-use App\Models\CarePlan;
-use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
-use Throwable;
-use Carbon\CarbonImmutable;
-use DateTimeInterface;
+use App\Classes\eHealth\EHealth;
+use App\Classes\eHealth\EHealthResponse;
 use App\Contracts\SubmittedToEHealth;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
 use App\Enums\ResponseStatus;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthValidationException;
+use App\Models\CarePlan;
+use App\Models\CarePlanActivity;
 use App\Models\EhealthJob as EhealthJobModel;
-use App\Models\LegalEntity;
 use App\Models\EhealthLink;
+use App\Models\LegalEntity;
+use App\Models\MedicalEvents\Sql\Approval;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
+use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Procedure;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\User;
-use InvalidArgumentException;
-use App\Classes\eHealth\EHealth;
+use App\Notifications\RemoteEHealthLinksNotification;
+use App\Repositories\MedicalEvents\Repository;
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
+use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
-use GuzzleHttp\Promise\PromiseInterface;
-use App\Classes\eHealth\EHealthResponse;
-use App\Models\MedicalEvents\Sql\Approval;
-use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Procedure;
-use App\Models\MedicalEvents\Sql\DiagnosticReport;
-use Illuminate\Queue\Middleware\RateLimited;
-use App\Repositories\MedicalEvents\Repository;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Notifications\RemoteEHealthLinksNotification;
-use App\Exceptions\EHealth\EHealthValidationException;
+use InvalidArgumentException;
+use Throwable;
 
 class RemoteEHealthLinksProcessing extends EHealthJob
 {
@@ -351,7 +352,7 @@ class RemoteEHealthLinksProcessing extends EHealthJob
             Repository::approval()->finishCarePlanSmsResend($this->eHealthLink, $responseData);
             if ($responseData['status'] === 'failed') {
                 $approval = $this->eHealthLink->linkable;
-                \Illuminate\Support\Facades\Cache::forget('care-plan-otp-resend:'.$approval->approvable->person->uuid.':'.$approval->uuid);
+                Cache::forget('care-plan-otp-resend:'.$approval->approvable->person->uuid.':'.$approval->uuid);
             }
 
             return;
@@ -420,7 +421,7 @@ class RemoteEHealthLinksProcessing extends EHealthJob
         if (data_get($this->eHealthLink->job?->request_data, 'operation') === 'resendSms') {
             Repository::approval()->finishCarePlanSmsResend($this->eHealthLink, ['status' => 'failed']);
             $approval = $this->eHealthLink->linkable;
-            \Illuminate\Support\Facades\Cache::forget('care-plan-otp-resend:'.$approval->approvable->person->uuid.':'.$approval->uuid);
+            Cache::forget('care-plan-otp-resend:'.$approval->approvable->person->uuid.':'.$approval->uuid);
 
             return;
         }
