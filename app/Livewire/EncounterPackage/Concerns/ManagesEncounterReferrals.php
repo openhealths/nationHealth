@@ -145,6 +145,9 @@ trait ManagesEncounterReferrals
             'service_id' => '',
             'priority' => 'routine',
             'quantity' => 1,
+            'quantity_system' => 'SERVICE_UNIT',
+            'quantity_code' => 'PIECE',
+            'quantity_unit' => 'шт.',
             'started_at' => $start->format('d.m.Y'),
             'start_time' => $start->format('H:i'),
             'end_time' => $start->format('H:i'),
@@ -154,6 +157,7 @@ trait ManagesEncounterReferrals
             'patient_instruction' => '',
             'inform_with' => InformWith::formValue($this->encounterReferralAuthMethods[0] ?? []),
             'reason_reference' => [],
+            'supporting_info' => [],
             'performer' => $transfer['uuid'] ?? '',
             'location_reference' => '',
             'performer_type' => '',
@@ -190,7 +194,26 @@ trait ManagesEncounterReferrals
         if ($key !== null) {
             $this->resetValidation('encounterReferralForm.'.$key);
         }
+        if ($key === 'quantity_code') {
+            $this->encounterReferralForm['quantity_unit'] = $this->encounterReferralQuantityUnits()[$value] ?? '';
+        }
         $this->encounterReferralWarningMessage = '';
+    }
+
+    #[Computed]
+    public function encounterReferralQuantityUnits(): array
+    {
+        try {
+            $units = dictionary()->basics()->byName('SERVICE_UNIT')->asCodeDescription()->all();
+        } catch (Throwable) {
+            $units = [];
+        }
+
+        return $units + ['PIECE' => 'шт.'];
+    }
+
+    protected function validateEncounterReferralReferences(): void
+    {
     }
 
     public function searchEncounterReferralServices(): void
@@ -295,6 +318,11 @@ trait ManagesEncounterReferrals
 
     public function validateEncounterReferral(bool $sign = true): void
     {
+        if (($this->encounterReferralForm['program_id'] ?? '') === 'preview-service-program') {
+            $this->addError('encounterReferralForm.program_id', __('encounters.referral_layout.test_program_hint'));
+
+            return;
+        }
         if ($this->encounterReferralRequestIdToSign !== null) {
             $this->checkEncounterReferralSubmission();
             if (($this->encounterReferralSubmission['status'] ?? null) === JobStatus::PENDING->value || $this->encounterReferralRequestIdToSign === null) {
@@ -316,6 +344,7 @@ trait ManagesEncounterReferrals
             'encounterReferralForm.service_id' => 'required|string|uuid',
             'encounterReferralForm.category' => 'required|string',
             'encounterReferralForm.quantity' => 'required|numeric|min:0.01',
+            'encounterReferralForm.quantity_code' => ['nullable', Rule::in(array_keys($this->encounterReferralQuantityUnits()))],
             'encounterReferralForm.priority' => ['required', Rule::in(array_keys($this->encounterReferralPriorityOptions()))],
         ], [], [
             'encounterReferralForm.service_id' => __('код послуги'),
@@ -326,6 +355,7 @@ trait ManagesEncounterReferrals
             'encounterReferralForm.ended_at' => __('дата закінчення'),
         ]);
 
+        $this->validateEncounterReferralReferences();
         $period = $this->encounterReferralPeriod();
 
         if ($this->encounterReferralServiceType === 'service_group'
@@ -916,39 +946,75 @@ trait ManagesEncounterReferrals
 
     protected function loadEncounterReferralPrograms(): void
     {
+        $programs = collect();
         try {
-            $this->encounterReferralPrograms = dictionary()->medicalPrograms()
-                ->where('is_active', true)
-                ->where('type', MedicalProgramType::SERVICE->value)
-                ->map(static fn (array $program): array => [
-                    'id' => (string) ($program['id'] ?? ''),
-                    'name' => (string) ($program['name'] ?? ''),
-                ])
-                ->filter(static fn (array $program): bool => $program['id'] !== '' && $program['name'] !== '')
+            $programs = dictionary()->medicalPrograms()->filter(static fn (array $program): bool =>
+                filter_var($program['is_active'] ?? $program['isActive'] ?? false, FILTER_VALIDATE_BOOLEAN)
+                && strtoupper((string) ($program['type'] ?? '')) === MedicalProgramType::SERVICE->value);
+        } catch (Throwable $exception) {
+            Log::warning('EncounterEdit: failed to read cached service programs: '.$exception->getMessage());
+        }
+
+        try {
+            // The user's authenticated client can load the service catalogue when the MIS cache is unavailable.
+            if ($programs->isEmpty() && filled(Session::get(config('ehealth.api.oauth.bearer_token')))) {
+                $programs = collect(EHealth::medicalProgram()->getMany([
+                    'type' => MedicalProgramType::SERVICE->value,
+                    'is_active' => true,
+                ])->getData());
+            }
+            $this->encounterReferralPrograms = $programs
+                ->filter(static fn (array $program): bool => filter_var($program['is_active'] ?? $program['isActive'] ?? false, FILTER_VALIDATE_BOOLEAN)
+                    && strtoupper((string) ($program['type'] ?? '')) === MedicalProgramType::SERVICE->value)
+                ->map(static function (array $program): array {
+                    $settings = $program['medical_program_settings'] ?? $program['medicalProgramSettings'] ?? [];
+                    $required = $settings['care_plan_required'] ?? $settings['carePlanRequired'] ?? null;
+                    if ($required !== null) {
+                        $settings['care_plan_required'] = filter_var($required, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                    }
+
+                    return [
+                        'id' => (string) ($program['id'] ?? ''),
+                        'name' => (string) ($program['name'] ?? ''),
+                        'medical_program_settings' => $settings,
+                    ];
+                })
+                ->filter(static fn (array $program): bool => Str::isUuid($program['id']) && $program['name'] !== '')
                 ->values()
                 ->all();
         } catch (Throwable $exception) {
             Log::warning('EncounterEdit: failed to load service programs for standalone referral: '.$exception->getMessage());
             $this->encounterReferralPrograms = [];
         }
+        if (app()->environment('local')) {
+            $this->encounterReferralPrograms[] = [
+                'id' => 'preview-service-program',
+                'name' => __('encounters.referral_layout.test_program'),
+                'is_demo' => true,
+                'medical_program_settings' => ['care_plan_required' => true],
+            ];
+        }
     }
-
     /**
      * Prefer PMG (state guarantees) when present; otherwise first loaded SERVICE program.
      */
     protected function resolveDefaultEncounterReferralProgramId(): string
     {
         foreach ($this->encounterReferralPrograms as $program) {
+            if (!empty($program['is_demo'])) {
+                continue;
+            }
             $name = mb_strtolower((string) ($program['name'] ?? ''));
             if (
                 str_contains($name, 'державних фінансових гарантій')
                 || str_contains($name, 'пмг')
+                || str_contains($name, 'медичних гарантій')
             ) {
                 return (string) ($program['id'] ?? '');
             }
         }
 
-        return (string) ($this->encounterReferralPrograms[0]['id'] ?? '');
+        return (string) (collect($this->encounterReferralPrograms)->first(fn (array $program): bool => empty($program['is_demo']))['id'] ?? '');
     }
 
     private function resetEncounterReferralValidation(): void

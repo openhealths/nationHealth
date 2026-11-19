@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Encounter;
 
-use App\Livewire\EncounterPackage\EncounterPackageEdit;
+use App\Contracts\SignatureProvider;
 use App\Enums\Person\EncounterStatus;
+use App\Livewire\EncounterPackage\EncounterPackageEdit;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\Person\Person;
 use App\Models\Preperson;
-use App\Contracts\SignatureProvider;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Http;
@@ -32,8 +32,8 @@ class EncounterReferralStateTest extends TestCase
         Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('actionType', 'sign_referral')
             ->set('showSignatureModal', true)
-            ->assertSeeHtml('wire:click="sign"')
-            ->assertDontSeeHtml('wire:click="cancelSelectedEncounter"')
+            ->assertSeeHtml('wire:submit="sign"')
+            ->assertDontSeeHtml('wire:submit="cancelSelectedEncounter"')
             ->call('sign')
             ->assertSet('signedAction', 'sign_referral');
     }
@@ -43,8 +43,8 @@ class EncounterReferralStateTest extends TestCase
         Livewire::test(EncounterPackageReferralStateHarness::class)
             ->set('actionType', 'cancel_encounter')
             ->set('showSignatureModal', true)
-            ->assertSeeHtml('wire:click="cancelSelectedEncounter"')
-            ->assertDontSeeHtml('wire:click="sign"');
+            ->assertSeeHtml('wire:submit="cancelSelectedEncounter"')
+            ->assertDontSeeHtml('wire:submit="sign"');
     }
 
     #[DataProvider('unrelatedSignatureActions')]
