@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Dto\Phone;
 
-use App\Contracts\Dto\Model as ModelContract;
 use App\Classes\eHealth\Api\Responses\Collections\PhoneCreate;
+use App\Contracts\Dto\Model as ModelContract;
+use App\Dto\Input\FormCollection;
 use App\Models\Relations\Phone as PhoneModel;
 use Symfony\Component\ObjectMapper\Attribute\Map;
-use App\Dto\FormCollection;
 
 #[Map(source: PhoneCreate::class)]
 #[Map(source: FormCollection::class)]

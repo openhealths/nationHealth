@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Dto\Division;
 
-use App\Dto\FormCollection;
+use App\Dto\Input\FormCollection;
 use Symfony\Component\ObjectMapper\Attribute\Map;
 use Symfony\Component\ObjectMapper\ObjectMapper;
 use Symfony\Component\PropertyAccess\PropertyAccess;
