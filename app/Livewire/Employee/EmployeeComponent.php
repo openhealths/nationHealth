@@ -265,6 +265,7 @@ abstract class EmployeeComponent extends Component
                 $validatedData['qualifications'] ?? null,
                 $validatedData['scienceDegree'] ?? null
             );
+            $employee->update(['status' => $validatedData['employee']['status']]);
 
             // 4. Close/Actualize Pending Requests
             $this->actualizePendingRequests($employee, $token);

@@ -38,12 +38,9 @@ class DeclarationApprovalScopesTest extends TestCase
         [$user, $legalEntity, $employee] = $this->loginWithRole($type, $role);
         $request = $this->newRequest($legalEntity, $employee);
 
+        $this->assertSame($allowed, $user->can('declaration_request:write'));
         $this->assertSame($allowed, $user->can('approve', DeclarationRequest::class));
         $this->assertSame($allowed, $user->can('approve', $request));
-
-        if (in_array($role, [Role::DOCTOR, Role::RECEPTIONIST], true)) {
-            $this->assertFalse($user->can('declaration_request:approve'));
-        }
     }
 
     public static function approvalRoles(): array
@@ -114,7 +111,7 @@ class DeclarationApprovalScopesTest extends TestCase
     #[DataProvider('resigningScopes')]
     public function test_doctor_can_resign_with_write_and_sign_scopes(array $missingScopes, bool $allowed): void
     {
-        [$user] = $this->loginWithRole();
+        [$user] = $this->loginWithRole(withoutApproveScope: true);
         foreach ($missingScopes as $scope) {
             $user->revokePermissionTo($scope);
         }
@@ -128,7 +125,7 @@ class DeclarationApprovalScopesTest extends TestCase
     public static function resigningScopes(): array
     {
         return [
-            'current doctor scopes without legacy approve' => [[], true],
+            'doctor scopes without legacy approve' => [[], true],
             'missing write' => [['declaration_request:write'], false],
             'missing sign' => [['declaration_request:sign'], false],
         ];
@@ -154,7 +151,7 @@ class DeclarationApprovalScopesTest extends TestCase
     #[DataProvider('approvalMethods')]
     public function test_doctor_approval_reaches_v3_and_opens_signing_without_legacy_scope(string $method): void
     {
-        [$user, $legalEntity, $employee] = $this->loginWithRole();
+        [$user, $legalEntity, $employee] = $this->loginWithRole(withoutApproveScope: true);
         $simplified = $method === 'simplified';
         $request = $this->newRequest($legalEntity, $employee, $simplified);
         $request->save();
@@ -213,8 +210,11 @@ class DeclarationApprovalScopesTest extends TestCase
         return [['sms'], ['offline'], ['simplified']];
     }
 
-    protected function loginWithRole(string $type = LegalEntity::TYPE_PRIMARY_CARE, Role $role = Role::DOCTOR): array
-    {
+    protected function loginWithRole(
+        string $type = LegalEntity::TYPE_PRIMARY_CARE,
+        Role $role = Role::DOCTOR,
+        bool $withoutApproveScope = false
+    ): array {
         Auth::shouldUse('ehealth');
         $legalEntity = LegalEntity::factory()->ofType($type)->create();
         $this->instance('legalEntity', $legalEntity);
@@ -222,6 +222,10 @@ class DeclarationApprovalScopesTest extends TestCase
         $party = Party::factory()->create();
         $user = User::factory()->create(['party_id' => $party->id]);
         $user->assignRole($role);
+        if ($withoutApproveScope) {
+            // A doctor with the older scope set still needs every permission assigned to that role.
+            $user->roles()->firstOrFail()->revokePermissionTo('declaration_request:approve');
+        }
         $user->syncPermissions(array_intersect(config('ehealth.roles.' . $role->value), config('ehealth.legal_entity_types.' . $type)));
         $division = Division::factory()->create(['legal_entity_id' => $legalEntity->id]);
         $employee = Employee::factory()->create([
