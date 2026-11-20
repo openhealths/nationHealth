@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\Equipment\Traits;
 
 use App\Classes\eHealth\EHealth;
-use App\Core\Arr;
+use App\Dto\Equipment\ChangeAvailabilityStatus;
+use App\Dto\Equipment\ChangeStatus;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Equipment\Status;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Models\Equipment;
 use App\Repositories\Repository;
 use App\Rules\InDictionary;
@@ -16,8 +19,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 trait StatusTrait
@@ -54,7 +55,7 @@ trait StatusTrait
         }
 
         try {
-            $response = EHealth::equipment()->changeStatus($equipment->uuid, removeEmptyKeys(Arr::toSnakeCase($validated)));
+            $response = EHealth::equipment()->changeStatus($equipment->uuid, (new ChangeStatus(...$validated))->toArray());
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when updating status of equipment');
 
@@ -62,7 +63,7 @@ trait StatusTrait
         }
 
         try {
-            Repository::equipment()->updateStatus($response->validate()['uuid'], $response->validate());
+            Repository::equipment()->updateStatus($response->validate());
 
             Session::flash('success', __('equipments.success.status_updated'));
             $this->dispatch('close-update-status-modal');
@@ -107,10 +108,7 @@ trait StatusTrait
         }
 
         try {
-            $response = EHealth::equipment()->changeAvailabilityStatus(
-                $uuid,
-                removeEmptyKeys(Arr::toSnakeCase($validated))
-            );
+            $response = EHealth::equipment()->changeAvailabilityStatus($uuid, (new ChangeAvailabilityStatus(...$validated))->toArray());
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when updating availability status of equipment');
 
@@ -118,7 +116,7 @@ trait StatusTrait
         }
 
         try {
-            Repository::equipment()->updateStatus($response->validate()['uuid'], $response->validate());
+            Repository::equipment()->updateStatus($response->validate());
 
             Session::flash('success', __('equipments.success.availability_status_updated'));
             $this->dispatch('close-update-availability-status-modal');

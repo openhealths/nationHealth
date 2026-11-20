@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Classes\eHealth\EHealth;
+use App\Classes\eHealth\EHealthResponse;
 use App\Core\EHealthJob;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
-use App\Repositories\Repository;
-use App\Classes\eHealth\EHealth;
-use GuzzleHttp\Promise\PromiseInterface;
-use App\Classes\eHealth\EHealthResponse;
 use App\Models\LegalEntity;
+use App\Repositories\Repository;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Queue\Middleware\RateLimited;
 use Throwable;
 
@@ -45,13 +45,13 @@ class EquipmentSync extends EHealthJob
      */
     protected function processResponse(?EHealthResponse $response): void
     {
-        $equipmentData = $this->normalizeDate($response?->validate());
+        $equipmentData = $response?->validate();
 
-        if (empty($equipmentData)) {
+        if ($equipmentData === null || $equipmentData->isEmpty()) {
             return;
         }
 
-        Repository::equipment()->sync($response?->map($equipmentData));
+        Repository::equipment()->sync($equipmentData);
     }
 
     /**

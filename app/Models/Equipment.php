@@ -55,6 +55,7 @@ class Equipment extends Model
         'manufacture_date' => EHealthDateCast::class,
         'expiration_date' => EHealthDateCast::class,
         'ehealth_inserted_at' => 'date:d.m.Y',
+        'ehealth_updated_at' => 'date:d.m.Y',
         'created_at' => 'date:d.m.Y',
         'properties' => 'array',
     ];

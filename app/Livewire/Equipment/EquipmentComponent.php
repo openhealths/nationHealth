@@ -6,15 +6,17 @@ namespace App\Livewire\Equipment;
 
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
+use App\Dto\Equipment\Ehealth as EhealthData;
+use App\Dto\Equipment\Form as EquipmentFormData;
 use App\Enums\User\Role;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
+use App\Livewire\Equipment\Forms\EquipmentForm as Form;
 use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Models\LegalEntity;
 use App\Traits\FormTrait;
-use App\Livewire\Equipment\Forms\EquipmentForm as Form;
 use GuzzleHttp\Promise\PromiseInterface;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
@@ -111,15 +113,9 @@ class EquipmentComponent extends Component
 
     protected function loadEquipmentToForm(Equipment $equipment): void
     {
-        $equipment->loadMissing(['names', 'recorder:id,uuid', 'division:id,uuid']);
+        $equipment->loadMissing(['names', 'recorder:id,uuid', 'division:id,uuid', 'parent:id,uuid']);
 
-        $formData = $equipment->toArray();
-
-        $formData['recorder'] = $equipment->recorder()->value('uuid');
-        $formData['divisionId'] = $equipment->division()->value('uuid');
-        $formData['parentId'] = $equipment->parent()->value('uuid');
-
-        $this->form->fill($formData);
+        $this->form->fill(objectMapper()->map($equipment, EquipmentFormData::class)->toArray());
     }
 
     /**
@@ -142,13 +138,14 @@ class EquipmentComponent extends Component
     /**
      * Send a request to the API; if successful, return it; otherwise, show and log errors.
      *
-     * @param  array  $validated
      * @return EHealthResponse|PromiseInterface|null
      */
-    protected function createInEHealth(array $validated): EHealthResponse|PromiseInterface|null
+    protected function createInEHealth(): EHealthResponse|PromiseInterface|null
     {
+        $payload = objectMapper()->map($this->form, EhealthData::class)->toArray();
+
         try {
-            return EHealth::equipment()->create($validated);
+            return EHealth::equipment()->create($payload);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when creating equipment');
 
