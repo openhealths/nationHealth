@@ -1,7 +1,7 @@
 <div>
     @if ($selectionMode)
         <div class="mb-8">
-            <h3 class="modal-header mb-8 !border-b-0 pb-0">{{ __('dictionaries.service_catalog.search_service') }}</h3>
+            <h3 class="modal-header mb-8 border-b-0! pb-0">{{ __('dictionaries.service_catalog.search_service') }}</h3>
 
             @include('livewire.dictionary.parts.service-catalog-filters')
         </div>
@@ -64,7 +64,7 @@
                             <tr class="index-table-tr">
                                 <td class="index-table-td-primary">
                                     <div class="flex items-start gap-3">
-                                        <div class="mt-1 w-6 flex-shrink-0">
+                                        <div class="mt-1 w-6 shrink-0">
                                             @if ($hasChildren)
                                                 <button
                                                     type="button"
@@ -119,8 +119,8 @@
                                     >
                                         <td class="index-table-td-primary">
                                             <div class="flex items-start gap-3">
-                                                <div class="mt-1 ml-6 w-6 flex-shrink-0">
-                                                    @icon('chevron-right', 'w-3 h-3 text-gray-400 mt-1')
+                                                <div class="mt-1 ml-6 w-6 shrink-0">
+                                                    @icon('chevron-down', 'w-3 h-3 text-gray-400 mt-1 -rotate-90')
                                                 </div>
                                                 <div class="flex flex-col">
                                                     <span>{{ $service['name'] ?? '' }}</span>
@@ -186,7 +186,7 @@
                                     >
                                         <td class="index-table-td-primary">
                                             <div class="flex items-start gap-3">
-                                                <div class="mt-1 ml-6 w-6 flex-shrink-0">
+                                                <div class="mt-1 ml-6 w-6 shrink-0">
                                                     @if ($groupHasChildren)
                                                         <button
                                                             type="button"
@@ -202,7 +202,7 @@
                                                             </span>
                                                         </button>
                                                     @else
-                                                        @icon('chevron-right', 'w-3 h-3 text-gray-400 mt-1')
+                                                        @icon('chevron-down', 'w-3 h-3 text-gray-400 mt-1 -rotate-90')
                                                     @endif
                                                 </div>
                                                 <div class="flex flex-col">
@@ -249,7 +249,7 @@
                                             >
                                                 <td class="index-table-td-primary">
                                                     <div class="flex items-start gap-3">
-                                                        <div class="mt-1 ml-12 w-6 flex-shrink-0">
+                                                        <div class="mt-1 ml-12 w-6 shrink-0">
                                                             @if ($subgroupHasServices)
                                                                 <button
                                                                     type="button"
@@ -265,7 +265,7 @@
                                                                     </span>
                                                                 </button>
                                                             @else
-                                                                @icon('chevron-right', 'w-3 h-3 text-gray-400 mt-1')
+                                                                @icon('chevron-down', 'w-3 h-3 text-gray-400 mt-1 -rotate-90')
                                                             @endif
                                                         </div>
                                                         <div class="flex flex-col">
@@ -312,8 +312,8 @@
                                                     >
                                                         <td class="index-table-td-primary">
                                                             <div class="flex items-start gap-3">
-                                                                <div class="mt-1 ml-18 w-6 flex-shrink-0">
-                                                                    @icon('chevron-right', 'w-3 h-3 text-gray-400 mt-1')
+                                                                <div class="mt-1 ml-18 w-6 shrink-0">
+                                                                    @icon('chevron-down', 'w-3 h-3 text-gray-400 mt-1 -rotate-90')
                                                                 </div>
                                                                 <div class="flex flex-col">
                                                                     <span>{{ $service['name'] ?? '' }}</span>
@@ -379,8 +379,8 @@
                                             >
                                                 <td class="index-table-td-primary">
                                                     <div class="flex items-start gap-3">
-                                                        <div class="mt-1 ml-12 w-6 flex-shrink-0">
-                                                            @icon('chevron-right', 'w-3 h-3 text-gray-400 mt-1')
+                                                        <div class="mt-1 ml-12 w-6 shrink-0">
+                                                            @icon('chevron-down', 'w-3 h-3 text-gray-400 mt-1 -rotate-90')
                                                         </div>
                                                         <div class="flex flex-col">
                                                             <span>{{ $service['name'] ?? '' }}</span>
@@ -439,7 +439,7 @@
             </div>
 
             @if ($services->isEmpty())
-                <x-nothing-found class="shift-content !mx-auto mt-8" maxWidth="" />
+                <x-nothing-found class="shift-content mx-auto! mt-8" maxWidth="" />
             @endif
         </div>
     </div>

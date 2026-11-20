@@ -433,37 +433,21 @@
 
                         <div class="form-row-2">
                             <div class="form-group group">
-                                <div class="datepicker-wrapper">
-                                    <input
-                                        x-model="modalDevice.manufactureDate"
-                                        datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                                        type="text"
-                                        name="manufactureDate"
-                                        id="manufactureDate"
-                                        class="datepicker-input with-leading-icon input peer"
-                                        placeholder=" "
-                                        autocomplete="off"
-                                    />
-                                    <label for="manufactureDate" class="wrapped-label">
-                                        {{ __('devices.manufacture_date') }}
-                                    </label>
-                                </div>
+                                <x-forms.date
+                                    x-model="modalDevice.manufactureDate"
+                                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                                    name="manufactureDate"
+                                    id="manufactureDate"
+                                    :label="__('devices.manufacture_date')"
+                                />
                             </div>
                             <div class="form-group group">
-                                <div class="datepicker-wrapper">
-                                    <input
-                                        x-model="modalDevice.expirationDate"
-                                        type="text"
-                                        name="expirationDate"
-                                        id="deviceExpirationDate"
-                                        class="datepicker-input with-leading-icon input peer"
-                                        placeholder=" "
-                                        autocomplete="off"
-                                    />
-                                    <label for="deviceExpirationDate" class="wrapped-label">
-                                        {{ __('devices.expiration_date') }}
-                                    </label>
-                                </div>
+                                <x-forms.date
+                                    x-model="modalDevice.expirationDate"
+                                    name="expirationDate"
+                                    id="deviceExpirationDate"
+                                    :label="__('devices.expiration_date')"
+                                />
                             </div>
                         </div>
 

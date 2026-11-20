@@ -26,6 +26,7 @@ use App\Services\MedicalEvents\Fhir;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -242,6 +243,10 @@ class EpisodeIndex extends BasePatientComponent
     {
         $paginator = Episode::readableFor($this->patient(), $this->hasPatientAccess)
             ->with(['period', 'managingOrganization.type.coding', 'careManager.type.coding'])
+            // A draft waiting for eHealth to process its submission cannot be edited
+            ->withExists([
+                'ehealthLinks as has_pending_submission' => static fn (Builder $query): Builder => $query->whereStatus(JobStatus::PENDING->value)
+            ])
             ->recentlyUpdatedFirst()
             ->paginate(config('pagination.per_page'));
 

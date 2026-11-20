@@ -40,6 +40,14 @@ class EpisodeEdit extends BaseEpisodeComponent
     public bool $isDraft = false;
 
     /**
+     * Whether the draft was opened along with an encounter draft, so it is sent together with that encounter.
+     *
+     * @var bool
+     */
+    #[Locked]
+    public bool $isSentWithEncounter = false;
+
+    /**
      * Request-scoped memoized episode model.
      *
      * @var Episode|null
@@ -64,6 +72,7 @@ class EpisodeEdit extends BaseEpisodeComponent
         $this->episodeModel = $episode;
         $this->episodeId = $episode->id;
         $this->isDraft = $episode->status === Status::DRAFT;
+        $this->isSentWithEncounter = $episode->encounterId !== null;
 
         parent::mount($legalEntity, $person, $preperson);
     }
@@ -101,7 +110,7 @@ class EpisodeEdit extends BaseEpisodeComponent
     }
 
     /**
-     * Validate the draft, create the episode in eHealth and turn the local draft into an active episode.
+     * Validate the draft, keep its changes and submit it to eHealth.
      *
      * @return void
      */
@@ -121,34 +130,27 @@ class EpisodeEdit extends BaseEpisodeComponent
             return;
         }
 
+        if ($episode->encounterId !== null) {
+            Session::flash('error', __('episodes.messages.sent_with_encounter'));
+
+            return;
+        }
+
         $validated = $this->validateForm($this->form->rulesForCreate());
 
         if ($validated === null) {
             return;
         }
 
-        $formattedData = $this->formatEpisode($validated, Status::ACTIVE);
-
         try {
-            EHealth::episode()->create($this->uuid, Arr::toSnakeCase($formattedData));
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error while creating episode');
-
-            return;
-        }
-
-        // eHealth accepted the episode; only now promote the local draft
-        try {
-            Repository::episode()->updateDraft($episode, $formattedData);
+            Repository::episode()->updateDraft($episode, $this->formatEpisode($validated, Status::DRAFT));
         } catch (Throwable $exception) {
-            $this->handleDatabaseErrors($exception, 'Failed to store created episode');
+            $this->handleDatabaseErrors($exception, 'Failed to store episode draft');
 
             return;
         }
 
-        Session::flash('success', __('episodes.messages.created'));
-
-        $this->redirectToEpisodes();
+        $this->submitToEHealth($episode, $this->formatEpisode($validated, Status::ACTIVE));
     }
 
     /**

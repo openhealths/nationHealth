@@ -6,6 +6,9 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Core\Arr;
 use App\Enums\Episode\Status;
+use App\Enums\JobStatus;
+use App\Models\EhealthJob;
+use App\Models\EhealthLink;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\EpisodeCurrentDiagnosis;
 use App\Models\MedicalEvents\Sql\EpisodeDiagnosesHistory;
@@ -26,14 +29,14 @@ class EpisodeRepository extends BaseRepository
      * @param  array  $data
      * @param  Person|Preperson  $patient
      * @param  int|null  $encounterId
-     * @return void
+     * @return Episode
      * @throws Throwable
      */
-    public function store(array $data, Person|Preperson $patient, ?int $encounterId = null): void
+    public function store(array $data, Person|Preperson $patient, ?int $encounterId = null): Episode
     {
         [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
 
-        DB::transaction(function () use ($data, $ownerColumn, $ownerId, $encounterId) {
+        return DB::transaction(function () use ($data, $ownerColumn, $ownerId, $encounterId): Episode {
             $type = Repository::coding()->store($data['type']);
 
             $managingOrganization = Repository::identifier()
@@ -55,6 +58,8 @@ class EpisodeRepository extends BaseRepository
             ]);
 
             $episode->period()->create(['start' => $data['period']['start']]);
+
+            return $episode;
         });
     }
 
@@ -142,8 +147,8 @@ class EpisodeRepository extends BaseRepository
     }
 
     /**
-     * Delete a draft episode together with every row it refers to: identifiers, codeable concepts, codings, its period
-     * and the records of its diagnoses and status history.
+     * Delete a draft episode together with every row it refers to: identifiers, codeable concepts, codings, its period,
+     * the records of its diagnoses and status history, and its rejected submissions.
      *
      * @param  Episode  $episode
      * @return void
@@ -153,7 +158,9 @@ class EpisodeRepository extends BaseRepository
     {
         DB::transaction(static function () use ($episode): void {
             Repository::encounter()->deleteWithLoadedRows(collect([
-                Episode::withRelationships()->findOrFail($episode->id)
+                Episode::withRelationships()
+                    ->with(['ehealthLinks.job', 'ehealthLinks.processingData'])
+                    ->findOrFail($episode->id)
             ]));
         });
     }
@@ -248,6 +255,8 @@ class EpisodeRepository extends BaseRepository
 
                 Repository::period()->sync($episode, $data['period']);
             }
+
+            $this->confirmPendingSubmissions($existingEpisodes->modelKeys());
         });
     }
 
@@ -308,7 +317,32 @@ class EpisodeRepository extends BaseRepository
                 $this->syncDiagnosesHistory($episode, $data['diagnoses_history'] ?? []);
                 $this->syncStatusHistory($episode, $data['status_history']);
             }
+
+            $this->confirmPendingSubmissions($existingEpisodes->modelKeys());
         });
+    }
+
+    /**
+     * Mark the pending submissions of the synced episodes as processed, as the sync confirms the episodes exist.
+     * This also releases a submission whose job could not be followed.
+     *
+     * @param  array  $episodeIds
+     * @return void
+     */
+    protected function confirmPendingSubmissions(array $episodeIds): void
+    {
+        if ($episodeIds === []) {
+            return;
+        }
+
+        $pendingSubmissions = EhealthLink::whereLinkableType(Episode::class)
+            ->whereIn('linkable_id', $episodeIds)
+            ->whereStatus(JobStatus::PENDING->value);
+
+        EhealthJob::whereIn('id', (clone $pendingSubmissions)->select('ehealth_job_id'))
+            ->update(['status' => JobStatus::PROCESSED->value]);
+
+        $pendingSubmissions->update(['status' => JobStatus::PROCESSED->value]);
     }
 
     /**

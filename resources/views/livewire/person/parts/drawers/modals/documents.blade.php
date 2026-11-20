@@ -51,7 +51,7 @@
                                                     openDropdown = false;
                                                 "
                                             >
-                                                @icon('file-edit', 'w-4 h-4')
+                                                @icon('edit', 'w-4 h-4')
                                                 {{ __('forms.edit') }}
                                             </button>
                                             <button

@@ -28,28 +28,15 @@
                     <form class="space-y-4">
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div>
-                                <label for="closingDate" class="label-modal">
-                                    {{ __('episodes.close_date_label') }} *
-                                </label>
-
-                                <div class="relative">
-                                    <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3">
-                                        @icon('calendar-week', 'w-5 h-5 text-gray-400')
-                                    </div>
-                                    <input
-                                        wire:model="closingForm.closingDate"
-                                        datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                                        type="text"
-                                        name="closingDate"
-                                        id="closingDate"
-                                        class="datepicker-input input-modal"
-                                        autocomplete="off"
-                                    />
-                                </div>
-
-                                @error('closingForm.closingDate')
-                                    <p class="text-error mt-1 text-xs">{{ $message }}</p>
-                                @enderror
+                                <x-forms.date
+                                    modal
+                                    wire:model="closingForm.closingDate"
+                                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                                    name="closingDate"
+                                    id="closingDate"
+                                    :label="__('episodes.close_date_label') . ' *'"
+                                    error="closingForm.closingDate"
+                                />
                             </div>
 
                             <div>
@@ -58,7 +45,7 @@
                                 </label>
 
                                 <div class="relative">
-                                    <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3">
+                                    <div class="pointer-events-none absolute inset-y-0 inset-s-0 flex items-center ps-3">
                                         @icon('mingcute-time-fill', 'w-5 h-5 text-gray-400')
                                     </div>
                                     <input

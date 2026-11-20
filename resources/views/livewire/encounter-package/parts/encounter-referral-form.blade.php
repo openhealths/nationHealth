@@ -219,24 +219,17 @@
             <div class="mb-4 grid grid-cols-1 gap-6 md:grid-cols-3">
                 @foreach (['started_at' => 'start', 'ended_at' => 'end'] as $field => $period)
                     <div class="grid grid-cols-1 gap-6">
-                        <div class="form-group">
-                            <div class="datepicker-wrapper" wire:key="referral-date-{{ $field }}">
-                                <input
-                                    type="text"
-                                    id="encounterReferral-{{ $field }}"
-                                    wire:model="encounterReferralForm.{{ $field }}"
-                                    class="datepicker-input with-leading-icon input peer @error('encounterReferralForm.'.$field) input-error @enderror"
-                                    placeholder="{{ __('referrals.period_fields.date_placeholder') }}"
-                                    autocomplete="off"
-                                    datepicker-autohide
-                                    datepicker-format="{{ frontendDateFormat() }}"
-                                    datepicker-min-date="{{ today()->format(config('app.date_format')) }}"
-                                />
-                                <label for="encounterReferral-{{ $field }}" class="wrapped-label required">
-                                    {{ $period === 'start' ? __('forms.start_date') : __('forms.end_date') }}
-                                </label>
-                            </div>
-                            <x-input-error for="encounterReferralForm.{{ $field }}" />
+                        <div class="form-group" wire:key="referral-date-{{ $field }}">
+                            <x-forms.date
+                                id="encounterReferral-{{ $field }}"
+                                wire:model="encounterReferralForm.{{ $field }}"
+                                placeholder="{{ __('referrals.period_fields.date_placeholder') }}"
+                                datepicker-autohide
+                                datepicker-format="{{ frontendDateFormat() }}"
+                                datepicker-min-date="{{ today()->format(config('app.date_format')) }}"
+                                :label="$period === 'start' ? __('forms.start_date') : __('forms.end_date')"
+                                :error="'encounterReferralForm.' . $field"
+                            />
                         </div>
                         <div class="form-group">
                             <input

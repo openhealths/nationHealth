@@ -83,32 +83,20 @@
             <div class="form-row-2">
                 <div class="grid grid-cols-2 gap-4">
                     <div class="form-group group">
-                        <div class="relative">
-                            <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3">
-                                @icon('calendar-week', 'w-5 h-5 text-gray-400')
-                            </div>
-                            <input
-                                wire:model="form.startDate"
-                                datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                                type="text"
-                                name="startDate"
-                                id="startDate"
-                                class="datepicker-input with-leading-icon input peer @error('form.startDate') input-error @enderror"
-                                placeholder=" "
-                                required
-                                autocomplete="off"
-                            />
-                            <label for="startDate" class="wrapped-label">{{ __('episodes.period_start') }}</label>
-                        </div>
-
-                        @error('form.startDate')
-                            <p class="text-error mt-1 text-xs">{{ $message }}</p>
-                        @enderror
+                        <x-forms.date
+                            wire:model="form.startDate"
+                            datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                            name="startDate"
+                            id="startDate"
+                            :label="__('episodes.period_start')"
+                            error="form.startDate"
+                            required
+                        />
                     </div>
 
                     <div class="form-group group">
                         <div class="relative">
-                            <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3">
+                            <div class="pointer-events-none absolute inset-y-0 inset-s-0 flex items-center ps-3">
                                 @icon('mingcute-time-fill', 'w-5 h-5 text-gray-400')
                             </div>
                             <input

@@ -19,8 +19,10 @@ use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Throwable;
 
 class EpisodeView extends BasePatientComponent
@@ -40,6 +42,22 @@ class EpisodeView extends BasePatientComponent
      */
     #[Locked]
     public string $episodeUuid;
+
+    /**
+     * Whether the episode was submitted to eHealth, so the status of its last submission is shown.
+     *
+     * @var bool
+     */
+    #[Locked]
+    public bool $isSubmitted = false;
+
+    /**
+     * Edit page of the episode while it can be changed, offered next to the status of its last submission.
+     *
+     * @var string|null
+     */
+    #[Locked]
+    public ?string $editUrl = null;
 
     /**
      * Request-scoped memoized episode.
@@ -84,6 +102,30 @@ class EpisodeView extends BasePatientComponent
 
         $this->episodeId = $episode->id;
         $this->episodeUuid = $episode->uuid;
+        $this->isSubmitted = $episode->ehealthLinks()->exists();
+
+        $this->refreshEditUrl();
+    }
+
+    /**
+     * Offer the edit page while the episode can be changed. eHealth processing or rejecting the submission
+     * makes the episode editable again, as an active episode or as a draft to fix.
+     *
+     * @return void
+     */
+    #[On('submission-processed')]
+    #[On('submission-rejected')]
+    public function refreshEditUrl(): void
+    {
+        if (Auth::user()->cannot('update', $this->episode())) {
+            $this->editUrl = null;
+
+            return;
+        }
+
+        $this->editUrl = $this->prepersonId !== null
+            ? route('prepersons.episodes.edit', [legalEntity(), 'preperson' => $this->prepersonId, 'episode' => $this->episodeId])
+            : route('persons.episodes.edit', [legalEntity(), 'person' => $this->personId, 'episode' => $this->episodeId]);
     }
 
     /**

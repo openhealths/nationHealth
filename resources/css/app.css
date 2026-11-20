@@ -575,6 +575,10 @@ input.employee-position-mode-checkbox {
     @apply pl-9;
 }
 
+.input-modal.input-error {
+    @apply border-red-500 dark:border-red-500;
+}
+
 .form-row-modal {
     @apply grid gap-4 mb-4 sm:grid-cols-2
 }

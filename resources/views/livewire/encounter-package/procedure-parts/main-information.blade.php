@@ -359,25 +359,14 @@
 
                         <div class="form-row-modal">
                             <div class="form-group group">
-                                <div class="datepicker-wrapper">
-                                    <input
-                                        x-model="modalProcedure.paperReferralServiceRequestDate"
-                                        type="text"
-                                        name="serviceRequestDate"
-                                        id="procedureServiceRequestDate"
-                                        class="datepicker-input with-leading-icon input peer"
-                                        placeholder=" "
-                                        required
-                                        autocomplete="off"
-                                    />
-                                    <label for="procedureServiceRequestDate" class="wrapped-label">
-                                        {{ __('medical-events.referral.date') }}
-                                    </label>
-
-                                    @error($procedureErrorPath . '.paperReferralServiceRequestDate')
-                                        <p class="text-error">{{ $message }}</p>
-                                    @enderror
-                                </div>
+                                <x-forms.date
+                                    x-model="modalProcedure.paperReferralServiceRequestDate"
+                                    name="serviceRequestDate"
+                                    id="procedureServiceRequestDate"
+                                    required
+                                    :label="__('medical-events.referral.date')"
+                                    :error="$procedureErrorPath . '.paperReferralServiceRequestDate'"
+                                />
                             </div>
 
                             <div class="form-group group">

@@ -471,20 +471,15 @@
         <template x-if="valueMap[modalObservation.codeCode] && valueMap[modalObservation.codeCode][1] === 'valueDateTime'">
             <div class="form-row-3">
                 <div>
-                    <label for="valueDate" class="label-modal"> {{ __('observations.value_date') }} </label>
-                    <div class="relative flex items-center">
-                        @icon('calendar-week', 'svg-input absolute left-2.5 pointer-events-none')
-                        <input
-                            x-model="modalObservation.valueDate"
-                            datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                            type="text"
-                            name="valueDate"
-                            id="valueDate"
-                            class="datepicker-input input-modal !pl-10"
-                            autocomplete="off"
-                            required
-                        />
-                    </div>
+                    <x-forms.date
+                        modal
+                        x-model="modalObservation.valueDate"
+                        datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                        name="valueDate"
+                        id="valueDate"
+                        required
+                        :label="__('observations.value_date')"
+                    />
 
                     <p class="text-error text-xs" x-show="(modalObservation.valueDate || '').trim().length === 0">
                         {{ __('forms.field_empty') }}
@@ -503,7 +498,7 @@
                             type="time"
                             name="valueTime"
                             id="valueTime"
-                            class="input-modal !pl-10"
+                            class="input-modal pl-10!"
                             autocomplete="off"
                             required
                         />

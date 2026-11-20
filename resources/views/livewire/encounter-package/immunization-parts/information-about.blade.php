@@ -55,19 +55,14 @@
 
     <div class="form-row-3">
         <div class="form-group group">
-            <label for="expirationDate" class="label-modal"> {{ __('immunizations.expiration_date') }} </label>
-            <div class="relative flex items-center">
-                @icon('calendar-week', 'svg-input absolute left-2.5 pointer-events-none')
-                <input
-                    x-model="modalImmunization.expirationDate"
-                    type="text"
-                    name="expirationDate"
-                    id="expirationDate"
-                    class="datepicker-input input-modal !pl-10"
-                    autocomplete="off"
-                    :required="modalImmunization.primarySource && ! modalImmunization.notGiven"
-                />
-            </div>
+            <x-forms.date
+                modal
+                x-model="modalImmunization.expirationDate"
+                name="expirationDate"
+                id="expirationDate"
+                x-bind:required="modalImmunization.primarySource && ! modalImmunization.notGiven"
+                :label="__('immunizations.expiration_date')"
+            />
 
             <p
                 class="text-error text-xs"

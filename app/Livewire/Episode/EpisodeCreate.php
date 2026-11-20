@@ -4,11 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Episode;
 
-use App\Classes\eHealth\EHealth;
-use App\Core\Arr;
 use App\Enums\Episode\Status;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Contracts\View\View;
@@ -21,6 +17,7 @@ class EpisodeCreate extends BaseEpisodeComponent
 {
     /**
      * Load the dictionaries and select options the form depends on, and start the episode now by default.
+     * The only available care manager is selected, while among several the user chooses, as the choice limits the episode types.
      *
      * @return void
      */
@@ -31,50 +28,10 @@ class EpisodeCreate extends BaseEpisodeComponent
         $this->form->id = Str::uuid()->toString();
         $this->form->startDate = now()->format(config('app.date_format'));
         $this->form->startTime = now()->format('H:i');
-    }
 
-    /**
-     * Validate the form, create the episode in eHealth and persist it locally.
-     *
-     * @return void
-     */
-    public function create(): void
-    {
-        if (Auth::user()->cannot('create', Episode::class)) {
-            Session::flash('error', __('episodes.policy.create'));
-
-            return;
+        if (count($this->employees) === 1) {
+            $this->form->careManagerId = $this->employees[0]['uuid'];
         }
-
-        $validated = $this->validateForm($this->form->rulesForCreate());
-
-        if ($validated === null) {
-            return;
-        }
-
-        $formattedData = $this->formatEpisode($validated, Status::ACTIVE);
-
-        try {
-            $response = EHealth::episode()->create($this->uuid, Arr::toSnakeCase($formattedData));
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error while creating episode');
-
-            return;
-        }
-
-        logger()->debug('Job ID to further debug', $response->getData());
-        // eHealth accepted the episode; only now persist it locally
-        try {
-            Repository::episode()->store($formattedData, $this->patient());
-        } catch (Throwable $exception) {
-            $this->handleDatabaseErrors($exception, 'Failed to store created episode');
-
-            return;
-        }
-
-        Session::flash('success', __('episodes.messages.created'));
-
-        $this->redirectToEpisodes();
     }
 
     /**
@@ -107,6 +64,36 @@ class EpisodeCreate extends BaseEpisodeComponent
         Session::flash('success', __('episodes.messages.draft_created'));
 
         $this->redirectToEpisodes();
+    }
+
+    /**
+     * Validate the form, store the episode as a draft and submit it to eHealth.
+     *
+     * @return void
+     */
+    public function create(): void
+    {
+        if (Auth::user()->cannot('create', Episode::class)) {
+            Session::flash('error', __('episodes.policy.create'));
+
+            return;
+        }
+
+        $validated = $this->validateForm($this->form->rulesForCreate());
+
+        if ($validated === null) {
+            return;
+        }
+
+        try {
+            $episode = Repository::episode()->store($this->formatEpisode($validated, Status::DRAFT), $this->patient());
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Failed to store episode draft');
+
+            return;
+        }
+
+        $this->submitToEHealth($episode, $this->formatEpisode($validated, Status::ACTIVE));
     }
 
     public function render(): View

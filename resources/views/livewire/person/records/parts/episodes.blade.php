@@ -112,8 +112,7 @@
                                     </button>
                                 @endif
 
-                                @if (in_array($status, [Status::DRAFT, Status::ACTIVE], true)
-                                                                                                                                                                                                    && $managesCareManager)
+                                @if ($managesCareManager && in_array($status, [Status::DRAFT, Status::ACTIVE], true) && !data_get($episode, 'hasPendingSubmission', false))
                                     @if (data_get($episode, 'id'))
                                         <a
                                             href="{{ route($prepersonId !== null ? 'prepersons.episodes.edit' : 'persons.episodes.edit', [legalEntity(), $prepersonId !== null ? 'preperson' : 'person' => $prepersonId ?? $personId, 'episode' => data_get($episode, 'id')]) }}"

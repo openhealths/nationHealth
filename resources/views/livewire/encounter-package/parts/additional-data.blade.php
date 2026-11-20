@@ -81,27 +81,16 @@
 >
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div class="form-group group">
-            <div class="relative">
-                <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3">
-                    @icon('calendar-week', 'w-5 h-5 text-gray-400')
-                </div>
-                <input
-                    wire:model="form.encounter.periodDate"
-                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                    datepicker-autoselect-today
-                    type="text"
-                    name="date"
-                    id="date"
-                    class="datepicker-input with-leading-icon input peer @error('form.encounter.periodDate') input-error @enderror"
-                    placeholder=" "
-                    required
-                    autocomplete="off"
-                />
-                <label for="date" class="wrapped-label required"> {{ __('encounters.period_date') }} </label>
-            </div>
-            @error('form.encounter.periodDate')
-                <p class="text-error">{{ $message }}</p>
-            @enderror
+            <x-forms.date
+                wire:model="form.encounter.periodDate"
+                datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
+                datepicker-autoselect-today
+                name="date"
+                id="date"
+                required
+                :label="__('encounters.period_date')"
+                error="form.encounter.periodDate"
+            />
         </div>
 
         <div class="form-group group">
