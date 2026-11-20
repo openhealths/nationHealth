@@ -54,6 +54,10 @@ class SharedCodingPersistenceTest extends TestCase
         $repository->update($concept, ['text' => null]);
         $this->assertNull($concept->fresh()->text);
         $this->assertSame(1, DB::table('codings')->count());
+        $concept->load(['coding' => static fn ($query) => $query->where('code', 'B')]);
+        $repository->update($concept, ['coding' => []]);
+        $this->assertSame(0, DB::table('codings')->count());
+
         foreach (['display', 'version', 'user_selected'] as $column) {
             $this->assertFalse(Schema::hasColumn('codings', $column));
         }

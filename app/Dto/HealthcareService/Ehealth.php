@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Dto\HealthcareService;
 
+use App\Dto\CodeableConcept\Ehealth as CodeableConceptEhealth;
 use App\Dto\EhealthMapping;
+use App\Dto\Transform\Ehealth\Availability;
 use App\Livewire\Division\Forms\HealthcareServiceForm;
 use Symfony\Component\ObjectMapper\Attribute\Map;
-use Symfony\Component\ObjectMapper\ObjectMapper;
-use Symfony\Component\PropertyAccess\PropertyAccess;
 
 /**
  * Healthcare service payload in the format expected by the eHealth API.
@@ -21,33 +21,23 @@ class Ehealth
 
     public ?string $divisionId = null;
 
-    public array $category = [];
+    #[Map(source: 'category', transform: [CodeableConceptEhealth::class, 'map'])]
+    public CodeableConceptEhealth $category;
 
     public ?string $specialityType = null;
 
     public ?string $providingCondition = null;
 
-    #[Map(source: 'type', transform: [Model::class, 'typeOrNull'])]
-    public ?array $type = null;
+    #[Map(source: 'type', transform: [CodeableConceptEhealth::class, 'map'])]
+    public ?CodeableConceptEhealth $type = null;
 
     public ?string $licenseId = null;
 
     public ?string $comment = null;
 
+    #[Map(source: 'availableTime', transform: [Availability::class, 'availableTime'])]
     public ?array $availableTime = null;
 
-    #[Map(source: 'notAvailable', transform: [Model::class, 'formNotAvailable'])]
+    #[Map(source: 'notAvailable', transform: [Availability::class, 'notAvailable'])]
     public ?array $notAvailable = null;
-
-    /**
-     * Maps the form into the eHealth payload DTO.
-     * The strict property accessor is kept: the form declares every field, so a wrong source name fails loudly.
-     *
-     * @param  HealthcareServiceForm  $form
-     * @return self
-     */
-    public static function fromForm(HealthcareServiceForm $form): self
-    {
-        return new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessor())->map($form, self::class);
-    }
 }

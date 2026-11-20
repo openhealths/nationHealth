@@ -44,27 +44,6 @@ class HealthcareServiceForm extends Form
     public ?array $notAvailable = [];
 
     /**
-     * Fill the form with data of the existing healthcare service.
-     *
-     * @param  HealthcareService  $healthcareService
-     * @return void
-     */
-    public function fillFromModel(HealthcareService $healthcareService): void
-    {
-        // Division is bound by uuid, while the model holds its id
-        $this->fill(Arr::except($healthcareService->toArray(), ['divisionId', 'type']));
-
-        // Type is set only for a few categories, otherwise the default structure has to stay in place
-        if ($healthcareService->type) {
-            $this->type = $healthcareService->type->toArray();
-        }
-
-        if ($this->availableTime) {
-            $this->availableTime = Arr::toCamelCase($this->availableTime);
-        }
-    }
-
-    /**
      * Rules based on: https://e-health-ua.atlassian.net/wiki/spaces/EH/pages/17089101853/Create+healthcare+service#Request-data-validation
      *
      * @return array
@@ -109,6 +88,7 @@ class HealthcareServiceForm extends Form
                     ->where('status', Status::ACTIVE)
             ],
             'category' => ['array', 'required'],
+            'category.coding' => ['required', 'array'],
             'category.coding.*.system' => ['required', 'string', Rule::in('HEALTHCARE_SERVICE_CATEGORIES')],
             'category.coding.*.code' => [
                 'required',
@@ -131,7 +111,7 @@ class HealthcareServiceForm extends Form
             ],
             'type' => ['array', 'nullable'],
             'type.coding.*.system' => $isTypeRequiredForCategory
-                ? ['nullable', 'string', Rule::in($typeDictionary)]
+                ? ['required', 'string', Rule::in($typeDictionary)]
                 : ['nullable', 'string'],
             'type.coding.*.code' => [
                 'nullable',

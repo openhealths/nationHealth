@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Division\HealthcareService;
 
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
-use Exception;
-use Throwable;
 use App\Classes\eHealth\EHealth;
 use App\Dto\HealthcareService\Model as HealthcareServiceData;
 use App\Enums\JobStatus;
 use App\Enums\Status;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\HealthcareServiceSync;
 use App\Models\Division;
 use App\Models\HealthcareService;
@@ -34,12 +32,13 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Throwable;
 
 class HealthcareServiceIndex extends Component
 {
     use BatchLegalEntityQueries;
-    use WithPagination;
     use FormTrait;
+    use WithPagination;
 
     protected const string BATCH_NAME = 'HealthcareServiceSync';
 
@@ -166,9 +165,9 @@ class HealthcareServiceIndex extends Component
         }
 
         try {
-            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
+            $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
 
-            Repository::healthcareService()->saveMapped($healthcareServiceData, $healthcareService, legalEntity());
+            Repository::healthcareService()->save($healthcareServiceData, $healthcareService);
 
             Session::flash('success', __('healthcare-services.success.activated'));
         } catch (Throwable $exception) {
@@ -195,9 +194,9 @@ class HealthcareServiceIndex extends Component
         }
 
         try {
-            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
+            $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
 
-            Repository::healthcareService()->saveMapped($healthcareServiceData, $healthcareService, legalEntity());
+            Repository::healthcareService()->save($healthcareServiceData, $healthcareService);
 
             Session::flash('success', __('healthcare-services.success.deactivated'));
         } catch (Throwable $exception) {
@@ -216,10 +215,10 @@ class HealthcareServiceIndex extends Component
         }
 
         try {
-            HealthcareService::destroy($healthcareService->id);
+            Repository::healthcareService()->deleteDraft($healthcareService);
 
             Session::flash('success', __('healthcare-services.success.draft_deleted'));
-        } catch (Exception $exception) {
+        } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Error while deleting healthcare service: ');
 
             return;
@@ -272,8 +271,7 @@ class HealthcareServiceIndex extends Component
         }
 
         try {
-            $validated = $response->validate();
-            Repository::healthcareService()->sync($response->map($validated));
+            Repository::healthcareService()->sync(legalEntity(), $response->validate());
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors(
                 $exception,
@@ -373,18 +371,21 @@ class HealthcareServiceIndex extends Component
      */
     protected function dispatchNextSyncJobs(User $user, string $token): void
     {
+        // Laravel restores the callback on every batch read. Resolve its recipient only if a job fails.
+        $userId = $user->getKey();
+
         Bus::batch([new HealthcareServiceSync(legalEntity(), page: 2)])
             ->withOption('legal_entity_id', legalEntity()->id)
             ->withOption('token', Crypt::encryptString($token))
-            ->withOption('user', $user)
+            ->withOption('user', $user->withoutRelations())
             ->withOption('sync_entity', LegalEntity::ENTITY_HEALTHCARE_SERVICE)
-            ->catch(function (Batch $batch, Throwable $exception) use ($user) {
+            ->catch(static function (Batch $batch, Throwable $exception) use ($userId): void {
                 Log::error('Healthcare Service sync batch failed.', [
                     'batch_id' => $batch->id,
                     'exception' => $exception
                 ]);
 
-                $user->notify(new SyncNotification('hcs', 'failed'));
+                User::find($userId)?->notify(new SyncNotification('hcs', 'failed'));
             })
             ->onQueue('sync')
             ->name(self::BATCH_NAME)

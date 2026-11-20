@@ -6,8 +6,10 @@ namespace App\Livewire\Division\HealthcareService;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use App\Dto\HealthcareService\Ehealth as EhealthData;
+use App\Dto\HealthcareService\EhealthUpdate as EhealthUpdateData;
 use App\Dto\HealthcareService\Model as HealthcareServiceData;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Livewire\Division\Forms\HealthcareServiceForm as Form;
 use App\Models\Division;
 use App\Models\HealthcareService;
@@ -19,26 +21,17 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class HealthcareServiceUpdate extends Component
 {
-    use WorkTimeUtilities;
     use FormTrait;
+    use WorkTimeUtilities;
 
     public Form $form;
-
-    /**
-     * Determine is user has policy to update.
-     *
-     * @var bool
-     */
-    #[Locked]
-    public bool $canUpdate;
 
     public bool $working = true;
 
@@ -47,26 +40,31 @@ class HealthcareServiceUpdate extends Component
     #[Locked]
     public int $healthcareServiceId;
 
-    #[Locked]
-    public string $healthcareServiceUuid;
-
     public function mount(LegalEntity $legalEntity, Division $division, HealthcareService $healthcareService): void
     {
         $this->healthcareServiceId = $healthcareService->id;
-        $this->healthcareServiceUuid = $healthcareService->uuid;
 
         $this->form->fill($healthcareService->only(['comment', 'availableTime', 'notAvailable']));
 
         if ($this->form->availableTime) {
             $this->form->availableTime = Arr::toCamelCase($this->form->availableTime);
         }
+    }
 
-        $this->canUpdate = Auth::user()->can('update', $healthcareService);
+    /**
+     * Healthcare service being updated.
+     *
+     * @return HealthcareService
+     */
+    #[Computed]
+    public function healthcareService(): HealthcareService
+    {
+        return HealthcareService::findOrFail($this->healthcareServiceId);
     }
 
     public function update(): void
     {
-        if (!$this->canUpdate) {
+        if (Auth::user()->cannot('update', $this->healthcareService)) {
             Session::flash('error', __('healthcare-services.policy.update'));
 
             return;
@@ -81,15 +79,10 @@ class HealthcareServiceUpdate extends Component
             return;
         }
 
-        $healthcareServiceEhealthMapped = EhealthData::fromForm($this->form)->toArray();
+        $healthcareServiceEhealthMapped = objectMapper()->map($this->form, EhealthUpdateData::class)->toArray();
 
         try {
-            // Only mutable fields are sent; the API format drops empty values, while for a PATCH they are exactly what clears the field
-            $response = EHealth::healthcareService()->update(
-                $this->healthcareServiceUuid,
-                Arr::only($healthcareServiceEhealthMapped, ['comment', 'available_time', 'not_available'])
-                    + ['comment' => null, 'available_time' => [], 'not_available' => []]
-            );
+            $response = EHealth::healthcareService()->update($this->healthcareService->uuid, $healthcareServiceEhealthMapped);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when updating a healthcare service');
 
@@ -97,13 +90,9 @@ class HealthcareServiceUpdate extends Component
         }
 
         try {
-            $healthcareServiceData = HealthcareServiceData::fromSource($response->validate());
+            $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
 
-            Repository::healthcareService()->saveMapped(
-                $healthcareServiceData,
-                HealthcareService::findOrFail($this->healthcareServiceId),
-                legalEntity()
-            );
+            Repository::healthcareService()->save($healthcareServiceData, $this->healthcareService);
 
             Session::flash('success', __('healthcare-services.success.updated'));
             $this->redirectRoute('healthcare-service.index', [legalEntity()], navigate: true);
