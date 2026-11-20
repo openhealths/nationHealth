@@ -97,8 +97,9 @@ class Model implements ModelContract
     public function toModel(?HealthcareService $healthcareService = null): HealthcareService
     {
         $healthcareService ??= new HealthcareService();
+        $relatedRecordProperties = ['category', 'type', 'divisionUuid'];
 
-        foreach (Arr::except(get_object_vars($this), ['category', 'type', 'divisionUuid']) as $key => $value) {
+        foreach (Arr::except(get_object_vars($this), $relatedRecordProperties) as $key => $value) {
             $healthcareService->setAttribute($key, $value);
         }
 

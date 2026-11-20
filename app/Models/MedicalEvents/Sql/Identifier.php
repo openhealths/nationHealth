@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
+/**
+ * A reference to another resource, as eHealth calls it: the identifier of that resource (its type and value)
+ * together with the display value of the reference. The type is stored as a related codeable concept.
+ */
 class Identifier extends Model
 {
     use HasCamelCasing;
