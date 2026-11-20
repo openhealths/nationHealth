@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Models\MedicalEvents\Sql;
 
 use App\Casts\UtcDateTimeCast;
+use App\Contracts\SubmittedToEHealth;
 use App\Models\CarePlan;
+use App\Models\EhealthLink;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Person\Person;
@@ -16,8 +18,11 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToEHealth
+class ServiceRequestRequest extends Model implements SubmittedToEHealth
 {
     use HasCamelCasing;
 
@@ -75,6 +80,13 @@ class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToE
         'reason_reference' => 'array',
     ];
 
+    #[Scope]
+    protected function forPatientWithReferralContext(Builder $query, int $personId): Builder
+    {
+        return $query->wherePersonId($personId)
+            ->with(['person', 'employee', 'requesterLegalEntity', 'priority']);
+    }
+
     public function statusReasonConcept(): BelongsTo
     {
         return $this->belongsTo(CodeableConcept::class, 'status_reason_id');
@@ -108,36 +120,36 @@ class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToE
     {
         return $this->belongsTo(Quantity::class, 'remaining_quantity_id');
     }
-    public function occurrencePeriod(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    public function occurrencePeriod(): MorphOne
     {
         return $this->morphOne(Period::class, 'periodable');
     }
 
-    private function referenceCollection(string $collection): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    private function referenceCollection(string $collection): BelongsToMany
     {
         return $this->belongsToMany(Identifier::class, 'service_request_references', 'service_request_id', 'identifier_id')->withPivotValue('collection', $collection)->withPivot('position')->orderByPivot('position');
     }
-    public function basedOnReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function basedOnReferences(): BelongsToMany
     {
         return $this->referenceCollection('basedOn');
     }
-    public function supportingInfoReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function supportingInfoReferences(): BelongsToMany
     {
         return $this->referenceCollection('supportingInfo');
     }
-    public function reasonReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function reasonReferences(): BelongsToMany
     {
         return $this->referenceCollection('reasonReference');
     }
-    public function permittedReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function permittedReferences(): BelongsToMany
     {
         return $this->referenceCollection('permittedResources');
     }
-    public function specimenReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function specimenReferences(): BelongsToMany
     {
         return $this->referenceCollection('specimens');
     }
-    public function focusReferences(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function focusReferences(): BelongsToMany
     {
         return $this->referenceCollection('focus');
     }
@@ -232,19 +244,24 @@ class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToE
      *
      * @param  Builder  $query
      * @param  Person|Preperson  $patient
+     * @param  LegalEntity|null  $legalEntity
      * @return Builder
      */
     #[Scope]
-    protected function basedOnCarePlanOfLegalEntity(Builder $query, Person|Preperson $patient): Builder
-    {
-        if ($patient instanceof Preperson) {
+    protected function basedOnCarePlanOfLegalEntity(
+        Builder $query,
+        Person|Preperson $patient,
+        ?LegalEntity $legalEntity = null
+    ): Builder {
+        $legalEntity ??= legalEntity();
+        if ($patient instanceof Preperson || $legalEntity === null) {
             return $query->whereRaw('1 = 0');
         }
 
         $carePlanIds = CarePlan::wherePersonId($patient->id)
             ->whereHas(
                 'managingOrganization',
-                static fn (Builder $identifier): Builder => $identifier->whereValue(legalEntity()->uuid)
+                static fn (Builder $identifier): Builder => $identifier->whereValue($legalEntity->uuid)
             )
             ->pluck('uuid');
 
@@ -254,8 +271,8 @@ class ServiceRequestRequest extends Model implements \App\Contracts\SubmittedToE
         });
     }
 
-    public function ehealthLinks(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    public function ehealthLinks(): MorphMany
     {
-        return $this->morphMany(\App\Models\EhealthLink::class, 'linkable');
+        return $this->morphMany(EhealthLink::class, 'linkable');
     }
 }

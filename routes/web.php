@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\ReferralController;
 use App\Http\Controllers\Auth\EHealthLoginController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Controllers\CarePlanController;
 use App\Http\Controllers\EmailController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Icd10Controller;
@@ -84,7 +84,16 @@ use Illuminate\Support\Facades\Route;
 use App\Livewire\LegalEntity\Connections\LegalEntityConnectionShow;
 use App\Livewire\LegalEntity\Connections\LegalEntityConnectionIndex;
 use App\Livewire\LegalEntity\Connections\LegalEntityConnectionCreate;
-use App\Repositories\Repository;
+use App\Livewire\Approval\ApprovalIndex;
+use App\Livewire\Approval\ApprovalView;
+use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
+use App\Livewire\CarePlan\CarePlanCreate;
+use App\Livewire\CarePlan\CarePlanIndex;
+use App\Livewire\CarePlan\CarePlanShow;
+use App\Livewire\CarePlan\CarePlanUpdate;
+use App\Livewire\MedicationRequest\MedicationRequestIndex;
+use App\Livewire\Referral\ReferralIndex;
+use App\Models\CarePlan;
 
 /*
 |--------------------------------------------------------------------------
@@ -257,29 +266,14 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
 
             // --- Referrals ---
             Route::prefix('referrals')->name('referrals.')->group(function () {
-                Route::get('/', \App\Livewire\Referral\ReferralIndex::class)
+                Route::get('/', ReferralIndex::class)
                     ->middleware('permission:service_request:read')
                     ->name('index');
-
-                Route::prefix('api')->name('api.')->group(function () {
-                    Route::get('/search', [ReferralController::class, 'search'])
-                        ->middleware('permission:service_request:read')
-                        ->name('search');
-                    Route::post('/{uuid}/process', [ReferralController::class, 'process'])
-                        ->middleware('permission:service_request:makeinprogress')
-                        ->name('process');
-                    Route::post('/{uuid}/complete', [ReferralController::class, 'complete'])
-                        ->middleware('permission:service_request:complete')
-                        ->name('complete');
-                    Route::post('/{uuid}/cancel-usage', [ReferralController::class, 'cancelUsage'])
-                        ->middleware('permission:service_request:use')
-                        ->name('cancel-usage');
-                });
             });
 
             // --- Medication Requests (ePrescriptions) ---
             Route::prefix('medication-requests')->name('medication-requests.')->group(function () {
-                Route::get('/', \App\Livewire\MedicationRequest\MedicationRequestIndex::class)
+                Route::get('/', MedicationRequestIndex::class)
                     ->middleware('permission:medication_dispense:write|medication_dispense:process|medication_request:details_pharm')
                     ->name('index');
             });
@@ -326,7 +320,7 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
                         });
                 });
 
-            Route::get('/care-plans', \App\Livewire\CarePlan\CarePlanIndex::class)
+            Route::get('/care-plans', CarePlanIndex::class)
                 ->name('care-plans.index');
             Route::get('/specimens', SpecimenIndex::class)
                 ->can('view', Specimen::class)
@@ -334,31 +328,25 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
             Route::get('/specimens/create', SpecimenCreate::class)
                 ->can('create', Specimen::class)
                 ->name('specimens.create');
-            Route::get('/care-plans/create/{personId?}', \App\Livewire\CarePlan\CarePlanCreate::class)
+            Route::get('/care-plans/create/{personId?}', CarePlanCreate::class)
                 ->name('care-plans.create')
-                ->can('create', \App\Models\CarePlan::class);
-            $redirectEncounterCarePlan = static function (\App\Models\LegalEntity $legalEntity, \App\Models\MedicalEvents\Sql\Encounter $encounter) {
-                $person = Repository::carePlan()->findPatient((int) $encounter->person_id) ?? abort(404);
-                \Illuminate\Support\Facades\Gate::authorize('view', [$encounter, $person]);
-
-                return redirect()->route('persons.encounters.care-plans.create', ['legalEntity' => $legalEntity, 'person' => $person, 'encounter' => $encounter]);
-            };
-            Route::get('/encounters/{encounter}/care-plan/create', $redirectEncounterCarePlan)
+                ->can('create', CarePlan::class);
+            Route::get('/encounters/{encounter}/care-plan/create', CarePlanController::class)
                 ->whereNumber('encounter')
-                ->can('create', \App\Models\CarePlan::class);
-            Route::get('/encounter/{encounter}/care-plan/create', $redirectEncounterCarePlan)
+                ->can('create', CarePlan::class);
+            Route::get('/encounter/{encounter}/care-plan/create', CarePlanController::class)
                 ->whereNumber('encounter')
-                ->can('create', \App\Models\CarePlan::class);
-            Route::get('/care-plans/{carePlan}', \App\Livewire\CarePlan\CarePlanShow::class)
+                ->can('create', CarePlan::class);
+            Route::get('/care-plans/{carePlan}', CarePlanShow::class)
                 ->whereNumber('carePlan')
                 ->can('view', 'carePlan')
                 ->name('care-plans.show');
-            Route::get('/care-plans/{carePlan}/activities/{activity}', \App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow::class)
+            Route::get('/care-plans/{carePlan}/activities/{activity}', CarePlanActivityShow::class)
                 ->whereNumber(['carePlan', 'activity'])
                 ->scopeBindings()
                 ->can('view', 'carePlan')
                 ->name('care-plans.activities.show');
-            Route::get('/care-plans/{carePlan}/edit', \App\Livewire\CarePlan\CarePlanUpdate::class)
+            Route::get('/care-plans/{carePlan}/edit', CarePlanUpdate::class)
                 ->whereNumber('carePlan')
                 ->can('view', 'carePlan')
                 ->name('care-plans.edit');
@@ -371,8 +359,8 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
             });
 
             Route::prefix('data-access')->name('data-access.')->group(static function () {
-                Route::get('/', \App\Livewire\Approval\ApprovalIndex::class)->name('index');
-                Route::get('/{approval}', \App\Livewire\Approval\ApprovalView::class)->can('view', 'approval')->name('view');
+                Route::get('/', ApprovalIndex::class)->name('index');
+                Route::get('/{approval}', ApprovalView::class)->can('view', 'approval')->name('view');
             });
 
             require __DIR__ . '/dictionaries.php';
