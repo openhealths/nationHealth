@@ -16,9 +16,6 @@ return [
 
     'edrpou' => 'Edrpou',
     'step' => 'Step :currentSteep with :totalSteps',
-    'status' => [
-        'autodeactivated' => 'Automatically deactivated',
-    ],
     'errors' => [
         'update_data' => 'An error has occurs during data update'
     ],

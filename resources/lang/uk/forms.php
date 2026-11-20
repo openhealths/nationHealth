@@ -464,7 +464,6 @@ return [
         'unknown' => 'Невідомо',
         'stopped' => 'Припинено',
         'entered_in_error' => 'Внесено помилково',
-        'autodeactivated' => 'Автоматично деактивовано',
         'expired' => 'Прострочено',
         'completed' => 'Завершено',
         'on_hold' => 'Призупинено',

@@ -13,9 +13,7 @@ use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
 use App\Repositories\Repository;
 use App\Traits\FormTrait;
-use Exception;
 use Gate;
-use Illuminate\Support\Carbon;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -23,7 +21,6 @@ use App\Livewire\Employee\Forms\EmployeeForm as Form;
 use Log;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
-use RuntimeException;
 use Throwable;
 
 abstract class EmployeeComponent extends Component
@@ -246,7 +243,7 @@ abstract class EmployeeComponent extends Component
         try {
             $token = session()->get(config('ehealth.api.oauth.bearer_token'));
             if (!$token) {
-                throw new RuntimeException('Сесія eHealth не активна. Будь ласка, перезайдіть.');
+                throw new \RuntimeException('Сесія eHealth не активна. Будь ласка, перезайдіть.');
             }
 
             // 2. API Request
@@ -256,7 +253,19 @@ abstract class EmployeeComponent extends Component
 
             $validatedData = $response->validate();
 
-            Repository::employee()->syncDetails($employee, $validatedData);
+            // 3. Database Update via Repository
+            // We use app() helper to resolve the repository
+            Repository::employee()->updateDetails(
+                $employee,
+                $validatedData['party'],
+                $validatedData['documents'],
+                $validatedData['phones'],
+                $validatedData['educations'] ?? null,
+                $validatedData['specialities'] ?? null,
+                $validatedData['qualifications'] ?? null,
+                $validatedData['scienceDegree'] ?? null
+            );
+            $employee->update(['status' => $validatedData['employee']['status']]);
 
             // 4. Close/Actualize Pending Requests
             $this->actualizePendingRequests($employee, $token);
@@ -268,7 +277,7 @@ abstract class EmployeeComponent extends Component
 
             return true;
 
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             Log::error('Single Employee Sync Failed', [
                 'employee_id' => $employee->id,
                 'error' => $e->getMessage()
@@ -305,24 +314,25 @@ abstract class EmployeeComponent extends Component
         foreach ($pendingRequests as $request) {
             try {
                 // Fetch specific request status from eHealth by UUID
-                $remoteRequestData = EHealth::employeeRequest()
+                $response = EHealth::employeeRequest()
                     ->withToken($token)
-                    ->getDetails($request->uuid)
-                    ->validate();
+                    ->getMany(['id' => $request->uuid]);
 
-                if ($remoteRequestData['uuid'] !== $request->uuid) {
+                $data = $response->validate();
+                $remoteRequestData = $data[0] ?? null;
+
+                if (!$remoteRequestData) {
                     continue;
                 }
 
                 $remoteStatus = $remoteRequestData['status'] ?? null;
-                $appliedAt = Carbon::parse($remoteRequestData['updated_at'], 'UTC')->setTimezone(config('app.timezone'));
 
                 // Update local status based on remote status
                 if ($remoteStatus === 'APPROVED') {
                     $request->update(
                         [
                             'status' => RequestStatus::APPROVED,
-                            'applied_at' => $appliedAt,
+                            'applied_at' => now(),
                         ]
                     );
                     $request->revision?->update(['status' => RevisionStatus::APPLIED]);
@@ -332,12 +342,12 @@ abstract class EmployeeComponent extends Component
                     $request->update(
                         [
                             'status' => $newStatus,
-                            'applied_at' => $appliedAt,
+                            'applied_at' => now(),
                         ]
                     );
                 }
 
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 Log::warning("Failed to check status for request {$request->uuid}: " . $e->getMessage());
                 // Continue to next request without stopping the flow
             }

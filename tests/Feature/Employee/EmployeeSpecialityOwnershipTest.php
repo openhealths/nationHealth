@@ -239,32 +239,6 @@ class EmployeeSpecialityOwnershipTest extends TestCase
         $this->assertSame($employee->id, $request->fresh()->employeeId);
     }
 
-    public function test_detail_sync_preserves_the_original_position_time_after_a_later_edit(): void
-    {
-        $employee = $this->employee('SPECIALIST', ['THERAPIST']);
-        $employee->update(['inserted_at' => '2024-01-01 08:00:00']);
-        $request = $this->request($employee, ['THERAPIST']);
-        $request->update(['uuid' => (string) Str::uuid(), 'applied_at' => '2024-01-01 17:00:00']);
-        $this->syncDetails($employee);
-        $this->assertSame('2024-01-01 08:00:00', $employee->fresh()->getRawOriginal('inserted_at'));
-    }
-
-    public function test_detail_sync_of_a_stopped_employee_does_not_claim_a_same_day_rehire_request(): void
-    {
-        $old = $this->employee('SPECIALIST', ['THERAPIST']);
-        $new = $this->employee('SPECIALIST', ['THERAPIST']);
-        $request = $this->request($new, ['THERAPIST']);
-        $request->update(['employee_id' => null, 'uuid' => (string) Str::uuid()]);
-        $data = $request->revision->data;
-        unset($data['employee_uuid']);
-        $request->revision->update(['data' => $data]);
-
-        $this->syncDetails($old, Status::STOPPED);
-        $this->assertNull($request->fresh()->employeeId);
-        $this->syncDetails($new);
-        $this->assertSame($new->id, $request->fresh()->employeeId);
-    }
-
     public function test_detail_sync_does_not_link_an_unsigned_new_position_draft(): void
     {
         $employee = $this->employee('SPECIALIST', ['THERAPIST']);
@@ -511,12 +485,11 @@ class EmployeeSpecialityOwnershipTest extends TestCase
         ];
     }
 
-    private function syncDetails(Employee $employee, Status $status = Status::APPROVED): void
+    private function syncDetails(Employee $employee): void
     {
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('validate')->once()->andReturn([
-            'employee' => ['start_date' => '2024-01-01', 'status' => $status->value, 'is_active' => $status === Status::APPROVED],
-            'division' => null,
+            'employee' => ['start_date' => '2024-01-01'], 'division' => null,
             'party' => ['uuid' => $this->party->uuid], 'documents' => [], 'phones' => [],
             'specialities' => [$this->certificate('THERAPIST')],
         ]);

@@ -7,15 +7,10 @@ namespace App\Classes\eHealth\Api;
 use App\Classes\eHealth\EHealthRequest;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
-use App\Enums\Status;
-use Carbon\CarbonImmutable;
 use GuzzleHttp\Promise\PromiseInterface;
 use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthResponseException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 
 class Employee extends EHealthRequest
 {
@@ -55,7 +50,7 @@ class Employee extends EHealthRequest
      */
     public function getDetails(string $uuid, $query = null, bool $groupByEntities = false): PromiseInterface|EHealthResponse
     {
-        $this->setValidator(fn (EHealthResponse $response): array => $this->validateDetails($response, $uuid));
+        $this->setValidator($this->validateDetails(...));
         $this->groupByEntities = $groupByEntities;
 
         return $this->get(self::URL . '/' . $uuid, $query);
@@ -99,12 +94,12 @@ class Employee extends EHealthRequest
         $rules = [
             '*' => 'required|array',
             '*.uuid' => 'required|uuid',
-            '*.status' => ['required', Rule::enum(Status::class)->only(Status::EMPLOYMENT)],
+            '*.status' => 'required|string',
             '*.position' => 'required|string',
             '*.employee_type' => 'required|string',
             '*.start_date' => 'required|date_format:Y-m-d',
             '*.end_date' => 'nullable|date_format:Y-m-d',
-            '*.is_active' => 'sometimes|required|boolean',
+            '*.is_active' => 'required|boolean',
             '*.party' => 'required|array',
             '*.party.uuid' => 'required|uuid',
             '*.party.no_tax_id' => 'required|boolean',
@@ -138,14 +133,7 @@ class Employee extends EHealthRequest
             );
         }
 
-        $employees = $validator->validated();
-        foreach ($employees as $index => $employee) {
-            // A list row may omit these fields. Bulk upsert needs the same columns for every position.
-            $employees[$index]['is_active'] ??= in_array(Status::from($employee['status']), Status::ACTIVE_EMPLOYMENT, true);
-            $employees[$index]['end_date'] ??= null;
-        }
-
-        return $employees;
+        return $validator->validated();
     }
 
     /**
@@ -154,7 +142,7 @@ class Employee extends EHealthRequest
      * @param  EHealthResponse  $response  The response from the eHealth API.
      * @return array The validated and transformed data.
      */
-    protected function validateDetails(EHealthResponse $response, string $uuid): array
+    protected function validateDetails(EHealthResponse $response): array
     {
         $transformedData = self::replaceEHealthPropNames($response->getData());
 
@@ -162,8 +150,8 @@ class Employee extends EHealthRequest
         $medTypes = implode(',', config('ehealth.medical_employees', []));
 
         $rules = [
-            'uuid' => ['required', 'uuid', Rule::in([$uuid])],
-            'status' => ['required', Rule::enum(Status::class)->only(Status::EMPLOYMENT)],
+            'uuid' => 'required|uuid',
+            'status' => 'required|string',
             'position' => 'required|string',
             'employee_type' => 'required|string',
             'start_date' => 'required|date_format:Y-m-d',
@@ -274,7 +262,6 @@ class Employee extends EHealthRequest
 
     /**
      * Replaces eHealth property names with the ones used in the application (e.g., id -> uuid).
-     * TODO: Move employee response mapping (field names, status aliases, employment dates and list defaults) to a DTO.
      *
      * @param  array  $properties  Raw properties from a single API item.
      * @return array Properties with application-friendly names.
@@ -284,16 +271,6 @@ class Employee extends EHealthRequest
         $replaced = [];
         foreach ($properties as $name => $value) {
             switch ($name) {
-                case 'start_date':
-                case 'end_date':
-                    // eHealth also returns employment dates as UTC timestamps with milliseconds.
-                    $replaced[$name] = is_string($value) && CarbonImmutable::hasFormat($value, 'Y-m-d\TH:i:s.v\Z')
-                        ? Str::before($value, 'T')
-                        : $value;
-                    break;
-                case 'status':
-                    $replaced['status'] = $value === 'ENTERED IN ERROR' ? Status::ENTERED_IN_ERROR->value : $value;
-                    break;
                 case 'id':
                     $replaced['uuid'] = $value;
                     break;

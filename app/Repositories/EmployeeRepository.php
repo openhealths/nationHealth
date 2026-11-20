@@ -7,7 +7,6 @@ namespace App\Repositories;
 use Log;
 use Throwable;
 use App\Core\Arr;
-use App\Enums\Status;
 use App\Models\LegalEntity;
 use App\Models\User;
 use App\Models\Relations\Party;
@@ -104,18 +103,7 @@ readonly class EmployeeRepository
 
         $linked = $requests->first(fn (EmployeeRequest $request): bool => (int) $request->employeeId === (int) $employee->id);
 
-        if ($linked || $requests->count() !== 1) {
-            return $linked;
-        }
-
-        $request = $requests->first();
-        // A later hire can share the old position's type, division and start date.
-        if (blank(data_get($request->revision?->data, 'employee_uuid'))
-            && !in_array($employee->status, Status::ACTIVE_EMPLOYMENT, true)) {
-            return null;
-        }
-
-        return $request;
+        return $linked ?? ($requests->count() === 1 ? $requests->first() : null);
     }
 
     /** @return list<array<string, mixed>> */
@@ -127,7 +115,7 @@ readonly class EmployeeRepository
             || !$employee->exists
             || (int) $employee->legalEntityId !== $legalEntityId
             || $employee->employeeType !== $employeeType
-            || $employee->status !== Status::APPROVED) {
+            || $employee->status !== \App\Enums\Status::APPROVED) {
             return [];
         }
 
@@ -196,27 +184,6 @@ readonly class EmployeeRepository
         $employeeRequest->save();
 
         return $employeeRequest;
-    }
-
-    public function syncDetails(Employee $employee, array $details): void
-    {
-        DB::transaction(function () use ($employee, $details) {
-            $employee->update([
-                'status' => $details['employee']['status'],
-                'is_active' => $details['employee']['is_active'],
-                'end_date' => $details['employee']['end_date'] ?? null,
-            ]);
-            $this->updateDetails(
-                $employee,
-                $details['party'],
-                $details['documents'],
-                $details['phones'],
-                $details['educations'] ?? null,
-                $details['specialities'] ?? null,
-                $details['qualifications'] ?? null,
-                $details['scienceDegree'] ?? null
-            );
-        });
     }
 
     /**

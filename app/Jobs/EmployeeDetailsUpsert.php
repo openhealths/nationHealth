@@ -71,7 +71,16 @@ class EmployeeDetailsUpsert extends EHealthJob
 
         $this->employee->save();
 
-        Repository::employee()->syncDetails($this->employee, $validatedData);
+        Repository::employee()->updateDetails(
+            $this->employee,
+            $validatedData['party'],
+            $validatedData['documents'],
+            $validatedData['phones'],
+            $validatedData['educations'] ?? null,
+            $validatedData['specialities'] ?? null,
+            $validatedData['qualifications'] ?? null,
+            $validatedData['scienceDegree'] ?? null
+        );
 
         $this->employee->setSyncStatus(JobStatus::COMPLETED);
         $this->employee->refresh();
@@ -90,7 +99,7 @@ class EmployeeDetailsUpsert extends EHealthJob
 
         $this->employee->update([
             'division_uuid' => $divisionUuid,
-            'inserted_at' => $this->employee->insertedAt ?? ($employeeRequest?->appliedAt ?? Carbon::now()),
+            'inserted_at' => $employeeRequest?->appliedAt ?? $this->employee->insertedAt ?? Carbon::now(),
             'division_id' => $divisionId,
             'user_id' => $this->employee->userId ?? $userId
         ]);
