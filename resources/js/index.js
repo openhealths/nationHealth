@@ -1,7 +1,9 @@
 import { referralIndex, referralDropdown } from './referral-index';
 import ui from '@alpinejs/ui';
+import { carePlanGroundsSearch } from './care-plan-grounds-search';
 
 document.addEventListener('alpine:init', () => {
+    window.Alpine.data('carePlanGroundsSearch', carePlanGroundsSearch);
     window.Alpine.data('referralIndex', referralIndex);
     window.Alpine.data('referralDropdown', referralDropdown);
     window.Alpine.plugin(ui);

@@ -12,27 +12,24 @@
 
     $quantityValue = is_array($activity->quantity) ? ($activity->quantity['value'] ?? null) : $activity->quantity;
     $quantityUnitCode = $activity->quantityCode ?: (is_array($activity->quantity) ? ($activity->quantity['code'] ?? null) : null);
-    $quantityUnitLabel = $quantityUnitCode
-        ? ($dictionaries['device_unit'][$quantityUnitCode]
-            ?? $dictionaries['MEDICATION_UNIT'][$quantityUnitCode]
-            ?? $quantityUnitCode)
-        : '';
+    $quantityUnits = match ($resolvedKind) {
+        'service_request' => ($dictionaries['SERVICE_UNIT'] ?? []) + ['PIECE' => __('care-plan.units'), 'MINUTE' => __('care-plan.minutes')],
+        'medication_request' => $dictionaries['MEDICATION_UNIT'] ?? [],
+        'device_request' => $dictionaries['device_unit'] ?? [],
+        default => [],
+    };
+    $quantityUnitLabel = $quantityUnits[$quantityUnitCode] ?? $quantityUnitCode ?? '';
 
     $remainingValue = $activity->remainingQuantity;
     $remainingUnitCode = $activity->remainingQuantityCode;
-    $remainingUnitLabel = $remainingUnitCode
-        ? ($dictionaries['device_unit'][$remainingUnitCode]
-            ?? $dictionaries['MEDICATION_UNIT'][$remainingUnitCode]
-            ?? $remainingUnitCode)
-        : $quantityUnitLabel;
+    $remainingUnitLabel = $remainingUnitCode ? ($quantityUnits[$remainingUnitCode] ?? $remainingUnitCode) : $quantityUnitLabel;
 
     $dailyAmountValue = $activity->dailyAmount;
-    $dailyAmountUnit = $activity->dailyAmountCode
-        ? ($dictionaries['MEDICATION_UNIT'][$activity->dailyAmountCode] ?? $activity->dailyAmountCode)
-        : '';
+    $dailyAmountUnit = $quantityUnits[$activity->dailyAmountCode] ?? $activity->dailyAmountCode ?? '';
 
     $programLabel = $activity->program
         ? ($dictionaries['medical_programs'][$activity->program]
+            ?? $dictionaries['medical_programs_service'][$activity->program]
             ?? $dictionaries['medical_programs_device'][$activity->program]
             ?? $dictionaries['medical_programs_medication'][$activity->program]
             ?? $activity->program)
@@ -61,6 +58,7 @@
 
     $goals = collect($activity->goal ?? [])
         ->map(fn ($goal) => is_string($goal) ? $goal : ($goal['code'] ?? ($goal['text'] ?? json_encode($goal))))
+        ->map(fn ($goal) => $dictionaries['care_plan_activity_goals'][$goal] ?? $goal)
         ->filter()
         ->values()
         ->all();
@@ -81,6 +79,9 @@
      author, product, reason_code, reason_reference, goal, quantity(+unit),
      remaining_quantity(+unit), scheduled_period; medication extras: daily_amount,
      description, program, status, status_reason; + outcome_* when present (3.10.3.2.5). --}}
+@if ($compact ?? false)
+    @include('livewire.care-plan.parts.activity.summary-card')
+@else
 <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
     <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -262,3 +263,4 @@
         </div>
     @endif
 </div>
+@endif

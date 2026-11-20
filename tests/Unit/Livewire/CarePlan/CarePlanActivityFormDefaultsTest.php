@@ -24,13 +24,18 @@ class CarePlanActivityFormDefaultsTest extends TestCase
         foreach ([
             'services-drawer.blade.php',
             'medication-form-drawer.blade.php',
-            'medical-device-form-drawer.blade.php',
         ] as $file) {
             $blade = file_get_contents(resource_path('views/livewire/care-plan/parts/modals/'.$file));
 
             $this->assertNotFalse($blade);
             $this->assertStringContainsString('wire:model="activityForm.goal"', $blade);
             $this->assertStringContainsString('care_plan_activity_goals', $blade);
+        }
+        $deviceFields = file_get_contents(resource_path('views/livewire/care-plan/parts/activity/device-fields.blade.php'));
+        $this->assertStringContainsString('wire:model="activityForm.goal"', $deviceFields);
+        $this->assertStringContainsString('care_plan_activity_goals', $deviceFields);
+        foreach (['medical-devices-drawer', 'medical-device-form-drawer'] as $drawer) {
+            $this->assertStringContainsString('livewire.care-plan.parts.activity.device-fields', file_get_contents(resource_path('views/livewire/care-plan/parts/modals/'.$drawer.'.blade.php')));
         }
     }
 
