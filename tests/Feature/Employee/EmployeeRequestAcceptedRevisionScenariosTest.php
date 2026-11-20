@@ -229,6 +229,42 @@ class EmployeeRequestAcceptedRevisionScenariosTest extends TestCase
     }
 
     #[Test]
+    public function delayed_approval_cannot_reactivate_the_old_position_after_a_same_day_rehire(): void
+    {
+        [$legalEntity, $employee, , $request] = $this->makeBatchEditPair();
+        $employee->update([
+            'status' => Status::STOPPED, 'is_active' => false, 'end_date' => '2025-01-15',
+            'inserted_at' => '2024-01-10 12:30:00',
+        ]);
+        $newUuid = (string) Str::uuid();
+        $rehire = $this->makeRequestWithRevision($legalEntity, requestOverrides: [
+            'party_id' => $employee->partyId, 'user_id' => $employee->userId, 'start_date' => '2025-01-15',
+        ]);
+        $processor = app(EmployeeRequestProcessor::class);
+        $processor->processBatch([[
+            'uuid' => $rehire->uuid, 'employee_id' => $newUuid, 'status' => 'APPROVED',
+            'position' => $employee->position, 'employee_type' => $employee->employeeType,
+            'start_date' => '2025-01-15', 'updated_at' => '2025-01-15T16:30:00Z',
+        ]], $legalEntity);
+
+        // Yesterday's edit is observed last and contains only the approval of the request.
+        $processor->processBatch([[
+            'uuid' => $request->uuid, 'status' => 'APPROVED', 'updated_at' => '2025-01-14T08:00:00Z',
+        ]], $legalEntity);
+
+        $this->assertSame(RequestStatus::APPROVED, $request->fresh()->status);
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id, 'status' => 'STOPPED', 'is_active' => false, 'end_date' => '2025-01-15',
+            'inserted_at' => '2024-01-10 12:30:00',
+        ]);
+        $this->assertDatabaseHas('employees', [
+            'uuid' => $newUuid, 'id' => $rehire->fresh()->employeeId, 'status' => 'APPROVED', 'is_active' => true,
+            'party_id' => $employee->partyId, 'user_id' => $employee->userId,
+            'end_date' => null, 'inserted_at' => '2025-01-15 18:30:00',
+        ]);
+    }
+
+    #[Test]
     public function batchAppliesLatestContentAndClosesOlderEdits(): void
     {
         [$legalEntity, $employee, $older, $newer] = $this->makeBatchEditPair();

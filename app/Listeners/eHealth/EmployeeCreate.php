@@ -13,7 +13,6 @@ use App\Enums\Status;
 use RuntimeException;
 use App\Enums\JobStatus;
 use App\Enums\User\Role;
-use App\Models\Relations\Party;
 use App\Classes\eHealth\EHealth;
 use App\Events\EHealthUserLogin;
 use App\Repositories\Repository;
@@ -442,7 +441,7 @@ class EmployeeCreate
                 $party = $employeeRequest->revision->data['party'];
                 $namesMatch = $party['first_name'] === $employee['party']['first_name']
                     && $party['last_name'] === $employee['party']['last_name']
-                    && $party['second_name'] === $employee['party']['second_name'];
+                    && ($party['second_name'] ?? null) === ($employee['party']['second_name'] ?? null);
 
                 $eHealthDateString = $employee['start_date'] ?? null;
 
@@ -450,57 +449,18 @@ class EmployeeCreate
                     return false;
                 }
 
-                // If start date is not provided in the request or names do not match, one cannot be sure that it's the same employee,
-                // so we will try to find any employee with the same position and employee type and with the same party data,
-                // and if there is only one such employee, we will assume that it's the same employee and use its start date
-                // for comparison, otherwise we will return false because of ambiguity.
-                if (is_null($employeeRequest->startDate) || !$namesMatch) {
-                    $partyUuid = $employee['party']['uuid'] ?? null;
-                    $party = Party::where('uuid', $partyUuid)->first();
-
-                    if (!$party) {
-                        return false;
-                    }
-
-                    $matchedEmployee = Employee::matchingEmployee(
-                        legalEntityUuid: $employeeRequest->legalEntityUuid,
-                        employeeType: $employeeRequest->employeeType,
-                        position: $employeeRequest->position,
-                        partyId: $party->id,
-                    )->first();
-
-                    if (!$matchedEmployee) {
-                        return false;
-                    }
-
-                    // Owner/party edits often leave employee_requests.start_date NULL and may omit
-                    // employee_request_data.start_date in revision JSON — never use bare ['start_date'].
-                    $fallbackStartDate = data_get($employeeRequest->revision?->data, 'employee_request_data.start_date')
-                        ?? data_get($employeeRequest->revision?->data, 'employee.start_date');
-
-                    if (!is_string($fallbackStartDate) || $fallbackStartDate === '') {
-                        $localStart = $matchedEmployee->startDate;
-                        $fallbackStartDate = $localStart instanceof \DateTimeInterface
-                            ? $localStart->format('Y-m-d')
-                            : (is_string($localStart) && $localStart !== '' ? $localStart : null);
-                    }
-
-                    if (!$fallbackStartDate) {
-                        return false;
-                    }
-
-                    $employeeRequest->startDate = $fallbackStartDate;
-                    $namesMatch = true; // If we have found the employee by other parameters and got the start date,
-                    // we can assume that names match because of the uniqueness of the employee record
-
+                // A rehire can have the same role and party as an earlier position.
+                // Only a request linked to this UUID may borrow its employee's start date.
+                $linkedUuid = $employeeRequest->employee?->uuid ?? data_get($employeeRequest->revision?->data, 'employee_uuid');
+                $linked = filled($linkedUuid) && $linkedUuid === $employee['uuid'];
+                $startDate = $employeeRequest->startDate
+                    ?? (data_get($employeeRequest->revision?->data, 'employee_request_data.start_date')
+                    ?? data_get($employeeRequest->revision?->data, 'employee.start_date'));
+                if ($linked && !$startDate) {
+                    $startDate = $employeeRequest->employee?->startDate ?? Employee::whereUuid($linkedUuid)->value('start_date');
                 }
 
-                $datesMatch = EmployeeRequestMatcher::datesMatchSameDay(
-                    $employeeRequest->startDate,
-                    $eHealthDateString
-                );
-
-                return $namesMatch && $datesMatch;
+                return ($linked || $namesMatch) && EmployeeRequestMatcher::datesMatchSameDay($startDate, $eHealthDateString);
             })
             ->sortByDesc(fn (EmployeeRequest $request) => [$request->created_at?->timestamp ?? 0, $request->id]);
 

@@ -16,6 +16,7 @@ enum Status: string
     case SIGNED = 'SIGNED';
     case DISMISSED = 'DISMISSED';
     case STOPPED = 'STOPPED';
+    case AUTODEACTIVATED = 'AUTODEACTIVATED';
     case ACTIVE = 'ACTIVE';
     case INACTIVE = 'INACTIVE';
     case DRAFT = 'DRAFT';
@@ -38,6 +39,7 @@ enum Status: string
             self::DRAFT => __('forms.status.draft'),
             self::UNSYNCED => __('forms.status.unsynced'),
             self::STOPPED => __('forms.status.stopped'),
+            self::AUTODEACTIVATED => __('forms.status.autodeactivated'),
             self::REORGANIZED => __('forms.status.reorganized'),
             self::ENTERED_IN_ERROR => __('forms.status.entered_in_error'),
             self::EXPIRED => __('forms.status.expired'),
@@ -50,7 +52,7 @@ enum Status: string
         return match ($this) {
             self::APPROVED, self::ACTIVE => 'badge-green',
             self::NEW, self::SIGNED, self::UNSYNCED, self::REORGANIZED, self::CONNECTED => 'badge-yellow',
-            self::DRAFT, self::REJECTED, self::DISMISSED, self::STOPPED,
+            self::DRAFT, self::REJECTED, self::DISMISSED, self::STOPPED, self::AUTODEACTIVATED,
             self::INACTIVE, self::ENTERED_IN_ERROR, self::EXPIRED => 'badge-red',
         };
     }

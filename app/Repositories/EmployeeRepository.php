@@ -7,6 +7,7 @@ namespace App\Repositories;
 use Log;
 use Throwable;
 use App\Core\Arr;
+use App\Enums\Status;
 use App\Models\LegalEntity;
 use App\Models\User;
 use App\Models\Relations\Party;
@@ -103,7 +104,18 @@ readonly class EmployeeRepository
 
         $linked = $requests->first(fn (EmployeeRequest $request): bool => (int) $request->employeeId === (int) $employee->id);
 
-        return $linked ?? ($requests->count() === 1 ? $requests->first() : null);
+        if ($linked || $requests->count() !== 1) {
+            return $linked;
+        }
+
+        $request = $requests->first();
+        // A later hire can share the old position's type, division and start date.
+        if (blank(data_get($request->revision?->data, 'employee_uuid'))
+            && !in_array($employee->status, [Status::APPROVED, Status::REORGANIZED], true)) {
+            return null;
+        }
+
+        return $request;
     }
 
     /** @return list<array<string, mixed>> */
@@ -115,7 +127,7 @@ readonly class EmployeeRepository
             || !$employee->exists
             || (int) $employee->legalEntityId !== $legalEntityId
             || $employee->employeeType !== $employeeType
-            || $employee->status !== \App\Enums\Status::APPROVED) {
+            || $employee->status !== Status::APPROVED) {
             return [];
         }
 
@@ -184,6 +196,32 @@ readonly class EmployeeRepository
         $employeeRequest->save();
 
         return $employeeRequest;
+    }
+
+    public function syncDetails(Employee $employee, array $details): void
+    {
+        DB::transaction(function () use ($employee, $details) {
+            $this->syncStatus($employee, $details['employee']);
+            $this->updateDetails(
+                $employee,
+                $details['party'],
+                $details['documents'],
+                $details['phones'],
+                $details['educations'] ?? null,
+                $details['specialities'] ?? null,
+                $details['qualifications'] ?? null,
+                $details['scienceDegree'] ?? null
+            );
+        });
+    }
+
+    public function syncStatus(Employee $employee, array $attributes): void
+    {
+        $employee->update([
+            'status' => $attributes['status'],
+            'is_active' => $attributes['is_active'],
+            'end_date' => $attributes['end_date'] ?? null,
+        ]);
     }
 
     /**
