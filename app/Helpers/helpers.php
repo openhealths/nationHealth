@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 use App\Classes\eHealth\Services\SchemaService;
 use App\Contracts\SignatureProvider;
+use App\Models\LegalEntity;
 use App\Services\Dictionary\DictionaryManager;
 use Carbon\CarbonImmutable;
-use App\Models\LegalEntity;
 use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 
 if (!function_exists('removeEmptyKeys')) {
@@ -93,7 +93,7 @@ if (!function_exists('toIsoDate')) {
             return null;
         }
 
-        if ($value instanceof \DateTimeInterface) {
+        if ($value instanceof DateTimeInterface) {
             return $value->format('Y-m-d');
         }
 
@@ -109,7 +109,7 @@ if (!function_exists('toIsoDate')) {
 
         try {
             return CarbonImmutable::parse($string)->format('Y-m-d');
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
     }
@@ -127,7 +127,7 @@ if (!function_exists('formatDisplayDate')) {
 
         $format ??= config('app.date_format');
 
-        if ($value instanceof \DateTimeInterface) {
+        if ($value instanceof DateTimeInterface) {
             return $value->format($format);
         }
 

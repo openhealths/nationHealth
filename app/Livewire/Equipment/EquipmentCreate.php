@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Equipment;
 
-use App\Core\Arr;
+use App\Dto\Equipment\Model as EquipmentData;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Equipment\Status;
-use App\Models\Division;
-use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Models\LegalEntity;
 use App\Repositories\Repository;
@@ -36,21 +34,18 @@ class EquipmentCreate extends EquipmentComponent
             return;
         }
 
-        $validated = $this->validateForm();
-        if (!$validated) {
+        if (!$this->validateForm()) {
             return;
         }
 
-        $apiPayload = $this->form->formatForApi($validated);
-
-        $response = $this->createInEHealth($apiPayload);
+        $response = $this->createInEHealth();
         if (!$response) {
             return;
         }
 
         try {
-            $validated = $response->validate();
-            Repository::equipment()->store($response->map($validated));
+            $data = objectMapper()->map($response->validate(), EquipmentData::class);
+            Repository::equipment()->save($data, new Equipment(['legal_entity_id' => legalEntity()->id]));
 
             Session::flash('success', __('equipments.success.created'));
             $this->redirectRoute('equipment.index', [legalEntity()], navigate: true);
@@ -69,25 +64,13 @@ class EquipmentCreate extends EquipmentComponent
             return;
         }
 
-        $validated = $this->validateForm();
-        if (!$validated) {
+        if (!$this->validateForm()) {
             return;
         }
 
-        $validated['legalEntityId'] = legalEntity()->id;
-        $validated['status'] = Status::DRAFT;
-        $validated['recorder'] = Employee::whereUuid($validated['recorder'])->value('id');
-
-        if (!empty($validated['divisionId'])) {
-            $validated['divisionId'] = Division::whereUuid($validated['divisionId'])->value('id');
-        }
-
-        if (!empty($validated['parentId'])) {
-            $validated['parentId'] = Equipment::whereUuid($validated['parentId'])->value('id');
-        }
-
         try {
-            Repository::equipment()->store(removeEmptyKeys(Arr::toSnakeCase($validated)));
+            $data = objectMapper()->map($this->form, EquipmentData::class);
+            Repository::equipment()->save($data, new Equipment(['legal_entity_id' => legalEntity()->id]));
 
             Session::flash('success', __('equipments.success.draft_created'));
             $this->redirectRoute('equipment.index', [legalEntity()], navigate: true);

@@ -35,9 +35,9 @@ return new class extends Migration
             $table->text('note')->nullable();
             $table->jsonb('properties')->nullable();
             $table->enum('error_reason', ['typo'])->nullable(); // https://e-health-ua.atlassian.net/wiki/spaces/ESOZ/pages/18769543191/equipment_status_reasons
-            $table->date('ehealth_inserted_at')->nullable();
+            $table->dateTime('ehealth_inserted_at')->nullable();
             $table->uuid('ehealth_inserted_by')->nullable();
-            $table->date('ehealth_updated_at')->nullable();
+            $table->dateTime('ehealth_updated_at')->nullable();
             $table->uuid('ehealth_updated_by')->nullable();
             $table->timestamps();
         });

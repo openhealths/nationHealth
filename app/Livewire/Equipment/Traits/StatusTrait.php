@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Livewire\Equipment\Traits;
 
 use App\Classes\eHealth\EHealth;
-use App\Core\Arr;
+use App\Dto\Equipment\EhealthChangeAvailabilityStatus;
+use App\Dto\Equipment\EhealthChangeStatus;
+use App\Dto\Equipment\Model as EquipmentData;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Equipment\Status;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Models\Equipment;
 use App\Repositories\Repository;
 use App\Rules\InDictionary;
@@ -16,8 +20,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 trait StatusTrait
@@ -45,7 +47,7 @@ trait StatusTrait
         }
 
         try {
-            $validated = $this->validate($this->rulesForChangingStatus($equipment));
+            $this->validate($this->rulesForChangingStatus($equipment));
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -53,8 +55,10 @@ trait StatusTrait
             return;
         }
 
+        $requestData = objectMapper()->map($this, EhealthChangeStatus::class)->toArray();
+
         try {
-            $response = EHealth::equipment()->changeStatus($equipment->uuid, removeEmptyKeys(Arr::toSnakeCase($validated)));
+            $response = EHealth::equipment()->changeStatus($equipment->uuid, $requestData);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when updating status of equipment');
 
@@ -62,7 +66,9 @@ trait StatusTrait
         }
 
         try {
-            Repository::equipment()->updateStatus($response->validate()['uuid'], $response->validate());
+            $data = objectMapper()->map($response->validate(), EquipmentData::class);
+
+            Repository::equipment()->updateStatus($data, $equipment);
 
             Session::flash('success', __('equipments.success.status_updated'));
             $this->dispatch('close-update-status-modal');
@@ -98,7 +104,7 @@ trait StatusTrait
         }
 
         try {
-            $validated = $this->validate($this->rulesForChangingAvailabilityStatus($equipment));
+            $this->validate($this->rulesForChangingAvailabilityStatus($equipment));
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -106,11 +112,10 @@ trait StatusTrait
             return;
         }
 
+        $requestData = objectMapper()->map($this, EhealthChangeAvailabilityStatus::class)->toArray();
+
         try {
-            $response = EHealth::equipment()->changeAvailabilityStatus(
-                $uuid,
-                removeEmptyKeys(Arr::toSnakeCase($validated))
-            );
+            $response = EHealth::equipment()->changeAvailabilityStatus($uuid, $requestData);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when updating availability status of equipment');
 
@@ -118,7 +123,9 @@ trait StatusTrait
         }
 
         try {
-            Repository::equipment()->updateStatus($response->validate()['uuid'], $response->validate());
+            $data = objectMapper()->map($response->validate(), EquipmentData::class);
+
+            Repository::equipment()->updateStatus($data, $equipment);
 
             Session::flash('success', __('equipments.success.availability_status_updated'));
             $this->dispatch('close-update-availability-status-modal');

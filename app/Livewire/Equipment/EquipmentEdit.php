@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Equipment;
 
+use App\Dto\Equipment\Model as EquipmentData;
 use App\Enums\Equipment\Status;
 use App\Models\Equipment;
 use App\Models\LegalEntity;
@@ -27,7 +28,7 @@ class EquipmentEdit extends EquipmentComponent
 
     public function create(): void
     {
-        $equipment = Equipment::find($this->equipmentId);
+        $equipment = Equipment::findOrFail($this->equipmentId);
         $this->form->status = Status::ACTIVE->value;
 
         if (Auth::user()->cannot('edit', $equipment)) {
@@ -36,22 +37,18 @@ class EquipmentEdit extends EquipmentComponent
             return;
         }
 
-        $validated = $this->validateForm();
-        if (!$validated) {
+        if (!$this->validateForm()) {
             return;
         }
 
-        $apiPayload = $this->form->formatForApi($validated);
-
-        $response = $this->createInEHealth($apiPayload);
+        $response = $this->createInEHealth();
         if (!$response) {
             return;
         }
 
         try {
-            $validated = $response->validate();
-            $validated['id'] = $this->equipmentId;
-            Repository::equipment()->update($response->map($validated));
+            $data = objectMapper()->map($response->validate(), EquipmentData::class);
+            Repository::equipment()->save($data, $equipment);
 
             Session::flash('success', __('equipments.success.created'));
             $this->redirectRoute('equipment.index', [legalEntity()], navigate: true);
