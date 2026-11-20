@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Equipment\Forms;
 
-use App\Core\Arr;
 use App\Enums\Equipment\{AvailabilityStatus, Status};
 use App\Enums\Status as BaseStatus;
 use App\Rules\InDictionary;
@@ -16,23 +15,23 @@ class EquipmentForm extends Form
 {
     public array $names = [['name' => '', 'type' => '']];
     public string|null $type = null;
-    public ?string $serialNumber;
+    public ?string $serialNumber = null;
     public string $status;
     public string $recorder;
-    public ?string $divisionId;
+    public ?string $divisionId = null;
     public string $availabilityStatus;
-    public ?string $inventoryNumber;
-    public ?string $manufacturer;
-    public ?string $manufactureDate;
-    public ?string $expirationDate;
-    public ?string $modelNumber;
-    public ?string $lotNumber;
-    public ?string $note;
+    public ?string $inventoryNumber = null;
+    public ?string $manufacturer = null;
+    public ?string $manufactureDate = null;
+    public ?string $expirationDate = null;
+    public ?string $modelNumber = null;
+    public ?string $lotNumber = null;
+    public ?string $note = null;
 
-    public ?string $parentId;
-    public ?string $deviceDefinitionId;
-    public ?array $properties;
-    public ?string $uuid;
+    public ?string $parentId = null;
+    public ?string $deviceDefinitionId = null;
+    public ?array $properties = null;
+    public ?string $uuid = null;
     public ?string $errorReason = null;
 
     /**
@@ -92,15 +91,15 @@ class EquipmentForm extends Form
             'properties.*.type' => ['required', 'string', 'max:255', new InDictionary('device_properties')],
             'properties.*.valueInteger' => [
                 'nullable',
-                'required_without_all:properties.*.valueDecimal,properties.*.valueBoolean,properties.*.valueString,',
+                'required_without_all:properties.*.valueDecimal,properties.*.valueBoolean,properties.*.valueString',
                 'prohibits:properties.*.valueDecimal,properties.*.valueBoolean,properties.*.valueString',
                 'integer:strict'
             ],
             'properties.*.valueDecimal' => [
                 'nullable',
-                'required_without_all:properties.*.valueInteger,properties.*.valueBoolean,properties.*.valueString,',
+                'required_without_all:properties.*.valueInteger,properties.*.valueBoolean,properties.*.valueString',
                 'prohibits:properties.*.valueInteger,properties.*.valueBoolean,properties.*.valueString',
-                'decimal'
+                'numeric'
             ],
             'properties.*.valueBoolean' => [
                 'nullable',
@@ -118,21 +117,6 @@ class EquipmentForm extends Form
             'deviceDefinitionId' => ['nullable', 'uuid'],
             // add exists: https://uaehealthapi.docs.apiary.io/#reference/public.-devices/get-device-definitions/get-device-definitions-v2
         ];
-    }
-
-    /**
-     * Convert validated date to ISO 8601 and format to snake case.
-     */
-    public function formatForApi(array $data): array
-    {
-        collect($data)
-            ->only(['manufactureDate', 'expirationDate'])
-            ->filter()
-            ->each(static function (string $value, string $key) use (&$data) {
-                $data[$key] = convertToYmd($value);
-            });
-
-        return removeEmptyKeys(Arr::toSnakeCase($data));
     }
 
     /**

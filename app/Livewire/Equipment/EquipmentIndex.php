@@ -8,6 +8,8 @@ use App\Classes\eHealth\EHealth;
 use App\Enums\Equipment\AvailabilityStatus;
 use App\Enums\Equipment\Status;
 use App\Enums\JobStatus;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\EquipmentSync;
 use App\Livewire\Equipment\Traits\StatusTrait;
 use App\Models\Equipment;
@@ -29,16 +31,14 @@ use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
 use Throwable;
 
 class EquipmentIndex extends Component
 {
     use BatchLegalEntityQueries;
-    use WithPagination;
-    use StatusTrait;
     use FormTrait;
+    use StatusTrait;
+    use WithPagination;
 
     protected const string BATCH_NAME = 'EquipmentSync';
 
@@ -233,9 +233,7 @@ class EquipmentIndex extends Component
         }
 
         try {
-            $validated = $this->normalizeDate($response->validate());
-
-            Repository::equipment()->sync($response->map($validated));
+            Repository::equipment()->sync($response->validate());
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors(
                 $exception,

@@ -4,115 +4,166 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
-use App\Core\Arr;
+use App\Classes\eHealth\Api\Responses\Collections\EquipmentDetails;
+use App\Classes\eHealth\Api\Responses\Collections\EquipmentGetMany;
+use App\Dto\Equipment\Model as EquipmentData;
+use App\Models\Division;
+use App\Models\Employee\Employee;
 use App\Models\Equipment;
 use App\Models\EquipmentName;
+use App\Models\LegalEntity;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 use Throwable;
+use UnexpectedValueException;
 
 class EquipmentRepository
 {
     /**
-     * Store data after successful creating in EHealth.
+     * Create or update equipment with its relationships and names.
      *
-     * @param  array  $data
+     * @param  EquipmentData  $data
+     * @param  Equipment  $equipment
      * @return Equipment
      * @throws Throwable
      */
-    public function store(array $data): Equipment
+    public function save(EquipmentData $data, Equipment $equipment): Equipment
     {
-        $equipment = Equipment::create(Arr::except($data, ['names', 'properties']));
-        $equipment->names()->createMany($data['names']);
+        return DB::transaction(function () use ($data, $equipment): Equipment {
+            $data->toModel($equipment);
+            $this->setRelationshipIds($data, $equipment);
+            $equipment->saveOrFail();
 
-        return $equipment;
+            $equipment->names()->delete();
+            $equipment->names()->createMany($data->names);
+
+            return $equipment;
+        });
     }
 
     /**
-     * Update existed record with EHealth data.
+     * Resolve equipment relationship UUIDs to local database IDs.
      *
-     * @param  array  $data
-     * @return Equipment
-     * @throws Throwable
+     * @param  EquipmentData  $data
+     * @param  Equipment  $equipment
+     * @return void
      */
-    public function update(array $data): Equipment
+    private function setRelationshipIds(EquipmentData $data, Equipment $equipment): void
     {
-        if (empty($data['id'])) {
-            throw new InvalidArgumentException('Equipment ID is required for update.');
+        if ($data->legalEntityId !== null) {
+            $equipment->legalEntityId = LegalEntity::whereUuid($data->legalEntityId)->value('id');
         }
 
-        $equipment = Equipment::findOrFail($data['id']);
-
-        $equipment->update(Arr::except($data, ['id', 'names', 'properties']));
-
-        // Update names
-        $equipment->names()->delete();
-        $equipment->names()->createMany($data['names']);
-
-        return $equipment;
+        $equipment->divisionId = $data->divisionId === null ? null : Division::whereUuid($data->divisionId)->value('id');
+        $equipment->parentId = $data->parentId === null ? null : Equipment::whereUuid($data->parentId)->value('id');
+        $equipment->recorder = $data->recorder === null ? null : Employee::whereUuid($data->recorder)->value('id');
     }
 
     /**
      * Update equipment data after updating status.
      *
-     * @param  string  $uuid
-     * @param  array  $data
+     * @param  EquipmentDetails  $response
      * @return void
      */
-    public function updateStatus(string $uuid, array $data): void
+    public function updateStatus(EquipmentDetails $response): void
     {
-        $forUpdate = Arr::only(
-            $data,
-            ['status', 'availability_status', 'error_reason', 'ehealth_updated_at', 'ehealth_updated_by']
-        );
-        Equipment::whereUuid($uuid)->update($forUpdate);
+        Equipment::whereUuid($response->get('id'))->update([
+            'status' => $response->get('status'),
+            'availability_status' => $response->get('availability_status'),
+            'error_reason' => $response->get('error_reason'),
+            'ehealth_updated_at' => $response->get('updated_at'),
+            'ehealth_updated_by' => $response->get('updated_by'),
+        ]);
     }
 
     /**
      * Sync equipment and related names.
      *
-     * @param  array  $items
+     * @param  EquipmentGetMany  $responses
      * @return void
      * @throws Throwable
      */
-    public function sync(array $items): void
+    public function sync(EquipmentGetMany $responses): void
     {
-        DB::transaction(static function () use ($items) {
-            $toUpsert = collect($items)->map(static function (array $item) {
-                unset($item['names']);
-                $item['properties'] = isset($item['properties']) ? json_encode($item['properties']) : null;
+        if ($responses->isEmpty()) {
+            return;
+        }
 
-                return $item;
-            });
+        DB::transaction(static function () use ($responses): void {
+            $items = $responses->toBase();
 
-            // Sync equipment
-            Equipment::upsert(
-                $toUpsert->toArray(),
+            $legalEntityIds = LegalEntity::whereIn(
                 'uuid',
-                Arr::except(new Equipment()->getFillable(), ['names'])
+                $items->pluck('legal_entity_id')->filter()->unique()
+            )->pluck('id', 'uuid');
+
+            $divisionIds = Division::whereIn(
+                'uuid',
+                $items->pluck('division_id')->filter()->unique()
+            )->pluck('id', 'uuid');
+
+            $parentIds = Equipment::whereIn(
+                'uuid',
+                $items->pluck('parent_id')->filter()->unique()
+            )->pluck('id', 'uuid');
+
+            $recorderIds = Employee::whereIn(
+                'uuid',
+                $items->pluck('recorder')->filter()->unique()
+            )->pluck('id', 'uuid');
+
+            $rows = $items->map(static function (EquipmentDetails $response) use (
+                $legalEntityIds,
+                $divisionIds,
+                $parentIds,
+                $recorderIds
+            ): array {
+                if (!isset($legalEntityIds[$response->get('legal_entity_id')])) {
+                    throw new UnexpectedValueException(
+                        'Unknown legal entity UUID for equipment: ' . $response->get('legal_entity_id')
+                    );
+                }
+
+                $data = objectMapper()->map($response, EquipmentData::class);
+                $row = $data->toModel()->getAttributes();
+
+                $row['legal_entity_id'] = $legalEntityIds[$response->get('legal_entity_id')];
+                $row['division_id'] = $divisionIds[$response->get('division_id')] ?? null;
+                $row['parent_id'] = $response->get('parent_id') ? ($parentIds[$response->get('parent_id')] ?? null) : null;
+                $row['recorder'] = $recorderIds[$response->get('recorder')] ?? null;
+
+                return $row;
+            })->all();
+
+            Equipment::upsert(
+                $rows,
+                'uuid',
+                array_values(array_diff(new Equipment()->getFillable(), ['uuid']))
             );
 
-            // Get equipments by uuid
-            $equipments = Equipment::whereIn('uuid', collect($items)->pluck('uuid'))
+            $equipments = Equipment::whereIn('uuid', $items->pluck('id'))
                 ->get(['id', 'uuid'])
                 ->keyBy('uuid');
 
-            // Map names data
-            $namesData = collect($items)->flatMap(static function (array $item) use ($equipments) {
-                $equipmentId = $equipments->get($item['uuid'])?->id;
-                if (!$equipmentId) {
-                    return [];
+            EquipmentName::whereIn('equipment_id', $equipments->pluck('id'))->delete();
+
+            $names = $items->flatMap(
+                static function (EquipmentDetails $response) use ($equipments): array {
+                    $id = $equipments->get($response->get('id'))?->id;
+
+                    if (!$id) {
+                        return [];
+                    }
+
+                    return array_map(static fn (array $name): array => [
+                        'equipment_id' => $id,
+                        'name' => $name['name'],
+                        'type' => $name['type'],
+                    ], $response->get('names'));
                 }
+            )->all();
 
-                return collect($item['names'])->map(
-                    static fn (array $name) => array_merge($name, ['equipment_id' => $equipmentId])
-                );
-            });
-
-            // Delete old and insert new
-            if ($namesData->isNotEmpty()) {
-                EquipmentName::whereIn('equipment_id', $equipments->pluck('id'))->delete();
-                EquipmentName::insert($namesData->toArray());
+            if ($names !== []) {
+                EquipmentName::insert($names);
             }
         });
     }
