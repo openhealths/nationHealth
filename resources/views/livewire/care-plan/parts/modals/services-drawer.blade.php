@@ -2,246 +2,103 @@
     id="services-drawer-right"
     x-model="showServiceDrawer"
     maxWidth="4/5"
+    topClass="top-[57px]"
     zIndex="40"
     overlayWidth="100%"
     onCloseClick="showServiceDrawer = false"
 >
     <x-slot name="title">
-        @if (isset($activityForm['id']) && $activityForm['id'])
-            {{ __('care-plan.edit_service_prescription') }}
-        @else
-            {{ __('care-plan.new_service_prescription') }}
-        @endif
+        <span class="block">
+            <span class="care-plan-service-context block">{{ $carePlan->person?->full_name }} — {{ __('care-plan.care_plan') }} №{{ $carePlan->requisition ?? $carePlan->id }}</span>
+            {{ !empty($activityForm['id']) ? __('care-plan.edit_service_prescription') : __('care-plan.new_service_prescription') }}
+        </span>
     </x-slot>
 
-    {{-- Content --}}
-    <form wire:submit.prevent="saveActivity">
-        @if (session()->has('error'))
-            <div
-                x-init="$el.scrollIntoView({ behavior: 'smooth', block: 'center' })"
-                class="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-gray-800 dark:text-red-400"
-                role="alert"
-            >
-                <div class="flex items-center gap-2">
-                    @icon('alert-circle', 'w-5 h-5 text-red-500')
-                    <span class="font-bold">{{ __('Увага!') }}</span>
-                </div>
-                <div class="mt-2">{{ session('error') }}</div>
-            </div>
-        @endif
-
+    <form wire:submit="saveActivity" class="care-plan-service-form">
+        {{-- CarePlanShow displays session errors through its consuming XMessage toast; field errors stay here. --}}
         @if ($errors->any())
-            <div
-                x-init="$el.scrollIntoView({ behavior: 'smooth', block: 'center' })"
-                class="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-gray-800 dark:text-red-400"
-                role="alert"
-            >
-                <div class="flex items-center gap-2">
-                    @icon('alert-circle', 'w-5 h-5 text-red-500')
-                    <span class="font-bold">{{ __('Будь ласка, виправте помилки:') }}</span>
-                </div>
-                <ul class="mt-2 list-inside list-disc">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+            <div role="alert" class="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-gray-700 dark:text-red-300">
+                @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
             </div>
         @endif
 
-        {{-- Main Data Section --}}
-        <fieldset class="fieldset">
-            <legend class="legend">{{ __('care-plan.main_data') }}</legend>
-            <div class="form-row-2">
+        <fieldset>
+            <legend>{{ __('care-plan.main_data') }}</legend>
+            <div class="care-plan-service-fields">
                 <div class="form-group group">
-                    <label class="label">{{ __('care-plan.service') }}*</label>
-                    <button type="button" class="input-select peer w-full text-left"
-                            wire:click="$set('showServiceSearchDrawer', true)">
-                        {{ !empty($selectedProduct) ? trim(($selectedProduct['code'] ?? '') . ' - ' . ($selectedProduct['name'] ?? '')) : __('care-plan.select_service') }}
-                    </button>
-                    @error('activityForm.product_reference') <p class="text-error">{{ $message }}</p> @enderror
-                </div>
-                <div class="form-group group">
-                    <label for="serviceProgram" class="label">{{ __('care-plan.program') }}</label>
                     <select id="serviceProgram" class="input-select peer" wire:model.live="selectedProgram">
                         <option value="">{{ __('forms.select') }}</option>
+
                         @foreach ($dictionaries['medical_programs_service'] ?? [] as $programId => $programName)
                             <option value="{{ $programId }}">{{ $programName }}</option>
                         @endforeach
                     </select>
-                    @error('activityForm.program') <p class="text-error">{{ $message }}</p> @enderror
+                    <label for="serviceProgram" class="label">{{ __('care-plan.program') }}</label>
+                    @error('activityForm.program')<p class="text-error">{{ $message }}</p>@enderror
                 </div>
-            </div>
-            <div class="form-row-3">
+
+                <div class="care-plan-service-product">
+                    <div class="form-group group">
+                        <button type="button" id="serviceProduct" class="input-select peer w-full text-left" wire:click="$set('showServiceSearchDrawer', true)">
+                            {{ $selectedProduct ? trim(($selectedProduct['code'] ?? '').' - '.($selectedProduct['name'] ?? '')) : __('care-plan.select_service_or_group') }}
+                        </button>
+                        <label for="serviceProduct" class="label">{{ __('care-plan.service') }}*</label>
+                        @error('activityForm.product_reference')<p class="text-error">{{ $message }}</p>@enderror
+                    </div>
+                    <button type="button" class="care-plan-add" wire:click="$set('showServiceSearchDrawer', true)">
+                        @icon('book-open', 'w-5 h-5') {{ __('care-plan.choose_from_catalog') }}
+                    </button>
+                </div>
+
                 <div class="form-group group">
-                    <label for="serviceQuantity" class="label">{{ __('care-plan.quantity') }}</label>
-                    <div class="flex gap-2">
-                        <input type="number" id="serviceQuantity" min="0" step="any" class="input peer w-full" wire:model="activityForm.quantity" />
-                        <select aria-label="{{ __('care-plan.quantity') }}" class="input-select peer w-24" wire:model="activityForm.quantity_code">
+                    <div class="care-plan-service-quantity">
+                        <input type="number" id="serviceQuantity" min="0.01" step="any" class="input peer" wire:model="activityForm.quantity" />
+                        <select aria-label="{{ __('care-plan.quantity_unit') }}" class="input-select peer" wire:model="activityForm.quantity_code">
                             <option value="PIECE">{{ __('care-plan.units') }}</option>
                             <option value="MINUTE">{{ __('care-plan.minutes') }}</option>
                         </select>
                     </div>
-                    @error('activityForm.quantity') <p class="text-error">{{ $message }}</p> @enderror
-                    @error('activityForm.quantity_code') <p class="text-error">{{ $message }}</p> @enderror
+                    <label for="serviceQuantity" class="label">{{ __('care-plan.quantity') }}</label>
+                    @error('activityForm.quantity')<p class="text-error">{{ $message }}</p>@enderror
+                    @error('activityForm.quantity_code')<p class="text-error">{{ $message }}</p>@enderror
                 </div>
-                <div class="form-group group">
-                    <label class="label">{{ __('care-plan.start_date') }}</label>
-                    <input type="text" class="input peer datepicker-input" datepicker-autohide datepicker-button="false" wire:model.live="activityForm.scheduled_period_start" />
-                    @error('activityForm.scheduled_period_start') <p class="text-error">{{ $message }}</p> @enderror
-                </div>
-                <div class="form-group group">
-                    <label class="label">{{ __('care-plan.end_date') }}</label>
-                    <input type="text" class="input peer datepicker-input" datepicker-autohide datepicker-button="false" wire:model.live="activityForm.scheduled_period_end" />
-                    @error('activityForm.scheduled_period_end') <p class="text-error">{{ $message }}</p> @enderror
-                </div>
+
+                @foreach (['start' => 'start_date', 'end' => 'end_date'] as $boundary => $dateLabel)
+                    <div class="form-group group">
+                        <div class="care-plan-service-period">
+                            @icon('calendar', 'w-4 h-4 text-gray-500')
+                            <input type="text" id="service-{{ $boundary }}-date" class="input peer datepicker-input" datepicker-autohide datepicker-format="{{ frontendDateFormat() }}" placeholder="дд.мм.рррр" wire:model="activityForm.scheduled_period_{{ $boundary }}" autocomplete="off" />
+                            @icon('clock', 'w-4 h-4 text-gray-500')
+                            <input type="text" inputmode="numeric" data-time maxlength="5" placeholder="гг:хх" aria-label="{{ __('care-plan.'.$dateLabel) }} — {{ __('care-plan.time') }}" class="input peer" disabled />
+                        </div>
+                        <label for="service-{{ $boundary }}-date" class="label">{{ __('care-plan.'.$dateLabel) }}</label>
+                        @error('activityForm.scheduled_period_'.$boundary)<p class="text-error">{{ $message }}</p>@enderror
+                    </div>
+                @endforeach
             </div>
         </fieldset>
 
-        {{-- Grounds for Prescription Section --}}
-        <fieldset class="fieldset" x-data="{ selectedGround: '' }">
-            <legend class="legend">{{ __('care-plan.grounds_for_prescription') }}</legend>
+        @include('livewire.care-plan.parts.activity.grounds-fields', ['inputPrefix' => 'service'])
 
-            <div class="mb-6 flex items-end gap-4">
-                <div class="flex-1">
-                    <label class="label">{{ __('Оберіть клінічний запис пацієнта') }}</label>
-                    <select
-                        x-model="selectedGround"
-                        @change="
-                            if (selectedGround) {
-                                let parts = selectedGround.split('|');
-                                $wire.addLinkedGround(parts[0], parts[1]);
-                                selectedGround = '';
-                            }
-                        "
-                        class="input-select peer w-full"
-                    >
-                        <option value="">{{ __('-- Оберіть запис --') }}</option>
-                        @if (!empty($availableConditions))
-                            <optgroup label="{{ __('Діагнози (Стани)') }}">
-                                @foreach ($availableConditions as $cond)
-                                    <option value="Condition|{{ $cond['uuid'] }}">
-                                        {{ __(':name (від :date)', ['name' => $cond['name'], 'date' => $cond['date']]) }}
-                                    </option>
-                                @endforeach
-                            </optgroup>
-                        @endif
-                        @if (!empty($availableReports))
-                            <optgroup label="{{ __('Діагностичні звіти') }}">
-                                @foreach ($availableReports as $report)
-                                    <option value="DiagnosticReport|{{ $report['uuid'] }}">
-                                        {{ __(':name (від :date)', ['name' => $report['name'], 'date' => $report['date']]) }}
-                                    </option>
-                                @endforeach
-                            </optgroup>
-                        @endif
-                        @if (!empty($availableObservations))
-                            <optgroup label="{{ __('Спостереження') }}">
-                                @foreach ($availableObservations as $obs)
-                                    <option value="Observation|{{ $obs['uuid'] }}">
-                                        {{ __(':name (від :date)', ['name' => $obs['name'], 'date' => $obs['date']]) }}
-                                    </option>
-                                @endforeach
-                            </optgroup>
-                        @endif
-                    </select>
-                </div>
-            </div>
+        <fieldset>
+            <legend>{{ __('care-plan.additional_info') }}</legend>
+            <div class="form-group group mb-10 max-w-sm">
+                <select id="service-expected-result" class="input-select peer" wire:model="activityForm.goal">
+                    <option value="">{{ __('forms.select') }}</option>
 
-            <div class="mb-4">
-                <h4 class="mb-4 text-base font-semibold text-gray-900 dark:text-white">
-                    {{ __('care-plan.justification_of_grounds') }}
-                </h4>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="thead-input">
-                            <tr>
-                                <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.date') }}</th>
-                                <th scope="col" class="px-4 py-3 font-medium">{{ __('care-plan.name') }}</th>
-                                <th scope="col" class="px-4 py-3 text-right font-medium">{{ __('Дія') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                            @forelse ($linkedGrounds as $ground)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                    <td class="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $ground['date'] }}
-                                    </td>
-                                    <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                        <span class="mr-2 inline-flex items-center rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                            {{ $ground['type'] === 'Condition' ? __('Діагноз') : ($ground['type'] === 'DiagnosticReport' ? __('Діагн. звіт') : __('Спостереження')) }}
-                                        </span>
-                                        {{ $ground['name'] }}
-                                    </td>
-                                    <td class="px-4 py-3 text-right">
-                                        <button
-                                            type="button"
-                                            wire:click="removeLinkedGround('{{ $ground['uuid'] }}')"
-                                            class="text-red-500 transition-colors hover:text-red-700"
-                                        >
-                                            @icon('delete', 'w-5 h-5')
-                                        </button>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="3" class="px-4 py-8 text-center text-gray-400 italic">
-                                        {{ __('Немає доданих обґрунтувань') }}
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </fieldset>
-
-        {{-- Additional Information Section --}}
-        <fieldset class="fieldset">
-            <legend class="legend">{{ __('care-plan.additional_info') }}</legend>
-
-            <div class="form-row-3">
-                <label for="expected_result" class="label"> {{ __('care-plan.expected_result') }} </label>
-                <select id="expected_result" class="input-select peer w-full" wire:model="activityForm.goal">
-                    <option value="">{{ __('care-plan.select_result') }}</option>
-                    @foreach ($this->dictionaries['care_plan_activity_goals'] ?? [] as $code => $label)
+                    @foreach ($dictionaries['care_plan_activity_goals'] ?? [] as $code => $label)
                         <option value="{{ $code }}">{{ $label }}</option>
                     @endforeach
                 </select>
-                @if (empty($this->dictionaries['care_plan_activity_goals']))
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        {{ __('care-plan.expected_result_dictionary_empty') }}
-                    </p>
-                @endif
+                <label for="service-expected-result" class="label">{{ __('care-plan.expected_result') }}</label>
             </div>
-
-            <div class="form-row">
-                <label for="description" class="label"> {{ __('care-plan.extended_description') }} </label>
-                <textarea
-                    id="description"
-                    class="input peer w-full"
-                    rows="4"
-                    placeholder="{{ __('care-plan.description') }}"
-                    wire:model="activityForm.description"
-                ></textarea>
-            </div>
+            <label for="service-description" class="mb-3 block text-sm">{{ __('care-plan.extended_description') }}</label>
+            <textarea id="service-description" class="care-plan-service-description" rows="5" placeholder="{{ __('care-plan.description') }}" wire:model="activityForm.description"></textarea>
         </fieldset>
 
-        <div class="mt-6 flex justify-start gap-3">
-            <button
-                type="button"
-                class="button-minor"
-                aria-controls="services-drawer-right"
-                @click="showServiceDrawer = false"
-            >
-                {{ __('forms.cancel') }}
-            </button>
-
-            <button type="submit" class="button-primary-outline">{{ __('forms.save') }}</button>
-
-            <button type="button" class="button-primary" wire:click="saveActivityAndSign">
-                {{ __('forms.save_and_sign') }}
-            </button>
+        <div class="flex flex-wrap gap-4 pb-8">
+            <button type="button" class="button-minor" @click="showServiceDrawer = false">{{ __('forms.cancel') }}</button>
+            <button type="submit" class="button-primary" wire:loading.attr="disabled" wire:target="saveActivity">{{ __('care-plan.add_prescription') }}</button>
         </div>
     </form>
 </x-dialog-drawer>

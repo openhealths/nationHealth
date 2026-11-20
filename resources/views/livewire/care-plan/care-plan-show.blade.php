@@ -11,6 +11,7 @@
     :uuid="$carePlan->person?->uuid ?? null"
     :patientFullName="$carePlan->person?->full_name ?? ''"
     :hideNavigation="true"
+    :title="__('care-plan.care_plan') . ' №' . ($carePlan->requisition ?? $carePlan->id)"
     :breadcrumbs="[
         ['label' => __('general.home') ?? 'Головна', 'url' => route('dashboard', [legalEntity()])],
         ['label' => $carePlan->person?->full_name ?? __('care-plan.patient') ?? 'Пацієнт', 'url' => route('persons.care-plans', [legalEntity(), $carePlan->person_id])],
@@ -19,7 +20,14 @@
 >
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
-    <x-slot name="headerActions"></x-slot>
+    <x-slot name="headerActions">
+        @if (filled($carePlan->uuid))
+            <button type="button" class="button-sync flex items-center gap-2" wire:click="sync" wire:loading.attr="disabled" wire:target="sync">
+                @icon('refresh', 'w-4 h-4')
+                {{ __('forms.synchronise_with_eHealth') }}
+            </button>
+        @endif
+    </x-slot>
 
     <div
         class="shift-content mt-6 pl-4"
@@ -29,6 +37,7 @@
             openDropdown: false,
             showServiceDrawer: @entangle('showServiceDrawer'),
             showServiceSearchDrawer: @entangle('showServiceSearchDrawer'),
+            showMedicalRecordsSearchDrawer: false,
             showMedicationDrawer: @entangle('showMedicationDrawer'),
             showMedicationSearchDrawer: @entangle('showMedicationSearchDrawer'),
             showMedicationFormDrawer: @entangle('showMedicationFormDrawer'),
@@ -41,6 +50,7 @@
         @close-drawers.window="
             showServiceDrawer = false;
             showServiceSearchDrawer = false;
+            showMedicalRecordsSearchDrawer = false;
             showMedicationDrawer = false;
             showMedicationSearchDrawer = false;
             showMedicationFormDrawer = false;
@@ -51,6 +61,7 @@
             showEPrescriptionDrawer = false;
         "
         wire:key="care-plan-show-container"
+        @care-plan-activity-added.window="activeTab = 'activities'"
     >
         <div class="w-full max-w-screen-xl">
             @if (!$this->canManageActivities && !$this->isTerminalCarePlan && $carePlan->status !== CarePlanStatus::DRAFT->value && !$carePlan->requiresFhirImport())
@@ -73,6 +84,11 @@
             @php
                 $status = is_array($carePlan->status) ? ($carePlan->status['coding'][0]['code'] ?? ($carePlan->status['text'] ?? '')) : $carePlan->status;
                 $statusEnum = CarePlanStatus::fromStored($status);
+                $activityCreationBlockReason = $activityCreationBlockReason ?? match (true) {
+                    $carePlan->requiresFhirImport() => __($statusEnum === CarePlanStatus::DRAFT ? 'care-plan.draft_backfill_required' : 'care-plan.full_sync_required'),
+                    !$this->canManageActivities && !$this->isTerminalCarePlan => __('care-plan.prescribing_patient_access_required'),
+                    default => null,
+                };
 
                 $categoryLabel = $carePlan->categoryConcept?->text;
                 if (!$categoryLabel) {
@@ -84,108 +100,7 @@
                 $tos = is_array($carePlan->terms_of_service) ? ($carePlan->terms_of_service['coding'][0]['code'] ?? ($carePlan->terms_of_service['text'] ?? '')) : $carePlan->terms_of_service;
             @endphp
 
-            <!-- Tabs Navigation -->
-            <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                    <button
-                        @click="activeTab = 'info'"
-                        type="button"
-                        :class="activeTab === 'info'
-                            ? 'border-blue-500 text-blue-600 dark:text-blue-500 font-bold'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 font-medium'"
-                        class="cursor-pointer border-b-2 px-1 pb-4 text-sm whitespace-nowrap transition-all"
-                    >
-                        {{ __('care-plan.plan_info') ?? 'Інформація про план' }}
-                    </button>
-                    <button
-                        @click="activeTab = 'activities'"
-                        type="button"
-                        :class="activeTab === 'activities'
-                            ? 'border-blue-500 text-blue-600 dark:text-blue-500 font-bold'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 font-medium'"
-                        class="cursor-pointer border-b-2 px-1 pb-4 text-sm whitespace-nowrap transition-all"
-                    >
-                        {{ __('care-plan.activities') ?? 'Призначення' }} ({{ $carePlan->activities->count() }})
-                    </button>
-                </nav>
-
-                <div class="flex flex-col gap-2 pb-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-                    @if (filled($carePlan->uuid))
-                        <button
-                            type="button"
-                            class="button-sync flex items-center justify-center gap-2 whitespace-nowrap"
-                            wire:click="sync"
-                            wire:loading.attr="disabled"
-                            wire:target="sync"
-                        >
-                            <span wire:loading.remove wire:target="sync">
-                                @icon('refresh', 'w-4 h-4')
-                            </span>
-                            <span wire:loading wire:target="sync" class="animate-spin">
-                                @icon('refresh', 'w-4 h-4')
-                            </span>
-                            <span>{{ __('forms.synchronise_with_eHealth') }}</span>
-                        </button>
-                    @endif
-
-                    @if ($this->canManageActivities && in_array(strtolower((string)$status), [CarePlanStatus::ACTIVE->value, 'new', 'pending']))
-                        <div class="relative">
-                            <button
-                                type="button"
-                                @click="openDropdown = ! openDropdown"
-                                @click.away="openDropdown = false"
-                                class="button-primary flex items-center justify-center gap-2"
-                            >
-                                @icon('plus', 'w-4 h-4')
-                                <span>{{ __('care-plan.new_prescription') }}</span>
-                            </button>
-
-                            <div
-                                x-show="openDropdown"
-                                x-transition
-                                style="display: none"
-                                class="ring-opacity-5 absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md border border-gray-100 bg-white shadow-lg ring-1 ring-black focus:outline-none dark:border-gray-600 dark:bg-gray-700"
-                            >
-                                <div class="py-1" role="none">
-                                    <button
-                                        type="button"
-                                        @click="
-                                            openDropdown = false;
-                                            showServiceDrawer = true;
-                                        "
-                                        wire:click="initActivityForm('service_request')"
-                                        class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600"
-                                    >
-                                        {{ __('care-plan.service_prescription') }}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        @click="
-                                            openDropdown = false;
-                                            showMedicationDrawer = true;
-                                        "
-                                        wire:click="initActivityForm('medication_request')"
-                                        class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600"
-                                    >
-                                        {{ __('care-plan.medication_prescription') }}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        @click="
-                                            openDropdown = false;
-                                            showMedicalDeviceDrawer = true;
-                                        "
-                                        wire:click="initActivityForm('device_request')"
-                                        class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600"
-                                    >
-                                        {{ __('care-plan.medical_device_prescription') }}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    @endif
-                </div>
-            </div>
+            @include('livewire.care-plan.parts.tabs-navigation')
 
             <!-- Info Tab Content -->
             <div x-show="activeTab === 'info'">
@@ -590,236 +505,7 @@
                 </div>
             </div>
 
-            <!-- Activities Tab Content -->
-            <div x-show="activeTab === 'activities'" style="display: none">
-                <fieldset class="fieldset !mb-6 !max-w-full !rounded-xl !border-gray-100 bg-white !p-6 !shadow-none dark:!border-gray-700 dark:bg-gray-800">
-                    <legend class="legend">{{ __('care-plan.activities') }}</legend>
-
-                    <div class="index-table-wrapper mt-4">
-                        <table class="index-table w-full">
-                            <thead class="index-table-thead">
-                                <tr>
-                                    <th class="index-table-th w-[35%]">{{ __('care-plan.kind') }}</th>
-                                    <th class="index-table-th w-[15%]">{{ __('care-plan.quantity') }}</th>
-                                    <th class="index-table-th w-[20%]">{{ __('forms.start_date') }}</th>
-                                    <th class="index-table-th w-[15%]">{{ __('forms.status.label') }}</th>
-                                    <th class="index-table-th w-[15%] text-right">{{ __('forms.actions') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse ($carePlan->activities ?? [] as $activity)
-                                    <tr class="index-table-tr">
-                                        <td class="index-table-td">
-                                            @php
-                                                $resolvedKind = $activity->resolvedKind();
-                                                $kindTranslationKey = 'care-plan.activity_kind.' . $resolvedKind;
-                                                $translatedKind = \Illuminate\Support\Facades\Lang::has($kindTranslationKey) ? __($kindTranslationKey) : $resolvedKind;
-                                            @endphp
-                                            <div class="font-medium text-gray-900 dark:text-white">
-                                                {{ $translatedKind ?: '-' }}
-                                            </div>
-                                            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                                                @if ($activity->uuid)
-                                                    ID:
-                                                    <span class="font-mono">{{ $activity->uuid }}</span>
-                                                @else
-                                                    ID:
-                                                    <span class="font-mono">{{ $activity->id }} ({{ __('care-plan.status.draft') }})</span>
-                                                @endif
-                                            </div>
-                                        </td>
-                                        <td class="index-table-td">
-                                            @if (is_array($activity->quantity))
-                                                {{ $activity->quantity['value'] ?? '-' }} {{ $activity->quantity['unit'] ?? '' }}
-                                            @else
-                                                {{ $activity->quantity ?? '-' }}
-                                            @endif
-                                        </td>
-                                        <td class="index-table-td">
-                                            {{ $activity->scheduled_period_start?->format('d.m.Y') }}
-                                        </td>
-                                        <td class="index-table-td">
-                                            @php
-                                                $activityStatus = is_array($activity->status) ? ($activity->status['coding'][0]['code'] ?? ($activity->status['text'] ?? '')) : $activity->status;
-                                                $activityStatusEnum = CarePlanStatus::tryFrom(strtolower(str_replace('_', '-', (string) $activityStatus)));
-                                                $statusKey = 'care-plan.status.' . strtolower($activityStatus);
-                                                $activityStatusDisplay = $activityStatusEnum?->label()
-                                                    ?? (\Illuminate\Support\Facades\Lang::has($statusKey) ? __($statusKey) : (is_array($activity->status) ? ($activity->status['text'] ?? ($activity->status['coding'][0]['display'] ?? $activityStatus)) : $activityStatus));
-                                                $activityBadgeColor = $activityStatusEnum === CarePlanStatus::DRAFT
-                                                    ? 'badge-red'
-                                                    : ($activityStatusEnum?->color()
-                                                        ?? (in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']) ? 'badge-yellow' : 'badge-green'));
-                                            @endphp
-                                            <span class="{{ $activityBadgeColor }}">
-                                                {{ $activityStatusDisplay }}
-                                            </span>
-                                        </td>
-                                        <td class="index-table-td text-right">
-                                            <div
-                                                x-data="{
-                                                    open: false,
-                                                    toggle() {
-                                                        if (this.open) {
-                                                            return this.close();
-                                                        }
-                                                        this.$refs.button.focus();
-                                                        this.open = true;
-                                                    },
-                                                    close(focusAfter) {
-                                                        if (! this.open) return;
-                                                        this.open = false;
-                                                        focusAfter && focusAfter.focus();
-                                                    },
-                                                }"
-                                                @keydown.escape.prevent.stop="close($refs.button)"
-                                                @focusin.window="! $refs.panel.contains($event.target) && close()"
-                                                x-id="['dropdown-button']"
-                                                class="relative inline-block text-left"
-                                            >
-                                                <button
-                                                    @click="toggle()"
-                                                    x-ref="button"
-                                                    :aria-expanded="open"
-                                                    :aria-controls="$id('dropdown-button')"
-                                                    type="button"
-                                                    class="record-inner-action-btn inline-flex cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                                                >
-                                                    @icon('edit-user-outline', 'w-6 h-6 text-gray-700 dark:text-gray-300')
-                                                </button>
-
-                                                <div
-                                                    x-show="open"
-                                                    x-cloak
-                                                    x-ref="panel"
-                                                    x-transition.origin.top.right
-                                                    @click.outside="close($refs.button)"
-                                                    :id="$id('dropdown-button')"
-                                                    class="absolute right-0 z-50 mt-2 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-700"
-                                                >
-                                                    <a
-                                                        href="{{ route('care-plans.activities.show', [legalEntity(), $carePlan->id, $activity->id]) }}"
-                                                        class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                        wire:navigate
-                                                    >
-                                                        @icon('eye', 'w-5 h-5 text-gray-500')
-                                                        {{ __('forms.view_details') }}
-                                                    </a>
-
-                                                    @if ($this->canManageActivities && in_array(strtoupper($activityStatus), ['NEW', 'DRAFT']))
-                                                        <button
-                                                            type="button"
-                                                            @click="close()"
-                                                            wire:click="editActivity({{ $activity->id }})"
-                                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                        >
-                                                            @icon('edit', 'w-5 h-5 text-gray-500')
-                                                            {{ __('forms.edit') }}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            @click="close()"
-                                                            wire:click="openSignatureModal('sign_activity', {{ $activity->id }})"
-                                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                        >
-                                                            @icon('check', 'w-5 h-5 text-gray-500')
-                                                            {{ __('care-plan.sign_activity') }}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            @click="close()"
-                                                            wire:click="confirmDeleteActivity({{ $activity->id }})"
-                                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                        >
-                                                            @icon('trash', 'w-5 h-5 text-gray-500')
-                                                            {{ __('forms.delete') }}
-                                                        </button>
-                                                    @elseif ($this->canManageActivities && in_array(strtoupper($activityStatus), ['ACTIVE', 'SCHEDULED', 'IN-PROGRESS', 'IN_PROGRESS', 'ON-HOLD', 'PROCESSED']))
-                                                        @if ($resolvedKind === 'medication_request')
-                                                            <button
-                                                                type="button"
-                                                                @click="
-                                                                    close();
-                                                                    activeTab = 'activities';
-                                                                "
-                                                                wire:click="initEPrescriptionForm({{ $activity->id }})"
-                                                                class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                            >
-                                                                @icon('check', 'w-5 h-5 text-gray-500')
-                                                                {{ __('care-plan.issue_eprescription') }}
-                                                            </button>
-                                                        @elseif ($resolvedKind === 'device_request')
-                                                            <button
-                                                                type="button"
-                                                                @click="
-                                                                    close();
-                                                                    activeTab = 'activities';
-                                                                "
-                                                                wire:click="initReferralForm({{ $activity->id }})"
-                                                                class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                            >
-                                                                @icon('check', 'w-5 h-5 text-gray-500')
-                                                                {{ __('care-plan.issue_device_eprescription') }}
-                                                            </button>
-                                                        @elseif ($resolvedKind === 'service_request')
-                                                            <button
-                                                                type="button"
-                                                                @click="
-                                                                    close();
-                                                                    activeTab = 'activities';
-                                                                "
-                                                                wire:click="initReferralForm({{ $activity->id }})"
-                                                                class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                            >
-                                                                @icon('check', 'w-5 h-5 text-gray-500')
-                                                                {{ __('care-plan.create_referral') }}
-                                                            </button>
-                                                        @endif
-                                                        <button
-                                                            type="button"
-                                                            @click="close()"
-                                                            wire:click="openSignatureModal('cancel_activity', {{ $activity->id }})"
-                                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                        >
-                                                            @icon('close', 'w-5 h-5 text-gray-500')
-                                                            {{ __('care-plan.cancel_activity') }}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            @click="close()"
-                                                            wire:click="openSignatureModal('complete_activity', {{ $activity->id }})"
-                                                            class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                        >
-                                                            @icon('check-circle', 'w-5 h-5 text-gray-500')
-                                                            {{ __('care-plan.complete_activity') }}
-                                                        </button>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="5" class="index-table-td !py-8 text-center text-gray-400">
-                                            {{ __('care-plan.no_activities') }}
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </fieldset>
-
-                <div class="mt-8 flex flex-wrap items-center justify-start gap-4 pt-4 pb-12">
-                    <a
-                        href="{{ route('persons.care-plans', [legalEntity(), $carePlan->person_id]) }}"
-                        class="button-minor flex items-center gap-2"
-                        wire:navigate
-                    >
-                        @icon('arrow-left', 'w-4 h-4')
-                        <span>{{ __('forms.back') }}</span>
-                    </a>
-                </div>
-            </div>
+            @include('livewire.care-plan.parts.activities-tab')
         </div>
 
         @if ($actionType === 'cancel')
@@ -878,6 +564,7 @@
         {{-- Drawers --}}
         @include('livewire.care-plan.parts.modals.services-drawer')
         @include('livewire.care-plan.parts.modals.service-search-drawer')
+        @include('livewire.care-plan.parts.modals.medical-records-search-drawer')
         @include('livewire.care-plan.parts.modals.medications-drawer')
         @include('livewire.care-plan.parts.modals.medication-search-drawer')
         @include('livewire.care-plan.parts.modals.medication-form-drawer')

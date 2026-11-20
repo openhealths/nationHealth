@@ -14,7 +14,11 @@ const alpine = buildSync({
         contents: `import Alpine from 'alpinejs';
             import ui from '@alpinejs/ui';
             import focus from '@alpinejs/focus';
-            Alpine.plugin([focus, ui]); window.Alpine = Alpine; Alpine.start();`,
+            Alpine.plugin([focus, ui]);
+            Alpine.magic('wire', el => ({
+                set(name, value) { Alpine.$data(el)[name] = value; }
+            }));
+            window.Alpine = Alpine; Alpine.start();`,
         resolveDir: process.cwd(),
     },
     bundle: true, write: false, format: 'iife',
@@ -23,7 +27,7 @@ const alpine = buildSync({
 const styles = `
     [x-cloak] { display: none !important; }
     .fixed { position: fixed; } .left-0 { left: 0; } .right-0 { right: 0; }
-    .top-0 { top: 0; } .bottom-0 { bottom: 0; }
+    .top-0 { top: 0; } .bottom-0 { bottom: 0; } [class~="top-[57px]"] { top: 57px; }
     .w-full { width: 100%; } .h-full { height: 100%; }
     [class~="sm:w-4/5"] { width: 80%; }
     [class~="sm:w-[calc(80%-30px)]"] { width: calc(80% - 30px); }
@@ -79,7 +83,9 @@ for (const [kind, fixture] of Object.entries(fixtures)) {
                 await page.locator('#query').click();
                 await page.locator('#query').fill('Search term');
                 await page.locator('#query').press('Enter');
-                await page.locator('#filter').click();
+                if (!(await page.locator('#filter-value').isVisible())) {
+                    await page.locator('#filter').click();
+                }
                 await page.locator('#filter-value').fill('Filter term');
                 await page.locator('#filter').click();
                 await page.locator('#next').click();
@@ -88,14 +94,13 @@ for (const [kind, fixture] of Object.entries(fixtures)) {
 
                 if (dismissal === 'cancel') await page.locator('#cancel').click();
                 if (dismissal === 'escape') await page.locator('#query').press('Escape');
-                // The service overlay is fully covered by its equal-width panel.
-                // Dispatch directly there; the other two have a clickable backdrop strip.
-                if (dismissal === 'backdrop' && kind === 'service') {
-                    await page.locator('#service-search-drawer-right [x-dialog\\:overlay]')
-                        .dispatchEvent('click');
-                } else if (dismissal === 'backdrop') await page.mouse.click(265, 800);
-                // x=30 is outside the overlay's 80% width, but inside the drawer root.
-                if (dismissal === 'outer-area') await page.mouse.click(30, 800);
+                const searchDrawer = page.locator(`[id$="search-drawer-right"]`);
+                if (dismissal === 'backdrop') {
+                    const panel = await searchDrawer.locator('[x-dialog\\:panel]').boundingBox();
+                    await page.mouse.click(panel.x / 2, 800);
+                }
+                // Exercise the root shield even when the backdrop fills its width.
+                if (dismissal === 'outer-area') await searchDrawer.dispatchEvent('click');
                 if (dismissal === 'select') await page.locator('#select').click();
                 await expectState(page, fixture, { form: true, search: false });
                 for (const [id, value] of Object.entries({

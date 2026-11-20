@@ -226,7 +226,7 @@ class CarePlanShowActionsTest extends TestCase
         }
     }
 
-    public function test_new_plan_without_approval_shows_activate_and_hides_lifecycle_buttons(): void
+    public function test_new_plan_without_approval_shows_activate_and_disabled_lifecycle_buttons(): void
     {
         $this->actingAs($this->user);
 
@@ -238,8 +238,10 @@ class CarePlanShowActionsTest extends TestCase
         $this->assertFalse($component->instance()->canChangePlanLifecycle);
         $component
             ->assertSee(__('care-plan.activate_plan_patient_approval'))
-            ->assertDontSee(__('care-plan.cancel_care_plan'))
-            ->assertDontSee(__('care-plan.complete_care_plan'));
+            ->assertSee(__('care-plan.cancel_care_plan'))
+            ->assertSee(__('care-plan.complete_care_plan'));
+        $this->assertLifecycleButtonDisabled($component->html(), 'cancel');
+        $this->assertLifecycleButtonDisabled($component->html(), 'complete');
     }
 
     public function test_unknown_activity_renders_error_in_the_action_response_without_event_or_signature(): void
@@ -384,10 +386,11 @@ class CarePlanShowActionsTest extends TestCase
         $component
             ->assertDontSeeHtml('wire:click="openMethodSelectionModal"')
             ->assertSee(__('care-plan.cancel_care_plan'))
-            ->assertDontSee(__('care-plan.complete_care_plan'));
+            ->assertSee(__('care-plan.complete_care_plan'));
+        $this->assertLifecycleButtonDisabled($component->html(), 'complete');
     }
 
-    public function test_cancelled_plan_hides_lifecycle_buttons_and_blocks_cancel(): void
+    public function test_cancelled_plan_disables_lifecycle_buttons_and_blocks_cancel(): void
     {
         $this->actingAs($this->user);
 
@@ -401,14 +404,16 @@ class CarePlanShowActionsTest extends TestCase
         $this->assertFalse($component->instance()->canChangePlanLifecycle);
         $this->assertFalse($component->instance()->canRequestPatientApproval);
         $component
-            ->assertDontSee(__('care-plan.cancel_care_plan'))
-            ->assertDontSee(__('care-plan.complete_care_plan'))
+            ->assertSee(__('care-plan.cancel_care_plan'))
+            ->assertSee(__('care-plan.complete_care_plan'))
             ->assertDontSeeHtml('wire:click="openMethodSelectionModal"')
             ->assertSee(__('care-plan.status.cancelled'))
             ->assertSee(__('forms.synchronise_with_eHealth'))
             ->call('openSignatureModal', 'cancel')
             ->assertSet('showSignatureModal', false)
             ->assertNotDispatched('flashMessage');
+        $this->assertLifecycleButtonDisabled($component->html(), 'cancel');
+        $this->assertLifecycleButtonDisabled($component->html(), 'complete');
     }
 
     public function test_show_page_offers_ehealth_sync_next_to_new_activity_actions(): void
@@ -882,13 +887,21 @@ class CarePlanShowActionsTest extends TestCase
             'personId' => $this->person->id, 'legalEntityId' => $this->legalEntity->id,
             'uuid' => (string) Str::uuid(), 'title' => 'Historical new plan', 'status' => 'new',
         ]);
-        Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
+        $component = Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
             ->assertOk()->assertSee('Historical new plan')
             ->assertSee(__('forms.synchronise_with_eHealth'))
             ->assertSee(__('care-plan.full_sync_required'))
             ->assertDontSeeHtml('wire:click="initActivityForm')
-            ->assertDontSee(__('care-plan.cancel_care_plan'))
-            ->assertDontSee(__('care-plan.complete_care_plan'));
+            ->assertSee(__('care-plan.cancel_care_plan'))
+            ->assertSee(__('care-plan.complete_care_plan'));
+        $this->assertLifecycleButtonDisabled($component->html(), 'cancel');
+        $this->assertLifecycleButtonDisabled($component->html(), 'complete');
+    }
+
+    private function assertLifecycleButtonDisabled(string $html, string $action): void
+    {
+        $attribute = preg_quote("wire:click=\"openSignatureModal('$action')\"", '~');
+        $this->assertMatchesRegularExpression('~<button\b(?=[^>]*'.$attribute.')(?=[^>]*\bdisabled\b)[^>]*>~', $html);
     }
 
     public function test_service_catalog_filters_categories_and_resets_for_another_selection(): void
