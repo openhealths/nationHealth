@@ -3,74 +3,47 @@ button.item-add {
 
     &:before {
         mask: url("../icons/plus.svg") no-repeat center / contain;
-        @apply content-[''] w-4 h-4 bg-blue-600;
+        @apply content-[''] w-4 h-4 bg-current;
     }
-}
-
-.dark button.item-add:before {
-    background-color: var(--color-blue-400);
 }
 
 button.item-remove {
-    @apply relative inline-flex items-center gap-1 text-red-600 text-sm cursor-pointer font-medium;
+    @apply relative inline-flex items-center gap-1 text-red-600 hover:text-red-800 dark:text-red-400 text-sm cursor-pointer font-medium;
 
     &:before {
         mask: url("../icons/minus.svg") no-repeat center / contain;
-        @apply content-[''] w-4 h-4 bg-red-600;
+        @apply content-[''] w-4 h-4 bg-current;
     }
-}
-
-.dark button.item-remove:before {
-    background-color: var(--color-red-400);
 }
 
 .with-leading-icon {
     @apply pl-10;
 }
 
-.wrapped-label {
-    @apply pl-0 peer-placeholder-shown:pl-10 peer-focus:font-medium absolute text-sm text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-6 scale-75 top-3 z-10 origin-[0] peer-focus:start-0 peer-focus:pl-0 rtl:peer-focus:translate-x-1/4 rtl:peer-focus:left-auto peer-focus:text-blue-600 peer-focus:dark:text-blue-500 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-6;
-}
-
-.timepicker-uk ~ .wrapped-label {
-    @apply !-translate-y-6 !scale-75 !origin-[0] !pl-0 !font-medium;
-}
-
-.datepicker-wrapper {
-    @apply relative;
-
-    &:before {
-        mask: url("../icons/calendar-week.svg") no-repeat;
-        @apply content-[''] absolute top-2.5 left-2.5 w-5 h-5 bg-gray-500;
-    }
-}
-
-.dark .datepicker-wrapper:before {
-    background-color: var(--color-gray-400);
-}
-
+.datepicker-wrapper,
 .phone-wrapper {
-    @apply relative;
+    @apply relative before:bg-gray-500 dark:before:bg-gray-400;
 
     &:before {
-        mask: url("../icons/phone.svg") no-repeat;
-        @apply content-[''] absolute top-2.5 left-2 w-5 h-5 bg-gray-500;
+        @apply content-[''] absolute top-2.5 w-5 h-5;
     }
 }
 
-.dark .phone-wrapper:before {
-    background-color: var(--color-gray-400);
+.datepicker-wrapper:before {
+    mask: url("../icons/calendar-week.svg") no-repeat;
+    @apply left-2.5;
+}
+
+.phone-wrapper:before {
+    mask: url("../icons/phone.svg") no-repeat;
+    @apply left-2;
 }
 
 .rule-engine-rules {
-    @apply relative pl-8 font-bold underline cursor-pointer;
+    @apply relative pl-8 font-bold underline cursor-pointer before:bg-gray-900 dark:before:bg-gray-400;
 
     &:before {
         mask: url("../icons/info-circle.svg") no-repeat;
-        @apply content-[''] absolute top-1/2 left-0 -translate-y-1/2 w-6 h-6 bg-gray-900;
+        @apply content-[''] absolute top-1/2 left-0 -translate-y-1/2 w-6 h-6;
     }
-}
-
-.dark .rule-engine-rules:before {
-    background-color: var(--color-gray-400);
 }

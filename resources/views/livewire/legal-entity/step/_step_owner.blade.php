@@ -3,7 +3,7 @@
 @endphp
 
 <fieldset
-    class="p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-7xl"
+    class="mt-6 mb-16 max-w-7xl rounded-lg border border-gray-200 p-4 shadow sm:p-8 sm:pb-10 dark:border-gray-700 dark:bg-gray-800"
     xmlns="http://www.w3.org/1999/html"
     x-data="{
         index: 2,
@@ -21,7 +21,7 @@
         keysMap: new WeakMap(),
 
         getKey(doc) {
-            if (!this.keysMap.has(doc)) {
+            if (! this.keysMap.has(doc)) {
                 this.keysMap.set(doc, crypto.randomUUID());
             }
             return this.keysMap.get(doc);
@@ -70,8 +70,12 @@
     x-init="
         typeof addHeader !== 'undefined' && addHeader(title, index);
         initTempOwnerData();
-        if (!Array.isArray(owner.phones) || owner.phones.length === 0) { owner.phones = [{ ...defaultPhone }] };
-        if (!Array.isArray(owner.documents) || owner.documents.length === 0) { owner.documents = [{ ...defaultDoc }] };
+        if (! Array.isArray(owner.phones) || owner.phones.length === 0) {
+            owner.phones = [{ ...defaultPhone }];
+        }
+        if (! Array.isArray(owner.documents) || owner.documents.length === 0) {
+            owner.documents = [{ ...defaultDoc }];
+        }
     "
     x-cloak
     x-show="activeStep === index || isEdit"
@@ -81,10 +85,10 @@
         <legend x-text="title" class="legend"></legend>
     </template>
 
-    <div class="flex items-center justify-between mb-2">
-        <h3 class="font-bold text-sm text-gray-600 mb-6">{{ __('forms.credentials_owner') }} *</h3>
+    <div class="mb-2 flex items-center justify-between">
+        <h3 class="mb-6 text-sm font-bold text-gray-600">{{ __('forms.credentials_owner') }} *</h3>
 
-        @if($isEdit && !$isDetails)
+        @if ($isEdit && !$isDetails)
             <label class="form-toggle">
                 <input
                     type="checkbox"
@@ -93,17 +97,14 @@
                     x-model="isOwnerChange"
                     :checked="isOwnerChange"
                     @change="ownerChange()"
-                >
+                />
                 <div class="form-toggle-track" aria-hidden="true"></div>
-                <span
-                    class="form-toggle-label"
-                    x-text="'{{ __('forms.owner_change') }}'"
-                ></span>
+                <span class="form-toggle-label" x-text="'{{ __('forms.owner_change') }}'"></span>
             </label>
         @endif
     </div>
 
-    <div class='form-row-3'>
+    <div class="form-row-3">
         {{-- Owner Last Name --}}
         <div class="form-group group">
             <input
@@ -114,19 +115,21 @@
                 x-model="owner.lastName"
                 aria-describedby="@error('legalEntityForm.owner.lastName') ownerLastNameErrorHelp @enderror"
                 class="input @error('legalEntityForm.owner.lastName') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
-                x-effect="$el.value = isOwnerChange ? (tempOwnerData.lastName ?? '') : owner.lastName ?? ''"
-                @blur="if (isOwnerChange) { tempOwnerData.lastName = $event.target.value } else { owner.lastName = $event.target.value }"
+                x-effect="$el.value = isOwnerChange ? (tempOwnerData.lastName ?? '') : (owner.lastName ?? '')"
+                @blur="
+                    if (isOwnerChange) {
+                        tempOwnerData.lastName = $event.target.value;
+                    } else {
+                        owner.lastName = $event.target.value;
+                    }
+                "
             />
 
             @error('legalEntityForm.owner.lastName')
-                <p id="ownerLastNameErrorHelp" class="text-error">
-                    {{ $message }}
-                </p>
+                <p id="ownerLastNameErrorHelp" class="text-error">{{ $message }}</p>
             @enderror
 
-            <label for="ownerLastName" class="label z-10">
-                {{ __('forms.last_name') }}
-            </label>
+            <label for="ownerLastName" class="label z-10"> {{ __('forms.last_name') }} </label>
         </div>
 
         {{-- Owner First Name --}}
@@ -139,19 +142,21 @@
                 x-model="owner.firstName"
                 aria-describedby="@error('legalEntityForm.owner.firstName') ownerFirstNameErrorHelp @enderror"
                 class="input @error('legalEntityForm.owner.firstName') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
-                x-effect="$el.value = isOwnerChange ? (tempOwnerData.firstName ?? '') : owner.firstName ?? ''"
-                @blur="if (isOwnerChange) { tempOwnerData.firstName = $event.target.value } else { owner.firstName = $event.target.value }"
+                x-effect="$el.value = isOwnerChange ? (tempOwnerData.firstName ?? '') : (owner.firstName ?? '')"
+                @blur="
+                    if (isOwnerChange) {
+                        tempOwnerData.firstName = $event.target.value;
+                    } else {
+                        owner.firstName = $event.target.value;
+                    }
+                "
             />
 
             @error('legalEntityForm.owner.firstName')
-                <p id="ownerFirstNameErrorHelp" class="text-error">
-                    {{ $message }}
-                </p>
+                <p id="ownerFirstNameErrorHelp" class="text-error">{{ $message }}</p>
             @enderror
 
-            <label for="ownerFirstName" class="label z-10">
-                {{ __('forms.first_name') }}
-            </label>
+            <label for="ownerFirstName" class="label z-10"> {{ __('forms.first_name') }} </label>
         </div>
 
         {{-- Owner Second Name --}}
@@ -163,28 +168,33 @@
                 x-model="owner.secondName"
                 aria-describedby="@error('legalEntityForm.owner.secondName') ownerSecondNameErrorHelp @enderror"
                 class="input @error('legalEntityForm.owner.secondName') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
-                x-effect="$el.value = isOwnerChange ? (tempOwnerData.secondName ?? '') : owner.secondName ?? ''"
-                @blur="if (isOwnerChange) { tempOwnerData.secondName = $event.target.value } else { owner.secondName = $event.target.value }"
+                x-effect="$el.value = isOwnerChange ? (tempOwnerData.secondName ?? '') : (owner.secondName ?? '')"
+                @blur="
+                    if (isOwnerChange) {
+                        tempOwnerData.secondName = $event.target.value;
+                    } else {
+                        owner.secondName = $event.target.value;
+                    }
+                "
             />
 
             @error('legalEntityForm.owner.secondName')
-                <p id="ownerSecondNameErrorHelp" class="text-error">
-                    {{ $message }}
-                </p>
+                <p id="ownerSecondNameErrorHelp" class="text-error">{{ $message }}</p>
             @enderror
 
-            <label for="ownerSecondName" class="label z-10">
-                {{ __('forms.second_name') }}
-            </label>
+            <label for="ownerSecondName" class="label z-10"> {{ __('forms.second_name') }} </label>
         </div>
 
         {{-- Owner Birth Date --}}
         <div class="form-group group">
-            <svg class="svg-input" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
-                 viewBox="0 0 20 20">
-                <path
-                    d="M20 4a2 2 0 0 0-2-2h-2V1a1 1 0 0 0-2 0v1h-3V1a1 1 0 0 0-2 0v1H6V1a1 1 0 0 0-2 0v1H2a2 2 0 0 0-2 2v2h20V4ZM0 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8H0v10Zm5-8h10a1 1 0 0 1 0 2H5a1 1 0 0 1 0-2Z"
-                />
+            <svg
+                class="svg-input"
+                aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+            >
+                <path d="M20 4a2 2 0 0 0-2-2h-2V1a1 1 0 0 0-2 0v1h-3V1a1 1 0 0 0-2 0v1H6V1a1 1 0 0 0-2 0v1H2a2 2 0 0 0-2 2v2h20V4ZM0 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8H0v10Zm5-8h10a1 1 0 0 1 0 2H5a1 1 0 0 1 0-2Z" />
             </svg>
 
             <input
@@ -196,35 +206,37 @@
                 x-model="owner.birthDate"
                 aria-describedby="@error('legalEntityForm.owner.birthDate') ownerBirthDateErrorHelp @enderror"
                 class="input datepicker-input @error('legalEntityForm.owner.birthDate') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
-                :class="isDisabled && !isOwnerChange ? 'text-gray-400 border-gray-200 dark:text-gray-500' : 'text-gray-900 border-gray-300'"
-                :disabled="isDisabled && !isOwnerChange"
-                x-effect="$el.value = isOwnerChange ? (tempOwnerData.birthDate ?? '') : owner.birthDate ?? ''"
-                @blur="if (isOwnerChange) { tempOwnerData.birthDate = $event.target.value } else { owner.birthDate = $event.target.value }"
+                :class="isDisabled && ! isOwnerChange
+                    ? 'text-gray-400 border-gray-200 dark:text-gray-500'
+                    : 'text-gray-900 border-gray-300'"
+                :disabled="isDisabled && ! isOwnerChange"
+                x-effect="$el.value = isOwnerChange ? (tempOwnerData.birthDate ?? '') : (owner.birthDate ?? '')"
+                @blur="
+                    if (isOwnerChange) {
+                        tempOwnerData.birthDate = $event.target.value;
+                    } else {
+                        owner.birthDate = $event.target.value;
+                    }
+                "
             />
 
             @error('legalEntityForm.owner.birthDate')
-                <p id="ownerBirthDateErrorHelp" class="text-error">
-                    {{ $message }}
-                </p>
+                <p id="ownerBirthDateErrorHelp" class="text-error">{{ $message }}</p>
             @enderror
 
-            <label for="ownerBirthDate" class="label z-10">
-                {{__('forms.birth_date')}}
-            </label>
+            <label for="ownerBirthDate" class="label z-10"> {{ __('forms.birth_date') }} </label>
         </div>
 
         {{-- Owner Gender --}}
         <div class="form-group group">
-            <div for="ownerGender" class='label z-10'>
-                {{ __('forms.gender') }} *
-            </div>
+            <div for="ownerGender" class="label z-10">{{ __('forms.gender') }} *</div>
 
             <ul
                 aria-describedby="@error('legalEntityForm.owner.gender') ownerGenderErrorHelp @enderror"
                 class="steps-owner_gender_list @error('legalEntityForm.owner.gender') text-error border-red-500 focus:border-red-500 scroll-to-error @enderror"
             >
                 @isset($dictionaries['GENDER'])
-                    @foreach($dictionaries['GENDER'] as $k => $gender)
+                    @foreach ($dictionaries['GENDER'] as $k => $gender)
                         <li class="w-content me-3">
                             <div class="flex items-center">
                                 <input
@@ -234,14 +246,20 @@
                                     class="steps-owner_radio"
                                     id="owner_gender_{{ $k }}"
                                     x-model="owner.gender"
-                                    x-effect="$el.checked = isOwnerChange ? ($el.value === (tempOwnerData.gender ?? '')) : ($el.value === owner.gender)"
-                                    @change="if (isOwnerChange) { tempOwnerData.gender = $event.target.value } else { owner.gender = $event.target.value }"
-                                >
-                                <label
-                                    name="label"
-                                    for="owner_gender_{{ $k }}"
-                                    class="steps-owner_radio_label"
-                                >
+                                    x-effect="
+                                        $el.checked = isOwnerChange
+                                            ? $el.value === (tempOwnerData.gender ?? '')
+                                            : $el.value === owner.gender
+                                    "
+                                    @change="
+                                        if (isOwnerChange) {
+                                            tempOwnerData.gender = $event.target.value;
+                                        } else {
+                                            owner.gender = $event.target.value;
+                                        }
+                                    "
+                                />
+                                <label name="label" for="owner_gender_{{ $k }}" class="steps-owner_radio_label">
                                     {{ $gender }}
                                 </label>
                             </div>
@@ -251,9 +269,7 @@
             </ul>
 
             @error('legalEntityForm.owner.gender')
-                <p id="ownerGenderErrorHelp" class="text-error">
-                    {{ $message }}
-                </p>
+                <p id="ownerGenderErrorHelp" class="text-error">{{ $message }}</p>
             @enderror
         </div>
 
@@ -265,34 +281,40 @@
                 x-model="owner.position"
                 aria-describedby="@error('legalEntityForm.owner.position') ownerPositionErrorHelp @enderror"
                 class="input-select @error('legalEntityForm.owner.position') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
-                :class="isDisabled ? 'text-gray-400 border-gray-200 dark:text-gray-500' : 'text-gray-900 border-gray-300'"
-                :disabled="isDisabled && !isOwnerChange"
-                x-effect="$el.value = isOwnerChange ? (tempOwnerData.position || '_placeholder_') : (owner.position || '_placeholder_')"
-                @blur="if (isOwnerChange) { tempOwnerData.position = $event.target.value } else { owner.position = $event.target.value }"
+                :class="isDisabled
+                    ? 'text-gray-400 border-gray-200 dark:text-gray-500'
+                    : 'text-gray-900 border-gray-300'"
+                :disabled="isDisabled && ! isOwnerChange"
+                x-effect="
+                    $el.value = isOwnerChange
+                        ? tempOwnerData.position || '_placeholder_'
+                        : owner.position || '_placeholder_'
+                "
+                @blur="
+                    if (isOwnerChange) {
+                        tempOwnerData.position = $event.target.value;
+                    } else {
+                        owner.position = $event.target.value;
+                    }
+                "
             >
                 <option value="_placeholder_" selected hidden>-- {{ __('forms.select_position') }} --</option>
 
-                @foreach($dictionaries['POSITION'] as $k => $position)
+                @foreach ($dictionaries['POSITION'] as $k => $position)
                     <option value="{{ $k }}">{{ $position }}</option>
                 @endforeach
             </select>
 
             @error('legalEntityForm.owner.position')
-                <p id="ownerPositionErrorHelp" class="text-error">
-                    {{ $message }}
-                </p>
+                <p id="ownerPositionErrorHelp" class="text-error">{{ $message }}</p>
             @enderror
 
-            <label for="ownerPosition" class="label z-10">
-                {{ __('forms.owner_position') }}
-            </label>
+            <label for="ownerPosition" class="label z-10"> {{ __('forms.owner_position') }} </label>
         </div>
     </div>
 
     {{-- Owner IPN --}}
-    <div
-        class='form-row-3'
-    >
+    <div class="form-row-3">
         <div class="form-group group relative z-0">
             <input
                 required
@@ -305,16 +327,28 @@
                 aria-describedby="@error('legalEntityForm.owner.taxId') ownerTaxIdErrorHelp @enderror"
                 class="input @error('legalEntityForm.owner.taxId') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
                 :class="{ 'border-gray-200 dark:border-gray-700': owner.noTaxId }"
-                :disabled="owner.noTaxId || (isDisabled && !isOwnerChange)"
+                :disabled="owner.noTaxId || (isDisabled && ! isOwnerChange)"
                 x-ref="taxIdInput"
-                x-effect="$el.value = isOwnerChange ? (owner.noTaxId ? '' : (owner.taxId ?? '')) : (owner.noTaxId ? '' : (owner.taxId ?? ''))"
-                @blur="if (isOwnerChange) { tempOwnerData.taxId = $event.target.value } else { owner.taxId = $event.target.value }"
+                x-effect="
+                    $el.value = isOwnerChange
+                        ? owner.noTaxId
+                            ? ''
+                            : (owner.taxId ?? '')
+                        : owner.noTaxId
+                          ? ''
+                          : (owner.taxId ?? '')
+                "
+                @blur="
+                    if (isOwnerChange) {
+                        tempOwnerData.taxId = $event.target.value;
+                    } else {
+                        owner.taxId = $event.target.value;
+                    }
+                "
             />
 
             @error('legalEntityForm.owner.taxId')
-                <p id="ownerTaxIdErrorHelp" class="text-error">
-                    {{ $message }}
-                </p>
+                <p id="ownerTaxIdErrorHelp" class="text-error">{{ $message }}</p>
             @enderror
 
             <label
@@ -333,35 +367,48 @@
                     class="default-checkbox text-blue-500 focus:ring-blue-300"
                     x-model="owner.noTaxId"
                     :checked="owner.noTaxId"
-                    :disabled="isDisabled && !isOwnerChange"
-                    x-effect="isOwnerChange ? ($el.checked = (tempOwnerData.noTaxId ?? false)) : ($el.checked = owner.noTaxId)"
-                    @change="if (isOwnerChange) { tempOwnerData.noTaxId = $event.target.checked } else { owner.noTaxId = $event.target.checked }; updateTaxIdInput()"
-                >
+                    :disabled="isDisabled && ! isOwnerChange"
+                    x-effect="
+                        isOwnerChange ? ($el.checked = tempOwnerData.noTaxId ?? false) : ($el.checked = owner.noTaxId)
+                    "
+                    @change="
+                        if (isOwnerChange) {
+                            tempOwnerData.noTaxId = $event.target.checked;
+                        } else {
+                            owner.noTaxId = $event.target.checked;
+                        }
+                        updateTaxIdInput();
+                    "
+                />
 
-                <label for="noTaxId" class="ms-2 text-sm font-medium text-gray-500 dark:text-gray-300 @error('legalEntityForm.owner.noTaxId') scroll-to-error @enderror">
+                <label
+                    for="noTaxId"
+                    class="ms-2 text-sm font-medium text-gray-500 dark:text-gray-300 @error('legalEntityForm.owner.noTaxId') scroll-to-error @enderror"
+                >
                     {{ __('forms.no_tax_id') }}
                 </label>
 
                 @error('legalEntityForm.owner.noTaxId')
-                    <p id="ownerNoTaxIdErrorHelp" class="text-error">
-                        {{ $message }}
-                    </p>
+                    <p id="ownerNoTaxIdErrorHelp" class="text-error">{{ $message }}</p>
                 @enderror
             </div>
         </div>
     </div>
 
-    <h3 class="font-bold text-sm text-gray-600 mb-6">{{ __('forms.phones_owner') }} *</h3>
+    <h3 class="mb-6 text-sm font-bold text-gray-600">{{ __('forms.phones_owner') }} *</h3>
 
     {{-- Email --}}
-    <div class='form-row-3'>
+    <div class="form-row-3">
         <div class="form-group group">
-            <svg class="svg-input w-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
-                 viewBox="0 0 24 24">
-                <path
-                    d="M2.038 5.61A2.01 2.01 0 0 0 2 6v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6c0-.12-.01-.238-.03-.352l-.866.65-7.89 6.032a2 2 0 0 1-2.429 0L2.884 6.288l-.846-.677Z" />
-                <path
-                    d="M20.677 4.117A1.996 1.996 0 0 0 20 4H4c-.225 0-.44.037-.642.105l.758.607L12 10.742 19.9 4.7l.777-.583Z" />
+            <svg
+                class="svg-input w-5"
+                aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path d="M2.038 5.61A2.01 2.01 0 0 0 2 6v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6c0-.12-.01-.238-.03-.352l-.866.65-7.89 6.032a2 2 0 0 1-2.429 0L2.884 6.288l-.846-.677Z" />
+                <path d="M20.677 4.117A1.996 1.996 0 0 0 20 4H4c-.225 0-.44.037-.642.105l.758.607L12 10.742 19.9 4.7l.777-.583Z" />
             </svg>
 
             <input
@@ -372,31 +419,30 @@
                 x-model="owner.email"
                 aria-describedby="@error('legalEntityForm.owner.email') ownerEmailErrorHelp @enderror"
                 class="input @error('legalEntityForm.owner.email') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
-                x-effect="$el.value = isOwnerChange ? (tempOwnerData.email ?? '') : owner.email ?? ''"
-                @blur="if (isOwnerChange) { tempOwnerData.email = $event.target.value } else { owner.email = $event.target.value }"
+                x-effect="$el.value = isOwnerChange ? (tempOwnerData.email ?? '') : (owner.email ?? '')"
+                @blur="
+                    if (isOwnerChange) {
+                        tempOwnerData.email = $event.target.value;
+                    } else {
+                        owner.email = $event.target.value;
+                    }
+                "
             />
 
             @error('legalEntityForm.owner.email')
-                <p id="ownerEmailErrorHelp" class="text-error">
-                    {{ $message }}
-                </p>
+                <p id="ownerEmailErrorHelp" class="text-error">{{ $message }}</p>
             @enderror
 
-            <label for="ownerEmail" class="label z-10">
-                {{ __('forms.email') }}
-            </label>
+            <label for="ownerEmail" class="label z-10"> {{ __('forms.email') }} </label>
         </div>
     </div>
 
     {{-- Owner Phones --}}
-    <div
-        class="space-y-2"
-        x-id="['phone']"
-    >
+    <div class="space-y-2" x-id="['phone']">
         <template x-for="(phone, index) in owner.phones" :key="getKey(phone)">
             <div
                 class="form-row-3"
-                x-data="{errors: [] }"
+                x-data="{ errors: [] }"
                 x-init="errors = @js($errors->getMessages())"
                 :class="{ 'mb-2': index == owner.phones.length - 1 }"
             >
@@ -424,12 +470,7 @@
                         <p class="text-error" x-text="errors[`legalEntityForm.owner.phones.${index}.type`]"></p>
                     </template>
 
-                    <label
-                        :for="$id('phone', '_type_' + index)"
-                        class="label"
-                    >
-                        {{ __('forms.phone_type') }}
-                    </label>
+                    <label :for="$id('phone', '_type_' + index)" class="label"> {{ __('forms.phone_type') }} </label>
                 </div>
 
                 {{-- Phone Number Input --}}
@@ -438,46 +479,46 @@
                         required
                         type="tel"
                         placeholder=" "
-                        class="peer input pl-10 with-leading-icon text-gray-500"
+                        class="peer input with-leading-icon pl-10 text-gray-500"
                         x-model="phone.number"
                         x-mask="+380999999999"
                         :id="$id('phone', '_number' + index)"
-                        :class="{ 'input-error border-red-500 scroll-to-error': errors[`legalEntityForm.owner.phones.${index}.number`] }"
+                        :class="{
+                            'input-error border-red-500 scroll-to-error':
+                                errors[`legalEntityForm.owner.phones.${index}.number`],
+                        }"
                     />
 
                     <template x-if="errors[`legalEntityForm.owner.phones.${index}.number`]">
                         <p class="text-error" x-text="errors[`legalEntityForm.owner.phones.${index}.number`]"></p>
                     </template>
 
-                    <label
-                        :for="$id('phone', '_number' + index)"
-                        class="wrapped-label"
-                    >
+                    <label :for="$id('phone', '_number' + index)" class="wrapped-label">
                         {{ __('forms.phone') }}
                     </label>
                 </div>
 
                 <!-- Action Phone Buttons -->
-                <div
-                    x-cloak
-                    x-show="!@json($isDetails ?? false)"
-                    class="flex items-center space-x-4 justify-start"
-                >
+                <div x-cloak x-show="! @json($isDetails ?? false)" class="flex items-center justify-start space-x-4">
                     <!-- Add phone -->
                     <template x-if="owner.phones.length > 1">
                         <button
                             type="button"
                             @click.prevent="owner.phones.splice(index, 1)"
-                            class="item-remove text-red-600 hover:text-red-800 justify-self-start"
+                            class="item-remove justify-self-start"
                         >
-                            <span>{{__('forms.remove_phone')}}</span>
+                            <span>{{ __('forms.remove_phone') }}</span>
                         </button>
                     </template>
 
                     <!-- Remove Phone -->
                     <template x-if="index === owner.phones.length - 1 && owner.phones.length < 2">
-                        <button type="button" @click.prevent="owner.phones.push({ type: '', number: '' })" class="item-add">
-                            <span>{{__('forms.add_phone')}}</span>
+                        <button
+                            type="button"
+                            @click.prevent="owner.phones.push({ type: '', number: '' })"
+                            class="item-add"
+                        >
+                            <span>{{ __('forms.add_phone') }}</span>
                         </button>
                     </template>
                 </div>
@@ -485,32 +526,31 @@
         </template>
     </div>
 
-    <h3 class="font-bold text-sm text-gray-600 mb-10">{{ __('forms.documents_owner') }} *</h3>
+    <h3 class="mb-10 text-sm font-bold text-gray-600">{{ __('forms.documents_owner') }} *</h3>
 
     {{-- OWNER DOCUMENTS --}}
-    <div
-        class="space-y-2"
-        x-id="['doc']"
-    >
+    <div class="space-y-2" x-id="['doc']">
         <template x-for="(doc, index) in owner.documents" :key="getKey(doc)">
             <div
-                x-data="{errors: [] }"
+                x-data="{ errors: [] }"
                 x-init="errors = @js($errors->getMessages())"
                 class="mb-6"
                 :class="{ 'mb-2': index == owner.documents.length - 1 }"
             >
                 <template x-if="index > 0">
-                    <hr class="border-gray-200 dark:border-gray-700 mb-6">
+                    <hr class="mb-6 border-gray-200 dark:border-gray-700" />
                 </template>
 
-                <div class='form-row-3'>
+                <div class="form-row-3">
                     {{-- Owner Document Type --}}
                     <div class="form-group group relative z-0">
                         <select
                             required
                             x-model="doc.type"
                             class="input-select peer"
-                            :class="{ 'input-error scroll-to-error': errors[`legalEntityForm.owner.documents.${index}.type`] }"
+                            :class="{
+                                'input-error scroll-to-error': errors[`legalEntityForm.owner.documents.${index}.type`],
+                            }"
                             :id="$id('doc', '_type_' + index)"
                         >
                             <option value="_placeholder_" selected hidden>-- {{ __('Обрати тип') }} --</option>
@@ -529,10 +569,7 @@
                             <p class="text-error" x-text="errors[`legalEntityForm.owner.documents.${index}.type`]"></p>
                         </template>
 
-                        <label
-                            :for="$id('doc', '_type_' + index)"
-                            class="label z-10 pointer-events-none"
-                        >
+                        <label :for="$id('doc', '_type_' + index)" class="label pointer-events-none z-10">
                             {{ __('forms.document_type') }}
                         </label>
                     </div>
@@ -546,32 +583,31 @@
                             x-model="doc.number"
                             class="peer input"
                             :id="$id('doc', '_number' + index)"
-                            :class="{ 'input-error border-red-500 scroll-to-error': errors[`legalEntityForm.owner.documents.${index}.number`] }"
+                            :class="{
+                                'input-error border-red-500 scroll-to-error':
+                                    errors[`legalEntityForm.owner.documents.${index}.number`],
+                            }"
                         />
 
                         <template x-if="errors[`legalEntityForm.owner.documents.${index}.number`]">
-                            <p class="text-error" x-text="errors[`legalEntityForm.owner.documents.${index}.number`]"></p>
+                            <p
+                                class="text-error"
+                                x-text="errors[`legalEntityForm.owner.documents.${index}.number`]"
+                            ></p>
                         </template>
 
-                        <label
-                            :for="$id('doc', '_number' + index)"
-                            class="label z-10 pointer-events-none"
-                        >
+                        <label :for="$id('doc', '_number' + index)" class="label pointer-events-none z-10">
                             {{ __('forms.document_number') }}
                         </label>
                     </div>
 
                     {{-- Remove Documents Buttons --}}
-                    <div
-                        x-cloak
-                        x-show="!@json($isDetails ?? false)"
-                        class="flex items-center space-x-4 justify-start"
-                    >
+                    <div x-cloak x-show="! @json($isDetails ?? false)" class="flex items-center justify-start space-x-4">
                         <template x-if="owner.documents.length > 1">
                             <button
                                 type="button"
                                 @click.prevent="owner.documents.splice(index, 1)"
-                                class="item-remove text-red-600 hover:text-red-800 justify-self-start"
+                                class="item-remove justify-self-start"
                             >
                                 <span>{{ __('forms.remove_document') }}</span>
                             </button>
@@ -579,7 +615,7 @@
                     </div>
                 </div>
 
-                <div class='form-row-3'>
+                <div class="form-row-3">
                     {{-- Owner Document Issued By --}}
                     <div class="form-group group relative z-0">
                         <input
@@ -588,26 +624,33 @@
                             class="input peer"
                             x-model="doc.issuedBy"
                             :id="$id('doc', '_issuedBy' + index)"
-                            :class="{ 'input-error border-red-500 scroll-to-error': errors[`legalEntityForm.owner.documents.${index}.issuedBy`] }"
+                            :class="{
+                                'input-error border-red-500 scroll-to-error':
+                                    errors[`legalEntityForm.owner.documents.${index}.issuedBy`],
+                            }"
                         />
                         <template x-if="errors[`legalEntityForm.owner.documents.${index}.issuedBy`]">
-                            <p class="text-error" x-text="errors[`legalEntityForm.owner.documents.${index}.issuedBy`]"></p>
+                            <p
+                                class="text-error"
+                                x-text="errors[`legalEntityForm.owner.documents.${index}.issuedBy`]"
+                            ></p>
                         </template>
 
-                        <label
-                            :for="$id('doc', '_issuedBy' + index)"
-                            class="label z-10 pointer-events-none"
-                        >
-                            {{__('forms.issued_by')}}
+                        <label :for="$id('doc', '_issuedBy' + index)" class="label pointer-events-none z-10">
+                            {{ __('forms.issued_by') }}
                         </label>
                     </div>
 
                     {{-- Owner Document Issued At --}}
                     <div class="form-group group relative z-0">
-                        <svg class="svg-input pointer-events-none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
-                            viewBox="0 0 20 20">
-                            <path
-                                d="M20 4a2 2 0 0 0-2-2h-2V1a1 1 0 0 0-2 0v1h-3V1a1 1 0 0 0-2 0v1H6V1a1 1 0 0 0-2 0v1H2a2 2 0 0 0-2 2v2h20V4ZM0 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8H0v10Zm5-8h10a1 1 0 0 1 0 2H5a1 1 0 0 1 0-2Z" />
+                        <svg
+                            class="svg-input pointer-events-none"
+                            aria-hidden="true"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                        >
+                            <path d="M20 4a2 2 0 0 0-2-2h-2V1a1 1 0 0 0-2 0v1h-3V1a1 1 0 0 0-2 0v1H6V1a1 1 0 0 0-2 0v1H2a2 2 0 0 0-2 2v2h20V4ZM0 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8H0v10Zm5-8h10a1 1 0 0 1 0 2H5a1 1 0 0 1 0-2Z" />
                         </svg>
 
                         <input
@@ -617,17 +660,20 @@
                             datepicker-format="{{ frontendDateFormat() }}"
                             class="input datepicker-input peer"
                             :id="$id('doc', '_issuedAt' + index)"
-                            :class="{ 'input-error border-red-500 scroll-to-error': errors[`legalEntityForm.owner.documents.${index}.issuedAt`] }"
+                            :class="{
+                                'input-error border-red-500 scroll-to-error':
+                                    errors[`legalEntityForm.owner.documents.${index}.issuedAt`],
+                            }"
                         />
 
                         <template x-if="errors[`legalEntityForm.owner.documents.${index}.issuedAt`]">
-                            <p class="text-error" x-text="errors[`legalEntityForm.owner.documents.${index}.issuedAt`]"></p>
+                            <p
+                                class="text-error"
+                                x-text="errors[`legalEntityForm.owner.documents.${index}.issuedAt`]"
+                            ></p>
                         </template>
 
-                        <label
-                            :for="$id('doc', '_issuedAt' + index)"
-                            class="label z-10 pointer-events-none"
-                        >
+                        <label :for="$id('doc', '_issuedAt' + index)" class="label pointer-events-none z-10">
                             {{ __('forms.document_issued_at') }}
                         </label>
                     </div>
@@ -636,19 +682,15 @@
         </template>
 
         {{-- Add Document --}}
-        <div
-            x-cloak
-            x-show="!@json($isDetails ?? false)"
-            class="flex items-center space-x-4 justify-start"
-        >
+        <div x-cloak x-show="! @json($isDetails ?? false)" class="flex items-center justify-start space-x-4">
             <button
                 x-cloak
-                x-show ="owner.documents.length < 5"
+                x-show="owner.documents.length < 5"
                 type="button"
                 @click.prevent="owner.documents.push({ ...defaultDoc })"
                 class="item-add"
             >
-                <span>{{__('forms.add_document')}}</span>
+                <span>{{ __('forms.add_document') }}</span>
             </button>
         </div>
     </div>

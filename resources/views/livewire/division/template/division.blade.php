@@ -1,16 +1,16 @@
 @php
+    use App\Enums\Division\Status;
     use App\Models\Division;
     use App\Models\LegalEntity;
-    use App\Enums\Division\Status;
 
     $readonly = $action === 'show';
 
     // Determine an appropriate HTTP-method
     $httpMethod = match ($action) {
-        'show'   => 'GET',
-        'update'   => 'PATCH',
+        'show' => 'GET',
+        'update' => 'PATCH',
         'store' => 'POST',
-        default  => 'GET'
+        default => 'GET'
     };
 @endphp
 
@@ -23,11 +23,11 @@
             textConfirmation: '',
             actionType: '',
             actionTitle: '',
-            actionButtonText: ''
+            actionButtonText: '',
         }"
     >
         <x-header-navigation x-data="{ showFilter: false }" class="items-start">
-            <x-slot name='title'>
+            <x-slot name="title">
                 @yield('title')
             </x-slot>
 
@@ -35,27 +35,27 @@
                 @yield('description')
             </x-slot>
 
-            @if($readonly)
+            @if ($readonly)
                 @can('sync', $division)
-                <div class="mt-3 ml-0 flex flex-col sm:flex-row sm:flex-wrap gap-2 self-start">
-                    <button
-                        @if ($division->status === \App\Enums\Status::UNSYNCED)
-                            x-on:click.prevent="
+                    <div class="mt-3 ml-0 flex flex-col gap-2 self-start sm:flex-row sm:flex-wrap">
+                        <button
+                            @if ($division->status === \App\Enums\Status::UNSYNCED)
+                                x-on:click.prevent="
                                 divisionId={{ $division->id }};
                                 textConfirmation=@js(__('divisions.modals.sync.confirmation_text'));
                                 actionType='sync';
                                 actionTitle=@js(__('divisions.modals.sync.title'));
                                 actionButtonText=@js(__('forms.synchronise_with_eHealth'));
                             "
-                        @else
-                            wire:click="sync"
-                        @endif
-                        class="button-sync flex items-center gap-2 whitespace-nowrap"
-                    >
-                        @icon('refresh', 'w-4 h-4')
-                        <span>{{ __('forms.synchronise_with_eHealth') }}</span>
-                    </button>
-                </div>
+                            @else
+                                wire:click="sync"
+                            @endif
+                            class="button-sync flex items-center gap-2 whitespace-nowrap"
+                        >
+                            @icon('refresh', 'w-4 h-4')
+                            <span>{{ __('forms.synchronise_with_eHealth') }}</span>
+                        </button>
+                    </div>
                 @endcan
             @endif
         </x-header-navigation>
@@ -103,17 +103,16 @@
                             }
                         "
                     >
-
                         @if (!in_array(strtoupper($httpMethod), ['GET', 'POST']))
                             @method($httpMethod)
                         @endif
 
-                        @if($action === 'show')
-                            <fieldset class="p-4 sm:p-8 sm:pb-10 mb-16 mt-6 border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 max-w-[1280px]">
+                        @if ($action === 'show')
+                            <fieldset class="mt-6 mb-16 max-w-[1280px] rounded-lg border border-gray-200 p-4 shadow sm:p-8 sm:pb-10 dark:border-gray-700 dark:bg-gray-800">
                                 <legend class="legend">{{ __('forms.status_division') }}</legend>
                                 <div class="{{ $statusStyle }} status-alert-full mb-6">
                                     <span class="flex-shrink-0">
-                                        @if($division->status->value === Status::ACTIVE->value)
+                                        @if ($division->status->value === Status::ACTIVE->value)
                                             @icon('check-circle', 'w-5 h-5 text-green-700 mr-3')
                                         @else
                                             @icon('alert-circle', 'w-5 h-5 text-red-700 mr-3')
@@ -127,71 +126,65 @@
                         <fieldset class="fieldset">
                             <!-- Personal Data Fieldset -->
                             <legend class="legend">
-                                <h2>{{__('forms.main_information')}}</h2>
+                                <h2>{{ __('forms.main_information') }}</h2>
                             </legend>
 
                             <div class="form">
-
                                 <div class="form-row-3">
                                     <!-- Division Name -->
                                     <div class="form-group">
-                                        <input required
+                                        <input
+                                            required
                                             id="name_division"
                                             type="text"
                                             placeholder=" "
                                             class="peer input @error('divisionForm.division.name') input-error border-red-500 @enderror"
                                             name="name_division"
-                                            wire:model.defer='divisionForm.division.name'
+                                            wire:model.defer="divisionForm.division.name"
                                             x-bind:disabled="isDisabled"
                                         />
 
-                                        <label
-                                            for="name_division"
-                                            class="label"
-                                        >
+                                        <label for="name_division" class="label">
                                             {{ __('forms.full_name_division') }}
                                         </label>
 
                                         @error('divisionForm.division.name')
-                                        <p class="text-error">{{$message}}</p>
+                                            <p class="text-error">{{ $message }}</p>
                                         @enderror
                                     </div>
 
                                     <!-- Division Email -->
                                     <div class="form-group">
-                                        <input required
+                                        <input
+                                            required
                                             id="email"
                                             type="text"
                                             name="email"
                                             placeholder=" "
                                             class="peer input @error('divisionForm.division.email') input-error border-red-500 @enderror"
-                                            wire:model.defer='divisionForm.division.email'
+                                            wire:model.defer="divisionForm.division.email"
                                             x-bind:disabled="isDisabled"
                                         />
 
-                                        <label
-                                            for="email"
-                                            class="label"
-                                        >
-                                            {{ __('forms.email') }}
-                                        </label>
+                                        <label for="email" class="label"> {{ __('forms.email') }} </label>
 
                                         @error('divisionForm.division.email')
-                                        <p class="text-error">{{$message}}</p>
+                                            <p class="text-error">{{ $message }}</p>
                                         @enderror
                                     </div>
                                 </div>
 
-
                                 <!-- Division Type & External ID -->
                                 <div class="form-row-3">
                                     <div class="form-group">
-                                        <select id="type"
-                                                class='peer input @error("divisionForm.division.type") select-error border-red-500 @enderror'
-                                                wire:model.defer='divisionForm.division.type'
-                                                x-bind:disabled="isDisabled"
+                                        <select
+                                            id="type"
+                                            class='peer input @error("divisionForm.division.type") select-error border-red-500 @enderror'
+                                            wire:model.defer="divisionForm.division.type"
+                                            x-bind:disabled="isDisabled"
                                         >
-                                            <option value="_placeholder_" selected hidden>-- {{ __('forms.type') }}--
+                                            <option value="_placeholder_" selected hidden>
+                                                -- {{ __('forms.type') }}--
                                             </option>
 
                                             @foreach ($dictionaries['DIVISION_TYPE'] as $k => $type)
@@ -199,75 +192,82 @@
                                             @endforeach
                                         </select>
 
-                                        <label for="type" class="label">
-                                            {{ __('forms.type') }} *
-                                        </label>
+                                        <label for="type" class="label"> {{ __('forms.type') }} * </label>
 
                                         @error('divisionForm.division.type')
-                                        <p class="text-error">{{ $message }}</p>
+                                            <p class="text-error">{{ $message }}</p>
                                         @enderror
                                     </div>
 
                                     <div class="form-group">
-                                        <input type="text"
+                                        <input
+                                            type="text"
                                             placeholder=" "
                                             id="external_id"
                                             class="peer input @error('divisionForm.division.externalId') input-error border-red-500 @enderror"
                                             name="external_id"
-                                            wire:model.defer='divisionForm.division.externalId'
+                                            wire:model.defer="divisionForm.division.externalId"
                                             x-bind:disabled="isDisabled"
                                         />
 
-                                        <label
-                                            for="external_id"
-                                            class="label"
-                                        >
-                                            {{ __('forms.external_id') }}
-                                        </label>
+                                        <label for="external_id" class="label"> {{ __('forms.external_id') }} </label>
 
                                         @error('divisionForm.division.externalId')
-                                        <p class="text-error">{{ $message }}</p>
+                                            <p class="text-error">{{ $message }}</p>
                                         @enderror
                                     </div>
                                 </div>
 
                                 <!-- PHONES -->
-                                <div class="space-y-2"
+                                <div
+                                    class="space-y-2"
                                     x-data="{ phones: $wire.entangle('divisionForm.division.phones') }"
-                                    x-init="if (!Array.isArray(phones) || phones.length === 0) { phones = [{ type: '', number: '' }] }"
+                                    x-init="
+                                        if (! Array.isArray(phones) || phones.length === 0) {
+                                            phones = [{ type: '', number: '' }];
+                                        }
+                                    "
                                     x-id="['phone']"
                                 >
                                     <template x-for="(phone, index) in phones" :key="index">
-                                        <div x-data="{errors: [] }"
+                                        <div
+                                            x-data="{ errors: [] }"
                                             x-init="errors = @js($errors->getMessages())"
-                                            class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center"
+                                            class="grid grid-cols-1 items-center gap-6 md:grid-cols-3"
                                         >
                                             {{-- Phone Type Select --}}
                                             <div class="form-group">
-                                                <select required
-                                                        x-model="phones[index].type"
-                                                        class="input-select"
-                                                        :class="{ 'input-error': errors[`divisionForm.division.phones.${index}.type`] }"
-                                                        :disabled="isDisabled"
-                                                        :id="$id('phone', '_type_' + index)"
+                                                <select
+                                                    required
+                                                    x-model="phones[index].type"
+                                                    class="input-select"
+                                                    :class="{
+                                                        'input-error':
+                                                            errors[`divisionForm.division.phones.${index}.type`],
+                                                    }"
+                                                    :disabled="isDisabled"
+                                                    :id="$id('phone', '_type_' + index)"
                                                 >
                                                     <option value="_placeholder_" selected hidden>
                                                         -- {{ __('forms.type_mobile') }} --
                                                     </option>
-                                                    <template x-for="(phoneType, key) in $wire.dictionaries.PHONE_TYPE"
-                                                            :key="key"
+                                                    <template
+                                                        x-for="(phoneType, key) in $wire.dictionaries.PHONE_TYPE"
+                                                        :key="key"
                                                     >
-                                                        <option x-text="phoneType"
-                                                                :value="key"
-                                                                :disabled="phones.some((p) => p.type === key)"
-                                                                :selected="phone.type === key"
+                                                        <option
+                                                            x-text="phoneType"
+                                                            :value="key"
+                                                            :disabled="phones.some((p) => p.type === key)"
+                                                            :selected="phone.type === key"
                                                         ></option>
                                                     </template>
                                                 </select>
 
                                                 <template x-if="errors[`divisionForm.division.phones.${index}.type`]">
-                                                    <p class="text-error"
-                                                    x-text="errors[`divisionForm.division.phones.${index}.type`]"
+                                                    <p
+                                                        class="text-error"
+                                                        x-text="errors[`divisionForm.division.phones.${index}.type`]"
                                                     ></p>
                                                 </template>
 
@@ -279,14 +279,18 @@
                                             {{-- Phone Number Input --}}
                                             <div class="form-group">
                                                 <div class="phone-wrapper relative">
-                                                    <input required
+                                                    <input
+                                                        required
                                                         type="tel"
                                                         placeholder=" "
-                                                        class="peer input pl-10 with-leading-icon text-gray-500 "
+                                                        class="peer input with-leading-icon pl-10 text-gray-500"
                                                         x-model="phones[index].number"
                                                         x-mask="+380999999999"
                                                         :id="$id('phone', '_number' + index)"
-                                                        :class="{ 'input-error border-red-500': errors[`divisionForm.division.phones.${index}.number`] }"
+                                                        :class="{
+                                                            'input-error border-red-500':
+                                                                errors[`divisionForm.division.phones.${index}.number`],
+                                                        }"
                                                         :disabled="isDisabled"
                                                     />
 
@@ -296,30 +300,38 @@
                                                 </div>
 
                                                 <template x-if="errors[`divisionForm.division.phones.${index}.number`]">
-                                                    <p class="text-error"
-                                                    x-text="errors[`divisionForm.division.phones.${index}.number`]"></p>
+                                                    <p
+                                                        class="text-error"
+                                                        x-text="errors[`divisionForm.division.phones.${index}.number`]"
+                                                    ></p>
                                                 </template>
                                             </div>
 
                                             <!-- Action Phone Buttons -->
-                                            <div x-cloak
-                                                x-show="!isDisabled"
-                                                class="flex items-center space-x-4 justify-start"
+                                            <div
+                                                x-cloak
+                                                x-show="! isDisabled"
+                                                class="flex items-center justify-start space-x-4"
                                             >
                                                 <!-- Add phone -->
                                                 <template x-if="phones.length > 1">
-                                                    <button type="button" @click.prevent="phones.splice(index, 1)"
-                                                            class="item-remove text-red-600 hover:text-red-800 justify-self-start">
-                                                        <span>{{__('forms.remove_phone')}}</span>
+                                                    <button
+                                                        type="button"
+                                                        @click.prevent="phones.splice(index, 1)"
+                                                        class="item-remove justify-self-start"
+                                                    >
+                                                        <span>{{ __('forms.remove_phone') }}</span>
                                                     </button>
                                                 </template>
 
                                                 <!-- Remove Phone -->
                                                 <template x-if="index === phones.length - 1 && phones.length < 2">
-                                                    <button type="button"
-                                                            @click.prevent="phones.push({ type: '', number: '' })"
-                                                            class="item-add">
-                                                        <span>{{__('forms.add_phone')}}</span>
+                                                    <button
+                                                        type="button"
+                                                        @click.prevent="phones.push({ type: '', number: '' })"
+                                                        class="item-add"
+                                                    >
+                                                        <span>{{ __('forms.add_phone') }}</span>
                                                     </button>
                                                 </template>
                                             </div>
@@ -331,7 +343,8 @@
 
                                 <div class="form-row-3">
                                     <div class="form-group">
-                                        <input type="text"
+                                        <input
+                                            type="text"
                                             inputmode="decimal"
                                             id="longitude"
                                             required
@@ -340,22 +353,18 @@
                                             x-bind:disabled="isDisabled"
                                             name="longitude"
                                             @input.capture="$el.value = $el.value.replace(/([.,]\d{14})\d+/, '$1')"
-                                            wire:model='divisionForm.division.location.longitude'
+                                            wire:model="divisionForm.division.location.longitude"
                                         />
-                                        <label
-                                            for="longitude"
-                                            class="label"
-                                        >
-                                            {{ __('forms.longitude') }}
-                                        </label>
+                                        <label for="longitude" class="label"> {{ __('forms.longitude') }} </label>
 
                                         @error('divisionForm.division.location.longitude')
-                                        <p class="text-error">{{$message}}</p>
+                                            <p class="text-error">{{ $message }}</p>
                                         @enderror
                                     </div>
 
                                     <div class="form-group">
-                                        <input id="latitude"
+                                        <input
+                                            id="latitude"
                                             required
                                             type="text"
                                             inputmode="decimal"
@@ -364,28 +373,23 @@
                                             class="peer input"
                                             x-bind:disabled="isDisabled"
                                             @input.capture="$el.value = $el.value.replace(/([.,]\d{14})\d+/, '$1')"
-                                            wire:model='divisionForm.division.location.latitude'
+                                            wire:model="divisionForm.division.location.latitude"
                                         />
 
-                                        <label
-                                            for="latitude"
-                                            class="label"
-                                        >
-                                            {{ __('forms.latitude') }}
-                                        </label>
+                                        <label for="latitude" class="label"> {{ __('forms.latitude') }} </label>
 
                                         @error('divisionForm.division.location.latitude')
-                                        <p class="text-error">{{$message}}</p>
+                                            <p class="text-error">{{ $message }}</p>
                                         @enderror
                                     </div>
                                 </div>
-
 
                                 @if ($action === 'show')
                                     <!-- DLC -->
                                     <div class="form-row-3">
                                         <div class="form-group">
-                                            <input type="text"
+                                            <input
+                                                type="text"
                                                 id="dlcId"
                                                 placeholder=" "
                                                 class="peer input"
@@ -393,15 +397,11 @@
                                                 name="dlcId"
                                                 value="{{ $division->dlsId ?? '-' }}"
                                             />
-                                            <label
-                                                for="dlcId"
-                                                class="label"
-                                            >
-                                                {{ __('divisions.dlc_id') }}
-                                            </label>
+                                            <label for="dlcId" class="label"> {{ __('divisions.dlc_id') }} </label>
                                         </div>
                                         <div class="form-group">
-                                            <input type="text"
+                                            <input
+                                                type="text"
                                                 id="dlcVerify"
                                                 placeholder=" "
                                                 class="peer input"
@@ -409,10 +409,7 @@
                                                 name="dlcVerify"
                                                 value="{{ $division->dlsVerified === null ? '-' : ($division->dlsVerified ? __('forms.yes') : __('forms.no')) }}"
                                             />
-                                            <label
-                                                for="dlcVerify"
-                                                class="label"
-                                            >
+                                            <label for="dlcVerify" class="label">
                                                 {{ __('divisions.dlc_verify') }}
                                             </label>
                                         </div>
@@ -421,7 +418,8 @@
                                     <!-- DATE -->
                                     <div class="form-row-3">
                                         <div class="form-group">
-                                            <input type="text"
+                                            <input
+                                                type="text"
                                                 id="insertedAt"
                                                 placeholder=" "
                                                 class="peer input"
@@ -429,15 +427,13 @@
                                                 name="insertedAt"
                                                 value="{{ $division->ehealthInsertedAt ?? '-' }}"
                                             />
-                                            <label
-                                                for="insertedAt"
-                                                class="label"
-                                            >
+                                            <label for="insertedAt" class="label">
                                                 {{ __('forms.inserted_at') }}
                                             </label>
                                         </div>
                                         <div class="form-group">
-                                            <input type="text"
+                                            <input
+                                                type="text"
                                                 id="updatedAt"
                                                 placeholder=" "
                                                 class="peer input"
@@ -445,20 +441,16 @@
                                                 name="updatedAt"
                                                 value="{{ $division->ehealthUpdatedAt ?? '-' }}"
                                             />
-                                            <label
-                                                for="updatedAt"
-                                                class="label"
-                                            >
-                                                {{ __('forms.updated_at') }}
-                                            </label>
+                                            <label for="updatedAt" class="label"> {{ __('forms.updated_at') }} </label>
                                         </div>
                                     </div>
 
                                     <!-- UUID -->
-                                    @if($divisionUuid)
+                                    @if ($divisionUuid)
                                         <div class="form-row-3">
                                             <div class="form-group">
-                                                <input type="text"
+                                                <input
+                                                    type="text"
                                                     id="uuid"
                                                     placeholder=" "
                                                     class="peer input"
@@ -466,12 +458,7 @@
                                                     name="uuid"
                                                     value="{{ $divisionUuid }}"
                                                 />
-                                                <label
-                                                    for="uuid"
-                                                    class="label"
-                                                >
-                                                    {{ __('forms.uuid') }}
-                                                </label>
+                                                <label for="uuid" class="label"> {{ __('forms.uuid') }} </label>
                                             </div>
                                         </div>
                                     @endif
@@ -481,23 +468,25 @@
 
                         {{-- ADDRESS --}}
                         <fieldset class="fieldset">
-
                             <legend class="legend">
                                 <h2>{{ __('forms.address') }}</h2>
                             </legend>
 
-                            <div class="form" x-data="{ showReceptionAddress: $wire.entangle('divisionForm.showReceptionAddress') }">
+                            <div
+                                class="form"
+                                x-data="{ showReceptionAddress: $wire.entangle('divisionForm.showReceptionAddress') }"
+                            >
                                 <x-forms.addresses-search
                                     :address="$address"
                                     :districts="$districts"
                                     :settlements="$settlements"
                                     :streets="$streets"
                                     :readonly="$readonly"
-                                    class="mt-8 form-row-3"
+                                    class="form-row-3 mt-8"
                                 />
 
-                                @if(legalEntity()->type->name === LegalEntity::TYPE_OUTPATIENT)
-                                    <div class='form-row-3'>
+                                @if (legalEntity()->type->name === LegalEntity::TYPE_OUTPATIENT)
+                                    <div class="form-row-3">
                                         <div class="form-group group">
                                             <input
                                                 type="checkbox"
@@ -506,9 +495,12 @@
                                                 x-model="showReceptionAddress"
                                                 :checked="showReceptionAddress"
                                                 :disabled="isDisabled"
-                                            >
+                                            />
 
-                                            <label for="showReception" class="ms-2 text-sm font-medium text-gray-500 dark:text-gray-300">{{ __('divisions.receptionShow') }}</label>
+                                            <label
+                                                for="showReception"
+                                                class="ms-2 text-sm font-medium text-gray-500 dark:text-gray-300"
+                                            >{{ __('divisions.receptionShow') }}</label>
                                         </div>
                                     </div>
 
@@ -519,44 +511,52 @@
                                             :settlements="$receptionSettlements"
                                             :streets="$receptionStreets"
                                             :readonly="$readonly"
-                                            class="mt-8 form-row-3"
+                                            class="form-row-3 mt-8"
                                         />
                                     </div>
 
                                 @endif
 
                                 <div class="form-row-3">
-                                    <div class="form-group checkbox-group"
+                                    <div
+                                        class="form-group checkbox-group"
                                         x-data="{ isMountainGroup: @js($this->divisionForm->division['mountainGroup'] ?? false) }"
                                     >
-                                        <input id="mountain_group"
+                                        <input
+                                            id="mountain_group"
                                             type="checkbox"
                                             :checked="isMountainGroup"
                                             class="default-checkbox text-blue-500 focus:ring-blue-300"
                                             disabled
                                         />
 
-                                        <label for="mountain_group"
+                                        <label
+                                            for="mountain_group"
                                             class="ms-2 text-sm font-medium"
-                                            :class="isMountainGroup ? 'text-black dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'"
+                                            :class="isMountainGroup
+                                                ? 'text-black dark:text-gray-300'
+                                                : 'text-gray-400 dark:text-gray-500'"
                                         >
-                                            {{__('forms.mountainous_status')}}
+                                            {{ __('forms.mountainous_status') }}
                                         </label>
                                     </div>
                                 </div>
 
-                                @if(!$readonly)
-                                <div class="pt-6 mt-auto">
-                                    <p class="italic text-xs font-medium text-gray-400 dark:text-gray-300">{{ __('forms.addresses.try_without_region') }}</p>
-                                </div>
+                                @if (!$readonly)
+                                    <div class="mt-auto pt-6">
+                                        <p class="text-xs font-medium text-gray-400 italic dark:text-gray-300">
+                                            {{ __('forms.addresses.try_without_region') }}
+                                        </p>
+                                    </div>
                                 @endif
                             </div>
                         </fieldset>
 
                         {{-- WORKING HOURS --}}
-                        <fieldset class="fieldset"
-                                wire:key="division-working-hours-{{ $divisionForm->division['id'] ?? 'new' }}-{{ $divisionForm->division['status'] ?? 'DRAFT' }}"
-                                x-data="{
+                        <fieldset
+                            class="fieldset"
+                            wire:key="division-working-hours-{{ $divisionForm->division['id'] ?? 'new' }}-{{ $divisionForm->division['status'] ?? 'DRAFT' }}"
+                            x-data="{
                                     working: false,
                                     isStoreMode: {{ $action === 'store' ? 'true' : 'false' }},
                                     init() {
@@ -572,25 +572,37 @@
 
                             <div class="form">
                                 <div class="form-group mb-4">
-                                    <button @click.prevent="working = !working"
-                                            x-text="working ? '{{ __('forms.remove_work_schedule') }}' : '{{ __('forms.work_schedule') }}'"
-                                            class="item-add"
+                                    <button
+                                        @click.prevent="working = ! working"
+                                        x-text="working ? '{{ __('forms.remove_work_schedule') }}' : '{{ __('forms.work_schedule') }}'"
+                                        class="item-add"
                                     >
                                         {{ __('add_work_schedule') }}
                                     </button>
                                 </div>
 
-                                @if($action === 'store')
-                                    <div x-cloak
+                                @if ($action === 'store')
+                                    <div
+                                        x-cloak
                                         x-show="working"
-                                        class="p-4 rounded-lg bg-blue-100 flex items-start mb-4"
+                                        class="mb-4 flex items-start rounded-lg bg-blue-100 p-4"
                                     >
-                                        <svg class="w-6 h-6 text-blue-500 mr-3 mt-1" aria-hidden="true"
-                                            xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
-                                            viewBox="0 0 24 24">
-                                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                        <svg
+                                            class="mt-1 mr-3 h-6 w-6 text-blue-500"
+                                            aria-hidden="true"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="24"
+                                            height="24"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                stroke="currentColor"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
                                                 stroke-width="2"
-                                                d="M12 13V8m0 8h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                                                d="M12 13V8m0 8h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                                            />
                                         </svg>
                                         <div>
                                             <p class="font-bold text-blue-800">{{ __('forms.important') }}</p>
@@ -600,13 +612,13 @@
                                 @endif
 
                                 @if ($weekdays)
-                                    <div x-cloak
+                                    <div
+                                        x-cloak
                                         x-show="working"
-                                        class="grid md:grid-cols-2 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700"
+                                        class="grid overflow-hidden rounded-lg border border-gray-200 md:grid-cols-2 dark:border-gray-700"
                                     >
                                         @foreach ($weekdays as $key => $day)
-                                            <div
-                                                class="p-6 min-h-[220px] {{ $loop->iteration % 2 == 0 ? '' : 'border-r border-gray-200 dark:border-gray-700' }} {{ $loop->last ? '' : 'border-b border-gray-200 dark:border-gray-700' }} ">
+                                            <div class="p-6 min-h-[220px] {{ $loop->iteration % 2 == 0 ? '' : 'border-r border-gray-200 dark:border-gray-700' }} {{ $loop->last ? '' : 'border-b border-gray-200 dark:border-gray-700' }} ">
                                                 <div
                                                     :key="'{{ $key }}'"
                                                     x-data="{
@@ -616,7 +628,7 @@
                                                         (workingHours['{{ $key }}'][0][1] !== '' && workingHours['{{ $key }}'][0][1] !== null && workingHours['{{ $key }}'][0][1] !== '-1'),
 
                                                         switchWorking(day) {
-                                                            this.show_work = !this.show_work;
+                                                            this.show_work = ! this.show_work;
 
                                                             this.workingHours[day] = [this.show_work ? ['', ''] : ['-1', '-1']];
 
@@ -654,9 +666,11 @@
                                                     x-init="errors =@js($errors->getMessages())"
                                                 >
                                                     <div class="mb-4">
-                                                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ $day }}</h3>
+                                                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+                                                            {{ $day }}
+                                                        </h3>
                                                     </div>
-                                                    <div class="flex items-center gap-8 mb-4">
+                                                    <div class="mb-4 flex items-center gap-8">
                                                         <label class="form-toggle">
                                                             <input
                                                                 type="checkbox"
@@ -664,44 +678,45 @@
                                                                 x-model="show_work"
                                                                 x-on:click="switchWorking('{{ $key }}')"
                                                                 x-bind:disabled="isDisabled"
-                                                            >
+                                                            />
                                                             <div class="form-toggle-track" aria-hidden="true"></div>
                                                             <span
                                                                 class="form-toggle-label"
                                                                 x-text="show_work ? '{{ __('forms.works') }}' : '{{ __('forms.does_not_work') }}'"
                                                             ></span>
                                                         </label>
-                                                        <label class="inline-flex items-center cursor-pointer"
-                                                            x-bind:class="!show_work && 'opacity-40 pointer-events-none'">
-                                                            <input type="checkbox"
+                                                        <label
+                                                            class="inline-flex cursor-pointer items-center"
+                                                            x-bind:class="
+                                                                ! show_work && 'opacity-40 pointer-events-none'
+                                                            "
+                                                        >
+                                                            <input
+                                                                type="checkbox"
                                                                 x-model="shift"
                                                                 :checked="shift"
                                                                 @click="switchShift('{{ $key }}')"
                                                                 x-bind:disabled="isDisabled"
                                                                 id="shift_switcher"
-                                                                class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded-sm focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                                                class="h-5 w-5 rounded-sm border-gray-300 bg-gray-100 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-blue-600"
                                                             />
-                                                            <span
-                                                                class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">{{ __('forms.by_shift') }}</span>
+                                                            <span class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">{{ __('forms.by_shift') }}</span>
                                                         </label>
                                                     </div>
                                                     <template x-if="show_work">
                                                         <div class="mt-3 space-y-4">
-                                                            <template
-                                                                x-if="isStoreMode || workingHours['{{ $key }}'].length">
+                                                            <template x-if="isStoreMode || workingHours['{{ $key }}'].length">
                                                                 <template
                                                                     x-for="(shiftHours, shiftIndex) in workingHours['{{ $key }}']"
-                                                                    :key="shiftIndex">
+                                                                    :key="shiftIndex"
+                                                                >
                                                                     {{-- Don't remove this template!! It needs for properly deleted last shift --}}
                                                                     <template x-if="workingHours['{{ $key }}'][shiftIndex]">
                                                                         <div class="space-y-4">
                                                                             <template x-if="shift">
-                                                                                <div
-                                                                                    class="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                                                                                    <span
-                                                                                        class="w-2 h-2 rounded-full bg-blue-600"></span>
-                                                                                    <span
-                                                                                        x-text="(shiftIndex + 1) + ' {{ __('forms.shift') }}'"></span>
+                                                                                <div class="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+                                                                                    <span class="h-2 w-2 rounded-full bg-blue-600"></span>
+                                                                                    <span x-text="(shiftIndex + 1) + ' {{ __('forms.shift') }}'"></span>
                                                                                 </div>
                                                                             </template>
                                                                             <div class="flex items-end gap-4">
@@ -710,40 +725,43 @@
                                                                                         :for="'opened_by-' + '{{ $key }}' + '-' + shiftIndex"
                                                                                         class="label !text-xs !text-gray-500 dark:!text-gray-400"
                                                                                     >
-                                                                                        <span
-                                                                                            x-text="shift ? '{{ __('forms.start') }}' : '{{ __('forms.opened_by') }}'"></span>
+                                                                                        <span x-text="shift ? '{{ __('forms.start') }}' : '{{ __('forms.opened_by') }}'"></span>
                                                                                     </label>
                                                                                     <div class="relative w-full">
-                                                                                        <div
-                                                                                            class="absolute inset-y-0 start-0 flex items-center pointer-events-none">
+                                                                                        <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center">
                                                                                             <svg
-                                                                                                class="w-5 h-5 text-gray-500 dark:text-gray-400"
+                                                                                                class="h-5 w-5 text-gray-500 dark:text-gray-400"
                                                                                                 aria-hidden="true"
                                                                                                 xmlns="http://www.w3.org/2000/svg"
-                                                                                                width="24" height="24"
+                                                                                                width="24"
+                                                                                                height="24"
                                                                                                 fill="none"
-                                                                                                viewBox="0 0 24 24">
-                                                                                                <path stroke="currentColor"
+                                                                                                viewBox="0 0 24 24"
+                                                                                            >
+                                                                                                <path
+                                                                                                    stroke="currentColor"
                                                                                                     stroke-linecap="round"
                                                                                                     stroke-linejoin="round"
                                                                                                     stroke-width="2"
-                                                                                                    d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                                                                                                    d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                                                                                                />
                                                                                             </svg>
                                                                                         </div>
                                                                                         <input
                                                                                             type="text"
                                                                                             :id="'opened_by-' + '{{ $key }}' + '-' + shiftIndex"
-                                                                                            class="input timepicker-uk text-gray-900 dark:text-white border-t-0 border-r-0 border-l-0 border-b border-gray-300 focus:ring-0 px-0 ps-8"
+                                                                                            class="input timepicker-uk border-t-0 border-r-0 border-b border-l-0 border-gray-300 px-0 ps-8 text-gray-900 focus:ring-0 dark:text-white"
                                                                                             placeholder="--:--"
                                                                                             x-bind:value="workingHours['{{ $key }}'][shiftIndex][0] === '-1' ? '' : workingHours['{{ $key }}'][shiftIndex][0]"
                                                                                             x-on:change="workingHours['{{ $key }}'][shiftIndex][0] = $event.target.value"
                                                                                             x-bind:disabled="isDisabled"
                                                                                         />
                                                                                     </div>
-                                                                                    <template
-                                                                                        x-if="errors[`divisionForm.division.working_hours.{{ $key }}.type.${shiftIndex}.0`]">
-                                                                                        <p class="text-error"
-                                                                                        x-text="errors[`divisionForm.division.working_hours.{{ $key }}.type.${shiftIndex}.0`]"></p>
+                                                                                    <template x-if="errors[`divisionForm.division.working_hours.{{ $key }}.type.${shiftIndex}.0`]">
+                                                                                        <p
+                                                                                            class="text-error"
+                                                                                            x-text="errors[`divisionForm.division.working_hours.{{ $key }}.type.${shiftIndex}.0`]"
+                                                                                        ></p>
                                                                                     </template>
                                                                                 </div>
                                                                                 <div class="form-group w-full">
@@ -751,58 +769,72 @@
                                                                                         :for="'closed_by-' + '{{ $key }}' + '-' + shiftIndex"
                                                                                         class="label !text-xs !text-gray-500 dark:!text-gray-400"
                                                                                     >
-                                                                                        <span
-                                                                                            x-text="shift ? '{{ __('forms.end') }}' : '{{ __('forms.closed_by') }}'"></span>
+                                                                                        <span x-text="shift ? '{{ __('forms.end') }}' : '{{ __('forms.closed_by') }}'"></span>
                                                                                     </label>
                                                                                     <div class="relative w-full">
-                                                                                        <div
-                                                                                            class="absolute inset-y-0 start-0 flex items-center pointer-events-none">
+                                                                                        <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center">
                                                                                             <svg
-                                                                                                class="w-5 h-5 text-gray-500 dark:text-gray-400"
+                                                                                                class="h-5 w-5 text-gray-500 dark:text-gray-400"
                                                                                                 aria-hidden="true"
                                                                                                 xmlns="http://www.w3.org/2000/svg"
-                                                                                                width="24" height="24"
+                                                                                                width="24"
+                                                                                                height="24"
                                                                                                 fill="none"
-                                                                                                viewBox="0 0 24 24">
-                                                                                                <path stroke="currentColor"
+                                                                                                viewBox="0 0 24 24"
+                                                                                            >
+                                                                                                <path
+                                                                                                    stroke="currentColor"
                                                                                                     stroke-linecap="round"
                                                                                                     stroke-linejoin="round"
                                                                                                     stroke-width="2"
-                                                                                                    d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                                                                                                    d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                                                                                                />
                                                                                             </svg>
                                                                                         </div>
                                                                                         <input
                                                                                             type="text"
                                                                                             :id="'closed_by-' + '{{ $key }}' + '-' + shiftIndex"
-                                                                                            class="input timepicker-uk text-gray-900 dark:text-white border-t-0 border-r-0 border-l-0 border-b border-gray-300 focus:ring-0 px-0 ps-8"
+                                                                                            class="input timepicker-uk border-t-0 border-r-0 border-b border-l-0 border-gray-300 px-0 ps-8 text-gray-900 focus:ring-0 dark:text-white"
                                                                                             placeholder="--:--"
                                                                                             x-bind:value="workingHours['{{ $key }}'][shiftIndex][1] === '-1' ? '' : workingHours['{{ $key }}'][shiftIndex][1]"
                                                                                             x-on:change="workingHours['{{ $key }}'][shiftIndex][1] = $event.target.value"
                                                                                             x-bind:disabled="isDisabled"
                                                                                         />
                                                                                     </div>
-                                                                                    <template
-                                                                                        x-if="errors[`divisionForm.division.working_hours.{{ $key }}.type.${shiftIndex}.1`]">
-                                                                                        <p class="text-error"
-                                                                                        x-text="errors[`divisionForm.division.working_hours.{{ $key }}.type.${shiftIndex}.1`]"></p>
+                                                                                    <template x-if="errors[`divisionForm.division.working_hours.{{ $key }}.type.${shiftIndex}.1`]">
+                                                                                        <p
+                                                                                            class="text-error"
+                                                                                            x-text="errors[`divisionForm.division.working_hours.{{ $key }}.type.${shiftIndex}.1`]"
+                                                                                        ></p>
                                                                                     </template>
                                                                                 </div>
                                                                                 <button
                                                                                     type="button"
-                                                                                    x-show="shift && shiftIndex && !isDisabled"
+                                                                                    x-show="
+                                                                                        shift &&
+                                                                                        shiftIndex &&
+                                                                                        ! isDisabled
+                                                                                    "
                                                                                     @click="deleteShift('{{ $key }}', shiftIndex)"
-                                                                                    class="h-10 text-red-600 dark:text-red-500 hover:text-red-700 cursor-pointer"
+                                                                                    class="h-10 cursor-pointer text-red-600 hover:text-red-700 dark:text-red-500"
                                                                                     x-bind:disabled="isDisabled"
                                                                                 >
-                                                                                    <svg class="w-5 h-5" aria-hidden="true"
+                                                                                    <svg
+                                                                                        class="h-5 w-5"
+                                                                                        aria-hidden="true"
                                                                                         xmlns="http://www.w3.org/2000/svg"
-                                                                                        width="24" height="24" fill="none"
-                                                                                        viewBox="0 0 24 24">
-                                                                                        <path stroke="currentColor"
+                                                                                        width="24"
+                                                                                        height="24"
+                                                                                        fill="none"
+                                                                                        viewBox="0 0 24 24"
+                                                                                    >
+                                                                                        <path
+                                                                                            stroke="currentColor"
                                                                                             stroke-linecap="round"
                                                                                             stroke-linejoin="round"
                                                                                             stroke-width="2"
-                                                                                            d="M5 7h14m-9 3v8m4-8v8M10 3h4a1 1 0 0 1 1 1v3H9V4a1 1 0 0 1 1-1ZM6 7h12v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7Z"/>
+                                                                                            d="M5 7h14m-9 3v8m4-8v8M10 3h4a1 1 0 0 1 1 1v3H9V4a1 1 0 0 1 1-1ZM6 7h12v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7Z"
+                                                                                        />
                                                                                     </svg>
                                                                                 </button>
                                                                             </div>
@@ -812,8 +844,8 @@
                                                             </template>
                                                             <template x-if="workingHours['{{ $key }}'].length < 4">
                                                                 <button
-                                                                    x-show="shift && !isDisabled"
-                                                                    class='item-add text-sm'
+                                                                    x-show="shift && ! isDisabled"
+                                                                    class="item-add text-sm"
                                                                     @click.prevent="addAvailableShift('{{ $key }}')"
                                                                     x-bind:disabled="isDisabled"
                                                                 >
@@ -830,7 +862,7 @@
                             </div>
                         </fieldset>
 
-                        <div class="flex gap-2 items-center additional-actions">
+                        <div class="additional-actions flex items-center gap-2">
                             <a href="{{ route('division.index', [legalEntity()]) }}" class="button-minor">
                                 &larr; {{ __('forms.back') }}
                             </a>
@@ -844,7 +876,6 @@
             </section>
 
             @include('livewire.division.modal.confirmation-modal')
-
         </div>
     </div>
 </div>

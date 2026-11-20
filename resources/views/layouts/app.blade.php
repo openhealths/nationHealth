@@ -1,92 +1,93 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content="{{ csrf_token() }}" />
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+    <title>{{ config('app.name', 'Laravel') }}</title>
 
-        <script>
-            // Flowbite's recommendation: On page load or when changing themes, best to add inline in `head` to avoid FOUC
-            (function() {
-                const theme = localStorage.getItem('color-theme');
-                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                if (theme === 'dark' || (!theme && prefersDark)) {
-                    document.documentElement.classList.add('dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                }
-            })();
-        </script>
+    <script>
+        // Flowbite's recommendation: On page load or when changing themes, best to add inline in `head` to avoid FOUC
+        (function () {
+            const theme = localStorage.getItem('color-theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (theme === 'dark' || (!theme && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        })();
+    </script>
+
+    @once
+        @livewireStyles
+    @endonce
+
+    @vite(['resources/css/app.css'])
+</head>
+
+<body class="bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100">
+    <div class="min-h-screen bg-white antialiased dark:bg-gray-800">
+        <x-forms.loading :global="true" />
+
+        @livewire('components.header')
+
+        @livewire('components.sidebar')
+
+        <main id="main-content" class="responsive-content h-auto p-4 pt-20 max-lg:min-w-0 lg:ml-78">
+            @hasSection('content')
+                @yield('content')
+            @else
+                {{ $slot ?? '' }}
+            @endif
+        </main>
 
         @once
-            @livewireStyles
+            @livewireScripts
         @endonce
 
-        @vite(['resources/css/app.css'])
-    </head>
+        @stack('modals')
+        @stack('scripts')
 
-    <body class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
-        <div class="antialiased bg-white dark:bg-gray-800 min-h-screen">
-            <x-forms.loading :global="true" />
+        @livewire('components.x-message', ['listenAsync' => true])
 
-            @livewire('components.header')
+        @vite(['resources/js/app.js', 'resources/js/responsive.js'])
 
-            @livewire('components.sidebar')
+        @yield('scripts')
+    </div>
 
-            <main id="main-content" class="responsive-content max-lg:min-w-0 p-4 lg:ml-78 h-auto pt-20">
-                @hasSection('content')
-                    @yield('content')
-                @else
-                    {{ $slot ?? '' }}
-                @endif
-            </main>
+    <script>
+        document.addEventListener('livewire:init', () => {
+            Livewire.on('validation-failed-scroll', (event) => {
+                setTimeout(() => {
+                    const firstErrorKey = event.firstErrorKey;
+                    if (!firstErrorKey) return;
 
-            @once
-                @livewireScripts
-            @endonce
+                    let elementToScrollTo = null;
 
-            @stack('modals')
-            @stack('scripts')
+                    elementToScrollTo =
+                        document.querySelector(`[wire\\:model\\.live='${firstErrorKey}']`) ||
+                        document.querySelector(`[wire\\:model='${firstErrorKey}']`);
 
-            @livewire('components.x-message', ['listenAsync' => true])
+                    if (!elementToScrollTo) {
+                        const baseKey = firstErrorKey.replace(/\.\d+\..*$/, '');
 
-            @vite(['resources/js/index.js', 'resources/js/app.js', 'resources/js/responsive.js'])
+                        const sectionId = 'section-' + baseKey.replace('form.', '').replace(/\./g, '-');
 
-            @yield('scripts')
-        </div>
+                        elementToScrollTo = document.getElementById(sectionId);
+                    }
 
-        <script>
-            document.addEventListener('livewire:init', () => {
-                Livewire.on('validation-failed-scroll', (event) => {
-                    setTimeout(() => {
-                        const firstErrorKey = event.firstErrorKey;
-                        if (!firstErrorKey) return;
+                    if (elementToScrollTo) {
+                        elementToScrollTo.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                        let elementToScrollTo = null;
-
-                        elementToScrollTo = document.querySelector(`[wire\\:model\\.live='${firstErrorKey}']`) ||
-                            document.querySelector(`[wire\\:model='${firstErrorKey}']`);
-
-                        if (!elementToScrollTo) {
-                            const baseKey = firstErrorKey.replace(/\.\d+\..*$/, '');
-
-                            const sectionId = 'section-' + baseKey.replace('form.', '').replace(/\./g, '-');
-
-                            elementToScrollTo = document.getElementById(sectionId);
+                        if (elementToScrollTo.tagName === 'INPUT' || elementToScrollTo.tagName === 'SELECT') {
+                            elementToScrollTo.focus({ preventScroll: true });
                         }
-
-                        if (elementToScrollTo) {
-                            elementToScrollTo.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-                            if (elementToScrollTo.tagName === 'INPUT' || elementToScrollTo.tagName === 'SELECT') {
-                                elementToScrollTo.focus({ preventScroll: true });
-                            }
-                        }
-                    }, 150);
-                });
+                    }
+                }, 150);
             });
-        </script>
-    </body>
+        });
+    </script>
+</body>
 </html>
