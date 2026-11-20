@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Dto\Address;
 
-use App\Contracts\Dto\Model as ModelContract;
-use App\Models\Relations\Address as AddressModel;
 use App\Classes\eHealth\Api\Responses\Collections\AddressCreate;
+use App\Contracts\Dto\Model as ModelContract;
+use App\Dto\Input\FormCollection;
+use App\Models\Relations\Address as AddressModel;
 use Symfony\Component\ObjectMapper\Attribute\Map;
 use Symfony\Component\ObjectMapper\Condition\SourceClass;
-use App\Dto\FormCollection;
 
 #[Map(source: AddressCreate::class)]
 #[Map(source: FormCollection::class)]

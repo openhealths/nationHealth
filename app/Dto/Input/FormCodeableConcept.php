@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Dto;
+namespace App\Dto\Input;
 
 /**
  * Codeable concept from the form, used as a DTO mapping source, with each coding wrapped as FormCoding.

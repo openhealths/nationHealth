@@ -21,7 +21,7 @@ class EpisodeForm extends Form
      * @var string
      */
     #[Locked]
-    public string $id = '';
+    public string $uuid = '';
 
     /**
      * Local ID of the episode being edited, kept out of the UUID uniqueness check.
@@ -30,6 +30,14 @@ class EpisodeForm extends Form
      */
     #[Locked]
     public ?int $episodeId = null;
+
+    /**
+     * UUID of the current legal entity, which manages the episode.
+     *
+     * @var string
+     */
+    #[Locked]
+    public string $managingOrganizationId = '';
 
     public string $name = '';
 
@@ -49,7 +57,7 @@ class EpisodeForm extends Form
     public function rulesForCreate(): array
     {
         return [
-            'id' => ['required', 'uuid', Rule::unique('episodes', 'uuid')->ignore($this->episodeId)],
+            'uuid' => ['required', 'uuid', Rule::unique('episodes', 'uuid')->ignore($this->episodeId)],
             'typeCode' => [
                 'required',
                 'string',
@@ -204,6 +212,6 @@ class EpisodeForm extends Form
      */
     protected function messages(): array
     {
-        return ['id.unique' => __('episodes.validation.id_exists')];
+        return ['uuid.unique' => __('episodes.validation.id_exists')];
     }
 }

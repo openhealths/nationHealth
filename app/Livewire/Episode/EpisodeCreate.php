@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Episode;
 
-use App\Enums\Episode\Status;
+use App\Dto\Episode\Model as EpisodeData;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Contracts\View\View;
@@ -16,7 +16,8 @@ use Throwable;
 class EpisodeCreate extends BaseEpisodeComponent
 {
     /**
-     * Load the dictionaries and select options the form depends on, and start the episode now by default.
+     * Load the dictionaries and select options the form depends on, set the current legal entity as the managing
+     * organization and start the episode now by default.
      * The only available care manager is selected, while among several the user chooses, as the choice limits the episode types.
      *
      * @return void
@@ -25,7 +26,8 @@ class EpisodeCreate extends BaseEpisodeComponent
     {
         parent::initializeComponent();
 
-        $this->form->id = Str::uuid()->toString();
+        $this->form->uuid = Str::uuid()->toString();
+        $this->form->managingOrganizationId = legalEntity()->uuid;
         $this->form->startDate = now()->format(config('app.date_format'));
         $this->form->startTime = now()->format('H:i');
 
@@ -47,14 +49,14 @@ class EpisodeCreate extends BaseEpisodeComponent
             return;
         }
 
-        $validated = $this->validateForm($this->form->rulesForCreate());
-
-        if ($validated === null) {
+        if ($this->validateForm($this->form->rulesForCreate()) === null) {
             return;
         }
 
         try {
-            Repository::episode()->store($this->formatEpisode($validated, Status::DRAFT), $this->patient());
+            $episodeData = objectMapper()->map($this->form, EpisodeData::class);
+
+            Repository::episode()->store($episodeData, $this->patient());
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to store episode draft');
 
@@ -79,21 +81,21 @@ class EpisodeCreate extends BaseEpisodeComponent
             return;
         }
 
-        $validated = $this->validateForm($this->form->rulesForCreate());
-
-        if ($validated === null) {
+        if ($this->validateForm($this->form->rulesForCreate()) === null) {
             return;
         }
 
         try {
-            $episode = Repository::episode()->store($this->formatEpisode($validated, Status::DRAFT), $this->patient());
+            $episodeData = objectMapper()->map($this->form, EpisodeData::class);
+
+            $episode = Repository::episode()->store($episodeData, $this->patient());
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to store episode draft');
 
             return;
         }
 
-        $this->submitToEHealth($episode, $this->formatEpisode($validated, Status::ACTIVE));
+        $this->submitToEHealth($episode);
     }
 
     public function render(): View

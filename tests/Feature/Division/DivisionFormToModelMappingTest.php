@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Division;
 
 use App\Dto\Address\Model as AddressData;
-use App\Dto\Phone\Model as PhoneData;
 use App\Dto\Division\Model as DivisionData;
-use App\Dto\FormCollection;
+use App\Dto\Input\FormCollection;
+use App\Dto\Phone\Model as PhoneData;
 use App\Enums\Status;
 use App\Models\Division;
 use Illuminate\Support\Str;
