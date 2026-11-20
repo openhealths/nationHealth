@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Classes\eHealth;
 
 use App\Auth\EHealth\Services\TokenStorage;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Http;
 use App\Classes\eHealth\Errors\ErrorHandler;
 use App\Classes\eHealth\Exceptions\ApiException;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class Request
 {
@@ -108,7 +108,8 @@ class Request
                 'errors' => $errors
             ]);
 
-            $errorResult = (new ErrorHandler())->handleError($errors ?? []);
+            // Gateways may return a JSON scalar instead of an eHealth error envelope.
+            $errorResult = (new ErrorHandler())->handleError(\is_array($errors) ? $errors : []);
             $errorMessage = implode(' | ', $errorResult['errors'] ?? ['Unknown API Error']);
             throw new ApiException($errorMessage, $response->status());
         }

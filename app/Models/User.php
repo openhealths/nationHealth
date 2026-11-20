@@ -41,17 +41,17 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements MustVerifyEmail, OAuthenticatable
 {
-    use HasApiTokens,
-        HasCamelCasing,
-        HasRoles,
-        Notifiable {
-            HasRoles::assignRole as assignRoleParent;                // Aliasing original assignRole
-            HasRoles::syncPermissions as syncPermissionsParent;      // Aliasing original syncPermissions
-            HasRoles::givePermissionTo as givePermissionToParent;    // Aliasing original givePermissionTo
-            HasRoles::getAllPermissions as getAllPermissionsParent;  // Alias original getAllPermissions
-        }
+    use HasApiTokens;
+    use HasCamelCasing;
     /** @use HasFactory<UserFactory> */
     use HasFactory;
+    use HasRoles {
+        HasRoles::assignRole as assignRoleParent;                // Aliasing original assignRole
+        HasRoles::syncPermissions as syncPermissionsParent;      // Aliasing original syncPermissions
+        HasRoles::givePermissionTo as givePermissionToParent;    // Aliasing original givePermissionTo
+        HasRoles::getAllPermissions as getAllPermissionsParent;  // Alias original getAllPermissions
+    }
+    use Notifiable;
 
     /**
      * Track if email verification was already sent
