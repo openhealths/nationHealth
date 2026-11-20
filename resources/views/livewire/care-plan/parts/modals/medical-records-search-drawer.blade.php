@@ -1,145 +1,96 @@
 @php
-    $availableConditions = $availableConditions ?? [];
-    $availableObservations = $availableObservations ?? [];
-    $availableReports = $availableReports ?? [];
+    $recordTypes = [
+        'Condition' => __('care-plan.diagnoses_conditions'),
+        'Observation' => __('care-plan.observations'),
+        'DiagnosticReport' => __('care-plan.diagnostic_reports'),
+    ];
+    $searchRecords = collect($availableConditions ?? [])
+        ->map(fn ($item) => array_merge($item, ['type' => 'Condition']))
+        ->concat(collect($availableObservations ?? [])->map(fn ($item) => array_merge($item, ['type' => 'Observation'])))
+        ->concat(collect($availableReports ?? [])->map(fn ($item) => array_merge($item, ['type' => 'DiagnosticReport'])));
+    $searchRecords = $searchRecords->map(function ($item) use ($recordTypes) {
+        $episode = $item['episode'] ?? null;
+        $id = $item['episode_id'] ?? (is_array($episode) ? ($episode['id'] ?? $episode['uuid'] ?? '') : $episode);
+
+        return array_merge($item, [
+            'typeName' => $recordTypes[$item['type']],
+            'episodeId' => (string) $id,
+            'episodeName' => $item['episode_name'] ?? (is_array($episode) ? ($episode['name'] ?? $id) : $episode) ?? $id,
+        ]);
+    })->values();
+    $episodeOptions = $searchRecords->filter(fn ($record) => $record['episodeId'] !== '')
+        ->pluck('episodeName', 'episodeId');
+    $searchRecords = $searchRecords->all();
 @endphp
-
 <x-dialog-drawer
+    id="care-plan-medical-record-search"
     x-model="showMedicalRecordsSearchDrawer"
-    noTeleport="true"
+    :stopClickPropagation="true"
     topClass="top-[57px]"
-    zIndex="44"
-    customWidth="w-full sm:w-[calc(80%-15%)]"
-    overlayWidth="80%"
-    hasClose="true"
+    maxWidth="3/5"
+    zIndex="46"
+    overlayWidth="100%"
     onCloseClick="showMedicalRecordsSearchDrawer = false"
-    title="{{ __('care-plan.search_medical_records') }}"
 >
-    <div x-data="{
-        searchQuery: '',
-        selectedType: 'Condition',
-        records: [
-            @foreach(($availableConditions ?? []) as $item)
-            {
-                uuid: '{{ $item['uuid'] }}',
-                type: 'Condition',
-                typeName: '{{ __('care-plan.condition_diagnosis') }}',
-                name: '{{ addslashes($item['name']) }}',
-                date: '{{ $item['date'] }}'
-            },
-            @endforeach
-            @foreach(($availableObservations ?? []) as $item)
-            {
-                uuid: '{{ $item['uuid'] }}',
-                type: 'Observation',
-                typeName: '{{ __('care-plan.observation') }}',
-                name: '{{ addslashes($item['name']) }}',
-                date: '{{ $item['date'] }}'
-            },
-            @endforeach
-            @foreach(($availableReports ?? []) as $item)
-            {
-                uuid: '{{ $item['uuid'] }}',
-                type: 'DiagnosticReport',
-                typeName: '{{ __('care-plan.diagnostic_report') }}',
-                name: '{{ addslashes($item['name']) }}',
-                date: '{{ $item['date'] }}'
-            },
-            @endforeach
-        ],
-        get filteredRecords() {
-            return this.records.filter(r => {
-                const matchesType = !this.selectedType || r.type === this.selectedType;
-                const matchesQuery = !this.searchQuery || r.name.toLowerCase().includes(this.searchQuery.toLowerCase());
-                return matchesType && matchesQuery;
-            });
-        }
-    }" class="flex flex-col h-full w-full">
-
-    {{-- Search Fields Box --}}
-    <fieldset class="fieldset bg-white dark:bg-gray-800 !rounded-xl !border-gray-100 dark:!border-gray-700 !max-w-full !p-6 !mb-6 shadow-sm">
-        <legend class="legend">{{ __('care-plan.search_medical_records') }}</legend>
-
-        <div class="space-y-6">
-            {{-- Search icon + text header --}}
-            <div class="flex items-center gap-2 text-gray-700 dark:text-gray-300 font-medium">
-                @icon('search-outline', 'w-5 h-5 text-gray-400')
-                <span>{{ __('care-plan.search') }}</span>
-            </div>
-
-            {{-- Filters row --}}
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {{-- Type select --}}
+    <x-slot name="title">{{ __('care-plan.search_medical_records') }}</x-slot>
+    <div class="care-plan-record-search" wire:key="medical-record-search-{{ $carePlan->id }}-{{ md5(json_encode($searchRecords)) }}"
+        x-data="{ query: '', selectedType: 'Condition', episode: '', records: @js($searchRecords),
+            get filteredRecords() {
+                return this.records.filter(record => (!this.selectedType || record.type === this.selectedType)
+                    && (!this.query || record.name.toLocaleLowerCase().includes(this.query.toLocaleLowerCase()))
+                    && (!this.episode || record.episodeId === this.episode));
+            }
+        }">
+        <fieldset>
+            <legend>{{ __('care-plan.search_medical_records') }}</legend>
+            <div class="mb-6 flex items-center gap-2 text-sm">@icon('search', 'w-4 h-4') {{ __('forms.search') }}</div>
+            <div class="form-row-2">
                 <div class="form-group group">
-                    <label class="label">{{ __('care-plan.medical_record_type') }}</label>
-                    <select x-model="selectedType" class="input-select peer w-full">
+                    <select id="care-plan-record-type" x-model="selectedType" class="input-select peer">
                         <option value="">{{ __('care-plan.all_types') }}</option>
-                        <option value="Condition">{{ __('care-plan.diagnoses_conditions') }}</option>
-                        <option value="Observation">{{ __('care-plan.observations') }}</option>
-                        <option value="DiagnosticReport">{{ __('care-plan.diagnostic_reports') }}</option>
+                        @foreach ($recordTypes as $type => $typeLabel)<option value="{{ $type }}">{{ $typeLabel }}</option>@endforeach
                     </select>
+                    <label for="care-plan-record-type" class="label">{{ __('care-plan.medical_record_type') }}</label>
                 </div>
-
-                {{-- Episode placeholder --}}
                 <div class="form-group group">
-                    <label class="label">{{ __('care-plan.episode') }}</label>
-                    <select class="input-select peer w-full">
-                        <option value="">{{ __('care-plan.select_episode_placeholder') }}</option>
-                        <option value="1">{{ __('care-plan.health_maintenance_prevention_active_from') }} 8.05.2025</option>
+                    <select id="care-plan-record-episode" x-model="episode" @disabled($episodeOptions->isEmpty()) class="input-select peer">
+                        <option value="">{{ __('care-plan.all_episodes') }}</option>
+                        @foreach ($episodeOptions as $id => $name)<option value="{{ $id }}">{{ $name }}</option>@endforeach
                     </select>
+                    <label for="care-plan-record-episode" class="label">{{ __('care-plan.episode') }}</label>
                 </div>
             </div>
+            <div class="form-group group mt-6 max-w-sm">
+                <input id="care-plan-record-query" type="search" x-model="query" class="input peer" placeholder=" " />
+                <label for="care-plan-record-query" class="label">{{ __('care-plan.record_name_search') }}</label>
+            </div>
+        </fieldset>
+        <div class="table-scroll mt-12">
+            <table class="table-input w-full">
+                <thead class="thead-input"><tr>
+                    <th class="th-input">{{ __('care-plan.date') }}</th>
+                    <th class="th-input">{{ __('care-plan.type') }}</th>
+                    <th class="th-input">{{ __('care-plan.name') }}</th>
+                    <th class="th-input text-right">{{ __('care-plan.action') }}</th>
+                </tr></thead>
+                <tbody>
+                    <template x-for="record in filteredRecords" :key="record.type + record.uuid">
+                        <tr>
+                            <td class="td-input whitespace-nowrap" x-text="record.date"></td>
+                            <td class="td-input" x-text="record.typeName"></td>
+                            <td class="td-input" x-text="record.name"></td>
+                            <td class="td-input text-right">
+                                <button type="button" aria-label="{{ __('care-plan.add_medical_record') }}" class="cursor-pointer"
+                                    @click="$wire.addLinkedGround(record.type, record.uuid); showMedicalRecordsSearchDrawer = false">
+                                    @icon('plus-circle', 'w-5 h-5')
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="filteredRecords.length === 0"><td colspan="4" class="td-input text-center text-gray-400">{{ __('care-plan.nothing_found_by_filters') }}</td></tr>
+                </tbody>
+            </table>
         </div>
-    </fieldset>
-
-    {{-- Results Table --}}
-    <div class="overflow-x-auto rounded-lg border border-gray-100 dark:border-gray-700 mb-6">
-        <table class="w-full text-sm text-left">
-            <thead class="thead-input">
-                <tr>
-                    <th scope="col" class="px-4 py-3 text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ __('care-plan.date') }}</th>
-                    <th scope="col" class="px-4 py-3 text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ __('care-plan.type') }}</th>
-                    <th scope="col" class="px-4 py-3 text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ __('care-plan.name') }}</th>
-                    <th scope="col" class="px-4 py-3 text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">{{ __('care-plan.action') }}</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
-                <template x-for="item in filteredRecords" :key="item.uuid">
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        <td class="px-4 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap" x-text="item.date"></td>
-                        <td class="px-4 py-4 text-gray-500 dark:text-gray-400" x-text="item.typeName"></td>
-                        <td class="px-4 py-4 font-medium text-gray-900 dark:text-white" x-text="item.name"></td>
-                        <td class="px-4 py-4 text-right">
-                            <button type="button" 
-                                    @click="$wire.addLinkedGround(item.type, item.uuid); showMedicalRecordsSearchDrawer = false;" 
-                                    class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium inline-flex items-center justify-center p-1 rounded-full border border-blue-600 hover:bg-blue-50 transition-colors"
-                            >
-                                <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                </svg>
-                            </button>
-                        </td>
-                    </tr>
-                </template>
-                <template x-if="filteredRecords.length === 0">
-                    <tr>
-                        <td colspan="4" class="px-4 py-8 text-center text-gray-400 italic">
-                            {{ __('care-plan.nothing_found_by_filters') }}
-                        </td>
-                    </tr>
-                </template>
-            </tbody>
-        </table>
-    </div>
-
-    {{-- Footer --}}
-    <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700">
-        <button type="button"
-                class="button-minor"
-                @click="showMedicalRecordsSearchDrawer = false"
-        >
-            {{ __('forms.cancel') }}
-        </button>
-    </div>
+        <button type="button" class="button-minor mt-12" @click="showMedicalRecordsSearchDrawer = false">{{ __('forms.cancel') }}</button>
     </div>
 </x-dialog-drawer>

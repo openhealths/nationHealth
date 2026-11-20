@@ -46,9 +46,19 @@ foreach ($pairs as $kind => [$formView, $searchView]) {
     preg_match('/@click(?:\.stop)?="('.$searchModel[1].' = true)"/', $formSource, $openMatch);
     preg_match('/@click="('.$searchModel[1].' = false)"/', $searchSource, $cancelMatch);
 
-    // Device reopening is a Livewire action; simulate its asynchronous UI transition.
-    if ($kind === 'device' && str_contains($formSource, 'wire:click="openMedicalDeviceSearch"')) {
+    // Read extracted fields as well as the shell before validating the actual action.
+    if ($kind === 'device' && str_contains($formSource, "@include('livewire.care-plan.parts.activity.device-fields'")) {
+        $formSource .= file_get_contents($projectRoot.'/resources/views/livewire/care-plan/parts/activity/device-fields.blade.php');
+    }
+    $livewireOpenAction = match ($kind) {
+        'service', 'medication' => '$set(\''.$searchModel[1].'\', true)',
+        'device' => 'openMedicalDeviceSearch',
+    };
+    if (str_contains($formSource, 'wire:click="'.$livewireOpenAction.'"')) {
         $openMatch[1] = 'setTimeout(() => '.$searchModel[1].' = true, 25)';
+    }
+    if (str_contains($searchSource, 'wire:click="$set(\''.$searchModel[1].'\', false)"')) {
+        $cancelMatch[1] = 'setTimeout(() => '.$searchModel[1].' = false, 25)';
     }
 
     if (!isset($openMatch[1], $cancelMatch[1])) {

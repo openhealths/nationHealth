@@ -1,0 +1,109 @@
+.care-plan-tabs { display: flex; align-items: flex-start; gap: 32px; margin-bottom: 32px; }
+.care-plan-tab { min-width: 176px; padding: 12px 8px 16px; border-bottom: 2px solid #9ca3af; color: #6b7280; font-size: 14px; cursor: pointer; }
+.care-plan-tab.is-active { color: #2563eb; border-color: #2563eb; }
+.care-plan-add { color: #5254ff; font-size: 14px; cursor: pointer; padding: 12px 0; text-align: left; }
+.care-plan-add:hover:not(:disabled) { color: #1d4ed8; }
+.care-plan-add:disabled, .care-plan-new-menu button:disabled { opacity: .5; cursor: not-allowed; }
+.care-plan-new-menu { position: absolute; top: 100%; left: 0; z-index: 30; width: 240px; padding: 10px 0; background: white; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 3px #00000012; }
+.care-plan-new-menu button { display: block; width: 100%; padding: 10px 16px; text-align: left; cursor: pointer; font-size: 14px; }
+.care-plan-new-menu button:hover:not(:disabled), .care-plan-card-menu button:hover { background: #f8fafc; }
+.care-plan-preview-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; color: #6b7280; font-size: 12px; margin: -8px 0 24px; }
+.care-plan-preview-controls button { color: #5254ff; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.care-plan-activity-filters { margin-bottom: 40px; }
+.care-plan-activity-section { border: 1px solid #bfc1c5; border-radius: 16px; padding: 24px 28px 18px; margin-bottom: 32px; min-width: 0; }
+.care-plan-activity-section legend { padding: 0 8px; font-weight: 600; font-size: 16px; }
+.care-plan-activity-empty { display: flex; gap: 8px; align-items: center; background: #e0efff; color: #2563eb; border-radius: 5px; padding: 14px 12px; font-size: 13px; }
+.care-plan-activity-cards { display: grid; gap: 28px; }
+.care-plan-activity-card { border: 1px solid #bfc1c5; border-radius: 14px; font-size: 13px; color: #1f2937; background: #fff; }
+.care-plan-activity-card-header { display: grid; grid-template-columns: 100px minmax(0, 1fr) 146px 54px; border-bottom: 1px solid #bfc1c5; }
+.care-plan-activity-card-header > div { padding: 12px; min-width: 0; border-right: 1px solid #bfc1c5; }
+.care-plan-activity-card-header > div:last-child { border-right: 0; }
+.care-plan-card-label { display: block; font-size: 11px; margin-bottom: 4px; color: #6b7280; }
+.care-plan-card-product { display: flex; flex-direction: column; justify-content: center; }
+.care-plan-card-product strong { font-size: 14px; line-height: 1.5; font-weight: 600; }
+.care-plan-card-actions { display: flex; justify-content: center; align-items: center; }
+.care-plan-activity-card-body { display: grid; grid-template-columns: minmax(0, 1fr) 200px; }
+.care-plan-card-details { display: grid; grid-template-columns: 1fr 1fr 1.15fr .8fr; gap: 16px; padding: 16px 12px; }
+.care-plan-card-details > div { min-width: 0; }
+.care-plan-card-ground { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.care-plan-activity-card dt { font-size: 10px; color: #6b7280; margin-bottom: 3px; line-height: 1.4; }
+.care-plan-activity-card dd { margin: 0 0 10px; line-height: 1.4; overflow-wrap: anywhere; }
+.care-plan-activity-card dd:last-child { margin-bottom: 0; }
+.care-plan-card-meta { padding: 16px 12px; border-left: 1px solid #bfc1c5; }
+.care-plan-card-menu { position: absolute; right: -12px; top: calc(100% + 10px); width: 240px; border: 1px solid #e5e7eb; border-radius: 8px; background: white; padding: 8px 0; box-shadow: 0 2px 8px #00000014; z-index: 30; }
+.care-plan-card-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 16px; text-align: left; font-size: 13px; cursor: pointer; }
+.care-plan-card-menu button:disabled { opacity: .4; cursor: default; }
+.care-plan-card-documents { border-top: 1px solid #bfc1c5; }
+.care-plan-activity-card .badge-green, .care-plan-activity-card .badge-yellow, .care-plan-activity-card .badge-red, .care-plan-activity-card .badge-blue { display: inline-block; margin: 0; white-space: nowrap; font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+.care-plan-activity-card .badge-blue { background: #009fff; color: white; }
+.care-plan-card-document { display: grid; grid-template-columns: 1.6fr .8fr .8fr .65fr .65fr 1.5fr; gap: 12px; padding: 14px 12px; border-bottom: 1px solid #e5e7eb; }
+.care-plan-card-document:last-child { border-bottom: 0; }
+.care-plan-activity-card.is-medication .care-plan-card-document { grid-template-columns: 1.6fr 1fr 1fr .9fr 1.5fr; }
+.care-plan-activity-card.is-medication .care-plan-card-details dt { text-transform: uppercase; font-size: 9px; }
+.care-plan-show-more { display: block; width: 100%; text-align: center; color: #2563eb; font-size: 12px; padding: 14px; cursor: pointer; }
+.care-plan-preview-details { padding: 16px; background: #f8fafc; border-top: 1px solid #e5e7eb; }
+.care-plan-service-form { max-width: 960px; }
+.care-plan-service-form fieldset, .care-plan-record-search fieldset { border: 1px solid #bfc1c5; border-radius: 16px; padding: 28px 32px 32px; margin: 0 0 40px; min-width: 0; }
+.care-plan-service-form legend, .care-plan-record-search legend { font-size: 16px; padding: 0 8px; font-weight: 600; }
+.care-plan-service-fields { display: grid; gap: 28px; }
+.care-plan-service-fields .form-group { width: 100%; max-width: 340px; }
+.care-plan-service-product { display: flex; align-items: center; gap: 20px; }
+.care-plan-service-product .care-plan-add { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.care-plan-service-quantity { display: flex; gap: 24px; max-width: 220px; }
+.care-plan-service-period { display: flex; align-items: center; border-bottom: 1px solid #d1d5db; }
+.care-plan-service-period .input { border-bottom: 0; }
+.care-plan-service-period input[data-time] { max-width: 112px; }
+.care-plan-service-description { display: block; width: 100%; background: #f8f9fa; border: 1px solid #d1d5db; border-radius: 6px; padding: 12px; min-height: 150px; resize: vertical; font-size: 14px; }
+.care-plan-service-context { margin-bottom: 28px; color: #6b7280; font-size: 16px; font-weight: 600; }
+.care-plan-medication-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 30px 48px; }
+.care-plan-medication-amount { display: flex; align-items: center; gap: 24px; max-width: 250px; }
+.care-plan-medication-amount > :first-child { min-width: 70px; width: 110px; }
+.care-plan-medication-amount > :last-child { min-width: 70px; width: 110px; }
+.care-plan-program-options { display: grid; gap: 10px; max-width: 450px; padding: 16px; margin: 12px 0 28px; border: 1px solid #e5e7eb; border-radius: 6px; color: #6b7280; }
+.care-plan-program-options button { cursor: pointer; }
+.care-plan-medication-program .care-plan-program-details { margin: 28px 0 0 32px; color: #6b7280; padding: 24px 28px; }
+.care-plan-program-details dl { font-size: 14px; line-height: 1.65; }
+.care-plan-service-fields > .care-plan-program-details { margin: 0; color: #6b7280; padding: 24px 28px; }
+.care-plan-medication-facts { margin: 20px 0 0; color: #6b7280; font-weight: 600; font-size: 14px; line-height: 1.7; }
+.care-plan-medication-facts dt, .care-plan-medication-facts dd { display: inline; }
+.care-plan-medication-facts dd::before { content: " "; white-space: pre; }
+.care-plan-medication-form .form-group { margin-bottom: 0; }
+.care-plan-record-search .table-input { width: 100%; }
+.care-plan-record-search .th-input { font-size: 11px; }
+.care-plan-record-search .td-input { font-size: 13px; padding-top: 20px; padding-bottom: 20px; }
+.care-plan-catalog .flow-root { border: 1px solid #bfc1c5; border-radius: 16px; padding: 32px 20px; margin-top: 48px; }
+.care-plan-catalog .modal-header { display: none; }
+.care-plan-catalog .index-table-wrapper { border: 1px solid #e5e7eb; border-radius: 8px; overflow: auto; }
+.care-plan-catalog .index-table { min-width: 0; width: 100%; }
+.care-plan-catalog .index-table :is(th, td) { padding-left: 12px; padding-right: 12px; }
+.care-plan-catalog .index-table th:nth-child(1) { width: 42%; }
+.care-plan-catalog .index-table th:nth-child(2) { width: 18%; }
+.care-plan-catalog .index-table th:nth-child(3) { width: 14%; }
+.care-plan-catalog .index-table th:nth-child(4) { width: 16%; }
+.care-plan-catalog .index-table th:nth-child(5) { width: 10%; }
+.dark .care-plan-activity-card, .dark .care-plan-new-menu, .dark .care-plan-card-menu { background: #1f2937; color: #e5e7eb; }
+.dark .care-plan-new-menu button:hover:not(:disabled), .dark .care-plan-card-menu button:hover, .dark .care-plan-preview-details { background: #374151; }
+.dark .care-plan-activity-card, .dark .care-plan-activity-section, .dark .care-plan-activity-card-header, .dark .care-plan-activity-card-header > div, .dark .care-plan-card-meta, .dark .care-plan-card-documents, .dark .care-plan-service-form fieldset, .dark .care-plan-record-search fieldset { border-color: #4b5563; }
+.dark .care-plan-service-description { background: #374151; color: #f3f4f6; border-color: #4b5563; }
+@media (max-width: 1100px) {
+    .care-plan-activity-card-body { grid-template-columns: minmax(0, 1fr) 180px; }
+    .care-plan-card-details { grid-template-columns: 1fr 1fr; }
+    .care-plan-card-document { grid-template-columns: 1.4fr 1fr 1fr; }
+}
+@media (max-width: 640px) {
+    .care-plan-activity-card.is-medication .care-plan-card-document { grid-template-columns: 1fr 1fr; }
+    .care-plan-medication-grid { grid-template-columns: 1fr; }
+    .care-plan-medication-program .care-plan-program-details { margin-left: 0; }
+    .care-plan-catalog .index-table { min-width: 560px; }
+    .care-plan-tabs { flex-wrap: wrap; gap: 8px; }
+    .care-plan-tab { min-width: 0; padding: 12px; }
+    .care-plan-activity-section { padding: 20px 12px; }
+    .care-plan-activity-card-header { grid-template-columns: 1fr 54px; }
+    .care-plan-card-product { grid-column: 1 / -1; grid-row: 1; border-bottom: 1px solid #bfc1c5; border-right: 0 !important; }
+    .care-plan-card-actions { grid-column: 2; grid-row: 2 / 4; }
+    .care-plan-activity-card-body { display: block; }
+    .care-plan-card-meta { border-left: 0; border-top: 1px solid #bfc1c5; }
+    .care-plan-card-document { grid-template-columns: 1fr 1fr; }
+    .care-plan-service-form fieldset, .care-plan-record-search fieldset { padding: 24px 16px; }
+    .care-plan-service-product { flex-wrap: wrap; gap: 8px; }
+}
