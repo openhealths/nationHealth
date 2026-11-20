@@ -73,6 +73,7 @@ DOMAIN_PATHS=(
   tests/Feature/EHealth/EHealthResponseExceptionPartyNotVerifiedTest.php
   tests/Feature/Models/UserGetCarePlanWriterEmployeeTest.php
   tests/Feature/Person/PatientMedicationRequestsPhase6Test.php
+  tests/Feature/Person/PatientSummaryViewTest.php
   tests/Feature/Person/PatientReferralsPhase6Test.php
   tests/Feature/Person/PatientDeviceRequestsTest.php
   tests/Feature/Person/PatientReferralDateFiltersTest.php
