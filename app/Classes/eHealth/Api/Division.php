@@ -5,16 +5,13 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Api;
 
 use Exception;
-use Brick\Math\BigDecimal;
-use App\Models\LegalEntity;
+use App\Classes\eHealth\Api\Decoders\DivisionJsonDecoder;
+use App\Classes\eHealth\Api\Encoders\DivisionJsonEncoder;
 use App\Traits\WorkTimeUtilities;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use GuzzleHttp\Promise\PromiseInterface;
 use App\Classes\eHealth\EHealthResponse;
-use App\Models\Division as DivisionModel;
 use Illuminate\Support\Facades\Validator;
-use App\Dto\Division\Location as LocationData;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -108,7 +105,7 @@ class Division extends Request
 
         $this->setValidator($this->validateOne(...));
 
-        return $this->withBody($this->encodeRequestData($data), 'application/json')->patch(self::URL . '/' . $uuid);
+        return $this->withBody((new DivisionJsonEncoder())->encode($data), 'application/json')->patch(self::URL . '/' . $uuid);
     }
 
     /**
@@ -121,39 +118,7 @@ class Division extends Request
     {
         $this->setValidator($this->validateOne(...));
 
-        return $this->withBody($this->encodeRequestData($data), 'application/json')->post(self::URL);
-    }
-
-    /**
-     * Encode coordinates as JSON numbers without a float conversion losing their digits.
-     *
-     * @param  array<string, mixed>  $data
-     */
-    protected function encodeRequestData(array $data): string
-    {
-        $fields = [];
-
-        foreach ($data as $key => $value) {
-            if ($key === 'location' && \is_array($value)) {
-                $coordinates = [];
-
-                foreach ($value as $axis => $coordinate) {
-                    $number = \in_array($axis, ['latitude', 'longitude'], true) && $coordinate !== null
-                        ? (string) BigDecimal::of(LocationData::normalizeCoordinate($coordinate))
-                        : json_encode($coordinate, JSON_THROW_ON_ERROR);
-
-                    $coordinates[] = json_encode($axis, JSON_THROW_ON_ERROR) . ':' . $number;
-                }
-
-                $encoded = '{' . implode(',', $coordinates) . '}';
-            } else {
-                $encoded = json_encode($value, JSON_THROW_ON_ERROR);
-            }
-
-            $fields[] = json_encode($key, JSON_THROW_ON_ERROR) . ':' . $encoded;
-        }
-
-        return '{' . implode(',', $fields) . '}';
+        return $this->withBody((new DivisionJsonEncoder())->encode($data), 'application/json')->post(self::URL);
     }
 
     /**
@@ -270,105 +235,6 @@ class Division extends Request
     }
 
     /**
-     * Normalizes division response data for database upsert operation.
-     *
-     * This method transforms the division data received from eHealth API to a format
-     * suitable for bulk upsert operation by:
-     * 1. Removing nested relationship data (legal_entity_uuid, addresses, phones)
-     * 2. Setting the legal_entity_id from the current legal entity
-     * 3. Converting JSON-serializable fields (location, working_hours) to JSON strings
-     *
-     * @param  array  $divisionsList  Array of division data from eHealth API
-     * @return array Normalized array ready for database upsert operation
-     */
-    public function normalizeResponseDataForUpsert(array $divisionsList, LegalEntity $legalEntity): array
-    {
-        foreach ($divisionsList as $index => $division) {
-            unset($divisionsList[$index]['legal_entity_uuid']);
-            unset($divisionsList[$index]['addresses']);
-            unset($divisionsList[$index]['phones']);
-
-            $divisionsList[$index]['legal_entity_id'] = $legalEntity->id;
-
-            $divisionsList[$index]['location'] = empty($division['location'])
-                ? null
-                : json_encode($division['location']);
-
-            $divisionsList[$index]['working_hours'] = empty($division['working_hours'])
-                ? null
-                : json_encode($division['working_hours']);
-        }
-
-        return $divisionsList;
-    }
-
-    /**
-     * Prepares relationship data (table: 'addresses' and 'phones') for bulk database insertion.
-     *
-     * This method processes a list of division data from the eHealth API,
-     * extracts the nested 'addresses' and 'phones' arrays, and transforms them
-     * into a flat structure suitable for a bulk `insert()` operation. It uses a
-     * provided map to link the eHealth UUIDs to local database primary keys.
-     *
-     * @param  array  $dvisionsData  The raw division data list from the eHealth API.
-     * @param  Collection  $divisionIds  A collection mapping UUIDs (keys) to local division IDs (values).
-     * @return array An associative array containing 'divisionIds', 'addresses', and 'phones' data ready for the repository.
-     */
-    public static function getRelationshipData(array $dvisionsData, Collection $divisionIds): array
-    {
-        $divisionIdsArray = $divisionIds->values()->toArray();
-
-        $now = now();
-
-        $addressesData = [];
-        $phonesData = [];
-
-        foreach ($dvisionsData as $division) {
-            $divisionId = $divisionIds->get($division['uuid']);
-
-            // ADDRESSES PREPARE
-            foreach ($division['addresses'] ?? [] as $address) {
-                $addressesData[] = [
-                    'type' => $address['type'],
-                    'country' => $address['country'],
-                    'area' => $address['area'],
-                    'region' => $address['region'] ?? null,
-                    'settlement' => $address['settlement'],
-                    'settlement_type' => $address['settlement_type'],
-                    'settlement_id' => $address['settlement_id'],
-                    'street_type' => $address['street_type'] ?? null,
-                    'street' => $address['street'] ?? null,
-                    'building' => $address['building'] ?? null,
-                    'apartment' => $address['apartment'] ?? null,
-                    'zip' => $address['zip'] ?? null,
-                    'addressable_id' => $divisionId,
-                    'addressable_type' => DivisionModel::class,
-                    'created_at' => $now,
-                    'updated_at' => $now
-                ];
-            }
-
-            // PHONES PREPARE
-            foreach ($division['phones'] ?? [] as $phone) {
-                $phonesData[] = [
-                    'type' => $phone['type'],
-                    'number' => $phone['number'],
-                    'phoneable_id' => $divisionId,
-                    'phoneable_type' => DivisionModel::class,
-                    'created_at' => $now,
-                    'updated_at' => $now
-                ];
-            }
-        }
-
-        return [
-            'divisionIds' => $divisionIdsArray,
-            'addresses' => $addressesData,
-            'phones' => $phonesData
-        ];
-    }
-
-    /**
      * validate get Divisions input,
      * see: https://esoz.docs.apiary.io/#reference/administration/divisions/get-divisions
      */
@@ -380,7 +246,7 @@ class Division extends Request
 
         $replaced = [];
 
-        $divisionsList = $response->getData();
+        $divisionsList = (new DivisionJsonDecoder())->decode($response, list: true);
 
         $validationRules = ['*' => 'required|array'];
 
@@ -411,7 +277,7 @@ class Division extends Request
             throw new Exception('validateOne: ' . $response->body());
         }
 
-        $data = $response->getData();
+        $data = (new DivisionJsonDecoder())->decode($response);
 
         $replaced = self::replaceEHealthPropNames($data);
 

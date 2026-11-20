@@ -10,6 +10,7 @@ use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Middleware\CheckSessionToken;
 use App\Dto\Division\Model as DivisionData;
 use App\Enums\User\Role;
+use App\Enums\Status;
 use App\Http\Middleware\EnsureSingleSession;
 use App\Livewire\Division\DivisionComponent;
 use App\Livewire\Division\DivisionCreate;
@@ -21,7 +22,7 @@ use App\Livewire\Division\HealthcareService\HealthcareServiceCreate;
 use App\Livewire\Division\HealthcareService\HealthcareServiceEdit;
 use App\Livewire\Division\HealthcareService\HealthcareServiceIndex;
 use App\Livewire\Division\HealthcareService\HealthcareServiceUpdate;
-use App\Livewire\Encounter\EncounterComponent;
+use App\Livewire\EncounterPackage\EncounterPackageComponent;
 use App\Models\Division;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;
@@ -279,7 +280,7 @@ class DivisionTenantIsolationTest extends TestCase
             [HealthcareServiceEdit::class],
             [HealthcareServiceIndex::class],
             [HealthcareServiceUpdate::class],
-            [EncounterComponent::class],
+            [EncounterPackageComponent::class],
         ];
     }
 
@@ -302,7 +303,7 @@ class DivisionTenantIsolationTest extends TestCase
     public function test_encounter_can_still_filter_dictionary_configuration_internally(): void
     {
         config(['ehealth.audit_dictionary' => ['first', 'second', 'first']]);
-        $component = new class extends EncounterComponent
+        $component = new class extends EncounterPackageComponent
         {
             public function dictionaryKeys(): array
             {
@@ -485,7 +486,7 @@ class DivisionTenantIsolationTest extends TestCase
             'workingHours' => [], 'phones' => [], 'addresses' => [],
         ];
         $this->mock(DivisionRepository::class)->shouldReceive('saveMappedDivision')->once()
-            ->with(Mockery::on(fn (DivisionData $data): bool => $data->uuid === null && $data->status === 'DRAFT'), Mockery::type(Division::class), $entity)
+            ->with(Mockery::on(fn (DivisionData $data): bool => $data->uuid === null && $data->status === Status::DRAFT->value), Mockery::type(Division::class), $entity)
             ->andReturnUsing(function (DivisionData $data, Division $division): Division {
                 $this->assertNull($division->uuid);
                 $division->id = 77;
@@ -602,7 +603,7 @@ class DivisionTenantIsolationTest extends TestCase
         ];
         $this->mock(DivisionRepository::class)->shouldReceive('saveMappedDivision')->once()
             ->with(
-                Mockery::on(fn (DivisionData $data): bool => $data->uuid === 'division-one' && $data->status === 'UNSYNCED'),
+                Mockery::on(fn (DivisionData $data): bool => $data->uuid === 'division-one' && $data->status === Status::UNSYNCED->value),
                 Mockery::on(fn (Division $division): bool => $division->id === 11 && $division->uuid === 'division-one'),
                 $entity
             )->andReturnUsing(fn (DivisionData $data, Division $division): Division => $division);
@@ -787,7 +788,7 @@ class DivisionTenantIsolationTest extends TestCase
             'workingHours' => [], 'phones' => [], 'addresses' => [],
         ];
         $this->mock(DivisionRepository::class)->shouldReceive('saveMappedDivision')->once()
-            ->with(Mockery::on(fn (DivisionData $data): bool => $data->uuid === 'division-one' && $data->status === 'UNSYNCED'), $division, $entity)
+            ->with(Mockery::on(fn (DivisionData $data): bool => $data->uuid === 'division-one' && $data->status === Status::UNSYNCED->value), $division, $entity)
             ->andReturn($division);
 
         (new ReflectionMethod(DivisionComponent::class, 'saveToDB'))->invoke($component, $division);

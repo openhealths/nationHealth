@@ -75,13 +75,17 @@ class DivisionViewSyncTest extends TestCase
         $division = Division::where('uuid', $component->divisionUuid)->firstOrFail();
         $this->mockResponse($component);
         $this->mock(DivisionRepository::class)->shouldReceive('saveMappedDivision')->once()
-            ->with(Mockery::on(function (DivisionData $data): bool {
+            ->withArgs(function (DivisionData $data, Division $model, LegalEntity $entity) use ($division): bool {
+                $this->assertTrue($model->is($division));
+                $this->assertSame(legalEntity(), $entity);
                 $this->assertSame('Synchronized division', $data->name);
+                $this->assertCount(1, $data->addresses);
+                $this->assertCount(1, $data->phones);
                 $this->assertSame('settlement-uuid', $data->addresses[0]->settlementId);
                 $this->assertSame('+380501234567', $data->phones[0]->number);
 
                 return true;
-            }), Mockery::on(fn (Division $model): bool => $model->is($division)), legalEntity())
+            })
             ->andReturn($division)
             ->shouldNotReceive('syncDivisionData');
 
