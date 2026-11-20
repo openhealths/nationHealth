@@ -298,7 +298,7 @@ class EmployeeRequestProcessor
             );
 
             // 10. Assign Roles to User
-            if (in_array($employee->status, [Status::APPROVED, Status::REORGANIZED], true)) {
+            if (in_array($employee->status, Status::ACTIVE_EMPLOYMENT, true)) {
                 $this->assignUserRoles($employee, $request->legalEntityId, $request->userId);
             }
 

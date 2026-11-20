@@ -5,12 +5,8 @@ declare(strict_types=1);
 namespace App\Listeners;
 
 use Throwable;
-use App\Classes\eHealth\EHealth;
 use App\Enums\JobStatus;
 use App\Events\EHealthUserLogin;
-use App\Jobs\EmployeeSync;
-use App\Repositories\Repository;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use App\Notifications\SyncNotification;
 use App\Traits\BatchLegalEntityQueries;
@@ -36,16 +32,6 @@ class OnRegularLoginSyncronization implements ShouldQueue
      */
     public function handle(EHealthUserLogin $event): void
     {
-        // Refresh existing positions even when there are no pending employee requests or failed batches.
-        if (in_array(EmployeeSync::SCOPE_REQUIRED, $event->scopes, true)) {
-            try {
-                $this->syncEmployeeStatuses($event);
-            } catch (Throwable $exception) {
-                // A failed refresh must also leave login usable with a synchronous queue driver.
-                report($exception);
-            }
-        }
-
         // Skip if this is the first login
         if ($event->isFirstLogin) {
             return;
@@ -73,32 +59,6 @@ class OnRegularLoginSyncronization implements ShouldQueue
         }
 
         $event->user->notify(new SyncNotification('legal_entity', 'resumed'));
-    }
-
-    protected function syncEmployeeStatuses(EHealthUserLogin $event): void
-    {
-        $party = $event->user->party;
-        if (!$party?->uuid) {
-            return;
-        }
-
-        $employees = $party->employees()->where('legal_entity_id', $event->legalEntity->id)->get()->keyBy('uuid');
-        if ($employees->isEmpty()) {
-            return;
-        }
-
-        $client = EHealth::employee()->withToken(Crypt::decryptString($event->token));
-        $filters = ['legal_entity_id' => $event->legalEntity->uuid, 'party_id' => $party->uuid];
-        $page = 1;
-        do {
-            $response = $client->getMany($filters, $page++);
-            foreach ($response->validate() as $attributes) {
-                $employee = $employees->get($attributes['uuid']);
-                if ($employee && $attributes['party']['uuid'] === $party->uuid) {
-                    Repository::employee()->syncStatus($employee, $attributes);
-                }
-            }
-        } while ($response->isNotLast());
     }
 
     /**

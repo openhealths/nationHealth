@@ -26,6 +26,16 @@ enum Status: string
     case ENTERED_IN_ERROR = 'ENTERED_IN_ERROR';
     case CONNECTED = 'CONNECTED';
 
+    public const array ACTIVE_EMPLOYMENT = [self::APPROVED, self::REORGANIZED];
+
+    public const array EMPLOYMENT = [
+        ...self::ACTIVE_EMPLOYMENT,
+        self::STOPPED,
+        self::DISMISSED,
+        self::ENTERED_IN_ERROR,
+        self::AUTODEACTIVATED,
+    ];
+
     public function label(): string
     {
         return match ($this) {

@@ -111,7 +111,7 @@ readonly class EmployeeRepository
         $request = $requests->first();
         // A later hire can share the old position's type, division and start date.
         if (blank(data_get($request->revision?->data, 'employee_uuid'))
-            && !in_array($employee->status, [Status::APPROVED, Status::REORGANIZED], true)) {
+            && !in_array($employee->status, Status::ACTIVE_EMPLOYMENT, true)) {
             return null;
         }
 
@@ -201,7 +201,11 @@ readonly class EmployeeRepository
     public function syncDetails(Employee $employee, array $details): void
     {
         DB::transaction(function () use ($employee, $details) {
-            $this->syncStatus($employee, $details['employee']);
+            $employee->update([
+                'status' => $details['employee']['status'],
+                'is_active' => $details['employee']['is_active'],
+                'end_date' => $details['employee']['end_date'] ?? null,
+            ]);
             $this->updateDetails(
                 $employee,
                 $details['party'],
@@ -213,15 +217,6 @@ readonly class EmployeeRepository
                 $details['scienceDegree'] ?? null
             );
         });
-    }
-
-    public function syncStatus(Employee $employee, array $attributes): void
-    {
-        $employee->update([
-            'status' => $attributes['status'],
-            'is_active' => $attributes['is_active'],
-            'end_date' => $attributes['end_date'] ?? null,
-        ]);
     }
 
     /**

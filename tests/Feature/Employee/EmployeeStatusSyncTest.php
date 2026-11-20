@@ -9,8 +9,6 @@ use App\Classes\eHealth\Api\EmployeeRequest as EmployeeRequestApi;
 use App\Enums\Employee\RequestStatus;
 use App\Enums\JobStatus;
 use App\Enums\Status;
-use App\Events\EHealthUserLogin;
-use App\Listeners\OnRegularLoginSyncronization;
 use App\Livewire\Employee\EmployeeIndex;
 use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
@@ -26,6 +24,7 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class EmployeeStatusSyncTest extends TestCase
@@ -123,48 +122,30 @@ class EmployeeStatusSyncTest extends TestCase
         $this->assertEmployment($active, 'APPROVED', true, null);
     }
 
-    public function test_login_refreshes_existing_positions_across_pages_in_the_current_entity(): void
+    public static function invalidEmployeeFields(): array
     {
-        $otherEntity = LegalEntity::factory()->create(['legal_entity_type_id' => $this->entity->legalEntityTypeId]);
-        $foreign = $this->employee->replicate()->fill(['uuid' => (string) Str::uuid(), 'legal_entity_id' => $otherEntity->id]);
-        $foreign->save();
-        $row = $this->remote($this->employee);
-        $row['status'] = 'ENTERED IN ERROR';
-        unset($row['end_date']);
-        $this->fakeResponses(
-            ['data' => [$this->remote($foreign)], 'paging' => ['page_number' => 1, 'total_pages' => 2]],
-            ['data' => [$row], 'paging' => ['page_number' => 2, 'total_pages' => 2]]
-        );
-
-        $this->login(['employee:read']);
-
-        $this->assertCount(2, $this->requests);
-        foreach ($this->requests as $index => $request) {
-            $this->assertSame($this->entity->uuid, $request['legal_entity_id']);
-            $this->assertSame($this->employee->party->uuid, $request['party_id']);
-            $this->assertEquals($index + 1, $request['page']);
-            $this->assertTrue($request->hasHeader('Authorization', 'Bearer fixture-token'));
-        }
-        $this->assertEmployment($this->employee, 'ENTERED_IN_ERROR', false, null);
-        $this->assertEmployment($foreign, 'APPROVED', true, null);
+        return [
+            'invalid active flag' => ['is_active', 'invalid'],
+            'request status on a position' => ['status', 'SIGNED'],
+            'invalid calendar date' => ['end_date', '2026-02-30T10:45:16.000Z'],
+            'invalid timestamp' => ['end_date', '2026-09-01T99:45:16.000Z'],
+        ];
     }
 
-    public function test_login_requires_read_scope_and_keeps_local_status_on_invalid_response(): void
+    #[DataProvider('invalidEmployeeFields')]
+    public function test_single_sync_keeps_local_status_on_invalid_response(string $field, string $value): void
     {
+        setPermissionsTeamId($this->entity->id);
+        $this->user->givePermissionToParent(Permission::findOrCreate('employee:read', 'web'));
         $row = $this->remote($this->employee);
-        $row['is_active'] = 'invalid';
-        $this->fakeResponses(['data' => [$row]]);
+        $row['is_active'] = false;
+        $row[$field] = $value;
+        $this->fakeResponses(['data' => $row]);
 
-        $this->login(['employee:details']);
-        $this->assertCount(0, $this->requests);
-        $this->login(['employee:read']);
+        (new EmployeeIndex())->syncOne($this->employee->id);
+
         $this->assertCount(1, $this->requests);
         $this->assertEmployment($this->employee, 'APPROVED', true, null);
-    }
-
-    protected function login(array $scopes): void
-    {
-        (new OnRegularLoginSyncronization())->handle(new EHealthUserLogin($this->user, $this->entity, $this->user->uuid, $scopes));
     }
 
     protected function remote(Employee $employee): array

@@ -8,22 +8,18 @@ use App\Classes\eHealth\EHealthRequest;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
 use App\Enums\Status;
+use Carbon\CarbonImmutable;
 use GuzzleHttp\Promise\PromiseInterface;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class Employee extends EHealthRequest
 {
     public const string URL = '/api/employees';
-
-    protected const string EMPLOYMENT_DATE = 'date_format:Y-m-d,Y-m-d\TH:i:s.v\Z,Y-m-d\TH:i:s\Z';
-    protected const array EMPLOYMENT_STATUSES = [
-        Status::APPROVED, Status::REORGANIZED, Status::STOPPED, Status::DISMISSED,
-        Status::ENTERED_IN_ERROR, Status::AUTODEACTIVATED,
-    ];
 
     /**
      * If true, groups the response by entities associated with the employee, e.g., employee itself, party, educations, specialities, etc.
@@ -103,11 +99,11 @@ class Employee extends EHealthRequest
         $rules = [
             '*' => 'required|array',
             '*.uuid' => 'required|uuid',
-            '*.status' => ['required', Rule::enum(Status::class)->only(self::EMPLOYMENT_STATUSES)],
+            '*.status' => ['required', Rule::enum(Status::class)->only(Status::EMPLOYMENT)],
             '*.position' => 'required|string',
             '*.employee_type' => 'required|string',
-            '*.start_date' => 'required|' . self::EMPLOYMENT_DATE,
-            '*.end_date' => 'nullable|' . self::EMPLOYMENT_DATE,
+            '*.start_date' => 'required|date_format:Y-m-d',
+            '*.end_date' => 'nullable|date_format:Y-m-d',
             '*.is_active' => 'sometimes|required|boolean',
             '*.party' => 'required|array',
             '*.party.uuid' => 'required|uuid',
@@ -142,7 +138,14 @@ class Employee extends EHealthRequest
             );
         }
 
-        return array_map($this->normalizeEmployment(...), $validator->validated());
+        $employees = $validator->validated();
+        foreach ($employees as $index => $employee) {
+            // A list row may omit these fields. Bulk upsert needs the same columns for every position.
+            $employees[$index]['is_active'] ??= in_array(Status::from($employee['status']), Status::ACTIVE_EMPLOYMENT, true);
+            $employees[$index]['end_date'] ??= null;
+        }
+
+        return $employees;
     }
 
     /**
@@ -160,11 +163,11 @@ class Employee extends EHealthRequest
 
         $rules = [
             'uuid' => ['required', 'uuid', Rule::in([$uuid])],
-            'status' => ['required', Rule::enum(Status::class)->only(self::EMPLOYMENT_STATUSES)],
+            'status' => ['required', Rule::enum(Status::class)->only(Status::EMPLOYMENT)],
             'position' => 'required|string',
             'employee_type' => 'required|string',
-            'start_date' => 'required|' . self::EMPLOYMENT_DATE,
-            'end_date' => 'nullable|' . self::EMPLOYMENT_DATE,
+            'start_date' => 'required|date_format:Y-m-d',
+            'end_date' => 'nullable|date_format:Y-m-d',
             'is_active' => 'required|boolean',
 
             'division' => 'sometimes|nullable|array',
@@ -244,7 +247,7 @@ class Employee extends EHealthRequest
             );
         }
 
-        $validated = $this->normalizeEmployment($validator->validated());
+        $validated = $validator->validated();
 
         if (!$this->groupByEntities) {
             return $validated;
@@ -269,18 +272,9 @@ class Employee extends EHealthRequest
         ];
     }
 
-    protected function normalizeEmployment(array $employee): array
-    {
-        // The employee list can omit is_active; employee details supply the authoritative flag.
-        $employee['is_active'] ??= in_array($employee['status'], [Status::APPROVED->value, Status::REORGANIZED->value], true);
-        $employee['start_date'] = substr($employee['start_date'], 0, 10);
-        $employee['end_date'] = isset($employee['end_date']) ? substr($employee['end_date'], 0, 10) : null;
-
-        return $employee;
-    }
-
     /**
      * Replaces eHealth property names with the ones used in the application (e.g., id -> uuid).
+     * TODO: Move employee response mapping (field names, status aliases, employment dates and list defaults) to a DTO.
      *
      * @param  array  $properties  Raw properties from a single API item.
      * @return array Properties with application-friendly names.
@@ -290,6 +284,13 @@ class Employee extends EHealthRequest
         $replaced = [];
         foreach ($properties as $name => $value) {
             switch ($name) {
+                case 'start_date':
+                case 'end_date':
+                    // eHealth also returns employment dates as UTC timestamps with milliseconds.
+                    $replaced[$name] = is_string($value) && CarbonImmutable::hasFormat($value, 'Y-m-d\TH:i:s.v\Z')
+                        ? Str::before($value, 'T')
+                        : $value;
+                    break;
                 case 'status':
                     $replaced['status'] = $value === 'ENTERED IN ERROR' ? Status::ENTERED_IN_ERROR->value : $value;
                     break;
