@@ -1,4 +1,4 @@
-<nav
+<nav data-app-header
     class="bg-white border-b border-gray-200 px-4 py-2.5 dark:bg-gray-800 dark:border-gray-700 fixed left-0 right-0 top-0 z-50">
     <div class="flex flex-wrap justify-between items-center max-lg:flex-nowrap max-lg:gap-2">
         <div class="flex max-lg:min-w-0 justify-start items-center">
@@ -59,8 +59,9 @@
                         this.darkMode = document.documentElement.classList.contains('dark');
                     },
                     toggleTheme() {
-                        this.darkMode = !this.darkMode;
+                        this.darkMode = !document.documentElement.classList.contains('dark');
                         localStorage.setItem('color-theme', this.darkMode ? 'dark' : 'light');
+                        window.dispatchEvent(new CustomEvent('app-theme-changed', { detail: { darkMode: this.darkMode } }));
                         if (this.darkMode) {
                             document.documentElement.classList.add('dark');
                         } else {
@@ -69,6 +70,7 @@
                     }
                 }"
                 @click="toggleTheme()"
+                @app-theme-changed.window="darkMode = $event.detail.darkMode"
                 type="button"
                 aria-label="Toggle theme color"
                 class="cursor-pointer p-2 mr-1 text-gray-500 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600"
@@ -94,11 +96,11 @@
             >
                 <button type="button"
                         class="cursor-pointer flex mx-3 text-sm text-gray-500 rounded-full md:mr-0 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600"
-                        id="user-menu-button"
+                        id="user-menu-button-{{ $this->getId() }}"
                         x-ref="profileMenuButton"
                         aria-expanded="false"
                         :aria-expanded="profileMenuOpen.toString()"
-                        aria-controls="user-profile-menu"
+                        aria-controls="user-profile-menu-{{ $this->getId() }}"
                         @click="profileMenuOpen = !profileMenuOpen"
                 >
                     <span class="sr-only">Open user menu</span>
@@ -118,7 +120,7 @@
                     </svg>
                 </button>
 
-                <div id="user-profile-menu"
+                <div id="user-profile-menu-{{ $this->getId() }}"
                      x-cloak
                      x-show="profileMenuOpen"
                      class="absolute right-0 top-full z-50 mt-2 w-56 max-w-[calc(100vw-2rem)] text-base list-none bg-white divide-y divide-gray-100 shadow dark:bg-gray-700 dark:divide-gray-600 rounded-xl"
@@ -132,7 +134,7 @@
                         </span>
                     </div>
 
-                    <ul class="py-1 text-gray-700 dark:text-gray-300" aria-labelledby="user-menu-button">
+                    <ul class="py-1 text-gray-700 dark:text-gray-300" aria-labelledby="user-menu-button-{{ $this->getId() }}">
                         <li>
                             <a href="{{ route('profile.show') }}"
                                class="block py-2 px-4 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-400 dark:hover:text-white"
