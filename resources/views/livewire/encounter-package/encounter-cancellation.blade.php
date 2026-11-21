@@ -1,6 +1,11 @@
 @php($formPath = $formPath ?? 'form')
 
-<div x-data="{ showCancellationModal: $wire.entangle('showCancellationModal') }">
+{{-- Scrolling is locked with a class, not x-trap.noscroll: the signature modal opens in the same response as this one
+     closes, and noscroll of one would restore the locked overflow saved by the other, leaving the page unscrollable --}}
+<div
+    x-data="{ showCancellationModal: $wire.entangle('showCancellationModal') }"
+    x-effect="document.body.classList.toggle('overflow-hidden', showCancellationModal)"
+>
     <template x-teleport="body">
         <div
             x-show="showCancellationModal"
@@ -21,7 +26,7 @@
                     class="modal-content mx-auto w-full max-w-4xl bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100"
                     @click.stop
                     x-transition
-                    x-trap.noscroll.inert="showCancellationModal"
+                    x-trap.inert="showCancellationModal"
                 >
                     <h3 class="mb-4 text-xl font-bold text-gray-900 dark:text-white">
                         {{ __('medical-events.cancel_modal.title') }}

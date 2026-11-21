@@ -4,25 +4,32 @@ declare(strict_types=1);
 
 namespace App\Core;
 
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\Form;
 
 class BaseForm extends Form
 {
-    public string $knedp;
+    /**
+     * Longest accepted key container in base64: a 1 MB key file. Real key files are a few kilobytes.
+     */
+    protected const int KEY_CONTAINER_MAX_LENGTH = 1_398_104;
 
-    public TemporaryUploadedFile $keyContainerUpload;
+    public string $knedp = '';
 
-    public string $keyContainerFileName = '';
+    /**
+     * Key container in base64. It is read in the browser and arrives only with the signing request.
+     *
+     * @var string
+     */
+    public string $keyContainer = '';
 
-    public string $password;
+    public string $password = '';
 
     public function signingRules(): array
     {
         return [
             'knedp' => ['required', 'string'],
             'password' => ['required', 'string'],
-            'keyContainerUpload' => ['required', 'file', 'extensions:dat,pfx,pk8,zs2,jks,p7s']
+            'keyContainer' => ['required', 'string', 'max:' . static::KEY_CONTAINER_MAX_LENGTH]
         ];
     }
 
@@ -33,18 +40,8 @@ class BaseForm extends Form
      */
     public function resetSigningFields(): void
     {
-        if (isset($this->knedp)) {
-            $this->knedp = '';
-        }
-
-        if (isset($this->password)) {
-            $this->password = '';
-        }
-
-        if (isset($this->keyContainerUpload)) {
-            unset($this->keyContainerUpload);
-        }
-
-        $this->keyContainerFileName = '';
+        $this->knedp = '';
+        $this->password = '';
+        $this->keyContainer = '';
     }
 }

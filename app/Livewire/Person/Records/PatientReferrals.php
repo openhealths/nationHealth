@@ -536,7 +536,7 @@ class PatientReferrals extends BasePatientComponent
             $signedContent = signatureService()->signData(
                 Arr::toSnakeCase($payload),
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -599,7 +599,7 @@ class PatientReferrals extends BasePatientComponent
             $signedContent = signatureService()->signData(
                 Arr::toSnakeCase($payload),
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -690,7 +690,7 @@ class PatientReferrals extends BasePatientComponent
             $signedContent = signatureService()->signData(
                 $signPayload,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );

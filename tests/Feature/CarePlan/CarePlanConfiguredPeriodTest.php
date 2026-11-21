@@ -18,7 +18,6 @@ use App\Classes\eHealth\Api\CarePlan as CarePlanLifecycleService;
 use App\Contracts\SignatureProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -156,7 +155,7 @@ class CarePlanConfiguredPeriodTest extends TestCase
         Livewire::test(CarePlanUpdate::class, ['legalEntity' => $legalEntity, 'carePlan' => $draft->fresh()])
             ->assertSet('form.periodStart', $start)->assertSet('form.periodEnd', $end)
             ->set('form.termsOfService', 'OUTPATIENT')->set('form.knedp', 'test-knedp')
-            ->set('form.password', 'secret')->set('form.keyContainerUpload', UploadedFile::fake()->create('key.jks', 100))
+            ->set('form.password', 'secret')->set('form.keyContainer', base64_encode('key-container'))
             ->call('sign')->assertHasNoErrors();
 
         $this->assertNotNull($payload);

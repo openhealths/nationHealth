@@ -488,7 +488,7 @@ class PrepersonMerge extends Component
             $signedContent = signatureService()->signData(
                 $dataToSign,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );

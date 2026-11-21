@@ -468,7 +468,7 @@ class MedicationRequestLifecycleTest extends TestCase
             });
         $this->instance(\App\Services\MedicalEvents\MedicationRequestLifecycleService::class, $lifecycle);
 
-        // Mock the signature provider (KEP modal still fills form fields before signRejectPrescription).
+        // Mock the signature provider (the KEP modal fills the form fields and submits through sign()).
         $mockSignatureService = Mockery::mock(SignatureProvider::class);
         $this->instance(SignatureProvider::class, $mockSignatureService);
         $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
@@ -486,8 +486,8 @@ class MedicationRequestLifecycleTest extends TestCase
             ->set('statusReason', 'entered-in-error')
             ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
-            ->call('signRejectPrescription')
+            ->set('form.keyContainer', base64_encode('key-container'))
+            ->call('sign')
             ->assertSet('showSignatureModal', false);
 
         // Assert database updated

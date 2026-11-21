@@ -37,7 +37,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Livewire\WithFileUploads;
 use Livewire\Attributes\Locked;
 use RuntimeException;
 use Throwable;
@@ -47,7 +46,6 @@ class CarePlanCreate extends BasePatientComponent
     use SynchronizesCarePlans;
     use SubmitsClinicalOperations;
 
-    use WithFileUploads;
     use InteractsWithApprovals;
     use \App\Livewire\CarePlan\Concerns\HandlesCarePlanApprovalSms;
 
@@ -266,17 +264,6 @@ class CarePlanCreate extends BasePatientComponent
     protected function validateCategoryForSigning(): void
     {
         app(CarePlanRepository::class)->assertCategoryForEncounter($this->form->category, $this->form->encounter, (int) $this->personId);
-    }
-
-    public function updatedFormKeyContainerUpload(): void
-    {
-        $upload = $this->form->keyContainerUpload ?? null;
-
-        if ($upload && method_exists($upload, 'getClientOriginalName')) {
-            $this->form->keyContainerFileName = $upload->getClientOriginalName();
-        } elseif ($upload === null) {
-            $this->form->keyContainerFileName = '';
-        }
     }
 
     protected function refreshAuthorDisplay(): void
@@ -969,7 +956,7 @@ class CarePlanCreate extends BasePatientComponent
             $signedContent = signatureService()->signData(
                 $carePlanPayload,
                 $this->form->knedp,
-                $this->form->keyContainerUpload,
+                $this->form->keyContainer,
                 $this->form->password,
                 Auth::user()->party->taxId
             );

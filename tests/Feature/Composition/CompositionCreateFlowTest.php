@@ -11,7 +11,6 @@ use App\Enums\Composition\CompositionType;
 use App\Livewire\Composition\CompositionTempDisabilityCreate;
 use App\Models\MedicalEvents\Sql\Composition;
 use App\Enums\Composition\CompositionJobStatus;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -379,7 +378,7 @@ class CompositionCreateFlowTest extends TestCase
         $component->call('openSigningModal')
             ->set('form.knedp', 'ca-1')
             ->set('form.password', 'secret')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 8))
+            ->set('form.keyContainer', base64_encode('key-container'))
             ->call('sign')
             ->assertHasNoErrors()
             ->assertSet('showSignatureModal', false);

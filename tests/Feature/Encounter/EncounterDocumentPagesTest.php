@@ -26,7 +26,6 @@ use App\Policies\EncounterPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -725,7 +724,7 @@ class EncounterDocumentPagesTest extends TestCase
             ->assertSet('encounterReferralRequestIdToSign', $uuid)
             ->set('form.knedp', 'ca-1')
             ->set('form.password', 'synthetic-password')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 8))
+            ->set('form.keyContainer', base64_encode('key-container'))
             ->call('sign')->assertHasNoErrors()
             ->assertSet('encounterReferralSubmission.status', \App\Enums\JobStatus::PENDING->value)
             ->assertRedirect(route('persons.encounters.referrals.edit', [$legalEntity, $person, $encounter, $record->id]));
@@ -790,8 +789,8 @@ class EncounterDocumentPagesTest extends TestCase
         $component = $this->resumeReferralSigning($component, compact('legalEntity', 'person', 'encounter'))
             ->set('form.knedp', $field === 'knedp' ? '' : 'ca-1')
             ->set('form.password', $field === 'password' ? '' : 'synthetic-password');
-        if ($field !== 'keyContainerUpload') {
-            $component->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 8));
+        if ($field !== 'keyContainer') {
+            $component->set('form.keyContainer', base64_encode('key-container'));
         }
         $component->call('sign')->assertHasErrors('form.'.$field)
             ->assertSet('showSignatureModal', true)->assertSet('actionType', 'sign_referral')
@@ -802,7 +801,7 @@ class EncounterDocumentPagesTest extends TestCase
 
     public static function missingSignatureFields(): array
     {
-        return ['password' => ['password'], 'provider' => ['knedp'], 'key file' => ['keyContainerUpload']];
+        return ['password' => ['password'], 'provider' => ['knedp'], 'key file' => ['keyContainer']];
     }
 
     public function test_referral_that_expires_while_waiting_for_kep_is_rejected_before_signing(): void
@@ -844,7 +843,7 @@ class EncounterDocumentPagesTest extends TestCase
             ->call('validateEncounterReferral')->assertHasNoErrors();
         $component = $this->resumeReferralSigning($component, compact('legalEntity', 'person', 'encounter'))
             ->set('form.knedp', 'ca-1')->set('form.password', 'synthetic-password')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 8))
+            ->set('form.keyContainer', base64_encode('key-container'))
             ->call('sign')->assertHasErrors('encounterReferralForm.start_time')->assertSet('showSignatureModal', false);
         $record = \App\Models\MedicalEvents\Sql\ServiceRequestRequest::whereUuid($component->get('encounterReferralRequestIdToSign'))->sole();
         $this->assertSame('draft', $record->status);

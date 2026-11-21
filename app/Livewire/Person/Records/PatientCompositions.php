@@ -430,7 +430,7 @@ class PatientCompositions extends BasePatientComponent
             $signedContent = signatureService()->signData(
                 $this->form->toCancellationPayload($composition->uuid, $composition->type),
                 $this->form->knedp,
-                $this->form->keyContainerUpload,
+                $this->form->keyContainer,
                 $this->form->password,
                 Auth::user()->party->taxId
             );
