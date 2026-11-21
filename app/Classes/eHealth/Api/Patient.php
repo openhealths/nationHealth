@@ -13,6 +13,8 @@ use App\Exceptions\EHealth\EHealthValidationException;
 use App\Rules\InDictionary;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
+use stdClass;
 
 class Patient extends Request
 {
@@ -84,6 +86,7 @@ class Patient extends Request
      */
     public function getAllergyIntolerances(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(fn (EHealthResponse $response): array => $this->validateSummaryRecords($response, 'allergies'));
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
@@ -103,6 +106,7 @@ class Patient extends Request
      */
     public function getRiskAssessments(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(fn (EHealthResponse $response): array => $this->validateSummaryRecords($response, 'risk-assessments'));
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
@@ -141,6 +145,7 @@ class Patient extends Request
      */
     public function getMedicationStatements(string $patientId, array $query = []): PromiseInterface|EHealthResponse
     {
+        $this->setValidator(fn (EHealthResponse $response): array => $this->validateSummaryRecords($response, 'medication-statements'));
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge($this->options['query'], $query ?? []);
@@ -198,5 +203,115 @@ class Patient extends Request
         }
 
         return $replaced;
+    }
+
+    /**
+     * Validate the wire representation before decoding objects as associative arrays:
+     * otherwise both an empty object and an empty list become [].
+     */
+    private function validateSummaryRecords(EHealthResponse $response, string $section): array
+    {
+        $records = $response->object()->data ?? null;
+        self::validateSummaryValue($records, [self::summaryRecordSchema($section)], 'data');
+
+        return $response->getData();
+    }
+
+    /**
+     * The three GET /summary response item schemas from medical-events/OpenAPI.
+     * A leading ? marks optional properties, [shape] describes a JSON list, and oneOf
+     * lists sets of mutually exclusive properties. Undocumented extensions are retained.
+     */
+    private static function summaryRecordSchema(string $section): array
+    {
+        $coding = ['system' => 'string', 'code' => 'string'];
+        $concept = ['coding' => [$coding], '?text' => 'string'];
+        $referenceType = ['?coding' => [$coding], '?text' => 'string'];
+        $sourceConcept = ['?coding' => [['system' => 'string', '?code' => 'string']], '?text' => 'string'];
+        $reference = ['?identifier' => ['type' => $referenceType, 'value' => 'string']];
+        $actor = ['?identifier' => ['?type' => $sourceConcept, 'value' => 'string']];
+        $source = [
+            'oneOf' => [['asserter', 'report_origin']],
+            '?asserter' => $actor, '?report_origin' => $sourceConcept,
+        ];
+        $quantity = ['value' => 'number', 'system' => 'string', 'code' => 'string', '?unit' => 'string', '?comparator' => 'string'];
+        $range = ['low' => $quantity, 'high' => $quantity];
+
+        return match ($section) {
+            'allergies' => [
+                'id' => 'string', 'clinical_status' => 'string', 'verification_status' => 'string',
+                'type' => 'string', 'category' => 'string', 'criticality' => 'string',
+                'context' => $reference + ['display_value' => 'string'], 'code' => $concept,
+                'onset_date_time' => 'string', 'asserted_date' => 'string', 'inserted_at' => 'string',
+                'updated_at' => 'string', 'primary_source' => 'boolean', '?last_occurrence' => 'string',
+            ] + $source,
+            'medication-statements' => [
+                'id' => 'string', 'asserted_date' => 'string', 'status' => 'string', 'context' => $reference,
+                'primary_source' => 'boolean', 'medication_code' => $concept, '?based_on' => $reference,
+                '?effective_period' => 'string', '?note' => 'string', '?dosage' => 'string',
+                '?inserted_at' => 'string', '?updated_at' => 'string',
+            ] + $source,
+            'risk-assessments' => [
+                'id' => 'string', 'status' => 'string', 'code' => $concept, 'context' => $reference,
+                'asserted_date' => 'string', 'performer' => $actor, '?method' => $concept,
+                'oneOf' => [['reason_references', 'reason_codes']],
+                '?reason_references' => [['?identifier' => ['type' => $sourceConcept, 'value' => 'string']]],
+                '?reason_codes' => $sourceConcept,
+                '?basis' => [
+                    '?reference' => ['?identifier' => ['type' => $concept, 'value' => 'string']],
+                    '?text' => 'string', '?references' => [$reference],
+                ],
+                '?predictions' => [[
+                    'oneOf' => [['probability_range', 'probability_decimal'], ['when_range', 'when_period']],
+                    '?outcome' => $concept, '?probability_range' => $range, '?probability_decimal' => 'number',
+                    '?qualitative_risk' => $concept, '?relative_risk' => 'number', '?when_range' => $range,
+                    '?when_period' => ['start' => 'string', '?end' => 'string'], '?rationale' => 'string',
+                ]],
+                '?mitigation' => 'string', '?comment' => 'string', '?inserted_at' => 'string', '?updated_at' => 'string',
+            ],
+        };
+    }
+
+    private static function validateSummaryValue(mixed $value, array|string $schema, string $path): void
+    {
+        $type = is_string($schema) ? $schema : (array_is_list($schema) ? 'array' : 'object');
+        $valid = match ($type) {
+            'string' => is_string($value),
+            'boolean' => is_bool($value),
+            'number' => is_int($value) || is_float($value),
+            'array' => is_array($value),
+            'object' => $value instanceof stdClass,
+        };
+        if (!$valid) {
+            throw ValidationException::withMessages([$path => "Expected a JSON $type."]);
+        }
+        if ($type === 'array') {
+            foreach ($value as $index => $item) {
+                self::validateSummaryValue($item, $schema[0], "$path.$index");
+            }
+
+            return;
+        }
+        if ($type !== 'object') {
+            return;
+        }
+
+        foreach ($schema['oneOf'] ?? [] as $choices) {
+            $present = array_filter($choices, static fn (string $key): bool => property_exists($value, $key));
+            if (count($present) !== 1) {
+                throw ValidationException::withMessages([$path => 'Expected exactly one of: '.implode(', ', $choices).'.']);
+            }
+        }
+        foreach ($schema as $field => $rule) {
+            if ($field === 'oneOf') {
+                continue;
+            }
+            $key = ltrim($field, '?');
+            if (property_exists($value, $key)) {
+                self::validateSummaryValue($value->{$key}, $rule, "$path.$key");
+            } elseif ($key === $field) {
+                throw ValidationException::withMessages(["$path.$key" => 'Required property is missing.']);
+            }
+        }
     }
 }
