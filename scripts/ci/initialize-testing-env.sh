@@ -3,6 +3,8 @@
 set -euo pipefail
 set +x
 
+source "$(dirname "${BASH_SOURCE[0]}")/assert-not-production.sh"
+
 if [[ "${GITHUB_ACTIONS:-}" != "true" && "${TF_BUILD:-}" != "True" ]]; then
   echo "This initializer requires GitHub Actions or Azure Pipelines." >&2
   exit 1

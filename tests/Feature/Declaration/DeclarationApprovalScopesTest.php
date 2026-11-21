@@ -40,10 +40,6 @@ class DeclarationApprovalScopesTest extends TestCase
 
         $this->assertSame($allowed, $user->can('approve', DeclarationRequest::class));
         $this->assertSame($allowed, $user->can('approve', $request));
-
-        if (in_array($role, [Role::DOCTOR, Role::RECEPTIONIST], true)) {
-            $this->assertFalse($user->can('declaration_request:approve'));
-        }
     }
 
     public static function approvalRoles(): array
@@ -65,11 +61,22 @@ class DeclarationApprovalScopesTest extends TestCase
         return $cases;
     }
 
-    public function test_legacy_approve_scope_does_not_replace_write_scope(): void
+    public function test_write_scope_allows_standard_approval_without_approve_scope(): void
     {
         [$user, $legalEntity, $employee] = $this->loginWithRole();
-        $legacyPermission = Permission::findByName('declaration_request:approve', 'ehealth');
-        $user->permissions()->sync([$legacyPermission->id => ['legal_entity_id' => $legalEntity->id]]);
+        $user->revokePermissionTo('declaration_request:approve');
+        $user = $user->fresh();
+        $this->actingAs($user, 'ehealth');
+
+        $this->assertFalse($user->can('declaration_request:approve'));
+        $this->assertTrue($user->can('approve', $this->newRequest($legalEntity, $employee)));
+    }
+
+    public function test_approve_scope_does_not_replace_write_scope(): void
+    {
+        [$user, $legalEntity, $employee] = $this->loginWithRole();
+        $approvePermission = Permission::findByName('declaration_request:approve', 'ehealth');
+        $user->permissions()->sync([$approvePermission->id => ['legal_entity_id' => $legalEntity->id]]);
         $user = $user->fresh();
         $this->actingAs($user, 'ehealth');
 
@@ -121,14 +128,13 @@ class DeclarationApprovalScopesTest extends TestCase
         $user = $user->fresh();
         $this->actingAs($user, 'ehealth');
 
-        $this->assertFalse($user->can('declaration_request:approve'));
         $this->assertSame($allowed, $user->can('resign', Declaration::class));
     }
 
     public static function resigningScopes(): array
     {
         return [
-            'current doctor scopes without legacy approve' => [[], true],
+            'current doctor scopes' => [[], true],
             'missing write' => [['declaration_request:write'], false],
             'missing sign' => [['declaration_request:sign'], false],
         ];
@@ -152,7 +158,7 @@ class DeclarationApprovalScopesTest extends TestCase
     }
 
     #[DataProvider('approvalMethods')]
-    public function test_doctor_approval_reaches_v3_and_opens_signing_without_legacy_scope(string $method): void
+    public function test_doctor_approval_reaches_v3_and_opens_signing(string $method): void
     {
         [$user, $legalEntity, $employee] = $this->loginWithRole();
         $simplified = $method === 'simplified';
@@ -199,7 +205,6 @@ class DeclarationApprovalScopesTest extends TestCase
             $component->approve();
         }
 
-        $this->assertFalse($user->can('declaration_request:approve'));
         $this->assertNull(session('error'));
         $this->assertSame(RequestStatus::APPROVED, $request->fresh()->status);
         $this->assertSame(RequestStatus::APPROVED, $component->status);
