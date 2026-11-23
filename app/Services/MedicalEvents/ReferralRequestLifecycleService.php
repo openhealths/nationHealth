@@ -265,6 +265,17 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
     {
         $kind = $formData['kind'] ?? 'service_request';
 
+        $quantityCode = filled($formData['quantity_code'] ?? null) ? $formData['quantity_code'] : 'PIECE';
+        $quantityUnit = $quantityCode;
+        if (array_key_exists('quantity_unit', $formData)) {
+            try {
+                $units = dictionary()->basics()->byName('SERVICE_UNIT')->asCodeDescription()->all();
+            } catch (\Throwable) {
+                $units = [];
+            }
+            $quantityUnit = ($units + ['PIECE' => 'шт.'])[$quantityCode] ?? $quantityCode;
+        }
+
         return [
             'uuid' => $draftUuid ?? (string) Str::uuid(),
             'employee_id' => $employeeContext['employee_id'] ?? null,
@@ -275,7 +286,8 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
             'ended_at' => $kind === 'service_request' ? ($formData['ended_at'] ?? now()->addMonths(1)->toDateString()) : convertToYmd($formData['ended_at'] ?? now()->addMonths(1)->toDateString()),
             'quantity' => (float) ($formData['quantity'] ?? 1),
             'quantity_system' => $formData['quantity_system'] ?? 'SERVICE_UNIT',
-            'quantity_code' => $formData['quantity_code'] ?? 'PIECE',
+            'quantity_code' => $quantityCode,
+            ...(array_key_exists('quantity_unit', $formData) ? ['quantity_unit' => $quantityUnit] : []),
             'program_id' => $formData['program_id'] ?? null,
             'intent' => $formData['intent'] ?? 'order',
             'category' => $formData['category'] ?? null,
