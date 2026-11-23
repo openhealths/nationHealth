@@ -76,30 +76,24 @@
 
     <div class="form-row-2" x-show="modalSpecimen.collectedType === 'date_time'" x-cloak>
         <div class="form-group group relative flex justify-between">
-            <div class="datepicker-wrapper flex-1">
-                <input
+            <div class="flex-1">
+                <x-forms.date
                     x-model="modalSpecimen.collectedDate"
-                    :datepicker-max-date="{{ $maxCollectedDate ?? 'null' }}"
-                    type="text"
+                    x-bind:datepicker-max-date="{{ $maxCollectedDate ?? 'null' }}"
                     id="specimenCollectedDate"
-                    autocomplete="off"
-                    class="datepicker-input with-leading-icon input peer rounded-r-none border-r-0"
-                    placeholder=" "
-                    :required="modalSpecimen.collectedType === 'date_time'"
+                    class="rounded-r-none border-r-0"
+                    x-bind:required="modalSpecimen.collectedType === 'date_time'"
+                    :label="__('specimens.date_time')"
                 />
-                <label for="specimenCollectedDate" class="wrapped-label">{{ __('specimens.date_time') }}</label>
             </div>
-            <div class="relative -ml-px w-32">
-                <label for="specimenCollectedTime" class="sr-only">{{ __('forms.time') }}</label>
-                <input
+            <div class="-ml-px w-32">
+                <x-forms.time
                     x-model="modalSpecimen.collectedTime"
-                    type="time"
                     id="specimenCollectedTime"
-                    class="input peer rounded-l-none pl-10"
-                    placeholder=" "
-                    :required="modalSpecimen.collectedType === 'date_time'"
+                    class="rounded-l-none"
+                    x-bind:required="modalSpecimen.collectedType === 'date_time'"
+                    :label="__('forms.time')"
                 />
-                @icon('clock', 'svg-input left-2.5 text-gray-400')
             </div>
         </div>
     </div>
@@ -118,27 +112,21 @@
             <label for="specimenCollectedPeriodRange" class="label">{{ __('specimens.period') }}</label>
         </div>
 
-        <div class="form-group group relative">
-            <input
+        <div class="form-group group">
+            <x-forms.time
                 x-model="modalSpecimen.collectedPeriodStartTime"
-                type="time"
                 id="specimenCollectedPeriodStartTime"
-                class="input peer"
-                placeholder=" "
-                :required="modalSpecimen.collectedType === 'period'"
+                x-bind:required="modalSpecimen.collectedType === 'period'"
+                :label="__('specimens.period_start')"
             />
-            <label for="specimenCollectedPeriodStartTime" class="label">{{ __('specimens.period_start') }}</label>
         </div>
 
-        <div class="form-group group relative">
-            <input
+        <div class="form-group group">
+            <x-forms.time
                 x-model="modalSpecimen.collectedPeriodEndTime"
-                type="time"
                 id="specimenCollectedPeriodEndTime"
-                class="input peer"
-                placeholder=" "
+                :label="__('specimens.period_end')"
             />
-            <label for="specimenCollectedPeriodEndTime" class="label">{{ __('specimens.period_end') }}</label>
         </div>
     </div>
 

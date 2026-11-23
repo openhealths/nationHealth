@@ -145,26 +145,15 @@
             />
         </div>
 
-        <div class="form-group group !w-1/2" onclick="document.getElementById('procedurePerformedTime').showPicker()">
-            <label for="procedurePerformedTime" class="sr-only">{{ __('forms.time') }}</label>
-            <div class="relative flex items-center">
-                @icon('mingcute-time-fill', 'svg-input left-2.5')
-
-                <input
-                    x-model="modalProcedure.performedTime"
-                    @input="$event.target.blur()"
-                    type="time"
-                    name="performedTime"
-                    id="procedurePerformedTime"
-                    class="input peer !pl-10"
-                    autocomplete="off"
-                    :required="modalProcedure.status === 'completed' && modalProcedure.performedType === 'date_time'"
-                />
-            </div>
-
-            @error($procedureErrorPath . '.performedTime')
-                <p class="text-error">{{ $message }}</p>
-            @enderror
+        <div class="form-group group w-1/2!">
+            <x-forms.time
+                x-model="modalProcedure.performedTime"
+                name="performedTime"
+                id="procedurePerformedTime"
+                x-bind:required="modalProcedure.status === 'completed' && modalProcedure.performedType === 'date_time'"
+                :label="__('forms.time')"
+                :error="$procedureErrorPath . '.performedTime'"
+            />
         </div>
     </div>
 
@@ -185,29 +174,15 @@
                 />
             </div>
 
-            <div
-                class="form-group group !w-1/2"
-                onclick="document.getElementById('performedPeriodStartTime').showPicker()"
-            >
-                <label for="performedPeriodStartTime" class="sr-only">{{ __('forms.time') }}</label>
-                <div class="relative flex items-center">
-                    @icon('mingcute-time-fill', 'svg-input left-2.5')
-                    <input
-                        x-model="modalProcedure.performedPeriodStartTime"
-                        @input="$event.target.blur()"
-                        datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                        type="time"
-                        name="performedPeriodStartTime"
-                        id="performedPeriodStartTime"
-                        class="input peer !pl-10"
-                        autocomplete="off"
-                        :required="modalProcedure.status === 'completed' && modalProcedure.performedType === 'period'"
-                    />
-                </div>
-
-                @error($procedureErrorPath . '.performedPeriodStartTime')
-                    <p class="text-error">{{ $message }}</p>
-                @enderror
+            <div class="form-group group w-1/2!">
+                <x-forms.time
+                    x-model="modalProcedure.performedPeriodStartTime"
+                    name="performedPeriodStartTime"
+                    id="performedPeriodStartTime"
+                    x-bind:required="modalProcedure.status === 'completed' && modalProcedure.performedType === 'period'"
+                    :label="__('forms.time')"
+                    :error="$procedureErrorPath . '.performedPeriodStartTime'"
+                />
             </div>
         </div>
     </div>
@@ -229,29 +204,15 @@
                 />
             </div>
 
-            <div
-                class="form-group group !w-1/2"
-                onclick="document.getElementById('performedPeriodEndTime').showPicker()"
-            >
-                <label for="performedPeriodEndTime" class="sr-only">{{ __('forms.time') }}</label>
-                <div class="relative flex items-center">
-                    @icon('mingcute-time-fill', 'svg-input left-2.5')
-                    <input
-                        x-model="modalProcedure.performedPeriodEndTime"
-                        @input="$event.target.blur()"
-                        datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                        type="time"
-                        name="performedPeriodEndTime"
-                        id="performedPeriodEndTime"
-                        class="input peer !pl-10"
-                        autocomplete="off"
-                        :required="modalProcedure.status === 'completed' && modalProcedure.performedType === 'period'"
-                    />
-                </div>
-
-                @error($procedureErrorPath . '.performedPeriodEndTime')
-                    <p class="text-error">{{ $message }}</p>
-                @enderror
+            <div class="form-group group w-1/2!">
+                <x-forms.time
+                    x-model="modalProcedure.performedPeriodEndTime"
+                    name="performedPeriodEndTime"
+                    id="performedPeriodEndTime"
+                    x-bind:required="modalProcedure.status === 'completed' && modalProcedure.performedType === 'period'"
+                    :label="__('forms.time')"
+                    :error="$procedureErrorPath . '.performedPeriodEndTime'"
+                />
             </div>
         </div>
     </div>

@@ -51,24 +51,14 @@
             />
         </div>
 
-        <div
-            class="form-group group w-1/2!"
-            onclick="document.getElementById('clinicalImpressionEffectiveTime').showPicker()"
-        >
-            <label for="clinicalImpressionEffectiveTime" class="sr-only">{{ __('forms.time') }}</label>
-            <div class="relative flex items-center">
-                @icon('mingcute-time-fill', 'svg-input left-2.5')
-                <input
-                    x-model="modalClinicalImpression.effectiveTime"
-                    @input="$event.target.blur()"
-                    type="time"
-                    name="effectiveTime"
-                    id="clinicalImpressionEffectiveTime"
-                    class="input peer pl-10!"
-                    autocomplete="off"
-                    :required="modalClinicalImpression.effectiveType === 'date_time'"
-                />
-            </div>
+        <div class="form-group group w-1/2!">
+            <x-forms.time
+                x-model="modalClinicalImpression.effectiveTime"
+                name="effectiveTime"
+                id="clinicalImpressionEffectiveTime"
+                x-bind:required="modalClinicalImpression.effectiveType === 'date_time'"
+                :label="__('forms.time')"
+            />
         </div>
     </div>
 
@@ -86,24 +76,14 @@
                 />
             </div>
 
-            <div
-                class="form-group group w-1/2!"
-                onclick="document.getElementById('effectivePeriodStartTime').showPicker()"
-            >
-                <label for="effectivePeriodStartTime" class="sr-only">{{ __('forms.time') }}</label>
-                <div class="relative flex items-center">
-                    @icon('mingcute-time-fill', 'svg-input left-2.5')
-                    <input
-                        x-model="modalClinicalImpression.effectivePeriodStartTime"
-                        @input="$event.target.blur()"
-                        type="time"
-                        name="effectivePeriodStartTime"
-                        id="effectivePeriodStartTime"
-                        class="input peer pl-10!"
-                        autocomplete="off"
-                        :required="modalClinicalImpression.effectiveType === 'period'"
-                    />
-                </div>
+            <div class="form-group group w-1/2!">
+                <x-forms.time
+                    x-model="modalClinicalImpression.effectivePeriodStartTime"
+                    name="effectivePeriodStartTime"
+                    id="effectivePeriodStartTime"
+                    x-bind:required="modalClinicalImpression.effectiveType === 'period'"
+                    :label="__('forms.time')"
+                />
             </div>
         </div>
 
@@ -119,23 +99,13 @@
                 />
             </div>
 
-            <div
-                class="form-group group w-1/2!"
-                onclick="document.getElementById('effectivePeriodEndTime').showPicker()"
-            >
-                <label for="effectivePeriodEndTime" class="sr-only">{{ __('forms.time') }}</label>
-                <div class="relative flex items-center">
-                    @icon('mingcute-time-fill', 'svg-input left-2.5')
-                    <input
-                        x-model="modalClinicalImpression.effectivePeriodEndTime"
-                        @input="$event.target.blur()"
-                        type="time"
-                        name="effectivePeriodEndTime"
-                        id="effectivePeriodEndTime"
-                        class="input peer pl-10!"
-                        autocomplete="off"
-                    />
-                </div>
+            <div class="form-group group w-1/2!">
+                <x-forms.time
+                    x-model="modalClinicalImpression.effectivePeriodEndTime"
+                    name="effectivePeriodEndTime"
+                    id="effectivePeriodEndTime"
+                    :label="__('forms.time')"
+                />
             </div>
         </div>
     </div>

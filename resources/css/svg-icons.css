@@ -21,6 +21,7 @@ button.item-remove {
 }
 
 .datepicker-wrapper,
+.timepicker-wrapper,
 .phone-wrapper {
     @apply relative before:bg-gray-500 dark:before:bg-gray-400;
 
@@ -31,6 +32,11 @@ button.item-remove {
 
 .datepicker-wrapper:before {
     mask: url("../icons/calendar-week.svg") no-repeat;
+    @apply left-2.5;
+}
+
+.timepicker-wrapper:before {
+    mask: url("../icons/mingcute-time-fill.svg") no-repeat center / contain;
     @apply left-2.5;
 }
 

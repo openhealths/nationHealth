@@ -94,47 +94,25 @@
         </div>
 
         <div class="form-group group">
-            <div class="relative">
-                <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3">
-                    @icon('mingcute-time-fill', 'w-5 h-5 text-gray-400')
-                </div>
-                <input
-                    wire:model="form.encounter.periodStart"
-                    type="text"
-                    name="periodStart"
-                    id="periodStart"
-                    class="timepicker-uk with-leading-icon input peer @error('form.encounter.periodStart') input-error @enderror"
-                    placeholder=" "
-                    required
-                    autocomplete="off"
-                />
-                <label for="periodStart" class="wrapped-label required"> {{ __('encounters.period_start') }} </label>
-            </div>
-            @error('form.encounter.periodStart')
-                <p class="text-error">{{ $message }}</p>
-            @enderror
+            <x-forms.time
+                wire:model="form.encounter.periodStart"
+                name="periodStart"
+                id="periodStart"
+                required
+                :label="__('encounters.period_start')"
+                error="form.encounter.periodStart"
+            />
         </div>
 
         <div class="form-group group">
-            <div class="relative">
-                <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3">
-                    @icon('mingcute-time-fill', 'w-5 h-5 text-gray-400')
-                </div>
-                <input
-                    wire:model="form.encounter.periodEnd"
-                    type="text"
-                    name="periodEnd"
-                    id="periodEnd"
-                    class="timepicker-uk with-leading-icon input peer @error('form.encounter.periodEnd') input-error @enderror"
-                    placeholder=" "
-                    required
-                    autocomplete="off"
-                />
-                <label for="periodEnd" class="wrapped-label required"> {{ __('encounters.period_end') }} </label>
-            </div>
-            @error('form.encounter.periodEnd')
-                <p class="text-error">{{ $message }}</p>
-            @enderror
+            <x-forms.time
+                wire:model="form.encounter.periodEnd"
+                name="periodEnd"
+                id="periodEnd"
+                required
+                :label="__('encounters.period_end')"
+                error="form.encounter.periodEnd"
+            />
         </div>
     </div>
 

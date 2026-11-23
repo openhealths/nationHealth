@@ -20,23 +20,15 @@
             </p>
         </div>
 
-        <div class="w-1/2" onclick="document.getElementById('immunizationTime').showPicker()">
-            <label for="immunizationTime" class="label-modal"> {{ __('forms.time') }} </label>
-
-            <div class="relative flex items-center">
-                @icon('mingcute-time-fill', 'svg-input left-2.5')
-                <input
-                    x-model="modalImmunization.time"
-                    @input="$event.target.blur()"
-                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                    type="time"
-                    name="immunizationTime"
-                    id="immunizationTime"
-                    class="input-modal pl-10!"
-                    autocomplete="off"
-                    required
-                />
-            </div>
+        <div class="w-1/2">
+            <x-forms.time
+                modal
+                x-model="modalImmunization.time"
+                name="immunizationTime"
+                id="immunizationTime"
+                required
+                :label="__('forms.time')"
+            />
 
             <p class="text-error text-xs" x-show="modalImmunization.time.trim() === ''">
                 {{ __('forms.field_empty') }}

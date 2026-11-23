@@ -246,7 +246,7 @@
                                     @icon(
                                         'edit-user-outline',
                                         'w-6 h-6 text-gray-800 dark:text-gray-200'
-)
+                                    )
                                 </button>
 
                                 <div class="absolute right-0 z-50">
@@ -423,17 +423,12 @@
                                 />
                             </div>
 
-                            <div class="relative -ml-px w-32">
-                                <label for="detectedIssueTime" class="sr-only">{{ __('forms.time') }}</label>
-                                <input
+                            <div class="-ml-px w-32">
+                                <x-forms.time
                                     x-model="modalDetectedIssue.identifiedTime"
-                                    type="time"
                                     id="detectedIssueTime"
-                                    class="input peer pl-10"
-                                    placeholder=" "
+                                    :label="__('forms.time')"
                                 />
-
-                                @icon('clock', 'svg-input left-2.5 text-gray-400')
                             </div>
                         </div>
                     </div>
@@ -451,7 +446,7 @@
 
                                 @foreach (
                                     $this->dictionaries['detected_issue_codes'] ?? [] as $code => $issueCode
-)
+                                )
                                     <option value="{{ $code }}">{{ $issueCode }}</option>
                                 @endforeach
                             </select>
@@ -593,7 +588,7 @@
 
                                     @foreach (
                                         $this->dictionaries['eHealth/report_origins'] ?? [] as $code => $reportOrigin
-)
+                                    )
                                         <option value="{{ $code }}">{{ $reportOrigin }}</option>
                                     @endforeach
                                 </select>

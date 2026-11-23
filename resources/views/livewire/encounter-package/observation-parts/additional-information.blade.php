@@ -104,23 +104,15 @@
             </p>
         </div>
 
-        <div class="w-3/5" onclick="document.getElementById('observationIssuedTime').showPicker()">
-            <label for="observationIssuedTime" class="hidden"> {{ __('forms.time') }} </label>
-
-            <div class="relative mt-7 flex items-center">
-                @icon('mingcute-time-fill', 'svg-input left-2.5')
-                <input
-                    x-model="modalObservation.issuedTime"
-                    @input="$event.target.blur()"
-                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                    type="time"
-                    name="issuedTime"
-                    id="observationIssuedTime"
-                    class="input-modal pl-10!"
-                    autocomplete="off"
-                    required
-                />
-            </div>
+        <div class="w-3/5">
+            <x-forms.time
+                modal
+                x-model="modalObservation.issuedTime"
+                name="issuedTime"
+                id="observationIssuedTime"
+                required
+                :label="__('forms.time')"
+            />
 
             <p class="text-error text-xs" x-show="modalObservation.issuedTime.trim() === ''">
                 {{ __('forms.field_empty') }}
@@ -173,22 +165,15 @@
             />
         </div>
 
-        <div class="w-3/5" onclick="document.getElementById('effectiveTime').showPicker()">
-            <label for="effectiveTime" class="hidden"> {{ __('forms.time') }} </label>
-
-            <div class="relative mt-7 flex items-center">
-                @icon('mingcute-time-fill', 'svg-input left-2.5')
-                <input
-                    x-model="modalObservation.effectiveTime"
-                    @input="$event.target.blur()"
-                    type="time"
-                    name="effectiveTime"
-                    id="effectiveTime"
-                    class="input-modal pl-10!"
-                    autocomplete="off"
-                    :required="modalObservation.effectiveType === 'date_time'"
-                />
-            </div>
+        <div class="w-3/5">
+            <x-forms.time
+                modal
+                x-model="modalObservation.effectiveTime"
+                name="effectiveTime"
+                id="effectiveTime"
+                x-bind:required="modalObservation.effectiveType === 'date_time'"
+                :label="__('forms.time')"
+            />
         </div>
     </div>
 
@@ -210,44 +195,26 @@
             </div>
         </div>
 
-        <div class="w-3/5" onclick="document.getElementById('observationEffectivePeriodStartTime').showPicker()">
-            <label for="observationEffectivePeriodStartTime" class="label-modal">
-                {{ __('observations.effective_period_start') }}
-            </label>
-
-            <div class="relative flex items-center">
-                @icon('mingcute-time-fill', 'svg-input left-2.5')
-                <input
-                    x-model="modalObservation.effectivePeriodStartTime"
-                    @input="$event.target.blur()"
-                    type="time"
-                    name="effectivePeriodStartTime"
-                    id="observationEffectivePeriodStartTime"
-                    class="input-modal pl-10!"
-                    autocomplete="off"
-                    :required="modalObservation.effectiveType === 'period'"
-                />
-            </div>
+        <div class="w-3/5">
+            <x-forms.time
+                modal
+                x-model="modalObservation.effectivePeriodStartTime"
+                name="effectivePeriodStartTime"
+                id="observationEffectivePeriodStartTime"
+                x-bind:required="modalObservation.effectiveType === 'period'"
+                :label="__('observations.effective_period_start')"
+            />
         </div>
 
-        <div class="w-3/5" onclick="document.getElementById('observationEffectivePeriodEndTime').showPicker()">
-            <label for="observationEffectivePeriodEndTime" class="label-modal">
-                {{ __('observations.effective_period_end') }}
-            </label>
-
-            <div class="relative flex items-center">
-                @icon('mingcute-time-fill', 'svg-input left-2.5')
-                <input
-                    x-model="modalObservation.effectivePeriodEndTime"
-                    @input="$event.target.blur()"
-                    type="time"
-                    name="effectivePeriodEndTime"
-                    id="observationEffectivePeriodEndTime"
-                    class="input-modal pl-10!"
-                    autocomplete="off"
-                    :required="modalObservation.effectiveType === 'period'"
-                />
-            </div>
+        <div class="w-3/5">
+            <x-forms.time
+                modal
+                x-model="modalObservation.effectivePeriodEndTime"
+                name="effectivePeriodEndTime"
+                id="observationEffectivePeriodEndTime"
+                x-bind:required="modalObservation.effectiveType === 'period'"
+                :label="__('observations.effective_period_end')"
+            />
         </div>
     </div>
 

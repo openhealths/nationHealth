@@ -803,21 +803,13 @@
                             </div>
 
                             <div>
-                                <label for="onsetTime" class="sr-only">{{ __('forms.time') }}</label>
-                                <div class="relative">
-                                    <div class="pointer-events-none absolute inset-y-0 inset-s-0 flex items-center pl-1">
-                                        @icon('mingcute-time-fill', 'w-4 h-4 text-gray-400')
-                                    </div>
-                                    <input
-                                        x-model="modalCondition.onsetTime"
-                                        type="text"
-                                        name="onsetTime"
-                                        id="onsetTime"
-                                        class="timepicker-uk input w-full cursor-pointer pl-7"
-                                        autocomplete="off"
-                                        required
-                                    />
-                                </div>
+                                <x-forms.time
+                                    x-model="modalCondition.onsetTime"
+                                    name="onsetTime"
+                                    id="onsetTime"
+                                    required
+                                    :label="__('forms.time')"
+                                />
                                 <p class="text-error mt-1 text-xs" x-show="conditionOnsetAfterEncounterEnd()" x-cloak>
                                     {{ __('conditions.onset_after_encounter_end') }}
                                 </p>
@@ -836,21 +828,13 @@
                             </div>
 
                             <div>
-                                <label for="assertedTime" class="sr-only">{{ __('forms.time') }}</label>
-                                <div class="relative">
-                                    <div class="pointer-events-none absolute inset-y-0 inset-s-0 flex items-center pl-1">
-                                        @icon('mingcute-time-fill', 'w-4 h-4 text-gray-400')
-                                    </div>
-                                    <input
-                                        x-model="modalCondition.assertedTime"
-                                        type="text"
-                                        name="assertedTime"
-                                        id="assertedTime"
-                                        class="timepicker-uk input w-full cursor-pointer pl-7"
-                                        autocomplete="off"
-                                        required
-                                    />
-                                </div>
+                                <x-forms.time
+                                    x-model="modalCondition.assertedTime"
+                                    name="assertedTime"
+                                    id="assertedTime"
+                                    required
+                                    :label="__('forms.time')"
+                                />
                                 <p
                                     class="text-error mt-1 text-xs"
                                     x-show="conditionAssertedOutsideEncounterPeriod()"
@@ -910,7 +894,7 @@
                                         if (! modalCondition.bodySites) modalCondition.bodySites = [];
                                         modalCondition.bodySites.push({ code: '' });
                                     "
-                                    class="cursor-pointer mt-3 flex items-center gap-1.5 text-xs font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                    class="mt-3 flex cursor-pointer items-center gap-1.5 text-xs font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                                 >
                                     <span>{{ __('conditions.add_body_part') }}</span>
                                 </button>
