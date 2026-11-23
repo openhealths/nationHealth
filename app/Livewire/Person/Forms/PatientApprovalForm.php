@@ -6,6 +6,7 @@ namespace App\Livewire\Person\Forms;
 
 use App\Models\CarePlan;
 use App\Core\BaseForm;
+use App\Dto\ServiceRequest\Approval as ReferralApprovalData;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\Person\Person;
@@ -264,21 +265,21 @@ class PatientApprovalForm extends BaseForm
         }
 
         try {
-            $referral = app(PatientApprovalService::class)
-                ->referralDetails($person, $uuid);
+            $details = app(PatientApprovalService::class)->referralDetails($person, $uuid);
+            $referral = objectMapper()->map($details, ReferralApprovalData::class);
         } catch (Throwable) {
             throw ValidationException::withMessages([
                 'resourceIds' => __('approval.create.referral_check_failed'),
             ]);
         }
 
-        if (($referral['status'] ?? null) !== 'active') {
+        if ($referral->status !== 'active') {
             throw ValidationException::withMessages([
                 'resourceIds' => __('approval.create.referral_not_active'),
             ]);
         }
 
-        if (empty($referral['permitted_resources'])) {
+        if (empty($referral->permittedResources)) {
             throw ValidationException::withMessages([
                 'resourceIds' => __('approval.create.referral_no_resources'),
             ]);
