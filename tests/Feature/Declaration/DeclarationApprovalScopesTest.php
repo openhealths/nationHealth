@@ -17,6 +17,7 @@ use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\Permission;
 use App\Models\Relations\Party;
+use App\Models\Role as PermissionRole;
 use App\Models\User;
 use GuzzleHttp\Psr7\Response as PsrResponse;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -221,8 +222,12 @@ class DeclarationApprovalScopesTest extends TestCase
         setPermissionsTeamId($legalEntity->id);
         $party = Party::factory()->create();
         $user = User::factory()->create(['party_id' => $party->id]);
+        // Keep the v3 role usable without the legacy scope; allowedRoles requires its entire permission set.
+        PermissionRole::findByName($role->value, 'ehealth')->revokePermissionTo('declaration_request:approve');
         $user->assignRole($role);
-        $user->syncPermissions(array_intersect(config('ehealth.roles.' . $role->value), config('ehealth.legal_entity_types.' . $type)));
+        $scopes = array_intersect(config('ehealth.roles.' . $role->value), config('ehealth.legal_entity_types.' . $type));
+        // Exercise v3 approval independently of the legacy scope, even when role config still includes it.
+        $user->syncPermissions(array_diff($scopes, ['declaration_request:approve']));
         $division = Division::factory()->create(['legal_entity_id' => $legalEntity->id]);
         $employee = Employee::factory()->create([
             'party_id' => $party->id,
