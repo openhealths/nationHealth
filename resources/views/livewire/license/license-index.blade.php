@@ -76,7 +76,7 @@
                                                 @click.outside="open = false"
                                                 class="cursor-pointer text-gray-500 hover:text-gray-800 dark:hover:text-white focus:outline-none"
                                             >
-                                                @icon('edit-user-outline', 'svg-hover-action w-6 h-6 text-gray-800 dark:text-white')
+                                                @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                                             </button>
 
                                             <div

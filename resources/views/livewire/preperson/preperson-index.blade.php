@@ -217,7 +217,7 @@
                                                 type="button"
                                                 class="cursor-pointer rounded-full p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
                                             >
-                                                @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
+                                                @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                                             </button>
 
                                             <div

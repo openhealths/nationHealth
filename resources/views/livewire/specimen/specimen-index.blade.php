@@ -125,7 +125,7 @@
                                         type="button"
                                         class="inline-flex cursor-pointer items-center rounded-lg p-2 text-gray-500 hover:text-gray-800"
                                     >
-                                        @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-white')
+                                        @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                                     </button>
 
                                     <div

@@ -95,9 +95,7 @@
                                     aria-expanded="false"
                                     aria-controls="dropdown-button-1"
                                 >
-                                    <svg class="svg-hover-action h-6 w-6 text-gray-800 dark:text-gray-200" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-                                        <path stroke="currentColor" stroke-linecap="square" stroke-linejoin="round" stroke-width="2" d="M7 19H5a1 1 0 0 1-1-1v-1a3 3 0 0 1 3-3h1m4-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm7.441 1.559a1.907 1.907 0 0 1 0 2.698l-6.069 6.069L10 19l.674-3.372 6.07-6.07a1.907 1.907 0 0 1 2.697 0Z"></path>
-                                    </svg>
+                                    @icon('edit-user-outline', 'svg-hover-action h-6 w-6')
                                 </button>
 
                                 <div class="absolute" style="left: -120%" bis_skin_checked="1">

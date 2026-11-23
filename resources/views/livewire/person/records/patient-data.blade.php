@@ -934,7 +934,7 @@
                                                             type="button"
                                                             class="cursor-pointer rounded-full p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
                                                         >
-                                                            @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
+                                                            @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                                                         </button>
                                                         <div
                                                             x-show="openDropdown"
@@ -1067,7 +1067,7 @@
                                                                 type="button"
                                                                 class="cursor-pointer rounded-full p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
                                                             >
-                                                                @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
+                                                                @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                                                             </button>
 
                                                             <div
@@ -1165,7 +1165,7 @@
                                                     type="button"
                                                     class="cursor-pointer rounded-full p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
                                                 >
-                                                    @icon('edit-user-outline', 'w-5 h-5 text-gray-600 dark:text-gray-300')
+                                                    @icon('edit-user-outline', 'svg-hover-action w-5 h-5')
                                                 </button>
                                                 <div
                                                     x-show="openOptions"

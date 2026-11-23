@@ -809,7 +809,7 @@ input:-webkit-autofill {
     }
 
     .record-inner-action-btn {
-        @apply text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors focus:outline-none
+        @apply cursor-pointer text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600
     }
 
     .record-inner-grid-container {

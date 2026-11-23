@@ -158,13 +158,13 @@
                         >
                             <button
                                 type="button"
-                                class="record-inner-action-btn cursor-pointer rounded-lg p-2 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                class="record-inner-action-btn rounded-lg p-2 hover:bg-gray-50 dark:hover:bg-gray-700"
                                 @click="open = ! open"
                                 :aria-expanded="open"
                                 :aria-controls="$id('device-request-actions')"
                                 aria-label="{{ __('forms.actions') }}"
                             >
-                                @icon('edit-user-outline', 'w-6 h-6')
+                                @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                             </button>
                             <div
                                 x-show="open"

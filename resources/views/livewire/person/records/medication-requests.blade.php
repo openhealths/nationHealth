@@ -226,9 +226,9 @@
                                             :aria-expanded="open"
                                             :aria-controls="$id('medication-actions')"
                                             aria-label="{{ __('forms.actions') }}"
-                                            class="record-inner-action-btn cursor-pointer rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                                            class="record-inner-action-btn rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
                                         >
-                                            @icon('edit-user-outline', 'w-6 h-6 text-gray-700 dark:text-gray-300')
+                                            @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                                         </button>
                                         <div x-show="open" x-cloak x-transition :id="$id('medication-actions')" class="dropdown-menu right-0 w-56">
                                             <button type="button" wire:click="toggleExpand('{{ $recordUuid }}')" @click="open = false" class="dropdown-item">
