@@ -4,25 +4,36 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
-use App\Enums\Person\ServiceRequestStatus;
+use App\Dto\ServiceRequest\Model as ServiceRequestData;
 use App\Enums\JobStatus;
+use App\Enums\Person\EncounterStatus;
 use App\Enums\Person\ServiceRequestProgramStatus;
+use App\Enums\Person\ServiceRequestStatus;
+use App\Exceptions\MedicalEvents\ClinicalStorageException;
+use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Models\CarePlanActivity;
+use App\Models\EhealthLink;
 use App\Models\Employee\Employee;
+use App\Models\MedicalEvents\Sql\Coding;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
+use App\Models\Person\Person;
 use App\Repositories\MedicalEvents\Concerns\ResolvesRequestFhirRefs;
+use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
+use App\Repositories\Repository;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use App\Services\MedicalEvents\Mappers\ServiceRequestRegistryMapper;
+use Carbon\CarbonImmutable;
+use Closure;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Throwable;
-use App\Enums\Person\EncounterStatus;
-use App\Models\EhealthLink;
-use App\Models\MedicalEvents\Sql\DiagnosticReport;
-use App\Models\MedicalEvents\Sql\Procedure;
-use App\Models\Person\Person;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Symfony\Component\ObjectMapper\ObjectMapperInterface;
+use Throwable;
 
 /**
  * @property ServiceRequestRequest $model
@@ -31,7 +42,7 @@ class ServiceRequestRequestRepository extends BaseRepository
 {
     use ResolvesRequestFhirRefs;
 
-    private ?ServiceRequestRegistryMapper $registryMapper = null;
+    protected ?ServiceRequestRegistryMapper $registryMapper = null;
 
     public function __construct(ServiceRequestRequest $model)
     {
@@ -52,13 +63,13 @@ class ServiceRequestRequestRepository extends BaseRepository
     public function store(array $resource, int $personId, ?int $employeeId = null, ?int $divisionId = null): int
     {
         if (empty($resource['id'])) {
-            throw new \InvalidArgumentException('A mapped Service Request requires its identity.');
+            throw new InvalidArgumentException('A mapped Service Request requires its identity.');
         }
 
         return $this->storageTransaction(function () use ($resource, $personId, $employeeId, $divisionId): int {
             $existing = $this->model->newQuery()->whereUuid($resource['id'])->lockForUpdate()->first();
             if ($existing !== null && $this->hasPendingSubmission($existing)) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['submission' => __('care-plan.submission_pending')]);
+                throw ValidationException::withMessages(['submission' => __('care-plan.submission_pending')]);
             }
 
             return $this->storeResource($resource, $personId, $employeeId ?? $existing?->employeeId, $divisionId ?? $existing?->divisionId)->id;
@@ -89,12 +100,12 @@ class ServiceRequestRequestRepository extends BaseRepository
     public function storeResource(array $resource, int $personId, ?int $employeeId = null, ?int $divisionId = null): ServiceRequestRequest
     {
         if (empty($resource['id']) || empty(data_get($resource, 'code.identifier.value'))) {
-            throw new \InvalidArgumentException('A complete Service Request requires its identity and service reference.');
+            throw new InvalidArgumentException('A complete Service Request requires its identity and service reference.');
         }
-        $person = \App\Models\Person\Person::findOrFail($personId);
+        $person = Person::findOrFail($personId);
         $subject = data_get($resource, 'subject.identifier.value') ?? data_get($resource, 'patient.identifier.value');
         if ($subject !== null && $subject !== $person->uuid) {
-            throw new \InvalidArgumentException('The Service Request patient does not match its import context.');
+            throw new InvalidArgumentException('The Service Request patient does not match its import context.');
         }
         if (isset($resource['requesterEmployee']['identifier']['value'])) {
             $employeeId = Employee::whereUuid($resource['requesterEmployee']['identifier']['value'])->value('id');
@@ -103,7 +114,7 @@ class ServiceRequestRequestRepository extends BaseRepository
         return $this->storageTransaction(function () use ($resource, $personId, $employeeId, $divisionId): ServiceRequestRequest {
             $request = $this->model->newQuery()->whereUuid($resource['id'])->lockForUpdate()->first();
             if ($request !== null && $request->personId !== $personId) {
-                throw new \InvalidArgumentException('The Service Request belongs to another patient.');
+                throw new InvalidArgumentException('The Service Request belongs to another patient.');
             }
             $request ??= new ServiceRequestRequest();
             if ($request->exists) {
@@ -115,10 +126,11 @@ class ServiceRequestRequestRepository extends BaseRepository
                 'serviceId' => data_get($resource, 'code.identifier.value'), 'quantity' => data_get($resource, 'quantity.value'),
                 'programId' => data_get($resource, 'program.identifier.value'), 'note' => $resource['note'] ?? null,
                 'patientInstruction' => $resource['patientInstruction'] ?? null,
-                'startedAt' => $this->sqlDate(data_get($resource, 'occurrencePeriod.start')), 'endedAt' => $this->sqlDate(data_get($resource, 'occurrencePeriod.end')),
-                'occurrenceDateTime' => $this->sqlDate($resource['occurrenceDateTime'] ?? null),
+                'startedAt' => $this->formatUtcDatabaseTimestamp(data_get($resource, 'occurrencePeriod.start')),
+                'endedAt' => $this->formatUtcDatabaseTimestamp(data_get($resource, 'occurrencePeriod.end')),
+                'occurrenceDateTime' => $this->formatUtcDatabaseTimestamp($resource['occurrenceDateTime'] ?? null),
                 'programProcessingStatus' => $resource['programProcessingStatus'] ?? null,
-                'authoredOn' => $this->sqlDate($resource['authoredOn'] ?? null),
+                'authoredOn' => $this->formatUtcDatabaseTimestamp($resource['authoredOn'] ?? null),
                 'explanatoryLetter' => $resource['explanatoryLetter'] ?? null,
                 'informWith' => data_get($resource, 'informWith.authMethodId'), 'detailsSyncedAt' => now(),
                 'supportingInfo' => (new ServiceRequestMapper())->fromFhir($resource)['supporting_info'],
@@ -132,13 +144,13 @@ class ServiceRequestRequestRepository extends BaseRepository
                 $existing = $request->exists ? $request->getRelation($relation) : null;
                 $attributes[$attribute] = isset($resource[$field]) ? $this->syncCodeableConcept($request->exists ? $request : null, $resource[$field], $relation)->id : null;
             }
-            $attributes['intentId'] = isset($resource['intent']) ? \App\Models\MedicalEvents\Sql\Coding::firstOrCreate(['system' => self::REQUEST_INTENT_SYSTEM, 'code' => $resource['intent']])->id : null;
-            $attributes['priorityId'] = isset($resource['priority']) ? \App\Models\MedicalEvents\Sql\CodeableConcept::firstOrCreate(['text' => $resource['priority']])->id : null;
+            $attributes['intentId'] = isset($resource['intent']) ? Coding::firstOrCreate(['system' => self::REQUEST_INTENT_SYSTEM, 'code' => $resource['intent']])->id : null;
+            $this->syncPriority($request, $resource['priority'] ?? null);
             foreach (['quantity' => ['quantityQuantity', 'quantityId'], 'remainingQuantity' => ['remainingQuantity', 'remainingQuantityId']] as $field => [$relation, $attribute]) {
-                $attributes[$attribute] = Repository::quantity()->replaceComplete($request->exists ? $request->getRelation($relation) : null, $resource[$field] ?? null)?->id;
+                $attributes[$attribute] = MedicalEventsRepository::quantity()->replaceComplete($request->exists ? $request->getRelation($relation) : null, $resource[$field] ?? null)?->id;
             }
             $request->forceFill($attributes)->save();
-            Repository::period()->sync($request, !empty($resource['occurrencePeriod']) ? $resource['occurrencePeriod'] + ['start' => null] : null, 'occurrencePeriod');
+            MedicalEventsRepository::period()->sync($request, !empty($resource['occurrencePeriod']) ? $resource['occurrencePeriod'] + ['start' => null] : null, 'occurrencePeriod');
             foreach (self::FHIR_COLLECTIONS as $field => $relation) {
                 $this->syncPivot($request, $relation, $this->syncIdentifiers($request, $resource[$field] ?? [], $relation));
             }
@@ -165,7 +177,7 @@ class ServiceRequestRequestRepository extends BaseRepository
     {
         $request = is_int($request) ? $this->model->newQuery()->findOrFail($request) : $request;
         if ($request->detailsSyncedAt === null) {
-            throw new \InvalidArgumentException('Service Request requires full import or explicit draft conversion before use.');
+            throw new InvalidArgumentException('Service Request requires full import or explicit draft conversion before use.');
         }
         $request->load($this->fhirRelations());
         $resource = [];
@@ -182,12 +194,12 @@ class ServiceRequestRequestRepository extends BaseRepository
         }
         foreach (self::FHIR_REFERENCES as $field => [$relation]) {
             if ($request->getRelation($relation) !== null) {
-                $resource[$field] = Repository::identifier()->toReference($request->getRelation($relation));
+                $resource[$field] = MedicalEventsRepository::identifier()->toReference($request->getRelation($relation));
             }
         }
         foreach (['category' => 'category', 'performerType' => 'performerType', 'statusReason' => 'statusReasonConcept'] as $field => $relation) {
             if ($request->getRelation($relation) !== null) {
-                $resource[$field] = Repository::codeableConcept()->toResource($request->getRelation($relation));
+                $resource[$field] = MedicalEventsRepository::codeableConcept()->toResource($request->getRelation($relation));
             }
         }
         foreach (['quantity' => 'quantityQuantity', 'remainingQuantity' => 'remainingQuantity'] as $field => $relation) {
@@ -202,20 +214,20 @@ class ServiceRequestRequestRepository extends BaseRepository
             }
         }
         if ($request->occurrencePeriod !== null) {
-            $resource['occurrencePeriod'] = array_filter(Repository::period()->toResource($request->occurrencePeriod), static fn ($value) => $value !== null);
+            $resource['occurrencePeriod'] = array_filter(MedicalEventsRepository::period()->toResource($request->occurrencePeriod), static fn ($value) => $value !== null);
         }
         if ($request->occurrenceDateTime !== null) {
-            $resource['occurrenceDateTime'] = \Carbon\CarbonImmutable::parse($request->getRawOriginal('occurrence_date_time'), 'UTC')->format('Y-m-d\TH:i:s.u\Z');
+            $resource['occurrenceDateTime'] = CarbonImmutable::parse($request->getRawOriginal('occurrence_date_time'), 'UTC')->format('Y-m-d\TH:i:s.u\Z');
         }
         if ($request->informWith !== null) {
             $resource['informWith'] = ['authMethodId' => $request->informWith];
         }
         if ($request->authoredOn !== null) {
-            $resource['authoredOn'] = \Carbon\CarbonImmutable::parse($request->authoredOn, 'UTC')->utc()->toIso8601ZuluString();
+            $resource['authoredOn'] = CarbonImmutable::parse($request->authoredOn, 'UTC')->utc()->toIso8601ZuluString();
         }
         foreach (self::FHIR_COLLECTIONS as $field => $relation) {
             if (true) {
-                $resource[$field] = $request->getRelation($relation)->map(fn ($item) => Repository::identifier()->toReference($item))->all();
+                $resource[$field] = $request->getRelation($relation)->map(fn ($item) => MedicalEventsRepository::identifier()->toReference($item))->all();
             }
         }
 
@@ -224,7 +236,7 @@ class ServiceRequestRequestRepository extends BaseRepository
 
     public function backfillResources(int $personId, bool $write = false): array
     {
-        \App\Models\Person\Person::findOrFail($personId);
+        Person::findOrFail($personId);
         $report = ['records' => 0, 'converted' => 0, 'needsRemoteSync' => [], 'errors' => []];
         $resources = [];
         $this->model->newQuery()->wherePersonId($personId)->with(['employee.legalEntity', 'category.coding', 'priority', 'intent', 'basedOn.type.coding', 'context.type.coding'])->chunkById(100, function ($records) use (&$report, &$resources): void {
@@ -239,7 +251,7 @@ class ServiceRequestRequestRepository extends BaseRepository
                 }
                 try {
                     $resources[$record->id] = $this->legacyDraftResource($record);
-                } catch (\Throwable $exception) {
+                } catch (Throwable $exception) {
                     $report['errors'][] = ['localId' => $record->id, 'reason' => $exception->getMessage()];
                 }
             }
@@ -254,7 +266,7 @@ class ServiceRequestRequestRepository extends BaseRepository
                     continue;
                 }
                 if (!in_array(strtolower($record->status), ['draft', 'new'], true) || filled($record->requestNumber)) {
-                    throw new \InvalidArgumentException('The draft changed after preflight; repeat reconciliation.');
+                    throw new InvalidArgumentException('The draft changed after preflight; repeat reconciliation.');
                 }
                 $resource = $this->legacyDraftResource($record);
                 $this->storeResource($resource, $personId, $record->employeeId, $record->divisionId);
@@ -268,11 +280,11 @@ class ServiceRequestRequestRepository extends BaseRepository
     public function legacyDraftResource(ServiceRequestRequest $record): array
     {
         if (!in_array(strtolower($record->status), ['draft', 'new'], true) || filled($record->requestNumber)) {
-            throw new \InvalidArgumentException('Registered historical resources require a complete remote import.');
+            throw new InvalidArgumentException('Registered historical resources require a complete remote import.');
         }
         $record->loadMissing(['employee.legalEntity', 'category.coding', 'priority', 'intent', 'basedOn.type.coding', 'context.type.coding']);
         if ($record->employee === null || $record->employee->legalEntity === null) {
-            throw new \InvalidArgumentException('Historical author identity cannot be recovered.');
+            throw new InvalidArgumentException('Historical author identity cannot be recovered.');
         }
         $data = $record->getAttributes();
         $data['category'] = $record->category?->coding?->first()?->code ?? $record->category?->text;
@@ -285,36 +297,36 @@ class ServiceRequestRequestRepository extends BaseRepository
         $contextType = $record->context?->type?->first()?->coding?->first()?->code;
         if ($data['context_uuid'] !== null && $contextType === null) {
             if (!Encounter::whereUuid($data['context_uuid'])->wherePersonId($record->personId)->exists()) {
-                throw new \InvalidArgumentException('Historical context is untyped and cannot be matched to a patient encounter.');
+                throw new InvalidArgumentException('Historical context is untyped and cannot be matched to a patient encounter.');
             }
             $contextType = 'encounter';
         }
         $data['context_type'] = $contextType;
         $activity = $data['based_on_uuid'] ? CarePlanActivity::whereUuid($data['based_on_uuid'])->whereHas('carePlan', fn ($query) => $query->wherePersonId($record->personId))->first() : null;
         if ($data['based_on_uuid'] && $activity === null) {
-            throw new \InvalidArgumentException('The historical activity reference cannot be matched to this patient.');
+            throw new InvalidArgumentException('The historical activity reference cannot be matched to this patient.');
         }
         $options = ['employee_uuid' => $record->employee->uuid, 'legal_entity_uuid' => $record->employee->legalEntity->uuid, 'carePlanUuid' => $activity?->carePlan?->uuid, 'timezone' => config('app.timezone')];
         if ($record->quantity !== null) {
             $data['quantity_system'] = $activity?->quantitySystem;
             $data['quantity_code'] = $activity?->quantityCode;
             if (empty($data['quantity_system']) || empty($data['quantity_code'])) {
-                throw new \InvalidArgumentException('Historical quantity units are missing; reconciliation is required.');
+                throw new InvalidArgumentException('Historical quantity units are missing; reconciliation is required.');
             }
         }
         if ($activity !== null) {
             $data['service_type'] = $activity->productReferenceIdentifier?->type?->first()?->coding?->first()?->code;
             if (empty($data['service_type'])) {
-                throw new \InvalidArgumentException('Historical service/service_group type cannot be recovered.');
+                throw new InvalidArgumentException('Historical service/service_group type cannot be recovered.');
             }
         }
 
         return (new ServiceRequestMapper())->toFhir($data, $options);
     }
 
-    public function person(int $id): ?\App\Models\Person\Person
+    public function person(int $id): ?Person
     {
-        return \App\Models\Person\Person::find($id);
+        return Person::find($id);
     }
 
     public function activityForDraft(int $id, int $carePlanId, int $personId): CarePlanActivity
@@ -357,7 +369,7 @@ class ServiceRequestRequestRepository extends BaseRepository
 
     public function cacheExecutionResource(array $remote, string $patientUuid, Employee $employee): ?ServiceRequestRequest
     {
-        $person = \App\Models\Person\Person::whereUuid($patientUuid)->first();
+        $person = Person::whereUuid($patientUuid)->first();
         $resource = (new ServiceRequestMapper())->normalize($remote);
         // A summary is insufficient to materialize a new clinical document.
         if ($person === null || empty($resource['id']) || empty(data_get($resource, 'code.identifier.value'))) {
@@ -402,15 +414,15 @@ class ServiceRequestRequestRepository extends BaseRepository
             return [];
         }
         if ($activity->carePlan->personId !== $personId) {
-            throw new \InvalidArgumentException('The activity belongs to another patient.');
+            throw new InvalidArgumentException('The activity belongs to another patient.');
         }
         $type = $activity->productReferenceIdentifier?->type?->first()?->coding?->first()?->code;
         $system = $activity->quantitySystem;
         $code = $activity->quantityCode;
         $serviceId = $activity->productReference;
         $programId = $activity->program;
-        if ($activity->detailsSyncedAt !== null && method_exists(\App\Repositories\CarePlanActivityRepository::class, 'getResource')) {
-            $resource = app(\App\Repositories\CarePlanActivityRepository::class)->getResource($activity->id);
+        if ($activity->detailsSyncedAt !== null) {
+            $resource = Repository::carePlanActivity()->getResource($activity->id);
             $system = data_get($resource, 'detail.quantity.system');
             $code = data_get($resource, 'detail.quantity.code');
             $type = data_get($resource, 'detail.productReference.identifier.type.coding.0.code');
@@ -431,9 +443,9 @@ class ServiceRequestRequestRepository extends BaseRepository
         return ['statusReasonConcept.coding', 'intent', 'priority', 'category.coding', 'performerType.coding', 'quantityQuantity', 'remainingQuantity', 'occurrencePeriod', ...array_map(static fn (array $entry): string => $entry[0].'.type.coding', array_values(self::FHIR_REFERENCES)), ...array_map(static fn (string $name): string => $name.'.type.coding', array_values(self::FHIR_COLLECTIONS))];
     }
 
-    private function sqlDate(?string $value): ?string
+    private function formatUtcDatabaseTimestamp(?string $value): ?string
     {
-        return $value === null ? null : \Carbon\CarbonImmutable::parse($value, 'UTC')->utc()->format('Y-m-d H:i:s.u');
+        return $value === null ? null : CarbonImmutable::parse($value, 'UTC')->utc()->format('Y-m-d H:i:s.u');
     }
 
     /**
@@ -448,11 +460,24 @@ class ServiceRequestRequestRepository extends BaseRepository
      */
     public function searchByPersonId(int $personId, array $filters = []): array
     {
-        $query = $this->model
-            ->newQuery()
+        $user = Auth::user();
+        $legalEntity = legalEntity();
+        if ($user === null || $legalEntity === null || $user->cannot('viewAny', ServiceRequestRequest::class)) {
+            return [];
+        }
+
+        $person = Person::find($personId);
+        if ($person === null) {
+            return [];
+        }
+
+        $query = $this->model->newQuery()->readableFor($person, $user, $legalEntity)
             ->with(['basedOn', 'context', 'category.coding', 'priority', 'programReference'])
-            ->withExists(['ehealthLinks as submission_pending' => static fn ($query) => $query->where('status', \App\Enums\JobStatus::PENDING->value)])
-            ->where('person_id', $personId);
+            ->withExists(['ehealthLinks as submission_pending' => static fn (Builder $links) => $links->whereStatus(JobStatus::PENDING->value)]);
+
+        if ($user->can('updateAny', [ServiceRequestRequest::class, $legalEntity])) {
+            $query->withExists(['employee as request_author' => static fn (Builder $employees) => $employees->forUserInLegalEntity($user, $legalEntity)]);
+        }
 
         $status = trim((string) ($filters['status'] ?? ''));
         if ($status !== '') {
@@ -506,13 +531,12 @@ class ServiceRequestRequestRepository extends BaseRepository
                 ->pluck('id', 'uuid')
                 ->all();
 
-        return $requests
-            ->map(fn (ServiceRequestRequest $request): array => $this->toPatientRegistryRow(
-                $request,
-                $carePlanIdsByActivityUuid,
-                $encounterIdsByUuid
-            ))
-            ->all();
+        return $requests->map(function (ServiceRequestRequest $serviceRequest) use ($carePlanIdsByActivityUuid, $encounterIdsByUuid): array {
+            $row = $this->toPatientRegistryRow($serviceRequest, $carePlanIdsByActivityUuid, $encounterIdsByUuid);
+            $row['canEdit'] = ($serviceRequest->requestAuthor ?? false) && $serviceRequest->isEditableRequest();
+
+            return $row;
+        })->all();
     }
 
     /** Delegate display projection while preserving repository callers and pending-submission checks. */
@@ -548,7 +572,51 @@ class ServiceRequestRequestRepository extends BaseRepository
 
     public function findForPerson(int $id, int $personId): ServiceRequestRequest
     {
-        return $this->model->newQuery()->whereKey($id)->wherePersonId($personId)->firstOrFail();
+        return $this->model->newQuery()->forPerson($personId)->findOrFail($id);
+    }
+
+    /** Signing and editing lock the same referral until the write commits. */
+    public function withLockedRequest(int $personId, int $serviceRequestId, Closure $edit): ?ServiceRequestRequest
+    {
+        return $this->storageTransaction(function () use ($personId, $serviceRequestId, $edit): ?ServiceRequestRequest {
+            $serviceRequest = $this->model->newQuery()->forPerson($personId)->lockForUpdate()->findOrFail($serviceRequestId);
+            $serviceRequest->loadMissing('person');
+
+            return $edit($serviceRequest);
+        });
+    }
+
+    /** Apply the partial update inside the lock held by withLockedRequest(). */
+    public function saveRequest(
+        ServiceRequestData $data,
+        ServiceRequestRequest $serviceRequest,
+        ObjectMapperInterface $mapper
+    ): ServiceRequestRequest {
+        $mapper->map($data, $serviceRequest);
+        $this->syncPriority($serviceRequest, $data->priority);
+
+        if (!$serviceRequest->save()) {
+            throw new ClinicalStorageException(__('messages.database_error'));
+        }
+
+        return $serviceRequest;
+    }
+
+    /** A referral priority is a scalar code stored as the text of its own concept. */
+    private function syncPriority(ServiceRequestRequest $request, ?string $priority): void
+    {
+        if ($priority === null) {
+            $request->priority()->dissociate();
+
+            return;
+        }
+
+        $relation = $request->priority();
+        if ($request->priorityId !== null && $relation->where('text', $priority)->whereDoesntHave('coding')->exists()) {
+            return;
+        }
+
+        $relation->associate(MedicalEventsRepository::codeableConcept()->store(['text' => $priority]));
     }
 
     public function findByUuid(string $uuid): ?ServiceRequestRequest
@@ -687,7 +755,7 @@ class ServiceRequestRequestRepository extends BaseRepository
         $existing = $this->findByUuid($resource['id']);
         if ($existing !== null) {
             if ((int) $existing->personId !== $personId) {
-                throw new \InvalidArgumentException('A Service Request UUID already belongs to another patient.');
+                throw new InvalidArgumentException('A Service Request UUID already belongs to another patient.');
             }
 
             return;
@@ -755,8 +823,8 @@ class ServiceRequestRequestRepository extends BaseRepository
             } elseif ($relation?->value === $value) {
                 $attributes[$field.'_id'] = $relation->id;
             } else {
-                $identifier = Repository::identifier()->store($value);
-                Repository::codeableConcept()->attach($identifier, [
+                $identifier = MedicalEventsRepository::identifier()->store($value);
+                MedicalEventsRepository::codeableConcept()->attach($identifier, [
                     'identifier' => ['type' => ['coding' => [['system' => 'eHealth/resources', 'code' => $type]]]],
                 ]);
                 $attributes[$field.'_id'] = $identifier->id;
@@ -771,7 +839,7 @@ class ServiceRequestRequestRepository extends BaseRepository
             } elseif ($concept?->coding->first()?->code === $code) {
                 $attributes['performer_type_id'] = $concept->id;
             } else {
-                $attributes['performer_type_id'] = Repository::codeableConcept()->store([
+                $attributes['performer_type_id'] = MedicalEventsRepository::codeableConcept()->store([
                     'coding' => [['system' => 'SPECIALITY_TYPE', 'code' => $code]],
                 ])->id;
             }
@@ -946,29 +1014,29 @@ class ServiceRequestRequestRepository extends BaseRepository
 
     public function hasPendingSubmission(ServiceRequestRequest $record): bool
     {
-        return $record->ehealthLinks()->where('status', \App\Enums\JobStatus::PENDING->value)->exists();
+        return $record->ehealthLinks()->where('status', JobStatus::PENDING->value)->exists();
     }
 
-    public function beginSubmission(ServiceRequestRequest $record, array $changes, string $requiredScope = 'service_request:write', array $operationContext = []): \App\Models\EhealthLink
+    public function beginSubmission(ServiceRequestRequest $record, array $changes, string $requiredScope = 'service_request:write', array $operationContext = []): EhealthLink
     {
         return $this->storageTransaction(function () use ($record, $changes, $requiredScope, $operationContext) {
             $record = ServiceRequestRequest::whereKey($record->id)->lockForUpdate()->firstOrFail();
             if ($this->hasPendingSubmission($record)) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['submission' => __('care-plan.submission_pending')]);
+                throw ValidationException::withMessages(['submission' => __('care-plan.submission_pending')]);
             }
 
-            return \App\Jobs\RemoteEHealthLinksProcessing::startSubmission($record, [
+            return RemoteEHealthLinksProcessing::startSubmission($record, [
                 'resource' => $this->getResource($record), 'changes' => $changes,
                 'requiredScope' => $requiredScope, 'operationContext' => $operationContext, 'legalEntityId' => legalEntity()->id,
             ]);
         });
     }
 
-    public function finishSubmission(\App\Models\EhealthLink $link, array $jobData): bool
+    public function finishSubmission(EhealthLink $link, array $jobData): bool
     {
         return $this->storageTransaction(function () use ($link, $jobData): bool {
-            $link = \App\Models\EhealthLink::whereKey($link->id)->lockForUpdate()->firstOrFail();
-            if ($link->status !== \App\Enums\JobStatus::PENDING->value) {
+            $link = EhealthLink::whereKey($link->id)->lockForUpdate()->firstOrFail();
+            if ($link->status !== JobStatus::PENDING->value) {
                 return false;
             }
             $processed = strtolower((string) ($jobData['status'] ?? '')) === 'processed';
@@ -980,7 +1048,7 @@ class ServiceRequestRequestRepository extends BaseRepository
                 $data = $data[0] ?? $data;
                 $data = (new ServiceRequestMapper())->normalize($data);
                 if (isset($data['id']) && $data['id'] !== $record->uuid) {
-                    throw new \InvalidArgumentException('The processed Service Request does not match the submitted record.');
+                    throw new InvalidArgumentException('The processed Service Request does not match the submitted record.');
                 }
                 if (isset($data['status']) && in_array(strtolower($data['status']), ['processed', 'pending', 'processing', 'success', 'failed', 'accepted', 'queued'], true)) {
                     unset($data['status']);
@@ -996,14 +1064,14 @@ class ServiceRequestRequestRepository extends BaseRepository
                 if (isset($jobData['carePlanActivityResource'])) {
                     $activity = $this->relatedCarePlanActivity($record, $link->job->request_data['legalEntityId']);
                     if ($activity !== null) {
-                        app(\App\Repositories\CarePlanActivityRepository::class)->storeResource($jobData['carePlanActivityResource'], $activity->carePlan, $activity->id);
+                        Repository::carePlanActivity()->storeResource($jobData['carePlanActivityResource'], $activity->carePlan, $activity->id);
                     }
                 }
                 if (isset($context['localStatus'])) {
                     $record->forceFill(['status' => $context['localStatus']])->save();
                 }
             }
-            $status = $processed ? \App\Enums\JobStatus::PROCESSED->value : \App\Enums\JobStatus::FAILED->value;
+            $status = $processed ? JobStatus::PROCESSED->value : JobStatus::FAILED->value;
             $link->job()->update(['status' => $status, 'response_data' => $jobData]);
             $link->update([
                 'status' => $status,
