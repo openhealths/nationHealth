@@ -143,7 +143,7 @@
             <template x-if="modalDiagnosticReport.isReferralAvailable">
                 <div
                     class="form-group group"
-                    :class="{ '!z-30': modalDiagnosticReport.referralType === 'electronic' }"
+                    :class="{ 'z-30!': modalDiagnosticReport.referralType === 'electronic' }"
                 >
                     <div class="form-row-2" x-cloak>
                         <div>

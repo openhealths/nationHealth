@@ -28,6 +28,7 @@ return [
     'icf' => 'ICF',
     'coding_system' => 'Система кодувань',
     'value' => 'Значення',
+    'value_quantity_unit' => 'одиниця виміру',
     'value_date' => 'Дата',
     'components' => 'Компоненти',
     'extent_or_magnitude_of_impairment' => 'Обсяг або величина порушення',

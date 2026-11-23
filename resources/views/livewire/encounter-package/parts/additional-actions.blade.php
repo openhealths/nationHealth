@@ -1,4 +1,4 @@
-@use(App\Models\MedicalEvents\Sql\DeviceRequestRequest)
+@use('App\Models\MedicalEvents\Sql\DeviceRequestRequest')
 
 @php
     $additionalActionLinks = [
@@ -69,7 +69,7 @@
                         >
                             @icon($section['icon'], 'w-6 h-6')
                         </span>
-                        <span class="min-w-0 break-words">{{ $section['label'] }}</span>
+                        <span class="min-w-0 wrap-break-word">{{ $section['label'] }}</span>
                     </span>
                     <span
                         class="shrink-0 text-gray-400 transition-transform duration-300 dark:text-gray-500"

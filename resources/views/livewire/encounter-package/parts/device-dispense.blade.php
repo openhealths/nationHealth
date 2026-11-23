@@ -552,7 +552,7 @@
                         <input
                             type="text"
                             id="deviceDispensePerformer"
-                            class="input-select peer !cursor-not-allowed !text-gray-500 dark:!text-gray-400"
+                            class="input-select peer cursor-not-allowed! text-gray-500! dark:text-gray-400!"
                             :value="modalDeviceDispense.performerName || employeeName(modalDeviceDispense.performerId)"
                             disabled
                         />
@@ -690,7 +690,7 @@
                         <div class="form-group group" x-show="! modalDeviceDispense.deviceSelectionType" x-cloak>
                             <select
                                 id="deviceDispenseDevicePlaceholder"
-                                class="input-select peer !cursor-not-allowed !text-gray-500 dark:!text-gray-400"
+                                class="input-select peer cursor-not-allowed! text-gray-500! dark:text-gray-400!"
                                 disabled
                             >
                                 <option value="" selected>

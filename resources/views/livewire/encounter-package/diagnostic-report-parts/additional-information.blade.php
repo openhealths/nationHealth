@@ -323,7 +323,7 @@
                 <select
                     x-model="modalDiagnosticReport.resultsInterpreterEmployeeId"
                     id="resultsInterpreterPerformer"
-                    class="input-select peer !cursor-not-allowed !text-gray-500 dark:!text-gray-400"
+                    class="input-select peer cursor-not-allowed! text-gray-500! dark:text-gray-400!"
                     disabled
                 >
                     @foreach ($diagnosticReportEmployeeOptions as $employee)
@@ -352,7 +352,7 @@
                             :disabled="String(performerEmployeeId) ===
                             String(defaultDiagnosticReportPerformerEmployeeId)"
                             :class="String(performerEmployeeId) === String(defaultDiagnosticReportPerformerEmployeeId)
-                                ? '!cursor-not-allowed !text-gray-500 dark:!text-gray-400'
+                                ? 'cursor-not-allowed! text-gray-500! dark:text-gray-400!'
                                 : ''"
                             class="input-select peer min-w-0 flex-1"
                         >

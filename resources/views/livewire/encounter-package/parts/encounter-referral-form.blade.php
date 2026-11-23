@@ -1,9 +1,11 @@
+@use('App\Enums\JobStatus')
+
 <div
     x-data="{ openServiceCatalog: false }"
     @encounter-referral-service-catalog-close.window="openServiceCatalog = false"
 >
     @php
-        $submissionPending = ($encounterReferralSubmission['status'] ?? null) === \App\Enums\JobStatus::PENDING->value;
+        $submissionPending = ($encounterReferralSubmission['status'] ?? null) === JobStatus::PENDING->value;
         $preparingSignature = $prepareReferralForSigning ?? false;
     @endphp
     @if ($submissionPending)
@@ -230,8 +232,6 @@
                                 id="encounterReferral-{{ $field }}"
                                 wire:model="encounterReferralForm.{{ $field }}"
                                 placeholder="{{ __('referrals.period_fields.date_placeholder') }}"
-                                datepicker-autohide
-                                datepicker-format="{{ frontendDateFormat() }}"
                                 datepicker-min-date="{{ today()->format(config('app.date_format')) }}"
                                 :label="$period === 'start' ? __('forms.start_date') : __('forms.end_date')"
                                 :error="'encounterReferralForm.' . $field"

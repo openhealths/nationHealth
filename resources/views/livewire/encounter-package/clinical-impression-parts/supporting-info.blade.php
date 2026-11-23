@@ -114,7 +114,7 @@
                                 </button>
 
                                 {{-- Dropdown Panel --}}
-                                <div class="absolute" style="left: 50%">
+                                <div class="absolute left-1/2">
                                     {{-- Center a dropdown panel --}}
                                     <div
                                         x-ref="panel"
@@ -123,8 +123,7 @@
                                         @click.outside="close($refs.button)"
                                         :id="$id('dropdown-button')"
                                         x-cloak
-                                        class="dropdown-panel relative"
-                                        style="left: -50%"
+                                        class="dropdown-panel relative -left-1/2!"
                                         {{-- Center a dropdown panel --}}
                                     >
                                         <button
@@ -155,7 +154,7 @@
                 {{-- This moves the modal at the end of the body tag --}}
                 <div
                     x-show="openModal"
-                    style="display: none"
+                    x-cloak
                     @keydown.escape.prevent.stop="openModal = false"
                     role="dialog"
                     aria-modal="true"

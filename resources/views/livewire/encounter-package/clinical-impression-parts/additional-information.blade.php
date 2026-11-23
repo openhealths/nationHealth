@@ -27,7 +27,9 @@
                 @change="setEffectiveType($event.target.value)"
                 id="clinicalImpressionEffectiveType"
                 class="input-select peer"
+                required
             >
+                <option value="" selected>{{ __('forms.select') }}</option>
                 <option value="period">{{ __('clinical-impressions.effective_period') }}</option>
                 <option value="date_time">{{ __('clinical-impressions.effective_date_time') }}</option>
             </select>

@@ -1,5 +1,11 @@
-<div class="p-6 lg:p-8 bg-white dark:bg-gray-800 dark:bg-gradient-to-bl dark:from-gray-700/50 dark:via-transparent border-b border-gray-200 dark:border-gray-700">
-    <x-application-logo class="block h-12 w-auto" />
+<div class="p-6 lg:p-8 bg-white dark:bg-gray-800 dark:bg-linear-to-bl dark:from-gray-700/50 dark:via-transparent border-b border-gray-200 dark:border-gray-700">
+    <img
+        class="w-14"
+        src="{{ Vite::asset('resources/images/logo.webp') }}"
+        alt="{{ trans('oh.title') }}"
+        width="100%"
+        height="100%"
+    >
 
     <h1 class="mt-8 text-2xl font-medium text-gray-900 dark:text-white">
         Welcome to your Jetstream application!

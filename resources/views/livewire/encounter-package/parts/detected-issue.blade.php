@@ -1,7 +1,8 @@
-@php
-    use App\Models\MedicalEvents\Sql\Device;
-    use Illuminate\Support\Facades\Auth;
+@use('App\Enums\DetectedIssue\Status', 'DetectedIssueStatus')
+@use('App\Models\MedicalEvents\Sql\Device')
+@use('Illuminate\Support\Facades\Auth')
 
+@php
     $canCancelDeviceRecords = ($canCancelRecords ?? false) && Auth::user()->can('cancel', Device::class);
 @endphp
 
@@ -396,7 +397,7 @@
                                 <option value="">{{ __('forms.select') }}</option>
 
                                 @foreach ($this->dictionaries['detected_issue_statuses'] ?? [] as $code => $status)
-                                    @if (($isReadonly ?? false) || $code !== \App\Enums\DetectedIssue\Status::ENTERED_IN_ERROR->value)
+                                    @if (($isReadonly ?? false) || $code !== DetectedIssueStatus::ENTERED_IN_ERROR->value)
                                         <option value="{{ $code }}">{{ $status }}</option>
                                     @endif
                                 @endforeach

@@ -1,7 +1,6 @@
 <div
     class="p-4 sm:p-8"
     id="diagnostic-reports-section"
-    x-on:encounter-division-changed.window="divisionId = $event.detail.divisionId"
     x-data="{
          diagnosticReports: $wire.entangle('diagnosticReportForm.diagnosticReports'),
          selectedRecords: $wire.entangle('selectedRecords.diagnosticReports'),
@@ -18,12 +17,15 @@
          servicesDictionary: $store['custom/services'],
          equipmentOptions: @js($equipmentOptions),
          diagnosticReportEmployees: @js($diagnosticReportEmployees),
-         divisionId: @js(data_get($this->form->encounter, 'divisionId', '')),
 
         encounterPeriodDate: $wire.entangle('form.encounter.periodDate'),
         encounterPeriodStart: $wire.entangle('form.encounter.periodStart'),
         encounterPeriodEnd: $wire.entangle('form.encounter.periodEnd'),
         issuedDateTimeInvalid: false,
+
+        get divisionId() {
+            return $wire.form.encounter.divisionId || '';
+        },
 
         parseDateTime(date, time) {
             if (! date || ! time) {
@@ -495,7 +497,7 @@
     @endunless
 </div>
 
-<script>
+<script data-navigate-once>
     /**
      * Representation of the user's personal diagnostic report.
      */

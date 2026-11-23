@@ -266,7 +266,7 @@
     </div>
 </div>
 
-<script>
+<script data-navigate-once>
     /**
      * Representation of the user's personal clinicalImpression
      */

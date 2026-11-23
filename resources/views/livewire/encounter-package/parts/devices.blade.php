@@ -1,8 +1,8 @@
-@php
-    use App\Enums\Device\Status as DeviceStatus;
-    use App\Models\MedicalEvents\Sql\Device;
-    use Illuminate\Support\Facades\Auth;
+@use('App\Enums\Device\Status', 'DeviceStatus')
+@use('App\Models\MedicalEvents\Sql\Device')
+@use('Illuminate\Support\Facades\Auth')
 
+@php
     $canCancelDeviceRecords = ($canCancelRecords ?? false) && Auth::user()->can('cancel', Device::class);
 @endphp
 
@@ -872,7 +872,7 @@
     </x-dialog-drawer>
 </div>
 
-<script>
+<script data-navigate-once>
     /**
      * The value a device property carries, by the type it was given
      */
