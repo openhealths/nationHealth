@@ -20,7 +20,10 @@
         </div>
     @endif
     <form wire:submit.prevent="validateEncounterReferral" class="space-y-6">
-        <fieldset @disabled($submissionPending || $preparingSignature || ($referralReadonly ?? false)) class="fieldset-card p-6 sm:p-8">
+        <fieldset
+            @disabled($submissionPending || $preparingSignature || ($referralReadonly ?? false))
+            class="fieldset-card p-6 sm:p-8"
+        >
             <legend class="legend">{{ __('encounters.service') }}</legend>
             <div class="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div class="form-group group md:col-span-2">
@@ -214,7 +217,10 @@
             </div>
         </fieldset>
 
-        <fieldset @disabled($submissionPending || $preparingSignature || ($referralReadonly ?? false)) class="fieldset-card p-6 sm:p-8">
+        <fieldset
+            @disabled($submissionPending || $preparingSignature || ($referralReadonly ?? false))
+            class="fieldset-card p-6 sm:p-8"
+        >
             <legend class="legend">{{ __('encounters.referral_drawer.validity_and_quantity') }}</legend>
             <div class="mb-4 grid grid-cols-1 gap-6 md:grid-cols-3">
                 @foreach (['started_at' => 'start', 'ended_at' => 'end'] as $field => $period)
@@ -232,18 +238,12 @@
                             />
                         </div>
                         <div class="form-group">
-                            <input
+                            <x-forms.time
                                 id="encounterReferral-{{ $period }}Time"
-                                type="text"
                                 wire:model="encounterReferralForm.{{ $period }}_time"
-                                class="timepicker-uk input peer"
-                                autocomplete="off"
-                                placeholder="{{ __('referrals.period_fields.time_placeholder') }}"
+                                :label="__('referrals.period_fields.' . $period . '_time')"
+                                :error="'encounterReferralForm.' . $period . '_time'"
                             />
-                            <label for="encounterReferral-{{ $period }}Time" class="label required">
-                                {{ __('referrals.period_fields.'.$period.'_time') }}
-                            </label>
-                            <x-input-error for="encounterReferralForm.{{ $period }}_time" />
                         </div>
                     </div>
 
@@ -281,7 +281,10 @@
             </div>
         </fieldset>
 
-        <fieldset @disabled($submissionPending || $preparingSignature || ($referralReadonly ?? false)) class="fieldset-card p-6 sm:p-8">
+        <fieldset
+            @disabled($submissionPending || $preparingSignature || ($referralReadonly ?? false))
+            class="fieldset-card p-6 sm:p-8"
+        >
             <legend class="legend">{{ __('encounters.referral_drawer.additional') }}</legend>
             <div class="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div class="form-group group">

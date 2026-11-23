@@ -104,30 +104,21 @@
                 x-show="isReferenced(modalSpecimen.uuid)"
                 x-cloak
             >
-                <div class="datepicker-wrapper flex-1">
-                    <input
+                <div class="flex-1">
+                    <x-forms.date
                         x-model="modalSpecimen.receivedDate"
-                        type="text"
                         id="specimenReceivedDate"
-                        autocomplete="off"
-                        class="datepicker-input with-leading-icon input peer rounded-r-none border-r-0"
-                        placeholder=" "
+                        class="rounded-r-none border-r-0"
+                        :label="__('specimens.date_time_received')"
                     />
-                    <label
-                        for="specimenReceivedDate"
-                        class="wrapped-label"
-                    >{{ __('specimens.date_time_received') }}</label>
                 </div>
-                <div class="relative -ml-px w-32">
-                    <label for="specimenReceivedTime" class="sr-only">{{ __('forms.time') }}</label>
-                    <input
+                <div class="-ml-px w-32">
+                    <x-forms.time
                         x-model="modalSpecimen.receivedTime"
-                        type="time"
                         id="specimenReceivedTime"
-                        class="input peer rounded-l-none pl-10"
-                        placeholder=" "
+                        class="rounded-l-none"
+                        :label="__('forms.time')"
                     />
-                    @icon('clock', 'svg-input left-2.5 text-gray-400')
                 </div>
             </div>
         @endif

@@ -486,23 +486,15 @@
                     </p>
                 </div>
 
-                <div class="w-1/2" onclick="document.getElementById('valueTime').showPicker()">
-                    <label for="valueTime" class="label-modal"> {{ __('forms.time') }} </label>
-
-                    <div class="relative flex items-center">
-                        @icon('mingcute-time-fill', 'svg-input left-2.5')
-                        <input
-                            x-model="modalObservation.valueTime"
-                            @input="$event.target.blur()"
-                            datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                            type="time"
-                            name="valueTime"
-                            id="valueTime"
-                            class="input-modal pl-10!"
-                            autocomplete="off"
-                            required
-                        />
-                    </div>
+                <div class="w-1/2">
+                    <x-forms.time
+                        modal
+                        x-model="modalObservation.valueTime"
+                        name="valueTime"
+                        id="valueTime"
+                        required
+                        :label="__('forms.time')"
+                    />
 
                     <p class="text-error text-xs" x-show="(modalObservation.valueTime || '').trim().length === 0">
                         {{ __('forms.field_empty') }}

@@ -591,16 +591,13 @@
                             />
                         </div>
 
-                        <div class="relative -ml-px w-32">
-                            <input
+                        <div class="-ml-px w-32">
+                            <x-forms.time
                                 x-model="modalDeviceDispense.whenHandedOverTime"
-                                type="time"
                                 id="deviceDispenseWhenHandedOverTime"
-                                class="input peer pl-10"
-                                placeholder=" "
                                 required
+                                :label="__('forms.time')"
                             />
-                            @icon('clock', 'svg-input left-2.5 text-gray-400')
                         </div>
                     </div>
 

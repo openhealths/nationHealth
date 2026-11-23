@@ -223,7 +223,7 @@
     @if ($context === 'diagnostic-report')
         <div class="form-row-2">
             <div class="form-group group">
-                <label for="divisionNames" class="sr-only">{{ __('diagnostic-reports.division') }}</label>
+                <label for="diagnosticReportDivision" class="sr-only">{{ __('diagnostic-reports.division') }}</label>
                 <select
                     x-model="modalDiagnosticReport.divisionId"
                     @change="modalDiagnosticReport.usedReferences = []"
@@ -245,7 +245,7 @@
                                 '{{ $divisions[0]['uuid'] }}';
                         "
                     @endif
-                    id="divisionNames"
+                    id="diagnosticReportDivision"
                     class="input-select peer"
                     type="text"
                 >
@@ -422,33 +422,16 @@
             />
         </div>
 
-        <div class="form-group group !w-1/2" onclick="document.getElementById('issuedTime').showPicker()">
-            <label for="issuedTime" class="sr-only">{{ __('forms.time') }}</label>
-            <div class="relative flex items-center">
-                @icon('mingcute-time-fill', 'svg-input left-2.5')
-                <input
-                    x-model="modalDiagnosticReport.issuedTime"
-                    @if ($isEncounterContext)
-                        @input="
-                            $event.target.blur();
-                            validateIssuedDateTime();
-                        "
-                        :min="encounterPeriodStart"
-                        :max="encounterPeriodEnd"
-                    @endif
-                    datepicker-max-date="{{ now()->format(config('app.date_format')) }}"
-                    type="time"
-                    name="issuedTime"
-                    id="issuedTime"
-                    class="input peer !pl-10"
-                    autocomplete="off"
-                    required
-                />
-            </div>
-
-            @error($diagnosticReportErrorPath . '.issuedTime')
-                <p class="text-error">{{ $message }}</p>
-            @enderror
+        <div class="form-group group w-1/2!">
+            <x-forms.time
+                x-model="modalDiagnosticReport.issuedTime"
+                :x-on:input="$isEncounterContext ? 'validateIssuedDateTime()' : null"
+                name="issuedTime"
+                id="issuedTime"
+                required
+                :label="__('forms.time')"
+                :error="$diagnosticReportErrorPath . '.issuedTime'"
+            />
 
             @if ($isEncounterContext)
                 <p x-show="issuedDateTimeInvalid" x-cloak class="text-error">
@@ -497,32 +480,15 @@
             />
         </div>
 
-        <div
-            class="form-group group !w-1/2"
-            onclick="document.getElementById('diagnosticReportEffectiveTime').showPicker()"
-        >
-            <label for="diagnosticReportEffectiveTime" class="sr-only">{{ __('forms.time') }}</label>
-            <div class="relative flex items-center">
-                @icon(
-                    'mingcute-time-fill',
-                    'svg-input left-2.5'
-)
-
-                <input
-                    x-model="modalDiagnosticReport.effectiveTime"
-                    @input="$event.target.blur()"
-                    type="time"
-                    name="effectiveTime"
-                    id="diagnosticReportEffectiveTime"
-                    class="input peer !pl-10"
-                    autocomplete="off"
-                    :required="modalDiagnosticReport.effectiveType === 'date_time'"
-                />
-            </div>
-
-            @error($diagnosticReportErrorPath . '.effectiveTime')
-                <p class="text-error">{{ $message }}</p>
-            @enderror
+        <div class="form-group group w-1/2!">
+            <x-forms.time
+                x-model="modalDiagnosticReport.effectiveTime"
+                name="effectiveTime"
+                id="diagnosticReportEffectiveTime"
+                x-bind:required="modalDiagnosticReport.effectiveType === 'date_time'"
+                :label="__('forms.time')"
+                :error="$diagnosticReportErrorPath . '.effectiveTime'"
+            />
         </div>
     </div>
 
@@ -542,29 +508,15 @@
                     />
                 </div>
 
-                <div
-                    class="form-group group !w-1/2"
-                    onclick="document.getElementById('effectivePeriodStartTime').showPicker()"
-                >
-                    <label for="effectivePeriodStartTime" class="sr-only">{{ __('forms.time') }}</label>
-                    <div class="relative flex items-center">
-                        @icon('mingcute-time-fill', 'svg-input left-2.5')
-
-                        <input
-                            x-model="modalDiagnosticReport.effectivePeriodStartTime"
-                            @input="$event.target.blur()"
-                            type="time"
-                            name="effectivePeriodStartTime"
-                            id="effectivePeriodStartTime"
-                            class="input peer !pl-10"
-                            autocomplete="off"
-                            :required="modalDiagnosticReport.effectiveType === 'period'"
-                        />
-                    </div>
-
-                    @error($diagnosticReportErrorPath . '.effectivePeriodStartTime')
-                        <p class="text-error">{{ $message }}</p>
-                    @enderror
+                <div class="form-group group w-1/2!">
+                    <x-forms.time
+                        x-model="modalDiagnosticReport.effectivePeriodStartTime"
+                        name="effectivePeriodStartTime"
+                        id="effectivePeriodStartTime"
+                        x-bind:required="modalDiagnosticReport.effectiveType === 'period'"
+                        :label="__('forms.time')"
+                        :error="$diagnosticReportErrorPath . '.effectivePeriodStartTime'"
+                    />
                 </div>
             </div>
 
@@ -581,29 +533,15 @@
                     />
                 </div>
 
-                <div
-                    class="form-group group !w-1/2"
-                    onclick="document.getElementById('effectivePeriodEndTime').showPicker()"
-                >
-                    <label for="effectivePeriodEndTime" class="sr-only">{{ __('forms.time') }}</label>
-                    <div class="relative flex items-center">
-                        @icon('mingcute-time-fill', 'svg-input left-2.5')
-
-                        <input
-                            x-model="modalDiagnosticReport.effectivePeriodEndTime"
-                            @input="$event.target.blur()"
-                            type="time"
-                            name="effectivePeriodEndTime"
-                            id="effectivePeriodEndTime"
-                            class="input peer !pl-10"
-                            autocomplete="off"
-                            :required="Boolean(modalDiagnosticReport.effectivePeriodEndDate)"
-                        />
-                    </div>
-
-                    @error($diagnosticReportErrorPath . '.effectivePeriodEndTime')
-                        <p class="text-error">{{ $message }}</p>
-                    @enderror
+                <div class="form-group group w-1/2!">
+                    <x-forms.time
+                        x-model="modalDiagnosticReport.effectivePeriodEndTime"
+                        name="effectivePeriodEndTime"
+                        id="effectivePeriodEndTime"
+                        x-bind:required="Boolean(modalDiagnosticReport.effectivePeriodEndDate)"
+                        :label="__('forms.time')"
+                        :error="$diagnosticReportErrorPath . '.effectivePeriodEndTime'"
+                    />
                 </div>
             </div>
         </div>
