@@ -253,8 +253,7 @@ abstract class EmployeeComponent extends Component
 
             $validatedData = $response->validate();
 
-            // 3. Database Update via Repository
-            // We use app() helper to resolve the repository
+            // The grouped details carry the selected position's status and end date separately from its party data.
             Repository::employee()->updateDetails(
                 $employee,
                 $validatedData['party'],
@@ -263,7 +262,8 @@ abstract class EmployeeComponent extends Component
                 $validatedData['educations'] ?? null,
                 $validatedData['specialities'] ?? null,
                 $validatedData['qualifications'] ?? null,
-                $validatedData['scienceDegree'] ?? null
+                $validatedData['scienceDegree'] ?? null,
+                employment: $validatedData['employee']
             );
 
             // 4. Close/Actualize Pending Requests

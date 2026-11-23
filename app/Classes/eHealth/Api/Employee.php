@@ -148,14 +148,15 @@ class Employee extends EHealthRequest
 
         $employeeTypeKey = strtolower($transformedData['employee_type'] ?? '');
         $medTypes = implode(',', config('ehealth.medical_employees', []));
+        $employmentDateFormat = 'date_format:Y-m-d,Y-m-d\TH:i:s.v\Z';
 
         $rules = [
             'uuid' => 'required|uuid',
             'status' => 'required|string',
             'position' => 'required|string',
             'employee_type' => 'required|string',
-            'start_date' => 'required|date_format:Y-m-d',
-            'end_date' => 'nullable|date_format:Y-m-d',
+            'start_date' => ['required', $employmentDateFormat],
+            'end_date' => ['nullable', $employmentDateFormat],
             'is_active' => 'required|boolean',
 
             'division' => 'sometimes|nullable|array',
@@ -236,6 +237,12 @@ class Employee extends EHealthRequest
         }
 
         $validated = $validator->validated();
+
+        // Employment dates are stored as calendar dates, including when eHealth sends UTC timestamps.
+        $validated['start_date'] = substr($validated['start_date'], 0, 10);
+        if (isset($validated['end_date'])) {
+            $validated['end_date'] = substr($validated['end_date'], 0, 10);
+        }
 
         if (!$this->groupByEntities) {
             return $validated;

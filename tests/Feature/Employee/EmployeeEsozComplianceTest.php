@@ -15,7 +15,10 @@ use App\Models\Permission;
 use App\Models\Relations\Party;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Factory;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -128,6 +131,62 @@ class EmployeeEsozComplianceTest extends TestCase
         $this->assertStringContainsString($employee->uuid, $text);
         $this->assertStringContainsString($employee->startDate, $text);
         $this->assertStringContainsString($employee->endDate, $text);
+    }
+
+    public static function singleSyncStatuses(): array
+    {
+        return [
+            'dismissed' => ['STOPPED', Status::STOPPED],
+            'automatic deactivation' => ['AUTODEACTIVATED', Status::AUTODEACTIVATED],
+            'entered in error' => ['ENTERED IN ERROR', Status::ENTERED_IN_ERROR],
+            'another position' => ['STOPPED', null, false],
+            'invalid employee status' => ['DRAFT', null],
+            'dismissed while waiting for details' => ['APPROVED', null, true, true],
+        ];
+    }
+
+    #[DataProvider('singleSyncStatuses')]
+    public function test_sync_one_saves_only_the_selected_positions_status(
+        string $remote,
+        ?Status $syncedStatus,
+        bool $matchingUuid = true,
+        bool $dismissDuringRequest = false,
+    ): void {
+        [, $employee] = $this->fixture();
+        auth()->user()->update(['party_id' => $employee->partyId]);
+        $employee->update(['employee_type' => 'RECEPTIONIST']);
+        $other = $employee->replicate()->fill(['uuid' => (string) Str::uuid()]);
+        $other->save();
+        session([config('ehealth.api.oauth.bearer_token') => 'test-token']);
+        config(['ehealth.api.domain' => 'https://ehealth.example.test']);
+        $details = [
+            'id' => $matchingUuid ? $employee->uuid : $other->uuid, 'status' => $remote, 'is_active' => true,
+            'employee_type' => 'RECEPTIONIST', 'position' => 'P1', 'start_date' => '2024-01-01',
+            'party' => [
+                'id' => $employee->party->uuid, 'first_name' => 'Іван', 'last_name' => 'Тестовий',
+                'no_tax_id' => false, 'tax_id' => '1234567890', 'birth_date' => '1990-01-01',
+                'declaration_count' => 0, 'declaration_limit' => 0, 'verification_status' => 'VERIFIED',
+                'phones' => [['type' => 'MOBILE', 'number' => '+380501234567']],
+                'documents' => [['type' => 'PASSPORT', 'number' => 'AB123456']],
+            ],
+        ];
+        $api = new EmployeeApi(app(Factory::class));
+        $api->preventStrayRequests()->stub([function (Request $request) use ($employee, $details, $dismissDuringRequest) {
+            $this->assertSame('/api/employees/'.$employee->uuid, parse_url($request->url(), PHP_URL_PATH));
+            if ($dismissDuringRequest) {
+                $employee->update(['status' => Status::STOPPED]);
+            }
+
+            return Http::response(['data' => $details]);
+        }]);
+        $this->instance(EmployeeApi::class, $api);
+
+        $index = new EmployeeIndex();
+        $index->syncOne($employee->id);
+
+        $this->assertSame($syncedStatus ?? ($dismissDuringRequest ? Status::STOPPED : Status::APPROVED), $employee->fresh()->status);
+        $this->assertSame(Status::APPROVED, $other->fresh()->status);
+        $this->assertSame($syncedStatus !== null, $index->refreshTrigger === 1);
     }
 
     /** @return array{LegalEntity, Employee} */

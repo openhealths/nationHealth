@@ -463,6 +463,7 @@ return [
         'dracs_death_unverified' => 'Потребує підтвердження смерті',
         'unknown' => 'Невідомо',
         'stopped' => 'Припинено',
+        'autodeactivated' => 'Автоматично деактивовано',
         'entered_in_error' => 'Внесено помилково',
         'expired' => 'Прострочено',
         'completed' => 'Завершено',
