@@ -298,18 +298,10 @@ function initializeDateInputs() {
         });
     });
 
-    function initDefaultDatepickerMasks() {
-        document.querySelectorAll('.default-datepicker:not([data-date-mask])').forEach((el) => {
-            attachDateMask(el);
-        });
-    }
-
     initDatepickers();
-    initDefaultDatepickerMasks();
 
     const observer = new MutationObserver(() => {
         initDatepickers();
-        initDefaultDatepickerMasks();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
@@ -335,8 +327,6 @@ function initializeDateInputs() {
                     input.datepicker.show();
                 }
             }
-        } else if (input.matches?.('.default-datepicker')) {
-            attachDateMask(input);
         }
     }, true);
 
@@ -350,7 +340,6 @@ function initializeDateInputs() {
             }
         });
         initDatepickers();
-        initDefaultDatepickerMasks();
     };
 
     document.addEventListener('livewire:navigated', rebindAfterMorph);

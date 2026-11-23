@@ -1,11 +1,11 @@
-@php
-    use App\Livewire\EncounterPackage\EncounterPackageEdit;
-    use App\Livewire\EncounterPackage\EncounterPackageView;
-    use App\Enums\User\Role;
-    use App\Models\MedicalEvents\Sql\ClinicalImpression;
-    use App\Models\MedicalEvents\Sql\Encounter;
-    use Livewire\Livewire;
+@use('App\Livewire\EncounterPackage\EncounterPackageEdit')
+@use('App\Livewire\EncounterPackage\EncounterPackageView')
+@use('App\Enums\User\Role')
+@use('App\Models\MedicalEvents\Sql\ClinicalImpression')
+@use('App\Models\MedicalEvents\Sql\Encounter')
+@use('Livewire\Livewire')
 
+@php
     $patientName = $patientFullName ?? __('forms.patient');
     $title = __('encounters.label') . ' - ' . $patientName;
     $isReadonly = $this instanceof EncounterPackageEdit && $this->isReadonly;
@@ -120,12 +120,12 @@
                                 type="button"
                                 @click="openGroupActions = false"
                                 wire:click="openRecordsCancellation"
-                                class="dropdown-button !flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-600"
+                                class="dropdown-button flex! w-full items-center gap-2.5 px-4 py-2 text-left text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-600"
                             >
-                                <span class="!text-red-500 dark:!text-red-400">
+                                <span class="text-red-500! dark:text-red-400!">
                                     @icon('close', 'w-4 h-4')
                                 </span>
-                                <span class="!text-red-500 dark:!text-red-400">
+                                <span class="text-red-500! dark:text-red-400!">
                                     {{ __('medical-events.mark_as_error') }}
                                 </span>
                             </button>
@@ -373,7 +373,7 @@
 
                             <div
                                 x-show="activeSections.includes('{{ $item['id'] }}')"
-                                style="display: none"
+                                x-cloak
                                 class="px-5 pb-5"
                             >
                                 {{-- A disabled fieldset disables every control inside it, the record cancellation

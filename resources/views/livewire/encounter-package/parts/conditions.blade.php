@@ -939,7 +939,7 @@
                                         type="text"
                                         required
                                     >
-                                        <option selected>{{ __('forms.select') }}</option>
+                                        <option value="" selected>{{ __('forms.select') }}</option>
                                         @for ($i = 1; $i <= 10; $i++)
                                             <option value="{{ $i }}">{{ $i }}</option>
                                         @endfor
@@ -1219,7 +1219,7 @@
                                         class="input-select w-full appearance-none bg-none"
                                         type="text"
                                     >
-                                        <option selected>{{ __('forms.select') }}</option>
+                                        <option value="" selected>{{ __('forms.select') }}</option>
                                         @for ($i = 1; $i <= 10; $i++)
                                             <option value="{{ $i }}">{{ $i }}</option>
                                         @endfor
@@ -1294,13 +1294,12 @@
         x-cloak
         x-show="showPrimaryChangeWarning"
         class="fixed inset-0 z-60 overflow-y-auto px-4 py-6 sm:px-0"
-        style="display: none"
     >
         <div class="fixed inset-0 flex items-center justify-center">
             <div
                 x-show="showPrimaryChangeWarning"
                 class="fixed inset-0 bg-gray-500/75 transition-opacity dark:bg-gray-900/80"
-                x-on:click="showPrimaryChangeWarning = false"
+                @click="showPrimaryChangeWarning = false"
                 x-transition:enter="ease-out duration-300"
                 x-transition:enter-start="opacity-0"
                 x-transition:enter-end="opacity-100"
@@ -1311,7 +1310,7 @@
 
             <div
                 x-show="showPrimaryChangeWarning"
-                x-on:click.stop
+                @click.stop
                 class="relative z-10 w-full transform overflow-auto rounded-lg bg-white shadow-xl transition-all sm:max-w-2xl dark:bg-gray-800"
                 x-trap.inert.noscroll="showPrimaryChangeWarning"
                 x-transition:enter="ease-out duration-300"
@@ -1415,7 +1414,7 @@
     </x-dialog-drawer>
 </div>
 
-<script>
+<script data-navigate-once>
     /**
      * Representation of the user's personal conditions
      */

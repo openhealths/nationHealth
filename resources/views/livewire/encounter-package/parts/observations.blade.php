@@ -3,9 +3,11 @@
     class="p-4 sm:p-8"
     id="observations-section"
     {{-- Devices are offered from the encounter division's equipment, so a new division drops the picked ones --}}
-    x-on:encounter-division-changed.window="
-        observations = observations.map((observation) => ({ ...observation, deviceId: '' }));
-        modalObservation.deviceId = '';
+    x-init="
+        $watch('$wire.form.encounter?.divisionId', () => {
+            observations = observations.map((observation) => ({ ...observation, deviceId: '' }));
+            modalObservation.deviceId = '';
+        })
     "
     x-data="{
         observations: $wire.entangle('{{ $isEncounterContext ? 'observationForm' : 'form' }}.observations'),
@@ -360,7 +362,7 @@
             {{-- This moves the modal at the end of the body tag --}}
             <div
                 x-show="openModal"
-                style="display: none"
+                x-cloak
                 @keydown.escape.prevent.stop="openModal = false"
                 role="dialog"
                 aria-modal="true"
@@ -471,7 +473,7 @@
     </div>
 </div>
 
-<script>
+<script data-navigate-once>
     /**
      * Representation of the user's personal observation
      */

@@ -1,6 +1,6 @@
-@php
-    use App\Enums\Person\ProcedureStatus;
+@use('App\Enums\Person\ProcedureStatus')
 
+@php
     $procedureErrorPath = $context === 'encounter' ? 'procedureForm.procedures.*' : 'form.procedure';
 @endphp
 
@@ -32,7 +32,7 @@
         <template x-if="modalProcedure.isReferralAvailable">
             <div
                 class="form-group group"
-                :class="{ '!z-30': modalProcedure.referralType === 'electronic' }"
+                :class="{ 'z-30!': modalProcedure.referralType === 'electronic' }"
             >
                 <div class="form-row-2" x-cloak>
                     <div>
@@ -195,7 +195,7 @@
                                     type="text"
                                     name="basedOnIdentifier"
                                     id="procedureBasedOnIdentifier"
-                                    class="input peer !pr-7 uppercase"
+                                    class="input peer pr-7! uppercase"
                                     placeholder=" "
                                     autocomplete="off"
                                     x-mask="****-****-****-****"

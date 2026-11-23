@@ -1,26 +1,26 @@
 <div
-    class="record-inner-card overflow-hidden !rounded-[18px] !border-gray-300 dark:!border-gray-700"
+    class="record-inner-card overflow-hidden rounded-[18px]! border-gray-300! dark:border-gray-700!"
     @if ($referralSubmissionPending) wire:poll.5s="pollReferralCompletion" @endif
 >
     <div class="record-inner-header">
-        <div class="record-inner-column min-w-0 flex-1 !px-3 !py-3">
+        <div class="record-inner-column min-w-0 flex-1 px-3! py-3!">
             <div
-                class="record-inner-label !mb-1 !text-[9px] !text-gray-900 dark:!text-gray-300"
+                class="record-inner-label mb-1! text-[9px]! text-gray-900! dark:text-gray-300!"
             >
                 {{ $incomingReferral['requestNumber'] ?: '—' }}
             </div>
-            <div class="record-inner-value break-words !font-semibold">
+            <div class="record-inner-value break-words font-semibold!">
                 {{ $incomingReferral['itemName'] ?? '—' }}
             </div>
         </div>
-        <div class="record-inner-column-bordered shrink-0 !px-4 !py-3 md:w-48">
+        <div class="record-inner-column-bordered shrink-0 px-4! py-3! md:w-48">
             <button
                 type="button"
                 wire:click="openReferralRedeemModal"
                 wire:loading.attr="disabled"
                 wire:target="openReferralRedeemModal,redeemReferral"
                 @disabled(!($incomingReferral['canComplete'] ?? false) || ($incomingReferral['submissionPending'] ?? false))
-                class="button-primary whitespace-nowrap !px-3 !py-2 !text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                class="button-primary whitespace-nowrap px-3! py-2! text-xs! disabled:cursor-not-allowed disabled:opacity-50"
             >
                 {{ __('encounters.redeem_referral') }}
             </button>
@@ -38,7 +38,7 @@
         </div>
     </div>
     <div class="record-inner-body">
-        <div class="record-inner-grid-container !px-3 !py-4 md:!pl-3">
+        <div class="record-inner-grid-container px-3! py-4! md:pl-3!">
             <dl
                 class="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-[1fr_1.15fr_1.5fr_1.15fr]"
             >
@@ -54,12 +54,12 @@
                 ] as $detail)
                     <div class="min-w-0">
                         <dt
-                            class="record-inner-label !mb-1.5 !text-[9px] !text-gray-900 uppercase dark:!text-gray-300"
+                            class="record-inner-label mb-1.5! text-[9px]! text-gray-900! uppercase dark:text-gray-300!"
                         >
                             {{ $detail['label'] }}
                         </dt>
                         <dd
-                            class="record-inner-value break-words !text-xs !font-normal"
+                            class="record-inner-value break-words text-xs! font-normal!"
                         >
                             {{ $detail['value'] }}
                         </dd>

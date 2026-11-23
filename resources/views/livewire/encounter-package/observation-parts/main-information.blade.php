@@ -254,7 +254,7 @@
                         type="text"
                         required
                     >
-                        <option selected>{{ __('forms.select') }}</option>
+                        <option value="" selected>{{ __('forms.select') }}</option>
                         <template
                             :key="key"
                             x-for="(label, key) in codeableConceptValues[valueMap[modalObservation.codeCode]?.[0]]"
@@ -334,13 +334,9 @@
                 <form class="mx-auto max-w-xs">
                     <label for="valueQuantity" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
                         {{ __('observations.value') }}
-                        <span
-                            x-text="
-                                  valueMap[modalObservation.codeCode][2] !== '' && modalObservation.codeCode !== '{{ __('forms.select') }}' && valueMap[modalObservation.codeCode]?.[2] ?
-                                  `(одиниця виміру &quot;${$wire.dictionaries['eHealth/ucum/units'][valueMap[modalObservation.codeCode][2]]}&quot;)` :
-                                  ''
-                              "
-                        ></span>
+                        <span x-show="valueMap[modalObservation.codeCode]?.[2]">
+                            ({{ __('observations.value_quantity_unit') }} "<span x-text="$wire.dictionaries['eHealth/ucum/units'][valueMap[modalObservation.codeCode][2]]"></span>")
+                        </span>
                     </label>
                     <div
                         class="relative flex max-w-32 items-center"
@@ -673,7 +669,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/ICF/qualifiers/extent_or_magnitude_of_impairment'] as $key => $extentOrMagnitudeOfImpairment)
                                 <option value="{{ $key }}">{{ $extentOrMagnitudeOfImpairment }}</option>
                             @endforeach
@@ -703,7 +699,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/observation_interpretations'] as $key => $interpretation)
                                 <option value="{{ $key }}">{{ $interpretation }}</option>
                             @endforeach
@@ -755,7 +751,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/ICF/qualifiers/extent_or_magnitude_of_impairment'] as $key => $extentOrMagnitudeOfImpairment)
                                 <option value="{{ $key }}">{{ $extentOrMagnitudeOfImpairment }}</option>
                             @endforeach
@@ -785,7 +781,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/observation_interpretations'] as $key => $code)
                                 <option value="{{ $key }}">{{ $code }}</option>
                             @endforeach
@@ -829,7 +825,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/ICF/qualifiers/nature_of_change_in_body_structure'] as $key => $natureOfChangeInBodyStructure)
                                 <option value="{{ $key }}">{{ $natureOfChangeInBodyStructure }}</option>
                             @endforeach
@@ -859,7 +855,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/observation_interpretations'] as $key => $code)
                                 <option value="{{ $key }}">{{ $code }}</option>
                             @endforeach
@@ -903,7 +899,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/ICF/qualifiers/anatomical_localization'] as $key => $code)
                                 <option value="{{ $key }}">{{ $code }}</option>
                             @endforeach
@@ -933,7 +929,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/observation_interpretations'] as $key => $code)
                                 <option value="{{ $key }}">{{ $code }}</option>
                             @endforeach
@@ -982,7 +978,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/ICF/qualifiers/performance'] as $key => $performance)
                                 <option value="{{ $key }}">{{ $performance }}</option>
                             @endforeach
@@ -1012,7 +1008,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/observation_interpretations'] as $key => $code)
                                 <option value="{{ $key }}">{{ $code }}</option>
                             @endforeach
@@ -1054,7 +1050,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/ICF/qualifiers/capacity'] as $key => $capacity)
                                 <option value="{{ $key }}">{{ $capacity }}</option>
                             @endforeach
@@ -1084,7 +1080,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/observation_interpretations'] as $key => $code)
                                 <option value="{{ $key }}">{{ $code }}</option>
                             @endforeach
@@ -1136,7 +1132,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/ICF/qualifiers/barrier_or_facilitator'] as $key => $barrierOrFacilitator)
                                 <option value="{{ $key }}">{{ $barrierOrFacilitator }}</option>
                             @endforeach
@@ -1166,7 +1162,7 @@
                             type="text"
                             required
                         >
-                            <option selected>{{ __('forms.select') }}</option>
+                            <option value="" selected>{{ __('forms.select') }}</option>
                             @foreach ($this->dictionaries['eHealth/observation_interpretations'] as $key => $interpretation)
                                 <option value="{{ $key }}">{{ $interpretation }}</option>
                             @endforeach

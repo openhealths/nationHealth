@@ -145,7 +145,7 @@
                     class="input-modal"
                     required
                 >
-                    <option selected>{{ __('forms.select') }}</option>
+                    <option value="" selected>{{ __('forms.select') }}</option>
                     @foreach ($this->dictionaries['eHealth/reason_not_given_explanations'] as $key => $reasonNotGivenExplanation)
                         <option value="{{ $key }}">{{ $reasonNotGivenExplanation }}</option>
                     @endforeach

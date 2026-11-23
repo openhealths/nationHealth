@@ -1,8 +1,8 @@
-@php
-    use App\Enums\DeviceAssociation\Status as DeviceAssociationStatus;
-    use App\Models\MedicalEvents\Sql\Device;
-    use Illuminate\Support\Facades\Auth;
+@use('App\Enums\DeviceAssociation\Status', 'DeviceAssociationStatus')
+@use('App\Models\MedicalEvents\Sql\Device')
+@use('Illuminate\Support\Facades\Auth')
 
+@php
     $canCancelDeviceRecords = ($canCancelRecords ?? false) && Auth::user()->can('cancel', Device::class);
 @endphp
 

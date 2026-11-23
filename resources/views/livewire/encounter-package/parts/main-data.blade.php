@@ -1,6 +1,4 @@
-@php
-    use App\Livewire\EncounterPackage\EncounterPackageEdit;
-@endphp
+@use('App\Livewire\EncounterPackage\EncounterPackageEdit')
 
 <div
     class="p-4 sm:p-8"

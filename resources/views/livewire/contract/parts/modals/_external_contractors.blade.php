@@ -96,10 +96,9 @@
                                 </x-forms.label>
                             </x-slot>
                             <x-slot name='input'>
-                                <x-forms.input-date
+                                <x-forms.date
                                     id='contract_issued_at'
                                     wire:model='contract_request.external_contractors.contract.issued_at'
-                                    type='date'
                                 />
                             </x-slot>
                             @error('contract_request.external_contractors.contract.issued_at')
@@ -118,10 +117,9 @@
                                 </x-forms.label>
                             </x-slot>
                             <x-slot name='input'>
-                                <x-forms.input-date
+                                <x-forms.date
                                     id='contract_expires_at'
                                     wire:model='contract_request.external_contractors.contract.expires_at'
-                                    type='date'
                                 />
                             </x-slot>
                             @error('contract_request.external_contractors.contract.expires_at')

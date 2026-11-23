@@ -175,7 +175,7 @@
         <template x-teleport="body">
             <div
                 x-show="openModal"
-                style="display: none"
+                x-cloak
                 @keydown.escape.prevent.stop="openModal = false"
                 role="dialog"
                 aria-modal="true"
@@ -280,7 +280,7 @@
     </div>
 </div>
 
-<script>
+<script data-navigate-once>
     /**
      * Representation of the user's personal action
      */

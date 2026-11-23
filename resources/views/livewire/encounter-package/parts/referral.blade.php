@@ -129,15 +129,15 @@
                                 x-model="referralNumber"
                                 type="text"
                                 id="requisitionNumber"
-                                class="input !pr-7 peer @error('form.encounter.referralNumber') input-error @enderror uppercase"
+                                class="input pr-7! peer @error('form.encounter.referralNumber') input-error @enderror uppercase"
                                 placeholder=" "
                                 autocomplete="off"
-                                x-on:focus="showReferrals = true"
-                                x-bind:disabled="preparing || pending"
-                                x-on:input="updateNumber($el.value)"
-                                x-on:paste.prevent="updateNumber($event.clipboardData.getData('text'), true)"
-                                x-on:keydown.enter.prevent="resolveNumber()"
-                                x-on:keydown.escape="showReferrals = false"
+                                @focus="showReferrals = true"
+                                :disabled="preparing || pending"
+                                @input="updateNumber($el.value)"
+                                @paste.prevent="updateNumber($event.clipboardData.getData('text'), true)"
+                                @keydown.enter.prevent="resolveNumber()"
+                                @keydown.escape="showReferrals = false"
                             />
 
                             <label for="requisitionNumber" class="label">
@@ -148,7 +148,7 @@
                                 <button
                                     type="button"
                                     @click="updateNumber('')"
-                                    x-bind:disabled="preparing || pending"
+                                    :disabled="preparing || pending"
                                     class="text-gray-400 hover:text-gray-600"
                                 >
                                     @icon('close', 'w-4 h-4')
@@ -191,7 +191,7 @@
                             </div>
                         </div>
 
-                        <button type="button" class="button-primary mt-2" @click="resolveNumber()" x-bind:disabled="preparing || pending" x-show="!selectedNumber" x-cloak>
+                        <button type="button" class="button-primary mt-2" @click="resolveNumber()" :disabled="preparing || pending" x-show="!selectedNumber" x-cloak>
                             {{ __('forms.search') }}
                         </button>
                         <p class="text-sm text-gray-500 dark:text-gray-400" x-show="preparing || pending" x-cloak>
@@ -220,7 +220,7 @@
                                     wire:model="form.encounter.paperReferral.requisition"
                                     type="text"
                                     id="paperReferralNumber"
-                                    class="input !pr-7 peer @error('form.encounter.paperReferral.requisition') input-error @enderror"
+                                    class="input pr-7! peer @error('form.encounter.paperReferral.requisition') input-error @enderror"
                                     placeholder=" "
                                 />
                                 <label for="paperReferralNumber" class="label">
@@ -247,7 +247,7 @@
                                     wire:model="form.encounter.paperReferral.requesterEmployeeName"
                                     type="text"
                                     id="paperReferralAuthor"
-                                    class="input !pr-7 peer @error('form.encounter.paperReferral.requesterEmployeeName') input-error @enderror"
+                                    class="input pr-7! peer @error('form.encounter.paperReferral.requesterEmployeeName') input-error @enderror"
                                     placeholder=" "
                                     required
                                 />
@@ -277,7 +277,7 @@
                                     wire:model="form.encounter.paperReferral.requesterLegalEntityEdrpou"
                                     type="text"
                                     id="paperReferralEdrpou"
-                                    class="input !pr-7 peer @error('form.encounter.paperReferral.requesterLegalEntityEdrpou') input-error @enderror"
+                                    class="input pr-7! peer @error('form.encounter.paperReferral.requesterLegalEntityEdrpou') input-error @enderror"
                                     placeholder=" "
                                     required
                                 />
@@ -307,7 +307,7 @@
                                     wire:model="form.encounter.paperReferral.requesterLegalEntityName"
                                     type="text"
                                     id="paperReferralInstitutionName"
-                                    class="input !pr-7 peer @error('form.encounter.paperReferral.requesterLegalEntityName') input-error @enderror"
+                                    class="input pr-7! peer @error('form.encounter.paperReferral.requesterLegalEntityName') input-error @enderror"
                                     placeholder=" "
                                 />
                                 <label for="paperReferralInstitutionName" class="label">
@@ -346,7 +346,7 @@
                                     wire:model="form.encounter.paperReferral.note"
                                     type="text"
                                     id="paperReferralNotes"
-                                    class="input !pr-7 peer @error('form.encounter.paperReferral.note') input-error @enderror"
+                                    class="input pr-7! peer @error('form.encounter.paperReferral.note') input-error @enderror"
                                     placeholder=" "
                                 />
                                 <label for="paperReferralNotes" class="label">
