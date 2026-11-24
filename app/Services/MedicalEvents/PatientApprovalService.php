@@ -373,6 +373,9 @@ class PatientApprovalService
         return $method;
     }
 
+    /**
+     * Returns validated referral details from eHealth, including the resources permitted for patient approval.
+     */
     public function referralDetails(Person $person, string $uuid): ServiceRequestDetails
     {
         return EHealth::serviceRequest()->getDetails($person->uuid, $uuid)->validate();
