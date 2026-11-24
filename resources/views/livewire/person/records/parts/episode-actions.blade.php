@@ -7,6 +7,7 @@
     $episodeId = data_get($episode, 'id');
     $routePrefix = $prepersonId !== null ? 'prepersons.episodes.' : 'persons.episodes.';
     $parameters = [legalEntity(), $prepersonId !== null ? 'preperson' : 'person' => $prepersonId ?? $personId, 'episode' => $episodeId];
+    $hasPendingSubmission = data_get($episode, 'hasPendingSubmission', false);
 @endphp
 
 <x-patient.record-actions :href="$episodeId ? route($routePrefix.'view', $parameters) : null">
@@ -22,7 +23,7 @@
         </button>
     @endunless
 
-    @if ($managesCareManager && in_array($status, [Status::DRAFT, Status::ACTIVE], true) && !data_get($episode, 'hasPendingSubmission', false))
+    @if ($managesCareManager && !$hasPendingSubmission && in_array($status, [Status::DRAFT, Status::ACTIVE], true))
         @if ($episodeId)
             <a
                 href="{{ route($routePrefix.'edit', $parameters) }}"
@@ -46,7 +47,7 @@
         @endif
     @endif
 
-    @if ($showStatusActions && $status === Status::ACTIVE && $managesCareManager)
+    @if ($showStatusActions && $status === Status::ACTIVE && $managesCareManager && !$hasPendingSubmission)
         <button
             type="button"
             wire:click="openEpisodeClosing('{{ data_get($episode, 'uuid') }}')"
@@ -58,7 +59,7 @@
         </button>
     @endif
 
-    @if ($showStatusActions && in_array($status, [Status::ACTIVE, Status::CLOSED], true) && $managesCareManager)
+    @if ($showStatusActions && $managesCareManager && !$hasPendingSubmission && in_array($status, [Status::ACTIVE, Status::CLOSED], true))
         <button
             type="button"
             wire:click="openEpisodeCancellation('{{ data_get($episode, 'uuid') }}')"

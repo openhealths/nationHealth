@@ -6,6 +6,8 @@ namespace App\Repositories\MedicalEvents;
 
 use App\Core\Arr;
 use App\Dto\Episode\Model as EpisodeData;
+use App\Dto\Episode\ModelCancel as EpisodeCancelData;
+use App\Dto\Episode\ModelClose as EpisodeCloseData;
 use App\Dto\Episode\ModelUpdate as EpisodeUpdateData;
 use App\Enums\Episode\Status;
 use App\Enums\JobStatus;
@@ -140,42 +142,49 @@ class EpisodeRepository extends BaseRepository
     }
 
     /**
-     * Mark the episode as entered in error, keeping the reason and the explanation behind it.
+     * Mark the episode as entered in error, keeping the reason and the explanation eHealth processed the cancellation with.
      *
      * @param  Episode  $episode
-     * @param  array  $data
+     * @param  EpisodeCancelData  $data
      * @return void
      * @throws Throwable
      */
-    public function markAsEnteredInError(Episode $episode, array $data): void
+    public function markAsEnteredInError(Episode $episode, EpisodeCancelData $data): void
     {
         DB::transaction(function () use ($episode, $data): void {
             $episode->update([
                 'status' => Status::ENTERED_IN_ERROR->value,
-                'status_reason_id' => $this->syncCodeableConcept($episode, $data['statusReason'], 'statusReason')->id,
-                'explanatory_letter' => $data['explanatoryLetter']
+                'status_reason_id' => $this->syncCodeableConcept($episode, $data->statusReason, 'statusReason')->id,
+                'explanatory_letter' => $data->explanatoryLetter
             ]);
         });
     }
 
     /**
-     * Close the episode, keeping the reason, the summary and the moment it was closed at.
+     * Close the episode, keeping the reason, the summary and the moment eHealth processed the closing with.
+     * An episode already stored as entered in error is left as it is, since its cancellation is newer than the closing.
      *
      * @param  Episode  $episode
-     * @param  array  $data
+     * @param  EpisodeCloseData  $data
      * @return void
      * @throws Throwable
      */
-    public function markAsClosed(Episode $episode, array $data): void
+    public function markAsClosed(Episode $episode, EpisodeCloseData $data): void
     {
         DB::transaction(function () use ($episode, $data): void {
+            $episode = $episode->newQuery()->whereKey($episode->id)->lockForUpdate()->firstOrFail();
+
+            if ($episode->status === Status::ENTERED_IN_ERROR) {
+                return;
+            }
+
             $episode->update([
                 'status' => Status::CLOSED->value,
-                'status_reason_id' => $this->syncCodeableConcept($episode, $data['statusReason'], 'statusReason')->id,
-                'closing_summary' => $data['closingSummary']
+                'status_reason_id' => $this->syncCodeableConcept($episode, $data->statusReason, 'statusReason')->id,
+                'closing_summary' => $data->closingSummary
             ]);
 
-            $episode->period()->update(['end' => $data['period']['end']]);
+            $episode->period()->update(['end' => $data->periodEnd]);
         });
     }
 
@@ -356,8 +365,9 @@ class EpisodeRepository extends BaseRepository
     }
 
     /**
-     * Mark the pending submissions of the synced episodes as processed, as the sync confirms the episodes exist.
-     * This also releases a submission whose job could not be followed.
+     * Mark the pending submissions of the synced episodes as processed once the sync confirms them. An existing episode
+     * confirms its creation, while a closing or a cancellation is confirmed only once the episode has the status it was
+     * sent for. This also releases a submission whose job could not be followed.
      *
      * @param  array  $episodeIds
      * @return void
@@ -368,14 +378,25 @@ class EpisodeRepository extends BaseRepository
             return;
         }
 
-        $pendingSubmissions = EhealthLink::whereLinkableType(Episode::class)
+        $confirmedSubmissions = EhealthLink::with(['job', 'linkable'])
+            ->whereLinkableType(Episode::class)
             ->whereIn('linkable_id', $episodeIds)
-            ->whereStatus(JobStatus::PENDING->value);
+            ->whereStatus(JobStatus::PENDING->value)
+            ->get()
+            ->filter(static fn (EhealthLink $link): bool => match ($link->job->request_data['status']) {
+                Status::CLOSED->value, Status::ENTERED_IN_ERROR->value => $link->linkable->status->value === $link->job->request_data['status'],
+                default => true
+            });
 
-        EhealthJob::whereIn('id', (clone $pendingSubmissions)->select('ehealth_job_id'))
+        if ($confirmedSubmissions->isEmpty()) {
+            return;
+        }
+
+        EhealthJob::whereIn('id', $confirmedSubmissions->pluck('ehealth_job_id'))
             ->update(['status' => JobStatus::PROCESSED->value]);
 
-        $pendingSubmissions->update(['status' => JobStatus::PROCESSED->value]);
+        EhealthLink::whereIn('id', $confirmedSubmissions->modelKeys())
+            ->update(['status' => JobStatus::PROCESSED->value]);
     }
 
     /**

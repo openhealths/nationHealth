@@ -65,6 +65,8 @@ class Episode extends PatientApiBase
      */
     public function cancel(string $patientId, string $episodeId, array $data): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateSubmittedJob(...));
+
         return $this->patch(self::URL . "/$patientId/episodes/$episodeId/actions/cancel", $data);
     }
 
@@ -81,6 +83,8 @@ class Episode extends PatientApiBase
      */
     public function close(string $patientId, string $episodeId, array $data): PromiseInterface|EHealthResponse
     {
+        $this->setValidator($this->validateSubmittedJob(...));
+
         return $this->patch(self::URL . "/$patientId/episodes/$episodeId/actions/close", $data);
     }
 

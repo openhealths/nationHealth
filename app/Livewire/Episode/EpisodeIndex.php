@@ -6,12 +6,15 @@ namespace App\Livewire\Episode;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Dto\Episode\EhealthCancel as EhealthCancelData;
+use App\Dto\Episode\EhealthClose as EhealthCloseData;
 use App\Enums\Episode\Status;
 use App\Enums\JobStatus;
 use App\Enums\Person\EncounterStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\EpisodeFullSync;
+use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Livewire\Episode\Forms\EpisodeCancellationForm;
 use App\Livewire\Episode\Forms\EpisodeClosingForm;
 use App\Livewire\Person\Records\BasePatientComponent;
@@ -22,13 +25,13 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Repositories\MedicalEvents\Repository;
 use App\Rules\InDictionary;
-use App\Services\MedicalEvents\Fhir;
 use App\Traits\BatchLegalEntityQueries;
 use App\Traits\HandlesSyncBatch;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
@@ -243,7 +246,7 @@ class EpisodeIndex extends BasePatientComponent
     {
         $paginator = Episode::readableFor($this->patient(), $this->hasPatientAccess)
             ->with(['period', 'managingOrganization.type.coding', 'careManager.type.coding'])
-            // A draft waiting for eHealth to process its submission cannot be edited
+            // An episode waiting for eHealth to process its submission cannot be edited, closed or cancelled
             ->withExists([
                 'ehealthLinks as has_pending_submission' => static fn (Builder $query): Builder => $query->whereStatus(JobStatus::PENDING->value)
             ])
@@ -379,7 +382,8 @@ class EpisodeIndex extends BasePatientComponent
     }
 
     /**
-     * Mark the selected episode as entered in error in eHealth and store the outcome locally.
+     * Ask eHealth to mark the selected episode as entered in error and follow the job it is processed with.
+     * The episode keeps its status until the job is processed, so a rejected cancellation leaves it as it was.
      *
      * @return void
      */
@@ -397,6 +401,12 @@ class EpisodeIndex extends BasePatientComponent
             return;
         }
 
+        if ($episode->ehealthLinks()->whereStatus(JobStatus::PENDING->value)->exists()) {
+            Session::flash('warning', __('episodes.messages.submission_pending'));
+
+            return;
+        }
+
         // eHealth rejects the cancellation until every encounter of the episode is marked as entered in error
         $hasEncountersToCancel = Encounter::forEpisode($episode->uuid)
             ->where('status', '!=', EncounterStatus::ENTERED_IN_ERROR)
@@ -408,32 +418,46 @@ class EpisodeIndex extends BasePatientComponent
             return;
         }
 
-        $formattedData = Fhir::episode()->toCancelFhir($this->cancellationForm->validate());
+        $this->cancellationForm->validate();
+
+        $requestData = objectMapper()->map($this->cancellationForm, EhealthCancelData::class)->toArray();
 
         try {
-            EHealth::episode()->cancel(
-                $this->uuid,
-                $episode->uuid,
-                removeEmptyKeys(Arr::toSnakeCase($formattedData))
+            // Stored with the status the episode gets once eHealth processes the job, so the job knows what to apply
+            $submission = RemoteEHealthLinksProcessing::startSubmission(
+                $episode,
+                [...$requestData, 'status' => Status::ENTERED_IN_ERROR->value]
             );
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error while cancelling episode');
+        } catch (Throwable $exception) {
+            $this->handleDatabaseErrors($exception, 'Error while starting episode cancellation');
 
             return;
         }
 
-        // eHealth accepted the cancellation; only now persist it locally
         try {
-            Repository::episode()->markAsEnteredInError($episode, $formattedData);
-        } catch (Throwable $exception) {
-            $this->handleDatabaseErrors($exception, 'Failed to store cancelled episode');
+            $response = EHealth::episode()->cancel($this->uuid, $episode->uuid, $requestData);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while cancelling episode');
+            RemoteEHealthLinksProcessing::markSubmissionFailed($submission);
 
             return;
         }
 
         $this->showCancellationModal = false;
 
-        Session::flash('success', __('episodes.messages.cancelled'));
+        // The request is received already, so the episode stays locked against another cancellation even if following the job fails
+        try {
+            RemoteEHealthLinksProcessing::track($submission, $response->validate());
+
+            Session::flash('success', __('episodes.messages.cancel_request_sent'));
+        } catch (Throwable $exception) {
+            Log::channel('e_health_errors')->error('Cancelled episode is not tracked', [
+                'episodeId' => $episode->id,
+                'statusCode' => $response->getStatusCode(),
+                'exception' => $exception->getMessage()
+            ]);
+            Session::flash('error', __('errors.ehealth.messages.submission_not_tracked'));
+        }
     }
 
     /**
@@ -453,7 +477,8 @@ class EpisodeIndex extends BasePatientComponent
     }
 
     /**
-     * Close the selected episode in eHealth and store the outcome locally.
+     * Ask eHealth to close the selected episode and follow the job it is processed with.
+     * The episode stays active until the job is processed, so a rejected closing leaves it as it was.
      *
      * @return void
      */
@@ -471,36 +496,56 @@ class EpisodeIndex extends BasePatientComponent
             return;
         }
 
-        $episode->loadMissing('period');
-
-        $this->closingForm->periodStart = $episode->period?->start ?? '';
-
-        $formattedData = Fhir::episode()->toCloseFhir($this->closingForm->validate());
-
-        try {
-            EHealth::episode()->close(
-                $this->uuid,
-                $episode->uuid,
-                removeEmptyKeys(Arr::toSnakeCase($formattedData))
-            );
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle('Error while closing episode');
+        if ($episode->ehealthLinks()->whereStatus(JobStatus::PENDING->value)->exists()) {
+            Session::flash('warning', __('episodes.messages.submission_pending'));
 
             return;
         }
 
-        // eHealth accepted the closing; only now persist it locally
+        $episode->loadMissing('period');
+
+        $this->closingForm->periodStart = $episode->period?->start ?? '';
+
+        $this->closingForm->validate();
+
+        $requestData = objectMapper()->map($this->closingForm, EhealthCloseData::class)->toArray();
+
         try {
-            Repository::episode()->markAsClosed($episode, $formattedData);
+            // Stored with the status the episode gets once eHealth processes the job, so the job knows what to apply
+            $submission = RemoteEHealthLinksProcessing::startSubmission(
+                $episode,
+                [...$requestData, 'status' => Status::CLOSED->value]
+            );
         } catch (Throwable $exception) {
-            $this->handleDatabaseErrors($exception, 'Failed to store closed episode');
+            $this->handleDatabaseErrors($exception, 'Error while starting episode closing');
+
+            return;
+        }
+
+        try {
+            $response = EHealth::episode()->close($this->uuid, $episode->uuid, $requestData);
+        } catch (EHealthException|EHealthConnectionException $exception) {
+            $exception->handle('Error while closing episode');
+            RemoteEHealthLinksProcessing::markSubmissionFailed($submission);
 
             return;
         }
 
         $this->showClosingModal = false;
 
-        Session::flash('success', __('episodes.messages.closed'));
+        // The request is received already, so the episode stays locked against another request even if following the job fails
+        try {
+            RemoteEHealthLinksProcessing::track($submission, $response->validate());
+
+            Session::flash('success', __('episodes.messages.close_request_sent'));
+        } catch (Throwable $exception) {
+            Log::channel('e_health_errors')->error('Closed episode is not tracked', [
+                'episodeId' => $episode->id,
+                'statusCode' => $response->getStatusCode(),
+                'exception' => $exception->getMessage()
+            ]);
+            Session::flash('error', __('errors.ehealth.messages.submission_not_tracked'));
+        }
     }
 
     public function render(): View

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
+use App\Dto\CodeableConcept\Model as CodeableConceptData;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\Person\Person;
@@ -138,12 +139,15 @@ abstract class BaseRepository
      * A missing value clears the relationship.
      *
      * @param  mixed  $existing
-     * @param  array|null  $newData
+     * @param  CodeableConceptData|array|null  $newData
      * @param  string  $relationshipName
      * @return Model|null
      */
-    protected function syncCodeableConcept(?Model $existing, ?array $newData, string $relationshipName): ?Model
-    {
+    protected function syncCodeableConcept(
+        ?Model $existing,
+        CodeableConceptData|array|null $newData,
+        string $relationshipName
+    ): ?Model {
         if (empty($newData)) {
             return null;
         }
@@ -257,8 +261,12 @@ abstract class BaseRepository
 
     /**
      * Update an existing codeable concept with new data.
+     *
+     * @param  CodeableConcept  $codeableConcept
+     * @param  CodeableConceptData|array  $newData
+     * @return void
      */
-    protected function updateCodeableConcept(CodeableConcept $codeableConcept, array $newData): void
+    protected function updateCodeableConcept(CodeableConcept $codeableConcept, CodeableConceptData|array $newData): void
     {
         Repository::codeableConcept()->update($codeableConcept, $newData);
     }

@@ -24,11 +24,19 @@ class RemoteEHealthLinksNotification extends Notification implements ShouldBroad
         return ['database', 'broadcast'];
     }
 
+    /**
+     * Stored notification. The action picks its icon in the notification list: a success shows as completed,
+     * any other status as failed.
+     *
+     * @param  object  $notifiable
+     * @return array
+     */
     public function toDatabase(object $notifiable): array
     {
         return [
             'message' => $this->message,
             'status' => $this->status,
+            'action' => $this->status === 'success' ? 'completed' : 'failed'
         ];
     }
 
