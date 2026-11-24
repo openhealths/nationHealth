@@ -6,6 +6,7 @@ namespace App\Livewire\EncounterPackage\Concerns;
 
 use App\Classes\eHealth\EHealth as SubmissionApi;
 use App\Classes\eHealth\EHealth;
+use App\Dto\ServiceRequest\EhealthPrequalify;
 use App\Enums\JobStatus;
 use App\Enums\MedicalProgram\Type as MedicalProgramType;
 use App\Enums\Person\EncounterStatus;
@@ -25,6 +26,7 @@ use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -295,6 +297,18 @@ trait ManagesEncounterReferrals
 
     public function validateEncounterReferral(bool $sign = true): void
     {
+        $encounter = $this->resolveEncounterModelForStandalone();
+        if ($encounter === null) {
+            return;
+        }
+        $person = $this->patient();
+        if (!$person instanceof Person || (int) $encounter->person_id !== $person->id
+            || Auth::user()->cannot('createServiceRequest', [$encounter, $person, legalEntity()])) {
+            Session::flash('error', __('referrals.create_denied'));
+
+            return;
+        }
+
         if ($this->encounterReferralRequestIdToSign !== null) {
             $this->checkEncounterReferralSubmission();
             if (($this->encounterReferralSubmission['status'] ?? null) === JobStatus::PENDING->value || $this->encounterReferralRequestIdToSign === null) {
@@ -302,11 +316,6 @@ trait ManagesEncounterReferrals
             }
         }
         $this->encounterReferralWarningMessage = '';
-
-        $encounter = $this->resolveEncounterModelForStandalone();
-        if ($encounter === null) {
-            return;
-        }
 
         if ($this->rejectInvalidEncounterReferralTransfer($encounter)) {
             return;
@@ -368,7 +377,30 @@ trait ManagesEncounterReferrals
                 return;
             }
 
-            $lifecycle->prepareEncounterDraftForSigning($encounter, $formData, $employeeContext, $this->encounterReferralRequestIdToSign);
+            // A refusal leaves the saved draft editable. Only the same confirmed content may proceed to signing.
+            $draft = app(MedicalRequestOwnership::class)->serviceForEncounter($this->encounterReferralRequestIdToSign, $encounter);
+            $repository = MedicalEventsRepository::serviceRequest();
+            if (!$draft->isEditableRequest()) {
+                throw ValidationException::withMessages(['draft' => __('referrals.draft_changed')]);
+            }
+            $resource = $repository->getResource($draft);
+            if (isset($resource['program']) || data_get($resource, 'category.coding.0.code') === 'transfer_of_care') {
+                $payload = objectMapper()->map(new EhealthPrequalify($resource));
+                $result = EHealth::serviceRequest()->prequalify($person->uuid, $payload->all())
+                    ->throwUnlessStatus(200)
+                    ->validate();
+                if (($reason = $result->rejectionReason()) !== null) {
+                    throw new EHealthValidationException(['error' => ['message' => $reason]]);
+                }
+                $unchanged = $repository->withLockedRequest(
+                    $person->id,
+                    $draft->id,
+                    fn (ServiceRequestRequest $current) => $current->isEditableRequest() && $repository->getResource($current) === $resource ? $current : null
+                );
+                if ($unchanged === null) {
+                    throw ValidationException::withMessages(['draft' => __('referrals.draft_changed')]);
+                }
+            }
             $this->assertEncounterReferralPeriod($period);
             $this->showEncounterReferralDrawer = false;
             $this->actionType = 'sign_referral';
@@ -393,7 +425,8 @@ trait ManagesEncounterReferrals
             Log::error('EncounterEdit: failed to create encounter referral: '.$exception->getMessage());
             $this->showSignatureModal = false;
             $this->actionType = null;
-            $this->failEncounterReferral(__('Не вдалося створити направлення: ').$exception->getMessage());
+            $message = $exception instanceof RequestException ? __('care-plan.referral_prequalify_failed') : $exception->getMessage();
+            $this->failEncounterReferral(__('Не вдалося створити направлення: ').$message);
         }
     }
 

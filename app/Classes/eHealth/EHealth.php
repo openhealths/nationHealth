@@ -28,6 +28,7 @@ use App\Classes\eHealth\Api\HealthcareService;
 use App\Classes\eHealth\Api\Job;
 use App\Classes\eHealth\Api\LegalEntity;
 use App\Classes\eHealth\Api\License;
+use App\Classes\eHealth\Api\MedicalEvents\ServiceRequest;
 use App\Classes\eHealth\Api\MedicalProgram;
 use App\Classes\eHealth\Api\MergeRequest;
 use App\Classes\eHealth\Api\Party;
@@ -55,7 +56,6 @@ use App\Classes\eHealth\Api\Verification;
 use App\Classes\eHealth\Api\Connection;
 use App\Classes\eHealth\Api\Patient\MedicationRequest;
 use App\Classes\eHealth\Api\Patient\MedicationDispense;
-use App\Classes\eHealth\Api\Patient\ServiceRequest;
 use App\Classes\eHealth\Api\Patient\DeviceRequest;
 
 final class EHealth
