@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
+use App\Classes\eHealth\Api\Responses\Collections\CarePlanDetails;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
@@ -31,7 +32,7 @@ class CarePlan extends Request
      */
     public function create(string $patientId, array $payload): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateResponse(...));
+        $this->setValidator($this->validateCreation(...));
 
         return $this->post("/api/patients/{$patientId}/care_plans", $payload);
     }
@@ -61,7 +62,7 @@ class CarePlan extends Request
      */
     public function getDetails(string $patientId, string $id, array $query = [], bool $preserveApiKeys = false): PromiseInterface|EHealthResponse
     {
-        $this->setValidator(fn (EHealthResponse $response): array => $this->validateDetails($response, $preserveApiKeys));
+        $this->setValidator($preserveApiKeys ? $this->validateSnapshot(...) : $this->validateDetails(...));
 
         return $this->get("/api/patients/{$patientId}/care_plans/{$id}", $query);
     }
@@ -136,87 +137,129 @@ class CarePlan extends Request
         return $this->get("/api/patients/$patientId/summary/care_plans", $mergedQuery);
     }
 
-    /**
-     * Validate the creation response. Accepted requests return job metadata;
-     * a completed synchronous request returns validated plan details. The array
-     * contract is retained for the existing clinical submission consumer.
-     */
-    protected function validateResponse(EHealthResponse $response): array
+    /** Creation is synchronous (201) or accepted for job processing (202). */
+    protected function validateCreation(EHealthResponse $response): CarePlanDetails|array
     {
-        if ($response->getStatusCode() === 202) {
-            return Validator::make($response->getData(), [
-                'status' => ['required', 'string'],
-                'eta' => ['sometimes', 'string'],
-                'links' => ['sometimes', 'array'],
-                'links.*.entity' => ['sometimes', 'string'],
-                'links.*.href' => ['required', 'string'],
-            ])->validate();
-        }
+        return match ($response->getStatusCode()) {
+            201 => $this->validateResponse($response),
+            202 => $this->validateSubmittedJob($response),
+            default => throw ValidationException::withMessages(['response' => __('errors.ehealth.messages.request_error')]),
+        };
+    }
 
-        $data = Arr::toCamelCase($response->getData());
-        $validator = Validator::make($data, $this->validationRules());
+    protected function validateResponse(EHealthResponse $response): CarePlanDetails
+    {
+        $validator = Validator::make($response->getData(), $this->validationRules());
+
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error('CarePlan response validation failed: ' . implode(', ', $validator->errors()->all()));
+        }
+
+        return new CarePlanDetails($validator->validate());
+    }
+
+    /** An accepted submission supplies job metadata for the existing poller. */
+    protected function validateSubmittedJob(EHealthResponse $response): array
+    {
+        $validator = Validator::make($response->getData(), [
+            'status' => ['required', 'string'],
+            'eta' => ['sometimes', 'nullable', 'string'],
+            'links' => ['sometimes', 'array', 'list'],
+            'links.*' => ['required', 'array'],
+            'links.*.entity' => ['sometimes', 'string'],
+            'links.*.href' => ['required', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            Log::channel('e_health_errors')->error('CarePlan job validation failed: ' . implode(', ', $validator->errors()->all()));
         }
 
         return $validator->validate();
     }
 
-    /** Full plan details required before mapping a registered plan to Model DTO. */
     protected function validationRules(): array
     {
-        $statuses = [
-            CarePlanStatus::PENDING->value, CarePlanStatus::ACTIVE->value,
-            CarePlanStatus::COMPLETED->value, CarePlanStatus::CANCELLED->value,
+        $status = Rule::in([
+            CarePlanStatus::PENDING->value,
+            CarePlanStatus::ACTIVE->value,
+            CarePlanStatus::COMPLETED->value,
+            CarePlanStatus::CANCELLED->value,
             CarePlanStatus::TERMINATED->value,
-        ];
+        ]);
+
         $rules = [
             'id' => ['required', 'uuid'],
-            'status' => ['required', Rule::in($statuses)],
+            'status' => ['required', $status],
             'title' => ['required', 'string'],
             'intent' => ['required', 'in:order'],
+            'period' => ['required', 'array'],
             'period.start' => ['required', 'date'],
             'period.end' => ['sometimes', 'nullable', 'date'],
             'requisition' => ['required', 'string'],
-            'addresses' => ['required', 'array', 'min:1'],
-            'statusHistory' => ['present', 'array'],
-            'statusHistory.*.status' => ['required', Rule::in($statuses)],
-            'statusHistory.*.insertedAt' => ['required', 'date'],
-            'statusHistory.*.insertedBy' => ['required', 'uuid'],
-            'insertedAt' => ['required', 'date'],
-            'updatedAt' => ['required', 'date'],
-            'insertedBy' => ['required', 'uuid'],
-            'updatedBy' => ['required', 'uuid'],
+            'addresses' => ['required', 'array', 'list'],
+            'status_history' => ['present', 'array', 'list'],
+            'status_history.*' => ['required', 'array'],
+            'status_history.*.status' => ['required', $status],
+            'status_history.*.inserted_at' => ['required', 'date'],
+            'status_history.*.inserted_by' => ['required', 'uuid'],
+            'inserted_at' => ['required', 'date'],
+            'updated_at' => ['required', 'date'],
+            'inserted_by' => ['required', 'uuid'],
+            'updated_by' => ['required', 'uuid'],
             'note' => ['sometimes', 'nullable', 'string'],
             'description' => ['sometimes', 'nullable', 'string'],
             'context' => ['sometimes', 'nullable', 'string'],
-            'informWith.authMethodId' => ['required_with:informWith', 'uuid'],
+            'inform_with' => ['sometimes', 'nullable', 'array', 'min:1'],
+            'inform_with.auth_method_id' => ['required_with:inform_with', 'uuid'],
         ];
-        foreach (['encounter', 'author', 'subject', 'managingOrganization', 'basedOn', 'partOf', 'careManager'] as $reference) {
-            $required = in_array($reference, ['encounter', 'author', 'subject', 'managingOrganization'], true)
-                ? 'required' : 'required_with:'.$reference;
-            $rules[$reference.'.identifier.value'] = [$required, 'uuid'];
-            $rules[$reference.'.identifier.type.coding'] = [$required, 'array', 'min:1'];
-            $rules[$reference.'.identifier.type.coding.*.code'] = ['required', 'string'];
-            $rules[$reference.'.identifier.type.coding.*.system'] = ['required', 'string'];
+
+        foreach (['category', 'terms_of_service', 'addresses.*'] as $concept) {
+            $rules += $this->conceptRules($concept, 'required');
         }
-        foreach (['category', 'termsOfService', 'addresses.*', 'statusReason'] as $concept) {
-            $required = $concept === 'statusReason' ? 'required_with:statusReason' : 'required';
-            $rules[$concept.'.coding'] = [$required, 'array', 'min:1'];
-            $rules[$concept.'.coding.*.code'] = ['required', 'string'];
-            $rules[$concept.'.coding.*.system'] = ['required', 'string'];
-            $rules[$concept.'.coding.*.display'] = ['sometimes', 'nullable', 'string'];
-            $rules[$concept.'.text'] = ['sometimes', 'nullable', 'string'];
+        foreach (['status_reason', 'status_history.*.status_reason'] as $concept) {
+            $rules += $this->conceptRules($concept, 'required_with:' . $concept);
         }
-        foreach (['contributor', 'supportingInfo'] as $references) {
-            $rules[$references] = ['sometimes', 'array'];
-            $rules[$references.'.*.identifier.value'] = ['required', 'uuid'];
-            $rules[$references.'.*.identifier.type.coding'] = ['required', 'array', 'min:1'];
-            $rules[$references.'.*.identifier.type.coding.*.code'] = ['required', 'string'];
-            $rules[$references.'.*.identifier.type.coding.*.system'] = ['required', 'string'];
+        foreach (['encounter', 'author', 'subject', 'managing_organization'] as $reference) {
+            $rules += $this->referenceRules($reference, 'required');
         }
+        foreach (['based_on', 'part_of', 'care_manager'] as $reference) {
+            $rules += $this->referenceRules($reference, 'required_with:' . $reference);
+        }
+        foreach (['contributor', 'supporting_info'] as $field) {
+            $rules[$field] = ['sometimes', 'array', 'list'];
+            $rules += $this->referenceRules($field . '.*', 'required');
+        }
+        $rules['managing_organization.display_value'] = ['required', 'string'];
 
         return $rules;
+    }
+
+    protected function conceptRules(string $path, string $required): array
+    {
+        return [
+            $path => [$required === 'required' ? 'required' : 'sometimes', 'array', 'min:1'],
+            $path . '.coding' => [$required, 'array', 'list', 'min:1'],
+            $path . '.coding.*' => ['required', 'array'],
+            $path . '.coding.*.code' => ['required', 'string'],
+            $path . '.coding.*.system' => ['required', 'string'],
+            $path . '.coding.*.display' => ['sometimes', 'nullable', 'string'],
+            $path . '.text' => ['sometimes', 'nullable', 'string'],
+        ];
+    }
+
+    protected function referenceRules(string $path, string $required): array
+    {
+        return [
+            $path => [$required === 'required' ? 'required' : 'sometimes', 'array', 'min:1'],
+            $path . '.identifier' => [$required, 'array'],
+            $path . '.identifier.value' => [$required, 'uuid'],
+            $path . '.display_value' => ['sometimes', 'nullable', 'string'],
+        ] + $this->conceptRules($path . '.identifier.type', $required);
+    }
+
+    protected function validateSnapshot(EHealthResponse $response): array
+    {
+        return $this->validateDetails($response, preserveApiKeys: true);
     }
 
     protected function validateDetails(EHealthResponse $response, bool $preserveApiKeys = false): array
