@@ -682,9 +682,9 @@
                                                     :aria-expanded="open"
                                                     :aria-controls="$id('dropdown-button')"
                                                     type="button"
-                                                    class="record-inner-action-btn inline-flex cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                                                    class="record-inner-action-btn inline-flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
                                                 >
-                                                    @icon('edit-user-outline', 'w-6 h-6 text-gray-700 dark:text-gray-300')
+                                                    @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                                                 </button>
 
                                                 <div

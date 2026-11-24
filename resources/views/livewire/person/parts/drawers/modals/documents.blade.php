@@ -33,7 +33,7 @@
                                     @click.outside="openDropdown = false"
                                 >
                                     <button @click="openDropdown = ! openDropdown" type="button" class="cursor-pointer">
-                                        @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
+                                        @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                                     </button>
 
                                     <div

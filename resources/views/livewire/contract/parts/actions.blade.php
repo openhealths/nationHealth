@@ -15,7 +15,7 @@
             @click="open = !open"
             class="inline-flex items-center p-2 text-sm font-medium text-center text-gray-500 hover:text-gray-800 rounded-lg focus:outline-none dark:text-gray-400 dark:hover:text-white"
             type="button">
-            @icon('edit-user-outline', 'svg-hover-action w-6 h-6 text-gray-800 dark:text-gray-300')
+            @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
         </button>
 
         <div x-show="open" x-transition

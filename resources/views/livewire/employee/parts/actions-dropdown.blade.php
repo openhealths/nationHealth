@@ -44,7 +44,7 @@
     <div class="relative flex justify-center" x-data="{ open: false }" @click.outside="open = false">
         <button @click="open = !open" type="button"
                 class="inline-flex items-center p-2 text-gray-500 hover:text-gray-800 rounded-lg">
-            @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-white')
+            @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
         </button>
 
         <div x-show="open" x-cloak x-transition

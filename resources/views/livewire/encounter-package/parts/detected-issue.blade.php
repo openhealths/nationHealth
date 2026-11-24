@@ -228,7 +228,7 @@
                                 <button
                                     type="button"
                                     @click.prevent="openExistingDetectedIssue(index)"
-                                    class="record-inner-action-btn cursor-pointer"
+                                    class="record-inner-action-btn"
                                     title="{{ __('forms.view') }}"
                                 >
                                     @icon('eye', 'w-6 h-6')
@@ -242,12 +242,9 @@
                                     :aria-expanded="openDropdown"
                                     :aria-controls="$id('dropdown-button')"
                                     type="button"
-                                    class="record-inner-action-btn cursor-pointer"
+                                    class="record-inner-action-btn"
                                 >
-                                    @icon(
-                                        'edit-user-outline',
-                                        'w-6 h-6 text-gray-800 dark:text-gray-200'
-                                    )
+                                    @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                                 </button>
 
                                 <div class="absolute right-0 z-50">

@@ -43,7 +43,7 @@
                         />
                         <button
                             type="button"
-                            class="record-inner-action-btn mb-2 cursor-pointer rounded p-2"
+                            class="record-inner-action-btn mb-2 rounded p-2"
                             @click="$wire.set('showDeviceCatalog', true)"
                             aria-label="{{ __('device-requests.patient.catalog') }}"
                             aria-haspopup="dialog"

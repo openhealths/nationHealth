@@ -317,9 +317,9 @@
                                         :aria-expanded="open"
                                         :aria-controls="$id('dropdown-button')"
                                         type="button"
-                                        class="record-inner-action-btn cursor-pointer"
+                                        class="record-inner-action-btn"
                                     >
-                                        @icon('edit-user-outline', 'w-5 h-5')
+                                        @icon('edit-user-outline', 'svg-hover-action w-5 h-5')
                                     </button>
 
                                     <div

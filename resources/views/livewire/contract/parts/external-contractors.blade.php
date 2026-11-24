@@ -165,7 +165,7 @@
                         <td class="td-input" x-text="contractor.contract?.expiresAt || ''"></td>
                         <td class="td-input flex flex-row gap-2">
                             <button @click="editExternalContractor(index)" class="svg-hover-action">
-                                @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
+                                @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                             </button>
                         </td>
                     </tr>

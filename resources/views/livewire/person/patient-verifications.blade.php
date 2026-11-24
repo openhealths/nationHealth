@@ -233,7 +233,7 @@
                                                             title="{{ __('forms.action') }}"
                                                             type="button"
                                                         >
-                                                            @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
+                                                            @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                                                         </button>
 
                                                         <div

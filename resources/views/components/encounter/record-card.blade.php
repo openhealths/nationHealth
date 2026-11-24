@@ -21,10 +21,10 @@
         <div class="record-inner-action-col !w-12 !border-t-0 !border-l !p-3">
             <button
                 type="button"
-                class="record-inner-action-btn cursor-pointer rounded-md p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+                class="record-inner-action-btn rounded-md p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
                 aria-label="{{ __('forms.actions') }}: {{ $record['title'] }}"
             >
-                @icon('edit-user-outline', 'w-5 h-5')
+                @icon('edit-user-outline', 'svg-hover-action w-5 h-5')
             </button>
         </div>
     </div>

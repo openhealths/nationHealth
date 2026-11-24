@@ -79,7 +79,7 @@
                             type="button"
                             @click="detailsOpen = false"
                             aria-label="{{ __('forms.close') }}"
-                            class="record-inner-action-btn cursor-pointer"
+                            class="record-inner-action-btn"
                         >
                             @icon('close', 'w-5 h-5')
                         </button>

@@ -191,7 +191,7 @@
                                                                     <span>{{ $participantName }}</span>
                                                                     <button
                                                                         type="button"
-                                                                        class="record-inner-action-btn shrink-0 cursor-pointer p-1"
+                                                                        class="record-inner-action-btn shrink-0 p-1"
                                                                         aria-haspopup="dialog"
                                                                         aria-label="{{ __('device-requests.patient.participant_details') }}: {{ $participantName }}"
                                                                         @click.stop="selectedParticipant = @js($participant); participantDetails = true"

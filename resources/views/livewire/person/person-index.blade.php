@@ -239,7 +239,7 @@
                                                         class="inline-block cursor-pointer rounded-full p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
                                                         title="{{ $isUpdateRequest ? __('patients.continue_update') : __('patients.continue_registration') }}"
                                                     >
-                                                        @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
+                                                        @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                                                     </a>
                                                     @if ($patient['status'] === Status::DRAFT->value)
                                                         @can('create', PersonRequest::class)
@@ -285,7 +285,7 @@
                                                         title="{{ __('forms.action') }}"
                                                         type="button"
                                                     >
-                                                        @icon('edit-user-outline', 'w-6 h-6 text-gray-800 dark:text-gray-200')
+                                                        @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
                                                     </button>
 
                                                     <div
