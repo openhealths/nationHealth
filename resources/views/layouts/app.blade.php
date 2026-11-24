@@ -68,7 +68,8 @@
 
                     elementToScrollTo =
                         document.querySelector(`[wire\\:model\\.live='${firstErrorKey}']`) ||
-                        document.querySelector(`[wire\\:model='${firstErrorKey}']`);
+                        document.querySelector(`[wire\\:model='${firstErrorKey}']`) ||
+                        document.getElementById(firstErrorKey);
 
                     if (!elementToScrollTo) {
                         const baseKey = firstErrorKey.replace(/\.\d+\..*$/, '');
@@ -81,7 +82,7 @@
                     if (elementToScrollTo) {
                         elementToScrollTo.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                        if (elementToScrollTo.tagName === 'INPUT' || elementToScrollTo.tagName === 'SELECT') {
+                        if (elementToScrollTo.matches('input, select, button')) {
                             elementToScrollTo.focus({ preventScroll: true });
                         }
                     }

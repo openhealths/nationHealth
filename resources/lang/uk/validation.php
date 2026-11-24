@@ -266,6 +266,7 @@ return [
         ],
         'identity_document_required' => 'У розділі «Документи» обов\'язково має бути хоча б один документ, що посвідчує особу (паспорт, ID-картка, посвідка на проживання тощо).',
         'employee' => [
+            'document_issuer_required' => 'Вкажіть, ким виданий документ.',
             'passport_national_id_mutual_exclusion' => 'Не можна одночасно вказати «Паспорт» і «Біометричний паспорт громадянина України». Залиште лише один з цих документів.',
             'document_type_not_allowed' => 'Обраний тип документа недопустимий для працівника. Свідоцтво про народження не використовується в реєстрації працівника — оберіть паспорт, ID-картку або посвідку на проживання.',
             'document_issued_before_birth' => 'Дата видачі документа не може бути раніше за дату народження працівника.',
@@ -449,6 +450,7 @@ return [
 
         'documents.*.type' => __('forms.document_type'),
         'documents.*.number' => __('forms.document_number'),
+        'employeeRequest.party.documents.*.issuedBy' => __('forms.document_issued_by'),
         'documents.*.issuedBy' => __('forms.document_issued_by'),
         'documents.*.issuedAt' => __('forms.document_issued_at'),
         'form.documents' => __('forms.documents'),

@@ -117,7 +117,6 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->validatePartyDataConsistency();
             $this->employeeRequest = $this->handleDraftPersistence();
             $this->employeeRequestId = $this->employeeRequest->id;
-            $this->validatedSigningPayload($this->employeeRequest);
 
             $this->flashSuccess(__('forms.employee_request_saved_successfully'));
             // 3.23.1.4 — review submitted fields before KEP
@@ -570,7 +569,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     abstract protected function handleDraftPersistence(): EmployeeRequest;
 
     /**
-     * Gets the persisted draft and checks that it is still unsigned.
+     * Gets the draft and validates it, including KEP-specific validation.
      */
     protected function validateAndGetDraft(): EmployeeRequest
     {
@@ -580,6 +579,8 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         if (is_null($requestToSign) || !is_null($requestToSign->uuid)) {
             throw new RuntimeException(__('forms.draft_not_found_or_already_signed'), 400);
         }
+
+        $this->form->validate($this->form->rulesForKepOnly());
 
         return $requestToSign;
     }
@@ -740,19 +741,22 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         }
     }
 
-    private function validatedSigningPayload(EmployeeRequest $requestToSign): array
-    {
-        $requestToSign->loadMissing('revision');
-        $payload = EHealth::employeeRequest()->schemaCreate($requestToSign->revision->data);
-        $this->form->validateSigningDocuments($payload['employee_request']['party']['documents'] ?? []);
-
-        return $payload;
-    }
-
+    /**
+     * Sign the employee request data with the signature provider.
+     */
     private function signEmployeeRequest(EmployeeRequest $requestToSign): string
     {
-        $payloadToSign = $this->validatedSigningPayload($requestToSign);
-        $this->form->validate($this->form->rulesForKepOnly());
+        $requestToSign->loadMissing('revision');
+        $payloadToSign = EHealth::employeeRequest()->schemaCreate($requestToSign->revision->data);
+        $documents = $payloadToSign['employee_request']['party']['documents'] ?? [];
+        // Validate the issuers that KEP will sign, keeping the form indices for inline errors.
+        $issuers = [];
+        foreach (array_keys($documents + $this->form->documents) as $index) {
+            $issuers[$index]['issuedBy'] = $documents[$index]['issued_by'] ?? null;
+        }
+        $this->form->validateOnly('documents.*.issuedBy', $this->form->documentsRules(), dataOverrides: [
+            'documents' => $issuers,
+        ]);
 
         return signatureService()->signData(
             $payloadToSign,
@@ -906,6 +910,23 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
      */
     protected function handleEHealthValidationError(EHealthValidationException $e): void
     {
+        $issuerErrors = [];
+        foreach ($e->getDetails()['error']['invalid'] ?? [] as $invalid) {
+            $index = Str::match('/^\$\.employee_request\.party\.documents\[(\d+)]\.issued_by\z/', $invalid['entry'] ?? '');
+            $rules = collect($invalid['rules'] ?? []);
+            $required = $rules->contains('rule', 'required')
+                || $rules->contains('description', 'required property issued_by was not present');
+            if ($index !== '' && $required) {
+                $issuerErrors["form.documents.$index.issuedBy"] = __('validation.custom.employee.document_issuer_required');
+            }
+        }
+
+        if ($issuerErrors) {
+            $this->setErrorBag($issuerErrors);
+            $this->showSignatureModal = false;
+            $this->dispatch('validation-failed-scroll', firstErrorKey: array_key_first($issuerErrors));
+        }
+
         $fullMessage = $e->getTranslatedMessage();
         $this->flashError($fullMessage);
 

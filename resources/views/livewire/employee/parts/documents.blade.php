@@ -32,7 +32,7 @@
 
         @foreach ($this->form->documents ?? [] as $index => $document)
             @error("form.documents.{$index}.issuedBy")
-                <p class="text-error -mt-2 mb-2">{{ $document['number'] ?? '' }} — {{ $message }}</p>
+                <p id="document-issuer-error-{{ $index }}" class="text-error -mt-2 mb-2">{{ $document['number'] ?? '' }} — {{ $message }}</p>
             @enderror
             @error("form.documents.{$index}.number")
                 <p class="text-error -mt-2 mb-2">{{ $message }}</p>
@@ -91,6 +91,9 @@
                             >
                                 <button
                                     x-ref="button"
+                                    :id="'form.documents.' + index + '.issuedBy'"
+                                    :aria-label="@js(__('forms.actions')) + ' — ' + document.number"
+                                    :aria-describedby="$wire.$errors.has('form.documents.' + index + '.issuedBy') ? 'document-issuer-error-' + index : null"
                                     @click="toggle()"
                                     :aria-expanded="openDropdown"
                                     :aria-controls="$id('dropdown-button')"
@@ -294,7 +297,7 @@
                                             :aria-describedby="issuerInvalid ? 'documentIssuedByError' : null"
                                         />
                                         <p id="documentIssuedByError" class="text-error" x-show="issuerInvalid" x-cloak>
-                                            {{ __('validation.required', ['attribute' => __('forms.document_issued_by')]) }}
+                                            {{ __('validation.custom.employee.document_issuer_required') }}
                                         </p>
                                     </div>
 
