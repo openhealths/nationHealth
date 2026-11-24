@@ -15,6 +15,7 @@ use App\Models\EhealthLink;
 use App\Models\CarePlanActivity;
 use App\Enums\CarePlanStatus;
 use App\Models\CarePlan;
+use App\Dto\CarePlan\Model as CarePlanData;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -65,6 +66,11 @@ class CarePlanRepository extends MedicalEventsBaseRepository
     private function uiRelations(): array
     {
         return [...self::FHIR_RELATIONS, 'person.names', 'author.party', 'encounter.episode', 'encounter.diagnoses.condition.type.coding', 'approvals.grantedTo.type.coding', ...array_map(static fn (string $relation): string => 'activities.'.$relation, CarePlanActivityRepository::FHIR_RELATIONS), 'activities.author.party'];
+    }
+
+    public function save(CarePlan $plan, CarePlanData $data): CarePlan
+    {
+        return $this->storeResource(get_object_vars($data), $plan->personId, $plan->legalEntityId, $plan->getKey());
     }
 
     public function formContext(array $form, ?int $localId = null): array
