@@ -34,8 +34,13 @@ test('qualification rows expose additional information without an edit action', 
     assert.ok(cellValues('qualifications', context).includes('—'));
 });
 
-test('document modal can save without an issue date while still requiring type and number', () => {
+test('document modal requires a nonblank issuer and allows an empty issue date', () => {
     const source = template('documents');
+    const issuer = source.match(/<input\s+x-model="modalDocument\.issuedBy"[^>]*>/)[0];
+    assert.match(issuer, /\srequired\s/);
+    const pattern = new RegExp(issuer.match(/pattern="([^"]+)"/)[1]);
+    assert.equal(pattern.test('  '), false);
+    assert.equal(pattern.test('ДМС'), true);
     const expression = source.match(/:disabled="([^"]*modalDocument[^\"]*)"/)[1];
     const disabled = modalDocument => vm.runInNewContext(expression, { modalDocument });
     assert.equal(disabled({ type: 'NATIONAL_ID', number: '123456789', issuedAt: '' }), false);

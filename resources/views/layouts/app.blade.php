@@ -68,7 +68,8 @@
 
                     elementToScrollTo =
                         document.querySelector(`[wire\\:model\\.live='${firstErrorKey}']`) ||
-                        document.querySelector(`[wire\\:model='${firstErrorKey}']`);
+                        document.querySelector(`[wire\\:model='${firstErrorKey}']`) ||
+                        document.getElementById(firstErrorKey);
 
                     if (!elementToScrollTo) {
                         const baseKey = firstErrorKey.replace(/\.\d+\..*$/, '');

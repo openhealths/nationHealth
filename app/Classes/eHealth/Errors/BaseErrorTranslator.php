@@ -80,6 +80,7 @@ class BaseErrorTranslator implements ApiErrorTranslator
             'value is not allowed in enum' => __('errors.ehealth.messages.value_not_allowed_in_enum'),
             'Request validation fails' => __('errors.ehealth.messages.validation_error'),
             'Validation error' => __('errors.ehealth.messages.request_parameters_validation_error'),
+            'required property issued_by was not present' => __('validation.custom.employee.document_issuer_required'),
             'Employee not found' => __('errors.ehealth.messages.employee_not_found'),
             'Invalid author employee type' => __('errors.ehealth.messages.invalid_author_employee_type'),
             "Employee doesn't match with user" => __('errors.ehealth.messages.employee_user_mismatch'),

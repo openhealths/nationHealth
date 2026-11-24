@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Tests\Feature\Employee;
 
 use App\Classes\eHealth\Api\Employee as EmployeeApi;
+use App\Classes\eHealth\Api\EmployeeRequest as EmployeeRequestApi;
 use App\Classes\eHealth\EHealthResponse;
+use App\Contracts\SignatureProvider;
 use App\Events\EHealthUserLogin;
 use App\Enums\Employee\RequestStatus;
 use App\Enums\Employee\RevisionStatus;
 use App\Enums\Status;
 use App\Listeners\eHealth\EmployeeCreate;
+use App\Livewire\Employee\EmployeeRequestEdit;
 use App\Models\Division;
 use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
@@ -23,16 +26,21 @@ use App\Repositories\EmployeeRepository;
 use App\Services\Employee\EmployeeRequestMatcher;
 use App\Services\Employee\EmployeeRequestProcessor;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionMethod;
+use Tests\Concerns\FakesEmployeeDictionaries;
 use Tests\TestCase;
 
 class EmployeeRequestRootCauseRegressionTest extends TestCase
 {
     use DatabaseTransactions;
+    use FakesEmployeeDictionaries;
 
     protected function setUp(): void
     {
@@ -95,6 +103,54 @@ class EmployeeRequestRootCauseRegressionTest extends TestCase
         $this->assertSame($oldParty->id, $otherRequest->fresh()->partyId);
         $this->assertSame($oldParty->id, $unlinkedRequest->fresh()->partyId);
         $this->assertSame($revisionBefore, $request->fresh()->revision->data);
+    }
+
+    public function test_a_draft_requires_an_issuer_for_each_document_before_saving_or_signing(): void
+    {
+        $this->fakeEmployeeDictionaries();
+        [$entity, , $user] = $this->fixture();
+        $this->actingAs($user);
+        Gate::before(fn (): bool => true);
+        $api = $this->partialMock(EmployeeRequestApi::class);
+        $api->shouldReceive('create')->once()->with('signed-test')->andReturn([
+            'id' => (string) Str::uuid(), 'ehealth_response' => ['data' => ['inserted_at' => now()->toISOString()]],
+        ]);
+        $signature = $this->mock(SignatureProvider::class);
+        $signature->shouldReceive('getCertificateAuthorities')->andReturn([]);
+        $signature->shouldReceive('signData')->once()->withArgs(
+            fn (array $payload): bool => $payload['employee_request']['party']['documents'][1]['issued_by'] === 'МВС'
+        )->andReturn('signed-test');
+
+        $position = ['employee_type' => 'HR', 'position' => config('ehealth.employee_type.HR.position')[0], 'start_date' => '2024-01-01'];
+        $draft = EmployeeRequest::create($position + ['legal_entity_id' => $entity->id, 'status' => RequestStatus::NEW]);
+        $draft->revision()->create(['status' => RevisionStatus::PENDING, 'data' => [
+            'employee_request_data' => $position,
+            'party' => $this->partyData() + ['email' => $user->email],
+            'phones' => [['type' => 'MOBILE', 'number' => '+380501234567']],
+            'documents' => [
+                ['type' => 'NATIONAL_ID', 'number' => '123456789', 'issued_by' => 'ДМС'],
+                ['type' => 'TEMPORARY_CERTIFICATE', 'number' => 'АА123456'],
+            ],
+        ]]);
+
+        $issuer = 'form.documents.1.issuedBy';
+        $component = Livewire::test(EmployeeRequestEdit::class, ['legalEntity' => $entity, 'employee_request' => $draft])
+            ->call('save')->assertHasErrors($issuer)->assertDispatched('validation-failed-scroll', firstErrorKey: $issuer)
+            ->call('prepareForSigning')->assertHasErrors($issuer)->assertNotDispatched('open-request-preview-modal')
+            ->assertSee('АА123456 — '.__('validation.custom.employee.document_issuer_required'));
+        $component->set('form.knedp', 'test')->set('form.password', 'test')
+            ->set('form.keyContainerUpload', UploadedFile::fake()->create('test.dat', 1));
+        foreach ([null, '', '   ', "\u{00a0}"] as $blank) {
+            $component->set($issuer, $blank)->call('sign')
+                ->assertHasErrors($issuer)->assertHasNoErrors('form.documents.0.issuedBy');
+        }
+        $signature->shouldNotHaveReceived('signData');
+        $api->shouldNotHaveReceived('create');
+
+        $component->set($issuer, 'МВС')->call('save')->assertHasNoErrors()
+            ->call('prepareForSigning')->assertHasNoErrors()->assertDispatched('open-request-preview-modal')
+            ->call('sign')->assertHasNoErrors()->assertDispatched('close-signature-modal');
+        self::assertSame(RevisionStatus::SENT, $draft->fresh()->revision->status);
     }
 
     public function test_login_rejects_ambiguous_unlinked_requests_in_the_same_division(): void
