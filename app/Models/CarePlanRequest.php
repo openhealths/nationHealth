@@ -5,25 +5,21 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\EHealthDateCast;
-use App\Contracts\SubmittedToEHealth;
 use App\Enums\JobStatus;
-use App\Models\Person\Person;
-use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-class CarePlanRequest extends Model implements SubmittedToEHealth
+class CarePlanRequest extends BaseCarePlan
 {
-    use HasCamelCasing;
+    protected $attributes = [
+        'addresses' => '[]',
+    ];
 
     protected $casts = [
         'period_start' => EHealthDateCast::class,
         'period_end' => EHealthDateCast::class,
         'co_authors' => 'array',
-        'addresses' => 'array',
         'episodes' => 'array',
         'medical_records' => 'array',
         'version' => 'integer',
@@ -40,17 +36,10 @@ class CarePlanRequest extends Model implements SubmittedToEHealth
     protected function editable(Builder $query): Builder
     {
         return $query->whereNull('care_plan_id')
-            ->whereDoesntHave('ehealthLinks', fn (Builder $links): Builder => $links->where('status', JobStatus::PENDING->value));
-    }
-
-    public function ehealthLinks(): MorphMany
-    {
-        return $this->morphMany(EhealthLink::class, 'linkable');
-    }
-
-    public function person(): BelongsTo
-    {
-        return $this->belongsTo(Person::class);
+            ->whereDoesntHave(
+                'ehealthLinks',
+                static fn (Builder $links): Builder => $links->where('status', JobStatus::PENDING->value)
+            );
     }
 
     public function carePlan(): BelongsTo
