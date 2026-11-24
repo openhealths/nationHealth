@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Dto\Episode;
 
-use App\Contracts\Dto\Model as ModelContract;
-use App\Core\Arr;
 use App\Dto\Coding\Model as CodingModel;
 use App\Dto\Identifier\Model as IdentifierModel;
 use App\Dto\Transform\Model\Reference;
@@ -14,31 +12,38 @@ use App\Enums\ResourceType;
 use App\Livewire\Episode\Forms\EpisodeForm;
 use App\Models\MedicalEvents\Sql\Episode;
 use Symfony\Component\ObjectMapper\Attribute\Map;
+use Symfony\Component\ObjectMapper\Condition\SourceClass;
+use Symfony\Component\ObjectMapper\Condition\TargetClass;
 
 /**
- * Episode form mapped to database attributes.
- * Properties without #[Map] are taken from the form property with the same name.
+ * Episode form mapped to database attributes, which are then mapped to the episode model.
+ * Every property stored on the episode has its own #[Map], since Eloquent attributes are not declared properties
+ * and the mapper copies a property without #[Map] only to a declared property of the same name.
+ * The type, the identifiers and the period start are mapped from the form only, since they are stored as related records.
  * The form has no status, so the episode keeps the draft status.
  */
-#[Map(source: EpisodeForm::class)]
-class Model implements ModelContract
+#[Map(target: Episode::class, source: EpisodeForm::class)]
+class Model
 {
+    #[Map]
     public string $uuid;
 
+    #[Map]
     public string $name;
 
+    #[Map(if: new TargetClass(Episode::class))]
     public string $status = Status::DRAFT->value;
 
-    #[Map(source: 'typeCode', transform: [self::class, 'type'])]
+    #[Map(source: 'typeCode', if: new SourceClass(EpisodeForm::class), transform: [self::class, 'type'])]
     public CodingModel $type;
 
-    #[Map(source: 'managingOrganizationId', transform: new Reference(ResourceType::LEGAL_ENTITY))]
+    #[Map(source: 'managingOrganizationId', if: new SourceClass(EpisodeForm::class), transform: new Reference(ResourceType::LEGAL_ENTITY))]
     public IdentifierModel $managingOrganization;
 
-    #[Map(source: 'careManagerId', transform: new Reference(ResourceType::EMPLOYEE))]
+    #[Map(source: 'careManagerId', if: new SourceClass(EpisodeForm::class), transform: new Reference(ResourceType::EMPLOYEE))]
     public IdentifierModel $careManager;
 
-    #[Map(source: 'startDate', transform: [self::class, 'periodStart'])]
+    #[Map(source: 'startDate', if: new SourceClass(EpisodeForm::class), transform: [self::class, 'periodStart'])]
     public string $periodStart;
 
     /**
@@ -63,23 +68,5 @@ class Model implements ModelContract
     public static function periodStart(string $startDate, EpisodeForm $form): string
     {
         return convertToEHealthISO8601("$startDate $form->startTime");
-    }
-
-    /**
-     * Episode attributes without the type, the identifiers and the period start, which are stored as related records.
-     *
-     * @param  Episode|null  $episode
-     * @return Episode
-     */
-    public function toModel(?Episode $episode = null): Episode
-    {
-        $episode ??= new Episode();
-        $relatedRecordProperties = ['type', 'managingOrganization', 'careManager', 'periodStart'];
-
-        foreach (Arr::except(get_object_vars($this), $relatedRecordProperties) as $key => $value) {
-            $episode->setAttribute($key, $value);
-        }
-
-        return $episode;
     }
 }

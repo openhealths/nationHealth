@@ -41,7 +41,7 @@ class EpisodeRepository extends BaseRepository
 
         if ($data instanceof EpisodeData) {
             return DB::transaction(static function () use ($data, $ownerColumn, $ownerId, $encounterId): Episode {
-                $episode = $data->toModel(new Episode([$ownerColumn => $ownerId, 'encounter_id' => $encounterId]));
+                $episode = objectMapper()->map($data, new Episode([$ownerColumn => $ownerId, 'encounter_id' => $encounterId]));
 
                 $episode->type()->associate(Repository::coding()->store($data->type));
                 $episode->managingOrganization()->associate(Repository::identifier()->store($data->managingOrganization));
@@ -112,7 +112,7 @@ class EpisodeRepository extends BaseRepository
     {
         if ($data instanceof EpisodeData) {
             DB::transaction(static function () use ($episode, $data): void {
-                $data->toModel($episode);
+                objectMapper()->map($data, $episode);
 
                 $episode->type->update($data->type->toArray());
                 Repository::identifier()->update($episode->careManager, $data->careManager);

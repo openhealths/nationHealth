@@ -28,7 +28,7 @@ class HealthcareServiceRepository
     public function save(HealthcareServiceData $data, HealthcareService $healthcareService): HealthcareService
     {
         return DB::transaction(static function () use ($data, $healthcareService): HealthcareService {
-            $data->toModel($healthcareService);
+            objectMapper()->map($data, $healthcareService);
 
             if ($healthcareService->category) {
                 Repository::codeableConcept()->update($healthcareService->category, $data->category);
@@ -112,7 +112,7 @@ class HealthcareServiceRepository
 
             // The upsert bypasses model casts, so the row is taken from the model attributes, already cast for storage
             $rows = $items->map(fn (HealthcareServiceData $data): array => [
-                ...$data->toModel()->getAttributes(),
+                ...objectMapper()->map($data, HealthcareService::class)->getAttributes(),
                 'division_id' => $divisionIds[$data->divisionUuid],
                 'legal_entity_id' => $legalEntity->id,
                 ...$this->storeCodeableConcepts($data, $existingServices->get($data->uuid))
