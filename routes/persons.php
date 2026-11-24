@@ -66,6 +66,7 @@ use App\Livewire\Procedure\ProcedureCreate;
 use App\Livewire\Procedure\ProcedureEdit;
 use App\Livewire\Procedure\ProcedureIndex;
 use App\Livewire\Procedure\ProcedureView;
+use App\Livewire\ServiceRequestRequest\ServiceRequestRequestEdit;
 use App\Livewire\Specimen\SpecimenCreate;
 use App\Livewire\Specimen\SpecimenEdit;
 use App\Models\CarePlan;
@@ -166,6 +167,10 @@ Route::prefix('persons')->whereNumber('person')
                 Route::get('/prescription-requests/{requestId}', PatientPrescriptionRequestView::class)
                     ->name('prescription-requests.view');
                 Route::get('/referrals', PatientReferrals::class)->name('referrals');
+                Route::get('/referrals/{serviceRequest}/edit', ServiceRequestRequestEdit::class)
+                    ->whereNumber('serviceRequest')
+                    ->can('update', ['serviceRequest', 'person', 'legalEntity'])
+                    ->name('referrals.edit');
                 Route::get('/device-requests', PatientDeviceRequests::class)
                     ->can('viewAny', DeviceRequestRequest::class)->name('device-requests');
                 Route::get('/device-requests/create', DeviceRequestForm::class)

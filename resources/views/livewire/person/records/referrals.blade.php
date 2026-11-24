@@ -218,6 +218,14 @@
                                                 @icon('eye', 'w-5 h-5 text-gray-500')
                                                 {{ $expandedUuid === $referral['uuid'] ? __('referrals.registry.hide') : __('forms.view_details') }}
                                             </button>
+                                            @if (!empty($referral['canEdit']))
+                                                <a
+                                                    class="dropdown-item"
+                                                    href="{{ route('persons.referrals.edit', [legalEntity(), 'person' => $personId, 'serviceRequest' => $referral['id']]) }}"
+                                                >
+                                                    {{ __('forms.edit') }}
+                                                </a>
+                                            @endif
                                             @if (!empty($referral['canSign']))
                                                 <button
                                                     type="button"
