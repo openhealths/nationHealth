@@ -68,9 +68,69 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         return [...self::FHIR_RELATIONS, 'person.names', 'author.party', 'encounter.episode', 'encounter.diagnoses.condition.type.coding', 'approvals.grantedTo.type.coding', ...array_map(static fn (string $relation): string => 'activities.'.$relation, CarePlanActivityRepository::FHIR_RELATIONS), 'activities.author.party'];
     }
 
+    /** Save the mapped model attributes and prepared relation DTOs in one transaction. */
     public function save(CarePlan $plan, CarePlanData $data): CarePlan
     {
-        return $this->storeResource(get_object_vars($data), $plan->personId, $plan->legalEntityId, $plan->getKey());
+        return $this->storageTransaction(function () use ($plan, $data): CarePlan {
+            $query = CarePlan::where('person_id', $plan->personId)
+                ->where('legal_entity_id', $plan->legalEntityId)->lockForUpdate();
+            $plan = $plan->exists ? $query->findOrFail($plan->id) : ($query->where('uuid', $data->uuid)->first() ?? $plan);
+            if (($plan->uuid !== null && $plan->uuid !== $data->uuid)
+                || $plan->person->uuid !== $data->subjectReference->value
+                || $plan->legalEntity->uuid !== $data->managingOrganization->value) {
+                throw new InvalidArgumentException('Cannot replace a Care Plan identity, patient or organization.');
+            }
+
+            objectMapper()->map($data, $plan);
+            $plan->authorId = Employee::where('uuid', $data->authorReference->value)
+                ->where('legal_entity_id', $plan->legalEntityId)->value('id');
+            $plan->encounterId = Encounter::where('uuid', $data->encounterIdentifier->value)
+                ->where('person_id', $plan->personId)->value('id');
+            $plan->detailsSyncedAt = now();
+
+            foreach (['categoryConcept', 'termsOfServiceConcept', 'statusReasonConcept'] as $relation) {
+                $concept = $data->{$relation};
+                if ($concept === null) {
+                    $plan->{$relation}()->dissociate();
+                    continue;
+                }
+                $existing = $plan->{$relation};
+                $stored = $existing === null
+                    ? MedicalEventsRepository::codeableConcept()->store($concept)
+                    : MedicalEventsRepository::codeableConcept()->update($existing, $concept);
+                $plan->{$relation}()->associate($stored);
+            }
+
+            foreach (['authorReference', 'encounterIdentifier', 'subjectReference', 'managingOrganization', 'basedOn', 'partOf', 'careManager'] as $relation) {
+                $identifier = $data->{$relation};
+                if ($identifier === null) {
+                    $plan->{$relation}()->dissociate();
+                    continue;
+                }
+                $existing = $plan->{$relation};
+                $stored = $existing === null
+                    ? MedicalEventsRepository::identifier()->store($identifier)
+                    : MedicalEventsRepository::identifier()->update($existing, $identifier);
+                $plan->{$relation}()->associate($stored);
+            }
+            $plan->saveOrFail();
+            MedicalEventsRepository::period()->sync($plan, $data->period, 'effectivePeriod');
+
+            foreach (['contributors', 'supportingInfoReferences'] as $relation) {
+                $existing = $plan->{$relation}()->get();
+                $ids = [];
+                foreach ($data->{$relation} as $position => $identifier) {
+                    $current = $existing->get($position);
+                    $stored = $current === null
+                        ? MedicalEventsRepository::identifier()->store($identifier)
+                        : MedicalEventsRepository::identifier()->update($current, $identifier);
+                    $ids[] = $stored->id;
+                }
+                $this->syncPivot($plan, $relation, $ids);
+            }
+
+            return $plan->unsetRelations();
+        });
     }
 
     public function formContext(array $form, ?int $localId = null): array
@@ -409,6 +469,11 @@ class CarePlanRepository extends MedicalEventsBaseRepository
             'note' => $plan->note,
             'addresses' => $plan->addresses ?? [],
             'requisition' => $plan->requisition,
+            'statusHistory' => $plan->statusHistory,
+            'insertedAt' => $plan->ehealthInsertedAt?->toIso8601String(),
+            'updatedAt' => $plan->ehealthUpdatedAt?->toIso8601String(),
+            'insertedBy' => $plan->ehealthInsertedBy,
+            'updatedBy' => $plan->ehealthUpdatedBy,
             'period' => $plan->effectivePeriod ? MedicalEventsRepository::period()->toResource($plan->effectivePeriod) : null,
             'supportingInfo' => $plan->supportingInfoReferences->map(fn ($reference): array => MedicalEventsRepository::identifier()->toReference($reference))->all(),
             'contributor' => $plan->contributors->map(fn ($reference): array => MedicalEventsRepository::identifier()->toReference($reference))->all(),

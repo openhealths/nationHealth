@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Casts\EHealthDateCast;
 use App\Contracts\SubmittedToEHealth;
+use App\Enums\JobStatus;
 use App\Models\Person\Person;
 use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -31,7 +32,15 @@ class CarePlanRequest extends Model implements SubmittedToEHealth
     #[Scope]
     protected function forEditor(Builder $query, int $legalEntityId, int $userId): Builder
     {
-        return $query->whereLegalEntityId($legalEntityId)->whereUserId($userId);
+        return $query->where('legal_entity_id', $legalEntityId)
+            ->where('user_id', $userId);
+    }
+
+    #[Scope]
+    protected function editable(Builder $query): Builder
+    {
+        return $query->whereNull('care_plan_id')
+            ->whereDoesntHave('ehealthLinks', fn (Builder $links): Builder => $links->where('status', JobStatus::PENDING->value));
     }
 
     public function ehealthLinks(): MorphMany

@@ -9,6 +9,14 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        Schema::table('care_plans', static function (Blueprint $table): void {
+            $table->json('status_history')->nullable();
+            $table->timestampTz('ehealth_inserted_at')->nullable();
+            $table->timestampTz('ehealth_updated_at')->nullable();
+            $table->uuid('ehealth_inserted_by')->nullable();
+            $table->uuid('ehealth_updated_by')->nullable();
+        });
+
         Schema::create('care_plan_requests', static function (Blueprint $table): void {
             $table->id();
             $table->uuid('uuid')->unique();
@@ -43,5 +51,8 @@ return new class extends Migration {
     public function down(): void
     {
         Schema::dropIfExists('care_plan_requests');
+        Schema::table('care_plans', static function (Blueprint $table): void {
+            $table->dropColumn(['status_history', 'ehealth_inserted_at', 'ehealth_updated_at', 'ehealth_inserted_by', 'ehealth_updated_by']);
+        });
     }
 };
