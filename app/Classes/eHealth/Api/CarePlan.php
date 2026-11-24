@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
-use App\Classes\eHealth\Api\Responses\Collections\CarePlanDetails;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
@@ -139,9 +138,10 @@ class CarePlan extends Request
 
     /**
      * Validate the creation response. Accepted requests return job metadata;
-     * a completed synchronous request returns typed plan details.
+     * a completed synchronous request returns validated plan details. The array
+     * contract is retained for the existing clinical submission consumer.
      */
-    protected function validateResponse(EHealthResponse $response): array|CarePlanDetails
+    protected function validateResponse(EHealthResponse $response): array
     {
         if ($response->getStatusCode() === 202) {
             return Validator::make($response->getData(), [
@@ -159,7 +159,7 @@ class CarePlan extends Request
             Log::channel('e_health_errors')->error('CarePlan response validation failed: ' . implode(', ', $validator->errors()->all()));
         }
 
-        return new CarePlanDetails($validator->validate());
+        return $validator->validate();
     }
 
     /** Full plan details required before mapping a registered plan to Model DTO. */
