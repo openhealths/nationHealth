@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Repositories\MedicalEvents;
 
+use App\Classes\eHealth\Api\Responses\Collections\ServiceRequestDetails;
+use App\Core\Arr;
 use App\Dto\ServiceRequest\Model as ServiceRequestData;
 use App\Enums\JobStatus;
 use App\Enums\Person\EncounterStatus;
@@ -160,6 +162,20 @@ class ServiceRequestRequestRepository extends BaseRepository
 
             return $request;
         });
+    }
+
+    public function importDetails(
+        ServiceRequestDetails $details,
+        ServiceRequestRequest $record,
+        ?int $employeeId = null,
+        ?int $divisionId = null
+    ): ServiceRequestRequest {
+        return $this->importResource(
+            Arr::toCamelCase($details->all()),
+            $record->personId,
+            $record->employeeId ?? $employeeId,
+            $record->divisionId ?? $divisionId
+        );
     }
 
     /** This entry point is for full responses fetched from ESOZ, never locally assembled drafts. */
@@ -619,9 +635,11 @@ class ServiceRequestRequestRepository extends BaseRepository
         $relation->associate(MedicalEventsRepository::codeableConcept()->store(['text' => $priority]));
     }
 
-    public function findByUuid(string $uuid): ?ServiceRequestRequest
+    public function findByUuid(string $uuid, ?int $personId = null): ?ServiceRequestRequest
     {
-        return $this->model->newQuery()->where('uuid', $uuid)->first();
+        return $this->model->newQuery()->whereUuid($uuid)
+            ->when($personId !== null, fn (Builder $query) => $query->wherePersonId($personId))
+            ->first();
     }
 
     public function incomingForEncounter(Encounter $encounter): ?ServiceRequestRequest
@@ -781,9 +799,10 @@ class ServiceRequestRequestRepository extends BaseRepository
             ->sum('quantity');
     }
 
-    public function findDraftByActivity(string $activityUuid): ?ServiceRequestRequest
+    public function findDraftByActivity(string $activityUuid, ?int $personId = null): ?ServiceRequestRequest
     {
         return $this->model->newQuery()
+            ->when($personId !== null, fn (Builder $query) => $query->wherePersonId($personId))
             ->whereHas('basedOn', fn ($q) => $q->where('value', $activityUuid))
             ->whereIn('status', ['draft', 'DRAFT'])
             ->latest('id')

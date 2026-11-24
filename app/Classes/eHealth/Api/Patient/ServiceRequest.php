@@ -100,7 +100,7 @@ class ServiceRequest extends PatientApiBase
     /** Preserve array results for existing signing, import and execution callers. */
     public function getById(string $patientId, string $id, array $query = [], bool $preserveApiKeys = false): PromiseInterface|EHealthResponse
     {
-        return $this->requestDetails($patientId, $id, $query, function (EHealthResponse $response) use ($patientId, $id, $preserveApiKeys): array {
+        $response = $this->requestDetails($patientId, $id, $query, function (EHealthResponse $response) use ($patientId, $id, $preserveApiKeys): array {
             $native = $this->validateDetails($response, $patientId, $id, $preserveApiKeys)->all();
             if ($preserveApiKeys) {
                 return $native;
@@ -108,6 +108,14 @@ class ServiceRequest extends PatientApiBase
 
             return $this->replaceEHealthPropNames($native);
         });
+        if ($preserveApiKeys) {
+            return $response;
+        }
+
+        // Legacy referral workflows read getData() directly. Check their response before exposing it.
+        $validate = static fn (EHealthResponse $detail): EHealthResponse => tap($detail)->validate();
+
+        return $response instanceof PromiseInterface ? $response->then($validate) : $validate($response);
     }
 
     protected function requestDetails(string $patientId, string $id, array $query, callable $validator): PromiseInterface|EHealthResponse

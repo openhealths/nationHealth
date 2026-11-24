@@ -622,8 +622,8 @@ trait ManagesEncounterReferrals
         if ($synchronize && $record->status !== 'active') {
             try {
                 $person = $repository->person((int) $encounter->person_id);
-                $remote = app(ReferralRequestLifecycleService::class)->fetchRemoteReferral($person->uuid, $record->uuid, 'service_request');
-                $record = $repository->importResource((new ServiceRequestMapper())->normalize($remote), $record->personId, $record->employeeId, $record->divisionId);
+                $remote = EHealth::serviceRequest()->getDetails($person->uuid, $record->uuid)->validate();
+                $record = $repository->importDetails($remote, $record);
             } catch (Throwable $exception) {
                 report($exception);
                 Session::flash('warning', __('referrals.submission_refresh_failed'));
@@ -645,8 +645,8 @@ trait ManagesEncounterReferrals
             try {
                 $repository = MedicalEventsRepository::serviceRequest();
                 $person = $repository->person((int) $record->personId);
-                $remote = app(ReferralRequestLifecycleService::class)->fetchRemoteReferral($person->uuid, $record->uuid, 'service_request');
-                $number = $remote['requisition'] ?? $remote['request_number'] ?? null;
+                $remote = EHealth::serviceRequest()->getDetails($person->uuid, $record->uuid)->validate();
+                $number = $remote['requisition'];
                 if (is_string($number) && $number !== '') {
                     $repository->updateRequestNumber($record->uuid, $number);
                     $record->requestNumber = $number;

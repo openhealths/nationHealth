@@ -9,7 +9,6 @@ use App\Classes\eHealth\EHealthResponse;
 use App\Core\Arr;
 use App\Enums\Person\DeviceRequestStatus;
 use App\Enums\Person\ServiceRequestStatus;
-use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Jobs\RemoteEHealthLinksProcessing;
@@ -538,32 +537,19 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
         }
 
         try {
-            $remote = $this->fetchRemoteReferral((string) $personUuid, (string) $requestRecord->uuid, $kind);
-            $remoteStatus = ServiceRequestStatus::resolve((string) ($remote['status'] ?? ''));
-        } catch (EHealthResponseException|EHealthValidationException|EHealthConnectionException|ValidationException $exception) {
-            // A local draft can legitimately have no matching ServiceRequest in eHealth.
-            if ($exception instanceof EHealthResponseException
-                && $exception->response->notFound()
-                && $exception->response->json('error.type') === 'NOT_FOUND') {
-                return false;
-            }
-            if ($kind !== 'service_request') {
-                if ($exception instanceof EHealthResponseException || $exception instanceof EHealthValidationException) {
-                    return false;
-                }
-
-                throw $exception;
-            }
-
-            $remoteStatus = null;
+            $response = $kind === 'service_request'
+                ? EHealth::serviceRequest()->getById((string) $personUuid, (string) $requestRecord->uuid)
+                : EHealth::deviceRequest()->getById((string) $personUuid, (string) $requestRecord->uuid);
+            $remote = $response->getData();
+        } catch (EHealthResponseException|EHealthValidationException) {
+            return false;
         }
 
-        if ($remoteStatus === null && $kind === 'service_request') {
-            // Do not offer another signature while the existing referral's remote state is unknown.
-            $message = __('care-plan.referral_full_details_required');
-            Session::flash('error', $message);
-            throw ValidationException::withMessages(['submission' => $message]);
+        if ($remote === []) {
+            return false;
         }
+
+        $remoteStatus = ServiceRequestStatus::resolve((string) ($remote['status'] ?? ''));
         if ($remoteStatus === null || $remoteStatus === ServiceRequestStatus::DRAFT) {
             return false;
         }
@@ -579,11 +565,10 @@ class ReferralRequestLifecycleService extends EHealthRequestLifecycleService
      */
     public function fetchRemoteReferral(string $personUuid, string $requestUuid, string $kind): array
     {
-        if ($kind === 'service_request') {
-            return EHealth::serviceRequest()->getById($personUuid, $requestUuid, preserveApiKeys: true)->validate();
-        }
+        $response = $kind === 'service_request'
+            ? EHealth::serviceRequest()->getById($personUuid, $requestUuid)
+            : EHealth::deviceRequest()->getById($personUuid, $requestUuid);
 
-        $response = EHealth::deviceRequest()->getById($personUuid, $requestUuid);
         $remote = $response->getData();
         if ($remote === []) {
             throw new EHealthResponseException($response);

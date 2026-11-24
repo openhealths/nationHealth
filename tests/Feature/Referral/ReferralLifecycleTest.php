@@ -8,7 +8,6 @@ use App\Classes\eHealth\Api\Patient\ServiceRequest as ServiceRequestApi;
 use App\Classes\eHealth\Api\Patient\DeviceRequest as DeviceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Contracts\SignatureProvider;
-use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
@@ -18,14 +17,11 @@ use App\Models\Person\Person;
 use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
-use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
-use App\Repositories\Repository;
+use App\Repositories\MedicalEvents\Repository;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
 use App\Services\MedicalEvents\Mappers\DeviceRequestMapper;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Validation\ValidationException;
-use PHPUnit\Framework\Attributes\TestWith;
 use Illuminate\Support\Str;
 use Mockery;
 use Tests\Concerns\CreatesFhirRequestIdentifiers;
@@ -34,21 +30,6 @@ use Tests\Concerns\CreatesFhirCarePlans;
 use Tests\TestCase;
 use Livewire\Livewire;
 use App\Livewire\CarePlan\Activity\Show\CarePlanActivityShow;
-use App\Classes\eHealth\Api\CarePlanActivity as CarePlanActivityApi;
-use App\Core\Arr;
-use App\Dto\MedicalEvents\DeviceActivityReadinessAssessment;
-use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
-use App\Models\MedicalEvents\Sql\Coding;
-use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
-use App\Models\Relations\Party;
-use App\Models\User;
-use App\Services\MedicalEvents\DeviceProgramParticipationGuard;
-use Carbon\Carbon;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Throwable;
 
 class ReferralLifecycleTest extends TestCase
 {
@@ -60,7 +41,7 @@ class ReferralLifecycleTest extends TestCase
     protected Person $person;
     protected Encounter $encounter;
     protected Employee $employee;
-    protected User $user;
+    protected \App\Models\User $user;
     protected CarePlanActivity $serviceActivity;
     protected CarePlanActivity $deviceActivity;
 
@@ -86,7 +67,7 @@ class ReferralLifecycleTest extends TestCase
             'legal_entity_uuid' => legalEntity()->uuid,
         ]);
 
-        $record = MedicalEventsRepository::serviceRequest()->findByUuid($uuid);
+        $record = Repository::serviceRequest()->findByUuid($uuid);
         $this->assertNotNull($record);
         $this->assertSame($destination, $record->performer->value);
         $this->assertSame($division, $record->locationReference->value);
@@ -149,9 +130,9 @@ class ReferralLifecycleTest extends TestCase
         ]);
 
         // 2. Create Encounter & helpers
-        $identifierId = Identifier::create(['value' => (string) Str::uuid()])->id;
-        $codingId = Coding::create(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id;
-        $ccId = CodeableConcept::create()->id;
+        $identifierId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => (string) Str::uuid()])->id;
+        $codingId = \App\Models\MedicalEvents\Sql\Coding::create(['code' => 'AMB', 'system' => 'eHealth/encounter_classes'])->id;
+        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
 
         $this->encounter = Encounter::create([
             'uuid' => (string) Str::uuid(),
@@ -164,10 +145,10 @@ class ReferralLifecycleTest extends TestCase
         ]);
 
         // 3. Create Legal Entity
-        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
-        $legalEntity = LegalEntity::create([
+        $legalEntity = \App\Models\LegalEntity::create([
             'uuid' => (string) Str::uuid(),
             'status' => 'ACTIVE',
             'sync_status' => 'COMPLETED',
@@ -177,7 +158,7 @@ class ReferralLifecycleTest extends TestCase
         $this->instance('legalEntity', $legalEntity);
 
         // 4. Create Employee
-        $party = Party::create([
+        $party = \App\Models\Relations\Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Іван',
             'last_name' => 'Петренко',
@@ -186,10 +167,10 @@ class ReferralLifecycleTest extends TestCase
             'gender' => 'MALE',
         ]);
 
-        $this->user = User::create([
+        $this->user = \App\Models\User::create([
             'uuid' => (string) Str::uuid(),
             'email' => 'ivan' . Str::random(5) . '@example.com',
-            'password' => Hash::make('password'),
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
             'party_id' => $party->id,
         ]);
 
@@ -250,33 +231,27 @@ class ReferralLifecycleTest extends TestCase
 
     private function mockActivityRegisteredInEHealth(): void
     {
-        $mockActivityApi = Mockery::mock(CarePlanActivityApi::class);
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class);
         $response = Mockery::mock(EHealthResponse::class);
         $response->shouldReceive('successful')->andReturn(true);
         $response->shouldReceive('getData', 'validate')->andReturn(['id' => (string) Str::uuid()]);
         $mockActivityApi->shouldReceive('getDetails')->andReturn($response);
-        $this->instance(CarePlanActivityApi::class, $mockActivityApi);
-    }
-
-    private function missingReferralException(): EHealthResponseException
-    {
-        $error = ['type' => 'NOT_FOUND', 'message' => 'Service request not found'];
-        $response = new Response(404, [], json_encode(['error' => $error], JSON_THROW_ON_ERROR));
-
-        return new EHealthResponseException(new EHealthResponse($response));
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
     }
 
     private function mockReferralMissingInEHealth(ServiceRequestApi $mockServiceApi, string $personUuid, string $requestUuid): void
     {
+        $missingResponse = Mockery::mock(EHealthResponse::class);
+        $missingResponse->shouldReceive('getData', 'validate')->andReturn([]);
         $mockServiceApi->shouldReceive('getById')
-            ->with($personUuid, $requestUuid, [], true)
-            ->andThrow($this->missingReferralException());
+            ->with($personUuid, $requestUuid)
+            ->andReturn($missingResponse);
     }
 
     public function test_can_persist_referral_requests_locally(): void
     {
-        $serviceRepo = MedicalEventsRepository::serviceRequest();
-        $deviceRepo = MedicalEventsRepository::deviceRequest();
+        $serviceRepo = Repository::serviceRequest();
+        $deviceRepo = Repository::deviceRequest();
 
         $serviceUuid = (string) Str::uuid();
         $deviceUuid = (string) Str::uuid();
@@ -335,7 +310,7 @@ class ReferralLifecycleTest extends TestCase
         ]);
 
         $service = ServiceRequestRequest::findOrFail($serviceId);
-        $device = DeviceRequestRequest::findOrFail($deviceId);
+        $device = \App\Models\MedicalEvents\Sql\DeviceRequestRequest::findOrFail($deviceId);
         $this->assertSame($this->serviceActivity->uuid, $service->basedOn->value);
         $this->assertSame($this->deviceActivity->uuid, $device->basedOn->value);
         $this->assertSame($this->encounter->uuid, $service->context->value);
@@ -701,8 +676,8 @@ class ReferralLifecycleTest extends TestCase
     public function test_referral_period_preserves_activity_time_and_kyiv_calendar_day(): void
     {
         config(['app.timezone' => 'Europe/Kyiv']);
-        $this->travelTo(Carbon::parse('2026-10-23T11:55:00+03:00'));
-        $repository = Repository::carePlanActivity();
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-23T11:55:00+03:00'));
+        $repository = app(\App\Repositories\CarePlanActivityRepository::class);
         $resource = $repository->getResource($this->serviceActivity);
         $resource['detail']['scheduledPeriod'] = ['start' => '2026-10-23T21:30:00Z', 'end' => '2026-11-02T21:59:59Z'];
         $repository->storeResource($resource, $this->serviceActivity->carePlan, $this->serviceActivity->id);
@@ -723,7 +698,7 @@ class ReferralLifecycleTest extends TestCase
     public function test_referral_period_rejects_past_start_despite_future_end_before_signing(): void
     {
         config(['app.timezone' => 'Europe/Kyiv']);
-        $this->travelTo(Carbon::parse('2026-10-23T11:55:00+03:00'));
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-23T11:55:00+03:00'));
         $this->actingAs($this->user);
         $this->mockActivityRegisteredInEHealth();
 
@@ -747,7 +722,7 @@ class ReferralLifecycleTest extends TestCase
     public function test_referral_period_rejects_end_time_before_start_on_same_day(): void
     {
         config(['app.timezone' => 'Europe/Kyiv']);
-        $this->travelTo(Carbon::parse('2026-10-23T11:55:00+03:00'));
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-23T11:55:00+03:00'));
         $this->actingAs($this->user);
         $this->mockActivityRegisteredInEHealth();
 
@@ -769,8 +744,8 @@ class ReferralLifecycleTest extends TestCase
     public function test_referral_period_retry_updates_same_draft_without_consuming_quantity_twice(): void
     {
         config(['app.timezone' => 'Europe/Kyiv']);
-        $this->travelTo(Carbon::parse('2026-10-23T11:55:00+03:00'));
-        Repository::carePlanActivity()->update($this->serviceActivity, ['program' => null, 'quantity' => 1.0]);
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-23T11:55:00+03:00'));
+        app(\App\Repositories\CarePlanActivityRepository::class)->update($this->serviceActivity, ['program' => null, 'quantity' => 1.0]);
         $this->actingAs($this->user);
         $this->mockActivityRegisteredInEHealth();
         $draftUuid = (string) Str::uuid();
@@ -814,7 +789,7 @@ class ReferralLifecycleTest extends TestCase
         $drafts = ServiceRequestRequest::query()
             ->whereHas('basedOn', fn ($query) => $query->whereValue($this->serviceActivity->uuid))->get();
         $this->assertCount(1, $drafts);
-        $resource = MedicalEventsRepository::serviceRequest()->getResource($drafts->sole());
+        $resource = Repository::serviceRequest()->getResource($drafts->sole());
         $this->assertSame('2026-10-23T09:30:00Z', $resource['occurrencePeriod']['start']);
         $this->assertSame('2026-11-02T21:59:00Z', $resource['occurrencePeriod']['end']);
         $this->assertSame('Keep this draft note', $resource['note']);
@@ -823,7 +798,7 @@ class ReferralLifecycleTest extends TestCase
     public function test_referral_period_expired_while_waiting_for_signature_returns_to_form(): void
     {
         config(['app.timezone' => 'Europe/Kyiv']);
-        $this->travelTo(Carbon::parse('2026-10-23T11:55:00+03:00'));
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-23T11:55:00+03:00'));
         $this->actingAs($this->user);
         $this->mockActivityRegisteredInEHealth();
         $draftUuid = (string) Str::uuid();
@@ -845,7 +820,7 @@ class ReferralLifecycleTest extends TestCase
             'carePlan' => $this->serviceActivity->carePlan,
             'activity' => $this->serviceActivity,
         ])->call('openSignatureModal', 'sign_servicerequest', null, $draftUuid);
-        $this->travelTo(Carbon::parse('2026-10-23T12:01:00+03:00'));
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-23T12:01:00+03:00'));
         $component->call('signReferral')
             ->assertSet('showSignatureModal', false)
             ->assertSet('showReferralDrawer', true)
@@ -856,7 +831,7 @@ class ReferralLifecycleTest extends TestCase
 
     public function test_livewire_skips_prequalify_when_activity_has_no_program(): void
     {
-        Repository::carePlanActivity()->update($this->serviceActivity, ['program' => null]);
+        app(\App\Repositories\CarePlanActivityRepository::class)->update($this->serviceActivity, ['program' => null]);
         $carePlan = $this->serviceActivity->carePlan;
         $this->actingAs($this->user);
         $this->mockActivityRegisteredInEHealth();
@@ -887,7 +862,7 @@ class ReferralLifecycleTest extends TestCase
 
     public function test_create_care_plan_device_draft_skips_prequalify_without_program(): void
     {
-        Repository::carePlanActivity()->update($this->deviceActivity, [
+        app(\App\Repositories\CarePlanActivityRepository::class)->update($this->deviceActivity, [
             'program' => null,
             'quantity_system' => 'device_unit',
             'quantity_code' => 'piece',
@@ -922,7 +897,7 @@ class ReferralLifecycleTest extends TestCase
                     'division_id' => null,
                 ]
             );
-        } catch (Throwable) {
+        } catch (\Throwable) {
             // Persist may hit local schema drift; the contract under test is skipping PreQualify.
         }
 
@@ -932,7 +907,7 @@ class ReferralLifecycleTest extends TestCase
     public function test_create_care_plan_device_draft_still_prequalifies_with_program(): void
     {
         $programId = (string) Str::uuid();
-        Repository::carePlanActivity()->update($this->deviceActivity, [
+        app(\App\Repositories\CarePlanActivityRepository::class)->update($this->deviceActivity, [
             'program' => $programId,
             'quantity_system' => 'device_unit',
             'quantity_code' => 'piece',
@@ -981,7 +956,7 @@ class ReferralLifecycleTest extends TestCase
                     'division_id' => null,
                 ]
             );
-        } catch (Throwable) {
+        } catch (\Throwable) {
             // Persist may hit local schema drift; PreQualify-with-program is the contract under test.
         }
 
@@ -1054,7 +1029,7 @@ class ReferralLifecycleTest extends TestCase
         $snapshot = json_decode(file_get_contents(base_path('tests/Fixtures/ServiceRequest/resource.json')), true, flags: JSON_THROW_ON_ERROR);
         $snapshot['id'] = $uuid;
         $snapshotResponse = Mockery::mock(EHealthResponse::class);
-        $snapshotResponse->shouldReceive('getData', 'validate')->andReturn(Arr::toSnakeCase($snapshot));
+        $snapshotResponse->shouldReceive('getData', 'validate')->andReturn(\App\Core\Arr::toSnakeCase($snapshot));
         $mockServiceApi->shouldReceive('getById')->once()->with($this->person->uuid, $uuid, [], true)->andReturn($snapshotResponse);
         $cancelResponse = Mockery::mock(EHealthResponse::class);
         $cancelResponse->shouldReceive('getStatusCode')->andReturn(200);
@@ -1082,7 +1057,7 @@ class ReferralLifecycleTest extends TestCase
             ->set('referralExplanatoryLetter', 'Synthetic cancellation reason')
             ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 10))
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
             ->call('signCancelReferral')
             ->assertSet('showSignatureModal', false)
             ->assertSee(__('care-plan.referral_cancel_success'))
@@ -1146,7 +1121,7 @@ class ReferralLifecycleTest extends TestCase
             ->assertSet('actionType', 'sign_servicerequest')
             ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 10))
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
             ->call('sign')
             ->assertHasNoErrors(['statusReason'])
             ->assertSet('showSignatureModal', false);
@@ -1192,7 +1167,7 @@ class ReferralLifecycleTest extends TestCase
         $this->instance(ServiceRequestApi::class, $mockServiceApi);
 
         $missingResponse = Mockery::mock(EHealthResponse::class);
-        $missingResponse->shouldReceive('validate')->andThrow($this->missingReferralException());
+        $missingResponse->shouldReceive('getData', 'validate')->andReturn([]);
         $getResponse = Mockery::mock(EHealthResponse::class);
         $getResponse->shouldReceive('getData', 'validate')->andReturn([
             'id' => $draftUuid,
@@ -1208,7 +1183,7 @@ class ReferralLifecycleTest extends TestCase
             ],
         ]);
         $mockServiceApi->shouldReceive('getById')
-            ->with($this->person->uuid, $draftUuid, [], true)
+            ->with($this->person->uuid, $draftUuid)
             ->andReturn($missingResponse, $getResponse);
 
         $mockServiceApi->shouldReceive('createSigned')->once()->andThrow(new EHealthValidationException([
@@ -1239,7 +1214,7 @@ class ReferralLifecycleTest extends TestCase
             ->call('openSignatureModal', 'sign_servicerequest', null, $draftUuid)
             ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 10))
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
             ->call('sign')
             ->assertSet('showSignatureModal', false);
 
@@ -1250,24 +1225,6 @@ class ReferralLifecycleTest extends TestCase
             'request_number' => 'SR-EXISTING-99',
             'employee_id' => $this->employee->id,
         ]);
-    }
-
-    #[TestWith([403])]
-    #[TestWith([404])]
-    #[TestWith([503])]
-    public function test_failed_detail_lookup_stops_a_local_draft_before_signing(int $status): void
-    {
-        $draft = new ServiceRequestRequest(['uuid' => (string) Str::uuid(), 'status' => 'draft']);
-        $api = Mockery::mock(ServiceRequestApi::class);
-        $api->shouldReceive('getById')->once()->with($this->person->uuid, $draft->uuid, [], true)
-            ->andThrow(new EHealthResponseException(new EHealthResponse(new Response($status))));
-        $api->shouldNotReceive('createSigned');
-        $this->instance(ServiceRequestApi::class, $api);
-
-        $this->expectException(ValidationException::class);
-        app(ReferralRequestLifecycleService::class)->trySyncDraftFromEHealth(
-            $this->serviceActivity->carePlan, $this->serviceActivity, $draft, 'service_request'
-        );
     }
 
     public function test_init_referral_form_syncs_draft_when_already_active_in_ehealth(): void
@@ -1302,9 +1259,9 @@ class ReferralLifecycleTest extends TestCase
         $remote['requesterLegalEntity']['identifier']['value'] = $this->employee->legalEntity->uuid;
         $remote['basedOn'][0]['identifier']['value'] = $carePlan->uuid;
         $remote['basedOn'][1]['identifier']['value'] = $this->serviceActivity->uuid;
-        $getResponse->shouldReceive('getData', 'validate')->andReturn(Arr::toSnakeCase($remote));
+        $getResponse->shouldReceive('getData', 'validate')->andReturn(\App\Core\Arr::toSnakeCase($remote));
         $mockServiceApi->shouldReceive('getById')
-            ->with($this->person->uuid, $draftUuid, [], true)
+            ->with($this->person->uuid, $draftUuid)
             ->andReturn($getResponse);
         $mockServiceApi->shouldNotReceive('createSigned');
 
@@ -1458,17 +1415,17 @@ class ReferralLifecycleTest extends TestCase
         $mockDeviceApi->shouldReceive('prequalify')->never();
         $this->instance(DeviceRequestApi::class, $mockDeviceApi);
 
-        $mockActivityApi = Mockery::mock(CarePlanActivityApi::class)->makePartial();
+        $mockActivityApi = Mockery::mock(\App\Classes\eHealth\Api\CarePlanActivity::class)->makePartial();
         $activityCreateResponse = Mockery::mock(EHealthResponse::class);
         $activityCreateResponse->shouldReceive('getStatusCode')->andReturn(201);
         $activityCreateResponse->shouldReceive('getData', 'validate')->andReturn(['id' => $activityUuid, 'status' => 'scheduled']);
         $mockActivityApi->shouldReceive('create')->once()->andReturn($activityCreateResponse);
-        $this->instance(CarePlanActivityApi::class, $mockActivityApi);
+        $this->instance(\App\Classes\eHealth\Api\CarePlanActivity::class, $mockActivityApi);
 
-        $mockGuard = Mockery::mock(DeviceProgramParticipationGuard::class);
+        $mockGuard = Mockery::mock(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class);
         $mockGuard->shouldReceive('resolveParticipatingProgramIds')->andReturn([$programId]);
-        $mockGuard->shouldReceive('assess')->andReturn(new DeviceActivityReadinessAssessment([], []));
-        $this->instance(DeviceProgramParticipationGuard::class, $mockGuard);
+        $mockGuard->shouldReceive('assess')->andReturn(new \App\Dto\MedicalEvents\DeviceActivityReadinessAssessment([], []));
+        $this->instance(\App\Services\MedicalEvents\DeviceProgramParticipationGuard::class, $mockGuard);
 
         $mockSignatureService = Mockery::mock(SignatureProvider::class);
         $mockSignatureService->shouldReceive('signData')->andReturn('mock-base64-signature');
@@ -1482,7 +1439,7 @@ class ReferralLifecycleTest extends TestCase
             ->call('openSignatureModal', 'sign_activity', $draftDeviceActivity->id)
             ->set('form.password', '12345678')
             ->set('form.knedp', 'acsk_test')
-            ->set('form.keyContainerUpload', UploadedFile::fake()->create('key.dat', 10))
+            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.dat', 10))
             ->call('sign')
             ->assertSet('showSignatureModal', false);
 

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\MedicalEvents;
 
 use App\Classes\eHealth\EHealth;
-use App\Classes\eHealth\Api\Responses\Collections\ServiceRequestDetails;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Exceptions\EHealth\EHealthConnectionException;
@@ -374,11 +373,15 @@ class PatientApprovalService
     }
 
     /**
-     * Returns validated referral details from eHealth, including the resources permitted for patient approval.
+     * Returns referral details from eHealth, including its permitted resources.
+     *
+     * @return array<string, mixed>
      */
-    public function referralDetails(Person $person, string $uuid): ServiceRequestDetails
+    public function referralDetails(Person $person, string $uuid): array
     {
-        return EHealth::serviceRequest()->getDetails($person->uuid, $uuid)->validate();
+        return EHealth::serviceRequest()
+            ->getById($person->uuid, $uuid)
+            ->getData();
     }
 
     /** @return array{approval_id: ?string, link_id: ?int} */

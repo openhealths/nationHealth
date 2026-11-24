@@ -26,14 +26,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Mockery;
 use Tests\TestCase;
-use App\Classes\eHealth\Api\Job;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
-use App\Models\MedicalEvents\Sql\Coding;
-use App\Models\MedicalEvents\Sql\Identifier;
-use App\Models\Relations\Party;
-use Illuminate\Support\Facades\DB;
-use Livewire\Component;
-use Throwable;
 
 /**
  * Regression suite for e-referral / e-prescription create & redeem after PR #652 / #768.
@@ -58,7 +50,7 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
     {
         parent::setUp();
 
-        $party = Party::create([
+        $party = \App\Models\Relations\Party::create([
             'uuid' => (string) Str::uuid(),
             'first_name' => 'Іван',
             'last_name' => 'Петренко',
@@ -74,8 +66,8 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
             'party_id' => $party->id,
         ]);
 
-        $typeId = DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
-            ?? DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
+        $typeId = \Illuminate\Support\Facades\DB::table('legal_entity_types')->where('name', 'PRIMARY_CARE')->value('id')
+            ?? \Illuminate\Support\Facades\DB::table('legal_entity_types')->insertGetId(['name' => 'PRIMARY_CARE']);
 
         $this->legalEntity = LegalEntity::create([
             'uuid' => (string) Str::uuid(),
@@ -281,19 +273,19 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
             ],
         ]);
 
-        $jobApi = Mockery::mock(Job::class);
+        $jobApi = Mockery::mock(\App\Classes\eHealth\Api\Job::class);
         $jobApi->shouldReceive('getDetails')
             ->andReturn($this->responseWithData(['status' => 'pending']));
         $jobApi->shouldReceive('getDetailsByHref')
             ->andReturn($this->responseWithData(['status' => 'pending']));
-        $this->app->instance(Job::class, $jobApi);
+        $this->app->instance(\App\Classes\eHealth\Api\Job::class, $jobApi);
 
         $service = app(ReferralRequestLifecycleService::class);
 
         try {
             $service->completeReferral($referralUuid, $encounterUuid);
             $this->fail('Expected completeReferral to reject pending job before returning.');
-        } catch (Throwable) {
+        } catch (\Throwable) {
             // Expected: timeout or validation from job resolver.
         }
 
@@ -316,13 +308,12 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
     private function mockRemoteReferral(string $uuid, string $programId): void
     {
         $api = Mockery::mock(PatientServiceRequest::class)->makePartial();
-        $response = Mockery::mock(EHealthResponse::class);
-        $response->shouldReceive('validate')->once()->andReturn([
-            'id' => $uuid, 'status' => 'active', 'program_processing_status' => 'new',
-            'subject' => ['identifier' => ['value' => $this->person->uuid]],
-            'program' => ['identifier' => ['value' => $programId]],
-        ]);
-        $api->shouldReceive('getById')->once()->with($this->person->uuid, $uuid, [], true)->andReturn($response);
+        $api->shouldReceive('getById')->once()->with($this->person->uuid, $uuid)
+            ->andReturn($this->responseWithData([
+                'id' => $uuid, 'status' => 'active', 'program_processing_status' => 'new',
+                'subject' => ['identifier' => ['value' => $this->person->uuid]],
+                'program' => ['identifier' => ['value' => $programId]],
+            ]));
         $this->instance(PatientServiceRequest::class, $api);
     }
 
@@ -339,12 +330,12 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
 
     private function createEncounter(string $uuid, string $status = 'finished'): Encounter
     {
-        $identifierId = Identifier::create(['value' => (string) Str::uuid()])->id;
-        $codingId = Coding::create([
+        $identifierId = \App\Models\MedicalEvents\Sql\Identifier::create(['value' => (string) Str::uuid()])->id;
+        $codingId = \App\Models\MedicalEvents\Sql\Coding::create([
             'code' => 'AMB',
             'system' => 'eHealth/encounter_classes',
         ])->id;
-        $ccId = CodeableConcept::create()->id;
+        $ccId = \App\Models\MedicalEvents\Sql\CodeableConcept::create()->id;
 
         return Encounter::create([
             'uuid' => $uuid,
@@ -361,7 +352,7 @@ class ElectronicReferralAndPrescriptionDiagnosticTest extends TestCase
 /**
  * Lightweight host for standalone encounter referral drawer diagnostics.
  */
-class DiagnosticEncounterStandaloneHarness extends Component
+class DiagnosticEncounterStandaloneHarness extends \Livewire\Component
 {
     use ResolvesEncounterStandaloneContext;
     use ManagesEncounterEPrescription;

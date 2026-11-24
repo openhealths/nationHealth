@@ -15,7 +15,6 @@ use App\Repositories\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Throwable;
 
 class PatientApprovalForm extends BaseForm
 {
@@ -38,7 +37,7 @@ class PatientApprovalForm extends BaseForm
 
             'resource' => $this->validateResources($person, $data),
             'child' => $this->validateChild($person, $data),
-            'service_request' => $this->validateReferral($person, $data),
+            'service_request' => $this->validateReferral($data),
 
             'diagnoses_group',
             'forbidden_group',
@@ -254,7 +253,7 @@ class PatientApprovalForm extends BaseForm
         return $contextUuid ? ['type' => $contextType, 'uuid' => $contextUuid] : null;
     }
 
-    private function validateReferral(Person $person, array $data): array
+    private function validateReferral(array $data): array
     {
         $uuid = $data['resourceIds'][0] ?? null;
 
@@ -264,15 +263,16 @@ class PatientApprovalForm extends BaseForm
             ]);
         }
 
-        try {
-            $details = app(PatientApprovalService::class)->referralDetails($person, $uuid);
-            $referral = objectMapper()->map($details, ReferralApprovalData::class);
-        } catch (Throwable) {
-            throw ValidationException::withMessages([
-                'resourceIds' => __('approval.create.referral_check_failed'),
-            ]);
-        }
+        return [
+            'mode' => 'service_request',
+            'service_request_uuid' => $uuid,
+            'access_level' => 'read',
+            'grant_to_legal_entity' => $data['grantToLegalEntity'],
+        ];
+    }
 
+    public function validateReferralAccess(ReferralApprovalData $referral): void
+    {
         if ($referral->status !== 'active') {
             throw ValidationException::withMessages([
                 'resourceIds' => __('approval.create.referral_not_active'),
@@ -284,13 +284,6 @@ class PatientApprovalForm extends BaseForm
                 'resourceIds' => __('approval.create.referral_no_resources'),
             ]);
         }
-
-        return [
-            'mode' => 'service_request',
-            'service_request_uuid' => $uuid,
-            'access_level' => 'read',
-            'grant_to_legal_entity' => $data['grantToLegalEntity'],
-        ];
     }
 
     private function validateGroup(array $data): array
