@@ -62,6 +62,11 @@ class CarePlan extends Model implements SubmittedToEHealth
         'part_of_id',
 
         'details_synced_at',
+        'status_history',
+        'ehealth_inserted_at',
+        'ehealth_updated_at',
+        'ehealth_inserted_by',
+        'ehealth_updated_by',
     ];
 
     protected $casts = [
@@ -71,6 +76,9 @@ class CarePlan extends Model implements SubmittedToEHealth
         'supporting_info' => 'array',
 
         'details_synced_at' => 'datetime',
+        'status_history' => 'array',
+        'ehealth_inserted_at' => 'datetime',
+        'ehealth_updated_at' => 'datetime',
     ];
 
     public function displayTitle(): string
