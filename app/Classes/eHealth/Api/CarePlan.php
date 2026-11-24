@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
-use App\Core\Arr;
-
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
+use App\Core\Arr;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class CarePlan extends Request
@@ -30,7 +30,16 @@ class CarePlan extends Request
      */
     public function create(string $patientId, array $payload): PromiseInterface|EHealthResponse
     {
-        $this->setValidator(\App\Classes\eHealth\Api\Job::validateSubmissionResponse(...));
+        $this->setValidator(function (EHealthResponse $response) use ($patientId): array {
+            if ($response->getStatusCode() === 201) {
+                return $this->validate($response->getData(), $patientId);
+            }
+
+            $data = Job::validateSubmissionResponse($response);
+            Validator::make($data, ['status' => ['required', 'string']])->validate();
+
+            return $data;
+        });
 
         return $this->post("/api/patients/{$patientId}/care_plans", $payload);
     }
@@ -78,7 +87,7 @@ class CarePlan extends Request
      */
     public function cancel(string $personId, string $id, array $payload): PromiseInterface|EHealthResponse
     {
-        $this->setValidator(\App\Classes\eHealth\Api\Job::validateSubmissionResponse(...));
+        $this->setValidator(Job::validateSubmissionResponse(...));
 
         return $this->patch("/api/patients/$personId/care_plans/$id/actions/cancel", $payload);
     }
@@ -96,7 +105,7 @@ class CarePlan extends Request
      */
     public function complete(string $personId, string $id, array $payload): PromiseInterface|EHealthResponse
     {
-        $this->setValidator(\App\Classes\eHealth\Api\Job::validateSubmissionResponse(...));
+        $this->setValidator(Job::validateSubmissionResponse(...));
 
         return $this->patch("/api/patients/$personId/care_plans/$id/actions/complete", $payload);
     }
@@ -133,6 +142,62 @@ class CarePlan extends Request
         $mergedQuery = array_merge($this->options['query'], $query);
 
         return $this->get("/api/patients/$patientId/summary/care_plans", $mergedQuery);
+    }
+
+    /**
+     * Validate the registered plan returned by creation or by its completed job.
+     */
+    public function validate(array $resource, string $patientUuid, ?string $planUuid = null): array
+    {
+        $data = Arr::toCamelCase($resource);
+        $statuses = ['new', 'active', 'completed', 'cancelled', 'terminated'];
+        $rules = [
+            'id' => ['required', 'uuid'],
+            'status' => ['required', Rule::in($statuses)],
+            'title' => ['required', 'string'],
+            'intent' => ['required', 'in:order'],
+            'period.start' => ['required', 'date'],
+            'period.end' => ['sometimes', 'nullable', 'date'],
+            'subject.identifier.value' => [Rule::in([$patientUuid])],
+            'requisition' => ['required', 'string'],
+            'addresses' => ['required', 'array', 'min:1'],
+            'statusHistory' => ['present', 'array'],
+            'statusHistory.*.status' => ['required', Rule::in($statuses)],
+            'statusHistory.*.insertedAt' => ['required', 'date'],
+            'statusHistory.*.insertedBy' => ['required', 'uuid'],
+            'insertedAt' => ['required', 'date'],
+            'updatedAt' => ['required', 'date'],
+            'insertedBy' => ['required', 'uuid'],
+            'updatedBy' => ['required', 'uuid'],
+            'note' => ['sometimes', 'nullable', 'string'],
+            'description' => ['sometimes', 'nullable', 'string'],
+            'informWith.authMethodId' => ['required_with:informWith', 'uuid'],
+        ];
+        if ($planUuid !== null) {
+            $rules['id'][] = Rule::in([$planUuid]);
+        }
+        foreach (['encounter', 'author', 'subject', 'managingOrganization'] as $reference) {
+            $rules[$reference.'.identifier.value'][] = 'required';
+            $rules[$reference.'.identifier.value'][] = 'uuid';
+            $rules[$reference.'.identifier.type.coding'] = ['required', 'array', 'min:1'];
+            $rules[$reference.'.identifier.type.coding.*.code'] = ['required', 'string'];
+            $rules[$reference.'.identifier.type.coding.*.system'] = ['required', 'string'];
+        }
+        foreach (['category', 'termsOfService', 'addresses.*'] as $concept) {
+            $rules[$concept.'.coding'] = ['required', 'array', 'min:1'];
+            $rules[$concept.'.coding.*.code'] = ['required', 'string'];
+            $rules[$concept.'.coding.*.system'] = ['required', 'string'];
+        }
+        foreach (['contributor', 'supportingInfo'] as $references) {
+            $rules[$references] = ['sometimes', 'array'];
+            $rules[$references.'.*.identifier.value'] = ['required', 'uuid'];
+            $rules[$references.'.*.identifier.type.coding'] = ['required', 'array', 'min:1'];
+            $rules[$references.'.*.identifier.type.coding.*.code'] = ['required', 'string'];
+            $rules[$references.'.*.identifier.type.coding.*.system'] = ['required', 'string'];
+        }
+        Validator::make($data, $rules)->validate();
+
+        return $data;
     }
 
     protected function validateDetails(EHealthResponse $response, bool $preserveApiKeys = false): array
