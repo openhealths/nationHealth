@@ -28,10 +28,15 @@ return new class extends Migration
             $table->foreignId('conclusion_code_id')->nullable()->constrained('codeable_concepts');
             $table->foreignId('recorded_by_id')->constrained('identifiers');
             $table->foreignId('encounter_id')->nullable()->constrained('identifiers');
+            $table->foreignId('origin_episode_id')->nullable()->constrained('identifiers');
             $table->boolean('primary_source');
             $table->foreignId('division_id')->nullable()->constrained('identifiers');
             $table->foreignId('managing_organization_id')->nullable()->constrained('identifiers');
             $table->foreignId('report_origin_id')->nullable()->constrained('codeable_concepts');
+            $table->string('explanatory_letter')->nullable();
+            $table->foreignId('cancellation_reason_id')->nullable()->constrained('codeable_concepts');
+            $table->timestamp('ehealth_inserted_at')->nullable();
+            $table->timestamp('ehealth_updated_at')->nullable();
             $table->timestamps();
         });
 

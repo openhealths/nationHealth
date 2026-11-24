@@ -41,6 +41,14 @@ DB_USERNAME=root
 DB_PASSWORD=
 ```
 Database block. We recommend to use PostgreSQL `DB_CONNECTION=pgsql`. MySQL, SQLite, SQL Server, MariaDB are also supported.
+
+For MySQL or MariaDB, set `explicit_defaults_for_timestamp=ON` in the database server configuration before running the install or update migrations:
+
+```ini
+[mysqld]
+explicit_defaults_for_timestamp=ON
+```
+
 #### Session
 ```
 SESSION_DRIVER=database
