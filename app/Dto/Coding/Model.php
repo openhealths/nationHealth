@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Dto\Coding;
 
 use App\Classes\eHealth\Api\Responses\Collections\EhealthCoding;
-use App\Dto\FormCoding;
+use App\Dto\Input\FormCoding;
 use Symfony\Component\ObjectMapper\Attribute\Map;
 
 /**
@@ -20,6 +20,18 @@ class Model
 
     #[Map(source: '[code]')]
     public string $code;
+
+    /**
+     * Form value mapped to this DTO.
+     * The array is wrapped as FormCoding, since the mapper maps only objects.
+     *
+     * @param  array  $coding
+     * @return self
+     */
+    public static function map(array $coding): self
+    {
+        return objectMapper()->map(new FormCoding($coding), self::class);
+    }
 
     /**
      * Coding as database attributes.

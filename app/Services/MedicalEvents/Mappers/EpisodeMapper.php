@@ -35,21 +35,6 @@ class EpisodeMapper implements FhirMapperContract
     }
 
     /**
-     * Build a FHIR structure out of the episode fields eHealth allows to update.
-     * The schema rejects any other property, the managing organization included.
-     *
-     * @param  array  $data  Flat episode form data
-     * @return array
-     */
-    public function toUpdateFhir(array $data): array
-    {
-        return [
-            'name' => $data['name'],
-            'careManager' => FhirResource::make()->coding('eHealth/resources', 'employee')->toIdentifier($data['careManagerId'])
-        ];
-    }
-
-    /**
      * Build a FHIR structure out of the reason the episode is marked as entered in error.
      *
      * @param  array  $data  Flat episode cancellation form data
@@ -110,7 +95,7 @@ class EpisodeMapper implements FhirMapperContract
         $periodStart = (string) data_get($data, 'period.start');
 
         return [
-            'id' => data_get($data, 'uuid'),
+            'uuid' => data_get($data, 'uuid'),
             'name' => data_get($data, 'name'),
             'typeCode' => data_get($data, 'type.code', ''),
             'careManagerId' => data_get($data, 'careManager.identifier.value', ''),

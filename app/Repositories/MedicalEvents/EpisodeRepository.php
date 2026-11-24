@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Repositories\MedicalEvents;
 
 use App\Core\Arr;
+use App\Dto\Episode\Model as EpisodeData;
+use App\Dto\Episode\ModelUpdate as EpisodeUpdateData;
 use App\Enums\Episode\Status;
 use App\Enums\JobStatus;
 use App\Models\EhealthJob;
@@ -24,17 +26,33 @@ use Throwable;
 class EpisodeRepository extends BaseRepository
 {
     /**
-     * Create episode for encounter in DB.
+     * Create the episode in DB with its type, identifiers and period.
+     * The array is the FHIR structure still built for an encounter package.
      *
-     * @param  array  $data
+     * @param  EpisodeData|array  $data
      * @param  Person|Preperson  $patient
      * @param  int|null  $encounterId
      * @return Episode
      * @throws Throwable
      */
-    public function store(array $data, Person|Preperson $patient, ?int $encounterId = null): Episode
+    public function store(EpisodeData|array $data, Person|Preperson $patient, ?int $encounterId = null): Episode
     {
         [$ownerColumn, $ownerId] = $this->resolveOwner($patient);
+
+        if ($data instanceof EpisodeData) {
+            return DB::transaction(static function () use ($data, $ownerColumn, $ownerId, $encounterId): Episode {
+                $episode = objectMapper()->map($data, new Episode([$ownerColumn => $ownerId, 'encounter_id' => $encounterId]));
+
+                $episode->type()->associate(Repository::coding()->store($data->type));
+                $episode->managingOrganization()->associate(Repository::identifier()->store($data->managingOrganization));
+                $episode->careManager()->associate(Repository::identifier()->store($data->careManager));
+                $episode->saveOrFail();
+
+                $episode->period()->create(['start' => $data->periodStart]);
+
+                return $episode;
+            });
+        }
 
         return DB::transaction(function () use ($data, $ownerColumn, $ownerId, $encounterId): Episode {
             $type = Repository::coding()->store($data['type']);
@@ -67,29 +85,44 @@ class EpisodeRepository extends BaseRepository
      * Update the episode fields that eHealth allows to change.
      *
      * @param  Episode  $episode
-     * @param  array  $data
+     * @param  EpisodeUpdateData  $data
      * @return void
      * @throws Throwable
      */
-    public function update(Episode $episode, array $data): void
+    public function update(Episode $episode, EpisodeUpdateData $data): void
     {
-        DB::transaction(function () use ($episode, $data) {
-            $this->updateIdentifier($episode->careManager, $data['careManager']);
+        DB::transaction(static function () use ($episode, $data): void {
+            Repository::identifier()->update($episode->careManager, $data->careManager);
 
-            $episode->update(['name' => $data['name']]);
+            $episode->update(['name' => $data->name]);
         });
     }
 
     /**
      * Update a draft episode, which is stored locally only and therefore editable as a whole.
+     * The managing organization is left as stored, since a draft stays with the legal entity it was created in.
+     * The array is the FHIR structure still built for an encounter package.
      *
      * @param  Episode  $episode
-     * @param  array  $data
+     * @param  EpisodeData|array  $data
      * @return void
      * @throws Throwable
      */
-    public function updateDraft(Episode $episode, array $data): void
+    public function updateDraft(Episode $episode, EpisodeData|array $data): void
     {
+        if ($data instanceof EpisodeData) {
+            DB::transaction(static function () use ($episode, $data): void {
+                objectMapper()->map($data, $episode);
+
+                $episode->type->update($data->type->toArray());
+                Repository::identifier()->update($episode->careManager, $data->careManager);
+                $episode->period->update(['start' => $data->periodStart]);
+                $episode->saveOrFail();
+            });
+
+            return;
+        }
+
         DB::transaction(function () use ($episode, $data) {
             $this->updateIdentifier($episode->careManager, $data['careManager']);
 

@@ -6,7 +6,7 @@ namespace App\Livewire\Episode;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
-use App\Enums\Episode\Status;
+use App\Dto\Episode\Ehealth as EhealthData;
 use App\Enums\Status as EmployeeStatus;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
@@ -15,7 +15,6 @@ use App\Livewire\Episode\Forms\EpisodeForm as Form;
 use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\Employee\Employee;
 use App\Models\MedicalEvents\Sql\Episode;
-use App\Services\MedicalEvents\Fhir;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -82,24 +81,6 @@ abstract class BaseEpisodeComponent extends BasePatientComponent
     }
 
     /**
-     * Build the eHealth structure of the episode out of the validated form data.
-     *
-     * @param  array  $validated
-     * @param  Status  $status
-     * @return array
-     */
-    protected function formatEpisode(array $validated, Status $status): array
-    {
-        return Fhir::episode()->toFhir(
-            $validated,
-            ['episode' => $validated['id'], 'employee' => $validated['careManagerId']],
-            $validated['startDate'],
-            $validated['startTime'],
-            $status
-        );
-    }
-
-    /**
      * Leave the form and get back to the patient episode list.
      *
      * @return void
@@ -110,16 +91,15 @@ abstract class BaseEpisodeComponent extends BasePatientComponent
     }
 
     /**
-     * Submit the stored draft to eHealth and follow the job it is processed with.
+     * Submit the stored draft to eHealth, built from the form, and follow the job it is processed with.
      * The episode stays a draft until the job is processed, so a rejected one can be fixed and submitted again.
      *
      * @param  Episode  $episode
-     * @param  array  $formattedData
      * @return void
      */
-    protected function submitToEHealth(Episode $episode, array $formattedData): void
+    protected function submitToEHealth(Episode $episode): void
     {
-        $requestData = Arr::toSnakeCase($formattedData);
+        $requestData = objectMapper()->map($this->form, EhealthData::class)->toArray();
 
         try {
             $submission = RemoteEHealthLinksProcessing::startSubmission($episode, $requestData);

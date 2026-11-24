@@ -1,3 +1,4 @@
+@use('App\Enums\Episode\Status')
 @use('App\Models\MedicalEvents\Sql\Episode')
 
 <x-layouts.patient
@@ -8,14 +9,16 @@
     :title="__('episodes.label') . ' ' . $episode->name"
 >
     <x-slot name="headerActions">
-        <button
-            wire:click.prevent="sync"
-            type="button"
-            class="button-sync flex items-center gap-2 px-5 py-2 text-sm whitespace-nowrap shadow-sm"
-        >
-            @icon('refresh', 'w-4 h-4')
-            {{ __('forms.synchronise_with_eHealth') }}
-        </button>
+        @if ($episode->status !== Status::DRAFT)
+            <button
+                wire:click.prevent="sync"
+                type="button"
+                class="button-sync flex items-center gap-2 px-5 py-2 text-sm whitespace-nowrap shadow-sm"
+            >
+                @icon('refresh', 'w-4 h-4')
+                {{ __('forms.synchronise_with_eHealth') }}
+            </button>
+        @endif
     </x-slot>
 
     <div class="shift-content mt-8 max-w-6xl pl-3.5">

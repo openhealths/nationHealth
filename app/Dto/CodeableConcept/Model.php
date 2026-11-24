@@ -6,7 +6,7 @@ namespace App\Dto\CodeableConcept;
 
 use App\Classes\eHealth\Api\Responses\Collections\EhealthCodeableConcept;
 use App\Dto\Coding\Model as CodingModel;
-use App\Dto\FormCodeableConcept;
+use App\Dto\Input\FormCodeableConcept;
 use Symfony\Component\ObjectMapper\Attribute\Map;
 use Symfony\Component\ObjectMapper\Transform\MapCollection;
 

@@ -155,59 +155,57 @@
                 </div>
             </div>
 
-            <div class="form-row-3 pt-8">
-                <div class="col-span-1 flex gap-3">
-                    @if ($isDraft)
-                        <button
-                            type="button"
-                            x-on:click="$dispatch('open-draft-deletion')"
-                            class="button-primary-outline-red flex-1 rounded-lg py-2.5 text-center text-sm"
-                        >
-                            {{ __('episodes.delete_draft') }}
-                        </button>
+            <div class="flex flex-wrap items-center gap-4 pt-8">
+                @if ($isDraft)
+                    <button
+                        type="button"
+                        x-on:click="$dispatch('open-draft-deletion')"
+                        class="button-primary-outline-red rounded-lg py-2.5 text-center text-sm whitespace-nowrap"
+                    >
+                        {{ __('episodes.delete_draft') }}
+                    </button>
 
+                    <button
+                        type="button"
+                        wire:click="save"
+                        wire:loading.attr="disabled"
+                        wire:loading.class="opacity-50 cursor-not-allowed"
+                        class="button-primary-outline flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm whitespace-nowrap"
+                    >
+                        @icon('archive', 'w-4 h-4')
+                        {{ __('forms.save') }}
+                    </button>
+
+                    @unless ($isSentWithEncounter)
                         <button
                             type="button"
-                            wire:click="save"
+                            wire:click="sendToEHealth"
                             wire:loading.attr="disabled"
                             wire:loading.class="opacity-50 cursor-not-allowed"
-                            class="button-primary-outline flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm"
+                            class="button-primary rounded-lg py-2.5 text-center text-sm whitespace-nowrap"
                         >
-                            @icon('file-text', 'w-4 h-4')
-                            {{ __('forms.save') }}
+                            {{ __('episodes.send_to_ehealth') }}
                         </button>
+                    @endunless
+                @else
+                    <button
+                        type="button"
+                        wire:click="cancel"
+                        class="button-minor me-2 justify-center rounded-lg py-2.5 text-center text-sm whitespace-nowrap"
+                    >
+                        {{ __('forms.back') }}
+                    </button>
 
-                        @unless ($isSentWithEncounter)
-                            <button
-                                type="button"
-                                wire:click="sendToEHealth"
-                                wire:loading.attr="disabled"
-                                wire:loading.class="opacity-50 cursor-not-allowed"
-                                class="button-primary flex-1 rounded-lg py-2.5 text-center text-sm"
-                            >
-                                {{ __('episodes.send_to_ehealth') }}
-                            </button>
-                        @endunless
-                    @else
-                        <button
-                            type="button"
-                            wire:click="cancel"
-                            class="button-minor me-2 flex-1 justify-center rounded-lg py-2.5 text-center text-sm"
-                        >
-                            {{ __('forms.back') }}
-                        </button>
-
-                        <button
-                            type="button"
-                            wire:click="save"
-                            wire:loading.attr="disabled"
-                            wire:loading.class="opacity-50 cursor-not-allowed"
-                            class="button-primary flex-1 rounded-lg py-2.5 text-center text-sm"
-                        >
-                            {{ __('episodes.save_changes') }}
-                        </button>
-                    @endif
-                </div>
+                    <button
+                        type="button"
+                        wire:click="save"
+                        wire:loading.attr="disabled"
+                        wire:loading.class="opacity-50 cursor-not-allowed"
+                        class="button-primary rounded-lg py-2.5 text-center text-sm whitespace-nowrap"
+                    >
+                        {{ __('episodes.save_changes') }}
+                    </button>
+                @endif
             </div>
         </form>
     </div>

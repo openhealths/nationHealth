@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Episode;
 
 use App\Classes\eHealth\EHealth;
-use App\Core\Arr;
+use App\Dto\Episode\EhealthUpdate as EhealthUpdateData;
+use App\Dto\Episode\Form as FormData;
+use App\Dto\Episode\Model as EpisodeData;
+use App\Dto\Episode\ModelUpdate as EpisodeUpdateData;
 use App\Enums\Episode\Status;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
@@ -14,7 +17,6 @@ use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\Fhir;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -86,9 +88,9 @@ class EpisodeEdit extends BaseEpisodeComponent
     {
         parent::initializeComponent();
 
-        $episode = $this->episode()->load(['type', 'careManager', 'period']);
+        $episode = $this->episode()->load(['type', 'managingOrganization', 'careManager', 'period']);
 
-        $this->form->fill(array_merge(Fhir::episode()->fromFhir($episode->toArray()), ['episodeId' => $episode->id]));
+        $this->form->fill(objectMapper()->map($episode, FormData::class));
     }
 
     /**
@@ -136,21 +138,21 @@ class EpisodeEdit extends BaseEpisodeComponent
             return;
         }
 
-        $validated = $this->validateForm($this->form->rulesForCreate());
-
-        if ($validated === null) {
+        if ($this->validateForm($this->form->rulesForCreate()) === null) {
             return;
         }
 
         try {
-            Repository::episode()->updateDraft($episode, $this->formatEpisode($validated, Status::DRAFT));
+            $episodeData = objectMapper()->map($this->form, EpisodeData::class);
+
+            Repository::episode()->updateDraft($episode, $episodeData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to store episode draft');
 
             return;
         }
 
-        $this->submitToEHealth($episode, $this->formatEpisode($validated, Status::ACTIVE));
+        $this->submitToEHealth($episode);
     }
 
     /**
@@ -189,14 +191,14 @@ class EpisodeEdit extends BaseEpisodeComponent
      */
     protected function saveDraft(Episode $episode): void
     {
-        $validated = $this->validateForm($this->form->rulesForCreate());
-
-        if ($validated === null) {
+        if ($this->validateForm($this->form->rulesForCreate()) === null) {
             return;
         }
 
         try {
-            Repository::episode()->updateDraft($episode, $this->formatEpisode($validated, Status::DRAFT));
+            $episodeData = objectMapper()->map($this->form, EpisodeData::class);
+
+            Repository::episode()->updateDraft($episode, $episodeData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to store episode draft');
 
@@ -216,16 +218,16 @@ class EpisodeEdit extends BaseEpisodeComponent
      */
     protected function updateInEHealth(Episode $episode): void
     {
-        $validated = $this->validateForm($this->form->rulesForUpdate());
-
-        if ($validated === null) {
+        if ($this->validateForm($this->form->rulesForUpdate()) === null) {
             return;
         }
 
-        $formattedData = Fhir::episode()->toUpdateFhir($validated);
+        // Both are built from the validated fields before the request, so the local update cannot fail on mapping after the request succeeds
+        $episodeData = objectMapper()->map($this->form, EpisodeUpdateData::class);
+        $requestData = objectMapper()->map($this->form, EhealthUpdateData::class)->toArray();
 
         try {
-            EHealth::episode()->update($this->uuid, $episode->uuid, Arr::toSnakeCase($formattedData));
+            EHealth::episode()->update($this->uuid, $episode->uuid, $requestData);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while updating episode');
 
@@ -234,7 +236,7 @@ class EpisodeEdit extends BaseEpisodeComponent
 
         // eHealth accepted the changes; only now persist them locally
         try {
-            Repository::episode()->update($episode, $formattedData);
+            Repository::episode()->update($episode, $episodeData);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to store updated episode');
 

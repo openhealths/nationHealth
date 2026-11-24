@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Dto\CodeableConcept;
 
 use App\Dto\Coding\Ehealth as CodingEhealth;
-use App\Dto\FormCodeableConcept;
+use App\Dto\Input\FormCodeableConcept;
 use Symfony\Component\ObjectMapper\Attribute\Map;
 use Symfony\Component\ObjectMapper\Transform\MapCollection;
 
