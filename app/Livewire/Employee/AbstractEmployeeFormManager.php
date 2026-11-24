@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Employee;
 
 use AllowDynamicProperties;
-use App\Classes\eHealth\Api\EmployeeRequest as EHealthEmployeeRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Employee\RequestStatus;
@@ -27,6 +26,7 @@ use Auth;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
@@ -117,6 +117,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->validatePartyDataConsistency();
             $this->employeeRequest = $this->handleDraftPersistence();
             $this->employeeRequestId = $this->employeeRequest->id;
+            $this->validatedSigningPayload($this->employeeRequest);
 
             $this->flashSuccess(__('forms.employee_request_saved_successfully'));
             // 3.23.1.4 — review submitted fields before KEP
@@ -168,7 +169,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $requestToSign = $this->validateAndGetDraft();
             $signedContent = $this->signEmployeeRequest($requestToSign);
 
-            $eHealthResponseAsArray = new EHealthEmployeeRequest()->create($signedContent);
+            $eHealthResponseAsArray = EHealth::employeeRequest()->create($signedContent);
 
             if (isset($eHealthResponseAsArray['error'])) {
                 throw new EHealthValidationException($eHealthResponseAsArray);
@@ -569,7 +570,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     abstract protected function handleDraftPersistence(): EmployeeRequest;
 
     /**
-     * Gets the draft and validates it, including KEP-specific validation.
+     * Gets the persisted draft and checks that it is still unsigned.
      */
     protected function validateAndGetDraft(): EmployeeRequest
     {
@@ -579,8 +580,6 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         if (is_null($requestToSign) || !is_null($requestToSign->uuid)) {
             throw new RuntimeException(__('forms.draft_not_found_or_already_signed'), 400);
         }
-
-        $this->form->validate($this->form->rulesForKepOnly());
 
         return $requestToSign;
     }
@@ -741,14 +740,19 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         }
     }
 
-    /**
-     * Sign the employee request data with the signature provider.
-     */
-    private function signEmployeeRequest(EmployeeRequest $requestToSign): string
+    private function validatedSigningPayload(EmployeeRequest $requestToSign): array
     {
         $requestToSign->loadMissing('revision');
-        $nestedDataForRevision = $requestToSign->revision->data;
-        $payloadToSign = EHealth::employeeRequest()->schemaCreate($nestedDataForRevision);
+        $payload = EHealth::employeeRequest()->schemaCreate($requestToSign->revision->data);
+        $this->form->validateSigningDocuments($payload['employee_request']['party']['documents'] ?? []);
+
+        return $payload;
+    }
+
+    private function signEmployeeRequest(EmployeeRequest $requestToSign): string
+    {
+        $payloadToSign = $this->validatedSigningPayload($requestToSign);
+        $this->form->validate($this->form->rulesForKepOnly());
 
         return signatureService()->signData(
             $payloadToSign,
@@ -775,6 +779,9 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     private function handleValidationException(ValidationException $e): void
     {
         $validator = $e->validator;
+        if ($validator->errors()->hasAny(['form.documents', 'form.documents.*.issuedBy'])) {
+            $this->showSignatureModal = false;
+        }
         $specificEmailError = __('validation.email_already_exists');
         $allMessages = $validator->errors()->all();
 
@@ -799,7 +806,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     /**
      * Builds a user-facing flash message from validation errors with document context.
      */
-    private function buildValidationFlashMessage(\Illuminate\Contracts\Validation\Validator $validator): string
+    private function buildValidationFlashMessage(Validator $validator): string
     {
         $messages = collect($validator->errors()->messages())
             ->flatMap(function (array $errors, string $key) {

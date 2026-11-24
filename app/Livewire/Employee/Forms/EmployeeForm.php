@@ -18,6 +18,7 @@ use App\Rules\HasIdentityDocumentRule;
 use App\Rules\UniquePassportRule;
 use Carbon\Carbon;
 use Closure;
+use Exception;
 use Livewire\Component;
 use Livewire\Form;
 use App\Rules\Name;
@@ -36,6 +37,8 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class EmployeeForm extends Form
 {
+    protected const array DOCUMENT_ISSUER_RULES = ['bail', 'required', 'string', 'regex:/\S/u'];
+
     public const array ROLE_DICTIONARIES = [
         'POSITION' => 'position',
         'SPECIALITY_TYPE' => 'speciality_type',
@@ -128,6 +131,19 @@ class EmployeeForm extends Form
         ];
     }
 
+    public function validateSigningDocuments(array $documents): void
+    {
+        // Report payload errors against the matching document in the Livewire form.
+        $formDocuments = array_map(fn ($document) => ['issuedBy' => $document['issued_by'] ?? null], $documents);
+
+        validator(
+            ['form' => ['documents' => $formDocuments]],
+            ['form.documents' => ['required', 'array'], 'form.documents.*.issuedBy' => self::DOCUMENT_ISSUER_RULES],
+            ['form.documents.*.issuedBy.regex' => __('validation.required')],
+            ['form.documents' => __('forms.documents'), 'form.documents.*.issuedBy' => __('forms.document_issued_by')]
+        )->validate();
+    }
+
     protected function rootFieldsRules(): array
     {
         $customPositionAllowed = config('ehealth.employee_type_custom_position_allowed', []);
@@ -195,7 +211,7 @@ class EmployeeForm extends Form
             'form.documents.*.type' => __('forms.document_type'),
             'form.documents.*.issuedAt' => __('forms.document_issued_at'),
             'form.documents.*.expirationDate' => __('forms.document_expiration_date'),
-            'form.documents.*.issuedBy' => __('forms.document_issued_by'),
+            'documents.*.issuedBy' => __('forms.document_issued_by'),
             'doctor.specialities' => __('forms.specialities'),
             'doctor.specialities.*.speciality' => __('forms.speciality'),
             'doctor.specialities.*.specialityOfficio' => __('forms.speciality_officio'),
@@ -229,6 +245,7 @@ class EmployeeForm extends Form
             'party.email.ascii' => __('validation.custom.party.email_must_be_latin'),
             'party.workingExperience.min' => __('validation.custom.party.working_experience_min'),
             'documents.*.type.in' => __('validation.custom.employee.document_type_not_allowed'),
+            'documents.*.issuedBy.regex' => __('validation.required'),
             'documents.min' => __('validation.custom.identity_document_required'),
         ];
     }
@@ -285,7 +302,7 @@ class EmployeeForm extends Form
                     }
                 }
             ],
-            'documents.*.issuedBy' => ['present', 'nullable', 'string'],
+            'documents.*.issuedBy' => self::DOCUMENT_ISSUER_RULES,
             'documents.*.issuedAt' => [
                 'nullable',
                 new DateFormat(),
@@ -868,7 +885,7 @@ class EmployeeForm extends Form
             }
             try {
                 return Carbon::parse($value)->format('Y-m-d');
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 return null;
             }
         };
