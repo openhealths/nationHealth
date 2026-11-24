@@ -371,26 +371,26 @@ trait ManagesCarePlanReferrals
             return;
         }
 
-        // Propose to sign
         $this->showReferralDrawer = false;
+        $this->showSignatureModal = false;
+        $this->actionType = '';
 
         try {
             $activity = $this->ownedActivity((int) $this->referralForm['activity_id']);
-        } catch (ModelNotFoundException) {
-            Session::flash('error', __('care-plan.document_context_unavailable'));
-            $this->showSignatureModal = false;
-            $this->actionType = '';
-
-            return;
-        }
-        if ($sign && $activity) {
             $kind = $activity->resolvedKind();
-            if ($kind !== $this->referralForm['kind'] || !in_array($kind, ['service_request', 'device_request'], true)) {
-                $this->flashUserError(__('care-plan.referral_wrong_activity_kind'));
+            if (!in_array($kind, ['service_request', 'device_request'], true) || $kind !== $this->referralForm['kind']) {
+                $this->showReferralDrawer = true;
+                Session::flash('error', __('care-plan.referral_wrong_activity_kind'));
 
                 return;
             }
+        } catch (ModelNotFoundException) {
+            Session::flash('error', __('care-plan.document_context_unavailable'));
 
+            return;
+        }
+
+        if ($sign) {
             if ($kind === 'service_request') {
                 $draft = MedicalEventsRepository::serviceRequest()->findDraftByActivity($activity->uuid, $this->carePlan->personId);
                 $registered = $draft && $this->syncRegisteredServiceRequestDraft($draft);
@@ -608,8 +608,14 @@ trait ManagesCarePlanReferrals
                 try {
                     $activity = $this->ownedActivityByBasedOnUuid($requestRecord->basedOn?->value);
 
-                    $registered = $this->importCarePlanServiceRequest($requestRecord, $activity);
-                    $dbData = ['status' => $registered->status, 'request_number' => $registered->requestNumber];
+                    $dbData = $this->buildReferralSignDbData($requestRecord, $activity);
+                    $dbData = app(ReferralRequestLifecycleService::class)->syncReferralFromRemote(
+                        $this->carePlan,
+                        $activity,
+                        $requestRecord,
+                        $kind,
+                        $dbData
+                    );
                     $this->finalizeSignedReferral($dbData, $kind, $activity, alreadyPersisted: true, alreadyExists: true);
                 } catch (Exception $syncException) {
                     Log::error('CarePlanShow: failed to sync referral after duplicate eHealth id: ' . $syncException->getMessage());
@@ -834,7 +840,11 @@ trait ManagesCarePlanReferrals
         }
     }
 
-    /** A registered referral must be imported before another signature can be offered. */
+    /**
+     * Check the local draft when opening the form and before preparing a signature.
+     * Import an existing referral. Allow signing a remote draft or an explicitly missing referral.
+     * An inconclusive lookup stops signing so the same referral cannot be submitted twice.
+     */
     private function syncRegisteredServiceRequestDraft(ServiceRequestRequest $draft): bool
     {
         try {
@@ -873,19 +883,6 @@ trait ManagesCarePlanReferrals
         return true;
     }
 
-    private function importCarePlanServiceRequest(ServiceRequestRequest $record, CarePlanActivity $activity): ServiceRequestRequest
-    {
-        $details = EHealth::serviceRequest()->getDetails($this->carePlan->person->uuid, $record->uuid)->validate();
-        $context = $this->resolveReferralEmployeeContext($record, $activity);
-
-        return MedicalEventsRepository::serviceRequest()->importResource(
-            Arr::toCamelCase($details->all()),
-            $record->personId,
-            $record->employeeId ?? $context['employee_id'],
-            $record->divisionId ?? $context['division_id'],
-        );
-    }
-
     public function syncReferralFromEHealth(string $requestUuid, string $kind): void
     {
         $this->authorizeCarePlanWrite();
@@ -916,12 +913,14 @@ trait ManagesCarePlanReferrals
                 'ended_at' => $requestRecord->endedAt?->format('Y-m-d'),
             ];
 
-            if ($requestRecord instanceof ServiceRequestRequest) {
-                $this->importCarePlanServiceRequest($requestRecord, $activity);
-            } else {
-                $dbData = $this->buildReferralSignDbData($requestRecord, $activity);
-                app(ReferralRequestLifecycleService::class)->syncReferralFromRemote($this->carePlan, $activity, $requestRecord, $kind, $dbData);
-            }
+            $dbData = $this->buildReferralSignDbData($requestRecord, $activity);
+            app(ReferralRequestLifecycleService::class)->syncReferralFromRemote(
+                $this->carePlan,
+                $activity,
+                $requestRecord,
+                $kind,
+                $dbData
+            );
 
             ($requestRecord instanceof ServiceRequestRequest ? MedicalEventsRepository::serviceRequest() : MedicalEventsRepository::deviceRequest())->refreshRecord($requestRecord);
 

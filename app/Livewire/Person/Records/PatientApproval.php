@@ -18,6 +18,7 @@ use App\Enums\JobStatus;
 use App\Exceptions\MedicalEvents\ApprovalVerificationException;
 use App\Models\Icd10;
 use App\Models\MedicalEvents\Sql\Approval;
+use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Models\Person\Person;
 use App\Models\Employee\Employee;
 use App\Repositories\Repository;
@@ -167,19 +168,16 @@ class PatientApproval extends Component
             return;
         }
 
-        $referral = MedicalEventsRepository::serviceRequest()->findByUuid($uuid, $this->personId);
-
-        if ($referral === null && !isset($this->remoteReferrals[$uuid])) {
+        $this->closePreview();
+        if (!isset($this->remoteReferrals[$uuid]) && !ServiceRequestRequest::forPerson($this->personId)->whereUuid($uuid)->exists()) {
             return;
         }
 
         try {
             $referralData = $this->referralDetails($this->person(), $uuid);
-            $this->previewRows = $referralData->previewRows();
+            $this->previewRows = $referralData->previewRows;
 
-            $this->previewTitle = __('approval.create.referral_prefix').' '.(
-                $referral?->requestNumber ?? $this->remoteReferrals[$uuid]['requisition']
-            );
+            $this->previewTitle = __('approval.create.referral_prefix').' '.$referralData->requisition;
             $this->previewSection = 'referral';
             $this->previewCodingSystem = 'all';
         } catch (Throwable) {

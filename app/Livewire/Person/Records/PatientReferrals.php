@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Livewire\Person\Records;
 
 use App\Classes\eHealth\EHealth as SubmissionApi;
-use App\Core\Arr;
 use App\Core\BaseForm as Form;
 use App\Enums\Person\ServiceRequestStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Exceptions\Signature\SignatureException;
+use App\Livewire\Concerns\ReadsClinicalSnapshots;
 use App\Livewire\Concerns\SubmitsClinicalOperations;
+use App\Livewire\Referral\Forms\ServiceRequestForm;
 use App\Jobs\ServiceRequestSync;
 use App\Models\Declaration;
 use App\Models\User;
@@ -24,6 +25,7 @@ use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\ServiceRequestRequest;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use App\Services\MedicalEvents\Mappers\ServiceRequestMapper;
+use App\Services\MedicalEvents\MedicalRequestOwnership;
 use App\Services\MedicalEvents\ReferralRequestLifecycleService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Bus\Batch;
@@ -45,7 +47,7 @@ class PatientReferrals extends BasePatientComponent
 {
     use SubmitsClinicalOperations;
     use BatchLegalEntityQueries;
-    use \App\Livewire\Concerns\ReadsClinicalSnapshots;
+    use ReadsClinicalSnapshots;
 
     use WithFileUploads;
 
@@ -531,10 +533,10 @@ class PatientReferrals extends BasePatientComponent
         try {
             $this->validate(['referralStatusReason' => ['required', 'string']]);
             $snapshot = $this->fetchServiceRequestSnapshot($this->uuid, $record->uuid);
-            $record = \App\Repositories\MedicalEvents\Repository::serviceRequest()->storeResource((new \App\Services\MedicalEvents\Mappers\ServiceRequestMapper())->normalize($snapshot), (int) $this->personId, $record->employeeId, $record->divisionId);
-            $payload = \App\Livewire\Referral\Forms\ServiceRequestForm::buildStatusContent($snapshot, $this->referralStatusReason, $letter, 'eHealth/service_request_recall_reasons');
+            $record = MedicalEventsRepository::serviceRequest()->storeResource((new ServiceRequestMapper())->normalize($snapshot), (int) $this->personId, $record->employeeId, $record->divisionId);
+            $payload = ServiceRequestForm::buildStatusContent($snapshot, $this->referralStatusReason, $letter, 'eHealth/service_request_recall_reasons');
             $signedContent = signatureService()->signData(
-                Arr::toSnakeCase($payload),
+                $payload,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
@@ -560,7 +562,7 @@ class PatientReferrals extends BasePatientComponent
         } catch (SignatureException $exception) {
             $exception->handle('Error when signing referral recall');
             $this->showSignatureModal = false;
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::error('PatientReferrals: failed to recall referral: '.$exception->getMessage());
             Session::flash('error', 'Не вдалося відкликати направлення: '.$exception->getMessage());
             $this->showSignatureModal = false;
@@ -594,10 +596,10 @@ class PatientReferrals extends BasePatientComponent
         try {
             $this->validate(['referralStatusReason' => ['required', 'string'], 'referralExplanatoryLetter' => ['required', 'string']]);
             $snapshot = $this->fetchServiceRequestSnapshot($this->uuid, $record->uuid);
-            $record = \App\Repositories\MedicalEvents\Repository::serviceRequest()->storeResource((new \App\Services\MedicalEvents\Mappers\ServiceRequestMapper())->normalize($snapshot), (int) $this->personId, $record->employeeId, $record->divisionId);
-            $payload = \App\Livewire\Referral\Forms\ServiceRequestForm::buildStatusContent($snapshot, $this->referralStatusReason, trim($this->referralExplanatoryLetter), 'eHealth/service_request_cancel_reasons');
+            $record = MedicalEventsRepository::serviceRequest()->storeResource((new ServiceRequestMapper())->normalize($snapshot), (int) $this->personId, $record->employeeId, $record->divisionId);
+            $payload = ServiceRequestForm::buildStatusContent($snapshot, $this->referralStatusReason, trim($this->referralExplanatoryLetter), 'eHealth/service_request_cancel_reasons');
             $signedContent = signatureService()->signData(
-                Arr::toSnakeCase($payload),
+                $payload,
                 $validated['knedp'],
                 $validated['keyContainerUpload'],
                 $validated['password'],
@@ -622,7 +624,7 @@ class PatientReferrals extends BasePatientComponent
         } catch (SignatureException $exception) {
             $exception->handle('Error when signing referral cancellation');
             $this->showSignatureModal = false;
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::error('PatientReferrals: failed to cancel referral: '.$exception->getMessage());
             Session::flash('error', 'Не вдалося скасувати направлення: '.$exception->getMessage());
             $this->showSignatureModal = false;
@@ -696,7 +698,7 @@ class PatientReferrals extends BasePatientComponent
             );
 
             $resource = $mapper->toFhir($dbData, $uuids + ['carePlanUuid' => $carePlan?->uuid]);
-            $requestRecord = \App\Repositories\MedicalEvents\Repository::serviceRequest()->storeResource($resource, (int) $this->personId, $requestRecord->employeeId, $requestRecord->divisionId);
+            $requestRecord = MedicalEventsRepository::serviceRequest()->storeResource($resource, (int) $this->personId, $requestRecord->employeeId, $requestRecord->divisionId);
             $finalResponse = $this->submitClinicalOperation($requestRecord, ['status' => 'active'], fn () => SubmissionApi::serviceRequest()->createSigned($this->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']));
             if ($finalResponse === null) {
                 return;
@@ -729,7 +731,7 @@ class PatientReferrals extends BasePatientComponent
         } catch (SignatureException $exception) {
             $exception->handle('Error when signing referral');
             $this->showSignatureModal = false;
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::error('PatientReferrals: failed to sign referral: '.$exception->getMessage());
             Session::flash('error', 'Не вдалося підписати направлення: '.$exception->getMessage());
             $this->showSignatureModal = false;
@@ -765,7 +767,7 @@ class PatientReferrals extends BasePatientComponent
             }
 
             Session::flash('error', 'Помилка надсилання СМС: '.$exception->getMessage());
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::error('PatientReferrals: failed to resend SMS: '.$exception->getMessage());
             Session::flash('error', 'Помилка надсилання СМС: '.$exception->getMessage());
         }
@@ -792,7 +794,7 @@ class PatientReferrals extends BasePatientComponent
 
         try {
             return app(ReferralRequestLifecycleService::class)->buildPrintoutHtml($context, $uuid);
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::error('PatientReferrals: failed to load printout: '.$exception->getMessage());
             Session::flash('error', 'Не вдалося завантажити друковану форму.');
 
@@ -827,7 +829,7 @@ class PatientReferrals extends BasePatientComponent
     {
         abort_unless($this->personId !== null, 404);
 
-        return app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)
+        return app(MedicalRequestOwnership::class)
             ->referralForPerson($uuid, $this->personId);
     }
 
@@ -837,7 +839,7 @@ class PatientReferrals extends BasePatientComponent
         $this->referralExplanatoryLetter = '';
         try {
             $this->referralStatusReasons = dictionary()->basics()->byName('eHealth/service_request_'.$operation.'_reasons')->asCodeDescription()->all();
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             $this->referralStatusReasons = [];
             Log::warning('Referral status reasons could not be loaded', ['exceptionType' => $exception::class]);
             Session::flash('error', __('Не вдалося завантажити довідник причин зміни направлення.'));

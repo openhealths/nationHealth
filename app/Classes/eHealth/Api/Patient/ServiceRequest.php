@@ -86,43 +86,41 @@ class ServiceRequest extends PatientApiBase
         return $this->get(self::URL . "/{$patientId}/service_requests", $query);
     }
 
-    /** Fetch one native, validated ServiceRequest for DTO mapping. */
+    /**
+     * Get a patient's referral by UUID. Calling validate() returns ServiceRequestDetails with eHealth field names.
+     * Its signaturePayload preserves nested JSON objects and eHealth extension fields.
+     *
+     * @see https://docs-preprod.ehealth.gov.ua/specs/medical-events.yaml Get Service request details
+     */
     public function getDetails(string $patientId, string $id, array $query = []): PromiseInterface|EHealthResponse
     {
-        return $this->requestDetails(
-            $patientId,
-            $id,
-            $query,
-            fn (EHealthResponse $response): ServiceRequestDetails => $this->validateDetails($response, $patientId, $id)
-        );
-    }
-
-    /** Preserve array results for existing signing, import and execution callers. */
-    public function getById(string $patientId, string $id, array $query = [], bool $preserveApiKeys = false): PromiseInterface|EHealthResponse
-    {
-        $response = $this->requestDetails($patientId, $id, $query, function (EHealthResponse $response) use ($patientId, $id, $preserveApiKeys): array {
-            $native = $this->validateDetails($response, $patientId, $id, $preserveApiKeys)->all();
-            if ($preserveApiKeys) {
-                return $native;
-            }
-
-            return $this->replaceEHealthPropNames($native);
-        });
-        if ($preserveApiKeys) {
-            return $response;
-        }
-
-        // Legacy referral workflows read getData() directly. Check their response before exposing it.
-        $validate = static fn (EHealthResponse $detail): EHealthResponse => tap($detail)->validate();
-
-        return $response instanceof PromiseInterface ? $response->then($validate) : $validate($response);
-    }
-
-    protected function requestDetails(string $patientId, string $id, array $query, callable $validator): PromiseInterface|EHealthResponse
-    {
-        $this->setValidator($validator);
+        $this->setValidator(fn (EHealthResponse $response): ServiceRequestDetails => $this->validateDetails($response, $patientId, $id));
 
         return $this->get(self::URL . "/{$patientId}/service_requests/{$id}", $query);
+    }
+
+    /**
+     * Get the same patient referral for callers that expect an array from validate().
+     * By default id becomes uuid and audit fields use their local names.
+     * Set preserveApiKeys to keep the field names supplied by eHealth.
+     *
+     * @deprecated Use getDetails()->validate(). Remove this adapter after the array and getData() callers migrate.
+     */
+    public function getById(string $patientId, string $id, array $query = [], bool $preserveApiKeys = false): EHealthResponse
+    {
+        $this->setValidator(function (EHealthResponse $response) use ($patientId, $id, $preserveApiKeys): array {
+            $details = $this->validateDetails($response, $patientId, $id)->all();
+
+            return $preserveApiKeys ? $details : $this->replaceEHealthPropNames($details);
+        });
+
+        $response = $this->get(self::URL . "/{$patientId}/service_requests/{$id}", $query);
+        if (!$preserveApiKeys) {
+            // The legacy lifecycle service imports getData() directly, so check the referral before returning it.
+            $response->validate();
+        }
+
+        return $response;
     }
 
     /**
@@ -175,161 +173,152 @@ class ServiceRequest extends PatientApiBase
         return app(ServiceRequestExecutorApi::class);
     }
 
-    /** Validate the native GET detail before returning either representation to its caller. */
-    protected function validateDetails(EHealthResponse $response, string $patientId, string $id, bool $preserveApiKeys = false): ServiceRequestDetails
+    /** Validate the response from the eHealth Get Service request details endpoint. */
+    protected function validateDetails(EHealthResponse $response, string $patientId, string $id): ServiceRequestDetails
     {
-        $envelope = $response->object();
-        $detail = $envelope->data ?? null;
-        if (!$response->ok() || !$detail instanceof stdClass || isset($envelope->error)) {
-            throw ValidationException::withMessages(['data' => __('care-plan.referral_full_details_required')]);
+        $document = $response->object()->data ?? null;
+        $data = $response->json('data');
+        $rules = $this->detailRules($patientId, $id);
+        $types = [];
+
+        // Associative decoding loses the difference between {} and []. Keep the original types for the schema rules.
+        foreach ($rules as $field => $rule) {
+            $fieldRules = is_array($rule) ? $rule : explode('|', $rule);
+            if (!in_array('array', $fieldRules, true)) {
+                continue;
+            }
+
+            $value = data_get($document, $field);
+            $values = str_contains($field, '*') ? ($value ?? []) : [$value];
+            $group = in_array('list', $fieldRules, true) ? 'lists' : 'objects';
+            foreach ($values as $item) {
+                if ($item !== null) {
+                    $types[$group][] = get_debug_type($item);
+                }
+            }
         }
 
-        $this->validateDetailFields($detail, 'data', [
-            'string' => ['id', 'requisition', 'status', 'intent', 'note', 'patient_instruction', 'expiration_date'],
-            'array' => ['status_history', 'reason_reference'],
-            stdClass::class => ['category', 'code', 'subject', 'requester_employee', 'requester_legal_entity',
-                'used_by_employee', 'used_by_legal_entity', 'quantity', 'remaining_quantity'],
+        $validator = Validator::make([
+            'http_status' => $response->status(),
+            ...array_intersect_key((array) $response->object(), ['error' => true]),
+            'data' => $data,
+            'types' => $types,
         ], [
-            'string' => ['priority', 'program_processing_status', 'explanatory_letter', 'inserted_at', 'updated_at', 'occurrence_date_time'],
-            'array' => ['based_on', 'supporting_info', 'permitted_resources', 'specimens', 'focus',
-                'program_processing_status_history', 'used_by_employee_history', 'used_by_legal_entity_history'],
-            stdClass::class => ['program', 'context', 'program_service', 'completed_with', 'performer', 'location_reference',
-                'performer_type', 'status_reason', 'occurrence_period', 'inform_with'],
+            'http_status' => 'in:200',
+            'error' => 'missing',
+            'data' => 'required|array',
+            'types.lists.*' => 'in:array',
+            'types.objects.*' => 'in:' . stdClass::class,
+            ...collect($rules)->mapWithKeys(static fn (string|array $rule, string $field): array => ["data.$field" => $rule])->all(),
         ]);
 
-        Validator::make((array) $detail, ['id' => 'required|uuid', 'status' => 'required|string'])->validate();
-        if (strcasecmp($detail->id, $id) !== 0) {
-            throw ValidationException::withMessages(['id' => __('care-plan.referral_full_details_required')]);
+        if ($validator->fails()) {
+            Log::channel('e_health_errors')->error('ServiceRequest details validation failed: ' . implode(', ', $validator->errors()->all()));
         }
 
-        if (isset($detail->occurrence_period) === isset($detail->occurrence_date_time)) {
-            throw ValidationException::withMessages(['occurrence_period' => __('care-plan.referral_full_details_required')]);
-        }
-        if (isset($detail->occurrence_period)) {
-            $this->validateDetailFields($detail->occurrence_period, 'occurrence_period', ['string' => ['start']], ['string' => ['end']]);
-        }
-        if (isset($detail->inform_with)) {
-            $this->validateDetailFields($detail->inform_with, 'inform_with', [], ['string' => ['auth_method_id']]);
-        }
+        $validator->validate();
 
-        foreach (['quantity', 'remaining_quantity'] as $key) {
-            $this->validateDetailFields($detail->$key, $key, ['string' => ['system', 'code'], 'number' => ['value']], ['string' => ['unit']]);
-        }
-        foreach (['category', 'performer_type', 'status_reason'] as $key) {
-            if (isset($detail->$key)) {
-                $this->validateDetailConcept($detail->$key, $key);
-            }
-        }
-        foreach (['code', 'subject', 'requester_employee', 'requester_legal_entity', 'used_by_employee', 'used_by_legal_entity',
-            'program', 'context', 'program_service', 'completed_with', 'performer', 'location_reference'] as $key) {
-            if (isset($detail->$key)) {
-                $this->validateDetailReference($detail->$key, $key, $key);
-            }
-        }
-        foreach (['based_on', 'reason_reference', 'permitted_resources', 'supporting_info', 'specimens', 'focus'] as $key) {
-            foreach ($detail->$key ?? [] as $index => $reference) {
-                $this->validateDetailReference($reference, "$key.$index", $key);
-            }
-        }
-        $this->validateDetailHistory($detail);
-
-        // Existing imports also accept the legacy patient reference when subject is display-only.
-        foreach (['subject.identifier.value', 'patient.identifier.value'] as $path) {
-            $value = data_get($detail, $path);
-            if ($value !== null && (!is_string($value) || strcasecmp($value, $patientId) !== 0)) {
-                throw ValidationException::withMessages([$path => __('care-plan.referral_full_details_required')]);
-            }
-        }
-
-        return new ServiceRequestDetails($preserveApiKeys ? $this->snapshotFields((array) $detail) : $response->getData());
+        return new ServiceRequestDetails($data, (array) $document);
     }
 
-    /** Keep JSON objects that PHP would otherwise encode as lists in the signed snapshot. */
-    protected function snapshotFields(array $fields): array
+    /** Rules for the complete patient referral returned by GET /api/patients/{patient_id}/service_requests/{service_request_id}. */
+    protected function detailRules(string $patientId, string $id): array
     {
-        foreach ($fields as $key => $value) {
-            if ($value instanceof stdClass) {
-                $properties = (array) $value;
-                $fields[$key] = array_is_list($properties) ? $value : $this->snapshotFields($properties);
-            } elseif (is_array($value)) {
-                $fields[$key] = $this->snapshotFields($value);
-            }
+        $patientIdentity = 'regex:/^' . preg_quote($patientId, '/') . '$/iD';
+        $rules = [
+            'id' => ['required', 'uuid', 'regex:/^' . preg_quote($id, '/') . '$/iD'],
+            'requisition' => 'present|string',
+            'status' => 'required|string',
+            'intent' => 'present|string',
+            'priority' => 'string',
+            'program_processing_status' => 'string',
+            'category' => 'present|array|required_array_keys:coding',
+            'performer_type' => 'array|required_array_keys:coding',
+            'status_reason' => 'array|required_array_keys:coding',
+            'status_history' => 'present|array|list',
+            'status_history.*' => 'array|required_array_keys:status,inserted_at',
+            'status_history.*.status' => 'string',
+            'status_history.*.inserted_at' => 'string',
+            'status_history.*.status_reason' => 'array|required_array_keys:coding',
+            'program_processing_status_history' => 'array|list',
+            'program_processing_status_history.*' => 'array|required_array_keys:program_processing_status,inserted_at,inserted_by',
+            'program_processing_status_history.*.program_processing_status' => 'string',
+            'program_processing_status_history.*.inserted_at' => 'string',
+            'program_processing_status_history.*.inserted_by' => 'string',
+            'note' => 'present|string',
+            'patient_instruction' => 'present|string',
+            'expiration_date' => 'present|string',
+            'explanatory_letter' => 'string',
+            'inserted_at' => 'string',
+            'updated_at' => 'string',
+            'occurrence_period' => 'required_without:data.occurrence_date_time|missing_with:data.occurrence_date_time|array|required_array_keys:start',
+            'occurrence_period.start' => 'string',
+            'occurrence_period.end' => 'string',
+            'occurrence_date_time' => 'required_without:data.occurrence_period|string',
+            'inform_with' => 'array',
+            'inform_with.auth_method_id' => 'string',
+        ];
+
+        foreach (['quantity', 'remaining_quantity'] as $field) {
+            $rules[$field] = 'present|array|required_array_keys:value,system,code';
+            $rules["$field.value"] = 'required|numeric:strict';
+            $rules["$field.system"] = 'string';
+            $rules["$field.code"] = 'string';
+            $rules["$field.unit"] = 'string';
         }
 
-        return $fields;
-    }
-
-    protected function validateDetailHistory(stdClass $detail): void
-    {
-        foreach ($detail->status_history as $index => $entry) {
-            $path = "status_history.$index";
-            $this->validateDetailFields($entry, $path, ['string' => ['status', 'inserted_at']], [stdClass::class => ['status_reason']]);
-            if (isset($entry->status_reason)) {
-                $this->validateDetailConcept($entry->status_reason, "$path.status_reason");
-            }
+        $references = [
+            'code' => 'present|array|required_array_keys:display_value',
+            'subject' => 'present|array|required_array_keys:display_value',
+            'requester_employee' => 'present|array|required_array_keys:display_value',
+            'requester_legal_entity' => 'present|array|required_array_keys:display_value',
+            'used_by_employee' => 'present|array|required_array_keys:display_value',
+            'used_by_legal_entity' => 'present|array|required_array_keys:display_value',
+            'program' => 'array|required_array_keys:display_value',
+            'context' => 'array|required_array_keys:display_value',
+            'program_service' => 'array|required_array_keys:identifier,display_value',
+            'completed_with' => 'array|required_array_keys:identifier,display_value',
+            'performer' => 'array|required_array_keys:identifier,display_value',
+            'location_reference' => 'array|required_array_keys:identifier,display_value',
+        ];
+        foreach (['used_by_employee', 'used_by_legal_entity'] as $field) {
+            $history = $field . '_history';
+            $rules[$history] = 'array|list';
+            $rules["$history.*"] = "array|required_array_keys:$field,inserted_at,inserted_by";
+            $rules["$history.*.inserted_at"] = 'string';
+            $rules["$history.*.inserted_by"] = 'string';
+            $references["$history.*.$field"] = 'array|required_array_keys:display_value';
         }
-        foreach ($detail->program_processing_status_history ?? [] as $index => $entry) {
-            $this->validateDetailFields($entry, "program_processing_status_history.$index", [
-                'string' => ['program_processing_status', 'inserted_at', 'inserted_by'],
-            ]);
-        }
-        foreach (['used_by_employee', 'used_by_legal_entity'] as $key) {
-            $history = $key . '_history';
-            foreach ($detail->$history ?? [] as $index => $entry) {
-                $path = "$history.$index";
-                $this->validateDetailFields($entry, $path, ['string' => ['inserted_at', 'inserted_by'], stdClass::class => [$key]]);
-                $this->validateDetailReference($entry->$key, "$path.$key", $key);
-            }
-        }
-    }
-
-    protected function validateDetailReference(mixed $reference, string $path, string $field): void
-    {
-        $required = $field === 'based_on' ? [] : ['string' => ['display_value']];
-        $identifier = [stdClass::class => ['identifier']];
-        $requiresIdentifier = in_array($field, ['program_service', 'completed_with', 'performer', 'location_reference'], true);
-        $this->validateDetailFields($reference, $path, $requiresIdentifier ? $required + $identifier : $required, $identifier);
-
-        if (isset($reference->identifier)) {
-            $clinicalLink = in_array($field, ['reason_reference', 'permitted_resources'], true);
-            $type = [stdClass::class => ['type']];
-            $this->validateDetailFields($reference->identifier, "$path.identifier", ['string' => ['value']] + ($clinicalLink ? [] : $type), $type);
-            if (isset($reference->identifier->type)) {
-                $specimenOrFocus = in_array($field, ['specimens', 'focus'], true);
-                $this->validateDetailConcept($reference->identifier->type, "$path.identifier.type", $specimenOrFocus, !$clinicalLink && !$specimenOrFocus);
-            }
-        }
-    }
-
-    protected function validateDetailConcept(mixed $concept, string $path, bool $requiresCoding = true, bool $requiresCode = true): void
-    {
-        $coding = ['array' => ['coding']];
-        $this->validateDetailFields($concept, $path, $requiresCoding ? $coding : [], $coding + ['string' => ['text']]);
-        foreach ($concept->coding ?? [] as $index => $item) {
-            $this->validateDetailFields($item, "$path.coding.$index", ['string' => $requiresCode ? ['system', 'code'] : ['system']], ['string' => ['code']]);
-        }
-    }
-
-    /** Check wire types before associative decoding loses the distinction between an empty object and a list. */
-    protected function validateDetailFields(mixed $object, string $path, array $required, array $optional = []): void
-    {
-        if (!$object instanceof stdClass) {
-            throw ValidationException::withMessages([$path => __('care-plan.referral_full_details_required')]);
+        foreach (['reason_reference', 'permitted_resources', 'based_on', 'supporting_info', 'specimens', 'focus'] as $field) {
+            $rules[$field] = $field === 'reason_reference' ? 'present|array|list' : 'array|list';
+            $references["$field.*"] = $field === 'based_on' ? 'array' : 'array|required_array_keys:display_value';
         }
 
-        foreach (array_merge_recursive($required, $optional) as $type => $fields) {
-            foreach (array_unique($fields) as $field) {
-                if (!property_exists($object, $field) && !in_array($field, $required[$type] ?? [], true)) {
-                    continue;
-                }
-
-                $value = $object->$field ?? null;
-                $valid = $type === 'number' ? is_int($value) || is_float($value) : get_debug_type($value) === $type;
-                if (!$valid) {
-                    throw ValidationException::withMessages(["$path.$field" => __('care-plan.referral_full_details_required')]);
-                }
-            }
+        $concepts = ['category', 'performer_type', 'status_reason', 'status_history.*.status_reason'];
+        foreach ($references as $field => $rule) {
+            $rules[$field] = $rule;
+            $rules["$field.display_value"] = 'string';
+            $type = "$field.identifier.type";
+            $clinicalLink = in_array($field, ['reason_reference.*', 'permitted_resources.*'], true);
+            $rules["$field.identifier"] = $clinicalLink ? 'array|required_array_keys:value' : 'array|required_array_keys:type,value';
+            $rules["$field.identifier.value"] = 'string';
+            $rules[$type] = in_array($field, ['specimens.*', 'focus.*'], true) ? 'array|required_array_keys:coding' : 'array';
+            $concepts[] = $type;
         }
+        foreach ($concepts as $field) {
+            $rules["$field.text"] = 'string';
+            $rules["$field.coding"] = 'array|list';
+            $codeOptional = in_array($field, ['reason_reference.*.identifier.type', 'permitted_resources.*.identifier.type',
+                'specimens.*.identifier.type', 'focus.*.identifier.type'], true);
+            $rules["$field.coding.*"] = $codeOptional ? 'array|required_array_keys:system' : 'array|required_array_keys:system,code';
+            $rules["$field.coding.*.system"] = 'string';
+            $rules["$field.coding.*.code"] = 'string';
+        }
+
+        $rules['subject.identifier.value'] = ['sometimes', 'required', 'string', $patientIdentity];
+        $rules['patient.identifier.value'] = ['sometimes', 'required', 'string', $patientIdentity];
+
+        return $rules;
     }
 
     protected function validateMany(EHealthResponse $response): array

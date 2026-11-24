@@ -37,15 +37,9 @@ trait ReadsClinicalSnapshots
 
     protected function fetchServiceRequestSnapshot(string $patientUuid, string $requestUuid): array
     {
-        $snapshot = EHealth::serviceRequest()->getById($patientUuid, $requestUuid, preserveApiKeys: true)->validate();
-        if (array_is_list($snapshot) && count($snapshot) === 1) {
-            $snapshot = $snapshot[0];
-        }
-        Validator::make($snapshot, [
-            'id' => ['required', 'in:'.$requestUuid],
-            'status' => ['required', 'in:active'],
-            'subject.identifier.value' => ['sometimes', 'required', 'in:'.$patientUuid],
-        ])->validate();
+        $details = EHealth::serviceRequest()->getDetails($patientUuid, $requestUuid)->validate();
+        $snapshot = $details->signaturePayload;
+        Validator::make($snapshot, ['status' => 'required|in:active'])->validate();
 
         return $snapshot;
     }

@@ -11,16 +11,19 @@ use Symfony\Component\ObjectMapper\Attribute\Map;
 #[Map(source: ServiceRequestDetails::class)]
 class Approval
 {
+    #[Map(source: '[requisition]')]
+    public string $requisition;
+
     #[Map(source: '[status]')]
     public string $status;
 
     #[Map(source: '[permitted_resources?]')]
     public ?array $permittedResources = null;
 
-    /** @return list<array{code: ?string, name: ?string}> */
-    public function previewRows(): array
-    {
-        return array_map(static fn (array $resource): array => [
+    /** @var list<array{code: ?string, name: ?string}> */
+    #[Map(if: false)]
+    public array $previewRows {
+        get => array_map(static fn (array $resource): array => [
             'code' => data_get($resource, 'identifier.type.coding.0.code'),
             'name' => data_get($resource, 'identifier.value'),
         ], $this->permittedResources ?? []);

@@ -625,11 +625,9 @@ class ServiceRequestRequestRepository extends BaseRepository
         $relation->associate(MedicalEventsRepository::codeableConcept()->store(['text' => $priority]));
     }
 
-    public function findByUuid(string $uuid, ?int $personId = null): ?ServiceRequestRequest
+    public function findByUuid(string $uuid): ?ServiceRequestRequest
     {
-        return $this->model->newQuery()->whereUuid($uuid)
-            ->when($personId !== null, fn (Builder $query) => $query->wherePersonId($personId))
-            ->first();
+        return $this->model->newQuery()->where('uuid', $uuid)->first();
     }
 
     public function incomingForEncounter(Encounter $encounter): ?ServiceRequestRequest
@@ -792,7 +790,7 @@ class ServiceRequestRequestRepository extends BaseRepository
     public function findDraftByActivity(string $activityUuid, ?int $personId = null): ?ServiceRequestRequest
     {
         return $this->model->newQuery()
-            ->when($personId !== null, fn (Builder $query) => $query->wherePersonId($personId))
+            ->when($personId !== null, fn (Builder $query) => $query->forPerson($personId))
             ->whereHas('basedOn', fn ($q) => $q->where('value', $activityUuid))
             ->whereIn('status', ['draft', 'DRAFT'])
             ->latest('id')
