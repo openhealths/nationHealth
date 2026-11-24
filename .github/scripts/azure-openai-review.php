@@ -332,6 +332,11 @@ function startAzureReview(callable $request): array
 
 function finishAzureReview(callable $request, string $jobStatus): void
 {
+    // Successful review steps already publish their result; only failures need cleanup.
+    if ($jobStatus === 'success') {
+        return;
+    }
+
     [, $api] = reviewContext();
     $checkId = reviewEnv('AZURE_REVIEW_CHECK_ID');
     if (!ctype_digit($checkId)) {
