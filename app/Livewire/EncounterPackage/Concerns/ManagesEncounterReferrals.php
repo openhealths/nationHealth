@@ -6,6 +6,7 @@ namespace App\Livewire\EncounterPackage\Concerns;
 
 use App\Classes\eHealth\EHealth as SubmissionApi;
 use App\Classes\eHealth\EHealth;
+use App\Core\Arr;
 use App\Enums\JobStatus;
 use App\Enums\MedicalProgram\Type as MedicalProgramType;
 use App\Enums\Person\EncounterStatus;
@@ -623,7 +624,12 @@ trait ManagesEncounterReferrals
             try {
                 $person = $repository->person((int) $encounter->person_id);
                 $remote = EHealth::serviceRequest()->getDetails($person->uuid, $record->uuid)->validate();
-                $record = $repository->importDetails($remote, $record);
+                $record = $repository->importResource(
+                    Arr::toCamelCase($remote->all()),
+                    $record->personId,
+                    $record->employeeId,
+                    $record->divisionId,
+                );
             } catch (Throwable $exception) {
                 report($exception);
                 Session::flash('warning', __('referrals.submission_refresh_failed'));

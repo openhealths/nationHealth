@@ -863,7 +863,12 @@ trait ManagesCarePlanReferrals
             return false;
         }
 
-        MedicalEventsRepository::serviceRequest()->importDetails($details, $draft);
+        MedicalEventsRepository::serviceRequest()->importResource(
+            Arr::toCamelCase($details->all()),
+            $draft->personId,
+            $draft->employeeId,
+            $draft->divisionId,
+        );
 
         return true;
     }
@@ -873,7 +878,12 @@ trait ManagesCarePlanReferrals
         $details = EHealth::serviceRequest()->getDetails($this->carePlan->person->uuid, $record->uuid)->validate();
         $context = $this->resolveReferralEmployeeContext($record, $activity);
 
-        return MedicalEventsRepository::serviceRequest()->importDetails($details, $record, $context['employee_id'], $context['division_id']);
+        return MedicalEventsRepository::serviceRequest()->importResource(
+            Arr::toCamelCase($details->all()),
+            $record->personId,
+            $record->employeeId ?? $context['employee_id'],
+            $record->divisionId ?? $context['division_id'],
+        );
     }
 
     public function syncReferralFromEHealth(string $requestUuid, string $kind): void
