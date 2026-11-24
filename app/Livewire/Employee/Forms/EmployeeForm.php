@@ -254,7 +254,7 @@ class EmployeeForm extends Form
         ];
     }
 
-    public function documentsRules(): array
+    protected function documentsRules(): array
     {
         $allowedDocumentTypes = config('ehealth.employee_identity_document_types', []);
 

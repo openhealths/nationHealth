@@ -747,16 +747,8 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     private function signEmployeeRequest(EmployeeRequest $requestToSign): string
     {
         $requestToSign->loadMissing('revision');
-        $payloadToSign = EHealth::employeeRequest()->schemaCreate($requestToSign->revision->data);
-        $documents = $payloadToSign['employee_request']['party']['documents'] ?? [];
-        // Validate the issuers that KEP will sign, keeping the form indices for inline errors.
-        $issuers = [];
-        foreach (array_keys($documents + $this->form->documents) as $index) {
-            $issuers[$index]['issuedBy'] = $documents[$index]['issued_by'] ?? null;
-        }
-        $this->form->validateOnly('documents.*.issuedBy', $this->form->documentsRules(), dataOverrides: [
-            'documents' => $issuers,
-        ]);
+        $nestedDataForRevision = $requestToSign->revision->data;
+        $payloadToSign = EHealth::employeeRequest()->schemaCreate($nestedDataForRevision);
 
         return signatureService()->signData(
             $payloadToSign,
@@ -783,9 +775,6 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     private function handleValidationException(ValidationException $e): void
     {
         $validator = $e->validator;
-        if ($validator->errors()->hasAny(['form.documents', 'form.documents.*.issuedBy'])) {
-            $this->showSignatureModal = false;
-        }
         $specificEmailError = __('validation.email_already_exists');
         $allMessages = $validator->errors()->all();
 
@@ -910,23 +899,6 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
      */
     protected function handleEHealthValidationError(EHealthValidationException $e): void
     {
-        $issuerErrors = [];
-        foreach ($e->getDetails()['error']['invalid'] ?? [] as $invalid) {
-            $index = Str::match('/^\$\.employee_request\.party\.documents\[(\d+)]\.issued_by\z/', $invalid['entry'] ?? '');
-            $rules = collect($invalid['rules'] ?? []);
-            $required = $rules->contains('rule', 'required')
-                || $rules->contains('description', 'required property issued_by was not present');
-            if ($index !== '' && $required) {
-                $issuerErrors["form.documents.$index.issuedBy"] = __('validation.custom.employee.document_issuer_required');
-            }
-        }
-
-        if ($issuerErrors) {
-            $this->setErrorBag($issuerErrors);
-            $this->showSignatureModal = false;
-            $this->dispatch('validation-failed-scroll', firstErrorKey: array_key_first($issuerErrors));
-        }
-
         $fullMessage = $e->getTranslatedMessage();
         $this->flashError($fullMessage);
 

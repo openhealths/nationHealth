@@ -82,7 +82,7 @@
                     if (elementToScrollTo) {
                         elementToScrollTo.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                        if (elementToScrollTo.matches('input, select, button')) {
+                        if (elementToScrollTo.tagName === 'INPUT' || elementToScrollTo.tagName === 'SELECT') {
                             elementToScrollTo.focus({ preventScroll: true });
                         }
                     }
