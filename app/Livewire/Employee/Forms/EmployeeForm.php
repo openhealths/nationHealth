@@ -14,6 +14,8 @@ use App\Rules\DocumentNumber;
 use App\Rules\HasIdentityDocumentRule;
 use App\Rules\UniquePassportRule;
 use Carbon\Carbon;
+use Closure;
+use Exception;
 use Livewire\Component;
 use Livewire\Form;
 use App\Rules\Name;
@@ -186,6 +188,7 @@ class EmployeeForm extends Form
             'party.workingExperience.integer' => __('validation.custom.party.working_experience_integer'),
             'party.workingExperience.gt' => __('validation.custom.party.working_experience_gt'),
             'documents.*.type.in' => __('validation.custom.employee.document_type_not_allowed'),
+            'documents.*.issuedBy' => __('validation.custom.employee.document_issuer_required'),
             'documents.min' => __('validation.custom.identity_document_required'),
         ];
     }
@@ -242,7 +245,7 @@ class EmployeeForm extends Form
                     }
                 }
             ],
-            'documents.*.issuedBy' => ['present', 'nullable', 'string'],
+            'documents.*.issuedBy' => ['bail', 'required', 'string', 'regex:/\S/u'],
             'documents.*.issuedAt' => ['required', new DateFormat(), 'before_or_equal:today'],
         ];
     }
@@ -275,7 +278,7 @@ class EmployeeForm extends Form
             'doctor.educations.*.speciality' => ['required', 'string', 'max:255'],
 
             'doctor.specialities' => array_merge($specialitiesRules, [
-                function (string $attribute, mixed $value, \Closure $fail) use ($isMedicalType): void {
+                function (string $attribute, mixed $value, Closure $fail) use ($isMedicalType): void {
                     if (!is_array($value)) {
                         return;
                     }
@@ -663,7 +666,7 @@ class EmployeeForm extends Form
             }
             try {
                 return Carbon::parse($value)->format('Y-m-d');
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 return null;
             }
         };

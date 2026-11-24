@@ -30,6 +30,7 @@ return [
         'validation_error_header' => 'eHealth відхилив запит через невірні дані. Будь ласка, виправте:',
         'messages' => [
             'required property' => 'відсутнє',
+            'required property issued_by was not present' => __('validation.custom.employee.document_issuer_required'),
             'schema does not allow additional properties' => 'містить недійсні дані',
             'type mismatch' => 'невідповідність типу даних.',
             'does not match pattern' => 'не відповідає очікуваному формату.',

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Employee;
 
 use AllowDynamicProperties;
-use App\Classes\eHealth\Api\EmployeeRequest as EHealthEmployeeRequest;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Employee\RequestStatus;
@@ -25,6 +24,7 @@ use Auth;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
@@ -153,7 +153,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $requestToSign = $this->validateAndGetDraft();
             $signedContent = $this->signDataWithCipher($requestToSign);
 
-            $eHealthResponseAsArray = new EHealthEmployeeRequest()->create($signedContent);
+            $eHealthResponseAsArray = EHealth::employeeRequest()->create($signedContent);
 
             if (isset($eHealthResponseAsArray['error'])) {
                 throw new EHealthValidationException($eHealthResponseAsArray);
@@ -715,7 +715,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     /**
      * Builds a user-facing flash message from validation errors with document context.
      */
-    private function buildValidationFlashMessage(\Illuminate\Contracts\Validation\Validator $validator): string
+    private function buildValidationFlashMessage(Validator $validator): string
     {
         $messages = collect($validator->errors()->messages())
             ->flatMap(function (array $errors, string $key) {

@@ -7,6 +7,7 @@
                   documents: [],
                   openModal: false,
                   modalDocument: new Doc(),
+                  issuerInvalid: false,
                   newDocument: false,
                   item: 0,
                   dictionary: @js($this->dictionaries['DOCUMENT_TYPE'])
@@ -30,6 +31,9 @@
         @enderror
 
         @foreach ($this->form->documents ?? [] as $index => $document)
+            @error("form.documents.{$index}.issuedBy")
+                <p id="form.documents.{{ $index }}.issuedBy" class="text-error -mt-2 mb-2">{{ $document['number'] ?? '' }} — {{ $message }}</p>
+            @enderror
             @error("form.documents.{$index}.number")
                 <p class="text-error -mt-2 mb-2">{{ $message }}</p>
             @enderror
@@ -118,6 +122,7 @@
                                                 item = index;
                                                 modalDocument = new Doc(document);
                                                 newDocument = false;
+                                                issuerInvalid = ! modalDocument.issuedBy?.trim();
                                                 openDropdown = false;
                                             "
                                             class="dropdown-button"
@@ -150,6 +155,7 @@
                         openModal = true; {{-- Open the Modal --}}
                         newDocument = true; {{-- We are adding a new document --}}
                         modalDocument = new Doc(); {{-- Replace the data of the previous document with a new one--}}
+                            issuerInvalid = false;
                     "
                 @click.prevent
                 class="item-add my-5"
@@ -187,7 +193,14 @@
                             </h3>
 
                             {{-- Content --}}
-                            <form>
+                            <form
+                                @submit.prevent.stop="
+                                    newDocument
+                                        ? documents.push({ ...modalDocument })
+                                        : (documents[item] = { ...modalDocument });
+                                    openModal = false;
+                                "
+                            >
                                 <div class="form-row-modal">
                                     <div>
                                         <label for="documentType" class="label-modal"
@@ -222,16 +235,26 @@
                                     </div>
 
                                     <div>
-                                        <label for="documentIssuedBy" class="label-modal"
-                                            >{{ __('forms.issued_by') }}<span class="text-red-600"></span
-                                        ></label>
+                                        <label for="documentIssuedBy" class="label-modal">
+                                            {{ __('forms.issued_by') }}<span class="text-red-600" aria-hidden="true"> *</span>
+                                        </label>
                                         <input
                                             x-model="modalDocument.issuedBy"
                                             type="text"
                                             name="documentIssuedBy"
                                             id="documentIssuedBy"
                                             class="input-modal"
+                                            required
+                                            pattern=".*\S.*"
+                                            @invalid="issuerInvalid = true"
+                                            @blur="issuerInvalid = ! $el.validity.valid"
+                                            @input="if (issuerInvalid) issuerInvalid = ! $el.validity.valid"
+                                            :aria-invalid="issuerInvalid.toString()"
+                                            :aria-describedby="issuerInvalid ? 'documentIssuedByError' : null"
                                         />
+                                        <p id="documentIssuedByError" class="text-error" x-show="issuerInvalid" x-cloak>
+                                            {{ __('validation.custom.employee.document_issuer_required') }}
+                                        </p>
                                     </div>
 
                                     <div class="relative">
@@ -258,12 +281,7 @@
                                     </button>
 
                                     <button
-                                        @click.prevent="
-                                            newDocument
-                                                ? documents.push({ ...modalDocument })
-                                                : (documents[item] = { ...modalDocument });
-                                            openModal = false;
-                                        "
+                                        type="submit"
                                         class="button-primary"
                                         :class="{
                                             'opacity-50 cursor-not-allowed': ! (

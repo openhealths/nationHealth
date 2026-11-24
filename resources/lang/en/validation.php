@@ -168,6 +168,9 @@ return [
     */
 
     'custom' => [
+        'employee' => [
+            'document_issuer_required' => 'Enter the authority that issued the document.',
+        ],
         'attribute-name' => [
             'rule-name' => 'custom-message',
         ],

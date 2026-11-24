@@ -239,7 +239,8 @@ class EHealthValidationException extends EHealthException
             } elseif (str_contains($message, 'Category mismatch')) {
                 $translatedMessage = 'Категорія послуги не відповідає обраному коду в довіднику ЕСОЗ. Будь ласка, оберіть правильну категорію в полі «Категорія» (наприклад, Діагностична процедура / Процедура / Лабораторна діагностика тощо)';
             } elseif (!empty($message)) {
-                $translatedMessage = $message;
+                $messages = trans('errors.ehealth.messages');
+                $translatedMessage = is_array($messages) ? ($messages[$message] ?? $message) : $message;
             }
 
             if (empty($translatedMessage) && !empty($ruleName)) {
