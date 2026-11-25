@@ -105,6 +105,24 @@ input[required] ~ label:after {
     @apply grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-6;
 }
 
+/* Align controls independently from the validation messages below them. */
+@variant md {
+    .form-row-aligned {
+        grid-template-rows: auto auto;
+        row-gap: 0;
+    }
+
+    .form-row-aligned > .form-group {
+        display: grid;
+        grid-row: span 2;
+        grid-template-rows: subgrid;
+    }
+
+    .form-row-aligned > .form-group > :first-child {
+        align-self: end;
+    }
+}
+
 .form-row {
     @apply md:mb-5 mb-4
 }
@@ -203,6 +221,10 @@ input::-webkit-contacts-auto-fill-button {
 
 .input-select option {
     @apply py-2 px-3 text-base leading-relaxed bg-white text-gray-900 dark:bg-gray-800 dark:text-white
+}
+
+.form-group:has([x-listbox] [aria-expanded="true"]) {
+    z-index: 50;
 }
 
 .input-error {

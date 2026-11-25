@@ -44,49 +44,36 @@
         >
             <legend class="legend">{{ __('forms.main_information') }}</legend>
 
-            <div class="form-row-2">
+            <div class="form-row-2 form-row-aligned">
                 <div class="form-group group">
-                    <select
-                        wire:model="form.divisionId"
-                        type="text"
-                        name="divisionName"
-                        id="divisionName"
-                        required
-                        class="input-select"
-                        disabled
-                    >
-                        <option value="{{ $this->form->divisionId }}" selected>{{ $divisionName }}</option>
-                    </select>
+                    <div class="relative">
+                        <select
+                            wire:model="form.divisionId"
+                            type="text"
+                            name="divisionName"
+                            id="divisionName"
+                            required
+                            class="input-select"
+                            disabled
+                        >
+                            <option value="{{ $this->form->divisionId }}" selected>{{ $divisionName }}</option>
+                        </select>
 
-                    <label for="divisionName" class="label">{{ __('forms.division_name') }}</label>
+                        <label for="divisionName" class="label">{{ __('forms.division_name') }}</label>
+                    </div>
 
                     @error('form.divisionId')
                         <p class="text-error">{{ $message }}</p>
                     @enderror
                 </div>
 
-                <div class="form-group group">
-                    <select
-                        wire:model="form.category.coding.0.code"
-                        type="text"
-                        name="category"
-                        id="category"
-                        class="input-select @error('form.category.coding.0.code') input-error @enderror"
-                        required
-                        x-bind:disabled="isDisabled"
-                    >
-                        <option value="" selected>{{ __('forms.select') }}</option>
-                        @foreach ($this->dictionaries['HEALTHCARE_SERVICE_CATEGORIES'] as $key => $category)
-                            <option value="{{ $key }}">{{ $category }}</option>
-                        @endforeach
-                    </select>
-
-                    <label for="category" class="label">{{ __('healthcare-services.category') }}</label>
-
-                    @error('form.category.coding.0.code')
-                        <p class="text-error">{{ $message }}</p>
-                    @enderror
-                </div>
+                <x-forms.listbox
+                    :options="$this->dictionaries['HEALTHCARE_SERVICE_CATEGORIES']"
+                    bind="form.category.coding.0.code"
+                    :label="__('healthcare-services.category')"
+                    is-disabled="isDisabled"
+                    :is-required="true"
+                />
             </div>
 
             <div class="form-row-2">
@@ -129,50 +116,40 @@
             </div>
 
             @if (legalEntity()->type->name !== LegalEntity::TYPE_PRIMARY_CARE)
-                <div class="form-row-2">
+                <div class="form-row-2 form-row-aligned">
                     <div class="form-group group" x-show="isRequired('type')" x-cloak>
-                        <select
-                            wire:model="form.type.coding.0.code"
-                            type="text"
-                            name="type"
-                            id="type"
-                            class="input-select @error('form.type.coding.0.code') input-error @enderror"
-                            x-bind:disabled="isDisabled"
-                        >
-                            <option value="" selected>{{ __('forms.select') }}</option>
-                            @foreach ($this->dictionaries['HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES'] as $key => $pharmacyDrugsType)
-                                <option value="{{ $key }}">{{ $pharmacyDrugsType }}</option>
-                            @endforeach
-                        </select>
+                        <div class="relative">
+                            <select
+                                wire:model="form.type.coding.0.code"
+                                type="text"
+                                name="type"
+                                id="type"
+                                class="input-select @error('form.type.coding.0.code') input-error @enderror"
+                                x-bind:disabled="isDisabled"
+                            >
+                                <option value="" selected>{{ __('forms.select') }}</option>
+                                @foreach ($this->dictionaries['HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES'] as $key => $pharmacyDrugsType)
+                                    <option value="{{ $key }}">{{ $pharmacyDrugsType }}</option>
+                                @endforeach
+                            </select>
 
-                        <label for="type" class="label">{{ __('healthcare-services.type') }}</label>
+                            <label for="type" class="label">{{ __('healthcare-services.type') }}</label>
+                        </div>
 
                         @error('form.type.coding.0.code')
                             <p class="text-error">{{ $message }}</p>
                         @enderror
                     </div>
 
-                    <div class="form-group group" x-show="isRequired('license')" x-cloak>
-                        <select
-                            wire:model="form.licenseId"
-                            type="text"
-                            name="licenseId"
-                            id="licenseId"
-                            class="input-select @error('form.licenseId') input-error @enderror"
-                            x-bind:disabled="isDisabled"
-                        >
-                            <option value="" selected>{{ __('forms.select') }}</option>
-                            @foreach ($licenses as $key => $license)
-                                <option value="{{ $license['uuid'] }}">{{ $license['type']->label() }}</option>
-                            @endforeach
-                        </select>
-
-                        <label for="licenseId" class="label">{{ __('healthcare-services.license') }}</label>
-
-                        @error('form.licenseId')
-                            <p class="text-error">{{ $message }}</p>
-                        @enderror
-                    </div>
+                    <x-forms.listbox
+                        :options="$licenses->mapWithKeys(static fn ($license) => [$license->uuid => $license->type->label()])->all()"
+                        bind="form.licenseId"
+                        :label="__('healthcare-services.license')"
+                        is-disabled="isDisabled || !isRequired('license')"
+                        :is-required="true"
+                        x-show="isRequired('license')"
+                        x-cloak
+                    />
                 </div>
             @endif
 

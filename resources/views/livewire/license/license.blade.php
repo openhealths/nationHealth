@@ -1,10 +1,4 @@
-<div
-    class="form shift-content"
-    x-data="{
-          licenseType: $wire.entangle('form.type'),
-          licenseTypes: @js($licenseTypes)
-      }"
->
+<div class="form shift-content">
     <div class="form-row-2">
         <div class="form-group">
             <input
@@ -41,68 +35,31 @@
 
     @if ($uuid)
         <div class="form-row">
-            <div class="form-group">
-                <input
-                    type="text"
-                    name="licenseTypeValue"
+            <div
+                class="form-group"
+                x-data="{ licenseType: $wire.entangle('form.type'), licenseTypes: @js($licenseTypes) }"
+            >
+                <div
                     id="licenseTypeValue"
-                    class="peer input dark:text-gray-400"
-                    x-bind:value="licenseTypes[licenseType]"
-                    placeholder=" "
-                    disabled
-                />
+                    role="textbox"
+                    aria-readonly="true"
+                    aria-labelledby="licenseTypeLabel"
+                    class="input h-auto min-h-10.5 whitespace-normal wrap-break-word dark:text-gray-400"
+                    x-text="licenseTypes[licenseType]"
+                ></div>
 
-                <label for="licenseTypeValue" class="label">{{ __('licenses.type.label') }}</label>
+                <span id="licenseTypeLabel" class="label">{{ __('licenses.type.label') }}</span>
             </div>
         </div>
     @else
-        <div
-            class="form-row"
-            x-data="{
-                open: false,
-                selected: licenseTypes[licenseType],
-                choose(key, label) {
-                    this.selected = label;
-                    licenseType = key;
-                    this.open = false;
-                },
-            }"
-            @click.away="open = false"
-        >
-            <div class="relative w-full">
-                <div
-                    class="input-select peer min-h-12 cursor-pointer px-3 py-2 pr-10 wrap-break-word whitespace-normal"
-                    @click="open = ! open"
-                    :class="{ 'ring-1 ring-blue-500 border-blue-500': open }"
-                >
-                    <span x-text="selected || @js(__('licenses.type.placeholder'))"></span>
-                    <span class="pointer-events-none absolute top-1/2 right-3 h-2 w-2 -translate-y-1/2 rotate-45 transform border-r-2 border-b-2 border-gray-500 dark:border-gray-400"></span>
-                </div>
-
-                <ul x-show="open" x-transition x-cloak class="dropdown-panel z-10 max-h-60 w-full overflow-auto">
-                    @foreach ($licenseTypes as $key => $label)
-                        <li>
-                            <button
-                                type="button"
-                                x-text="'{{ $label }}'"
-                                @click="choose('{{ $key }}', '{{ $label }}')"
-                                @class([
-                                    'text-left text-sm whitespace-normal break-words px-3 py-2 w-full text-start',
-                                    'rounded-t-md' => $loop->first,
-                                    'rounded-b-md' => $loop->last
-                                ])
-                            ></button>
-                        </li>
-                    @endforeach
-                </ul>
-
-                <label class="label">{{ __('licenses.type.label') }}</label>
-                <input type="hidden" name="licenseType" :value="selected" />
-
-                @error('form.type')
-                    <p class="text-error">{{ $message }}</p>
-                @enderror
-            </div>
+        <div class="form-row">
+            <x-forms.listbox
+                :options="$licenseTypes"
+                bind="form.type"
+                :label="__('licenses.type.label')"
+                :placeholder="__('licenses.type.placeholder')"
+                :is-required="true"
+            />
         </div>
     @endif
 
