@@ -54,7 +54,6 @@ use App\Livewire\Person\Records\PatientApproval;
 use Illuminate\Support\Facades\Http;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Livewire\EncounterPackage\Forms\EncounterForm;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use App\Contracts\SignatureProvider;
 use App\Repositories\MedicalEvents\ServiceRequestRequestRepository;
 use App\Enums\JobStatus;
@@ -275,7 +274,8 @@ class CarePlanShowActionsTest extends TestCase
 
         Livewire::test(CarePlanRefreshFailureHarness::class, ['carePlan' => $plan])
             ->call('prepareSignedRequest', $request->uuid)
-            ->call('signEPrescription')
+            ->set('form.knedp', 'knedp-1')
+            ->call('sign', base64_encode('key-container'), 'secret')
             ->assertSee('Prescription accepted')->assertSee('Existing quantity warning')
             ->assertSee(__('care-plan.eprescription_signed_refresh_pending'))
             ->assertDontSee('Помилка при підписанні рецепту')
@@ -332,7 +332,8 @@ class CarePlanShowActionsTest extends TestCase
 
         Livewire::test(CarePlanShow::class, ['carePlan' => $plan])
             ->call('openSignatureModal', 'sign_servicerequest', null, $draft->uuid)
-            ->call('signReferral')
+            ->set('form.knedp', 'knedp-1')
+            ->call('sign', base64_encode('key-container'), 'secret')
             ->assertSet('showSignatureModal', false)
             ->assertSee(__('care-plan.document_context_unavailable'))
             ->assertNotDispatched('flashMessage');
@@ -724,10 +725,9 @@ class CarePlanShowActionsTest extends TestCase
         $component->encounterReferralRequestIdToSign = $request->uuid;
         $component->form = Mockery::mock(EncounterForm::class);
         $component->form->shouldReceive('signingRules')->andReturn([]);
-        $component->form->shouldReceive('resetSigningFields')->once();
         $component->form->shouldReceive('validate')->andReturn([
             'password' => 'synthetic', 'knedp' => 'synthetic',
-            'keyContainerUpload' => Mockery::mock(TemporaryUploadedFile::class),
+            'keyContainer' => base64_encode('key-container'),
         ]);
         $lifecycle = $this->mock(ReferralRequestLifecycleService::class);
         $lifecycle->shouldReceive('resolveEncounterEmployeeContext')->andReturn([
@@ -1279,12 +1279,13 @@ class CarePlanRefreshFailureHarness extends CarePlanShow
     public function prepareSignedRequest(string $requestUuid): void
     {
         $this->ePrescriptionRequestIdToSign = $requestUuid;
+        $this->actionType = 'sign_eprescription';
     }
 
-    public function signEPrescription(): void
+    protected function signEPrescription(array $signingData): void
     {
         $this->failRefresh = true;
-        parent::signEPrescription();
+        parent::signEPrescription($signingData);
     }
 
     protected function refreshCarePlan(): void

@@ -549,8 +549,9 @@ abstract class DeclarationComponent extends Component
      *
      * @return void
      */
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
         $declarationRequest = DeclarationRequest::findOrFail($this->declarationRequestId);
 
         if (Auth::user()->cannot('sign', $declarationRequest)) {
@@ -599,7 +600,7 @@ abstract class DeclarationComponent extends Component
             $signedContent = signatureService()->signData(
                 $dataToSign,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );

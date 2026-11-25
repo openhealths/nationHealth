@@ -445,10 +445,14 @@ abstract class DiagnosticReportComponent extends Component
     /**
      * Validate, sign, persist the report as a draft and submit it to eHealth, which accepts it later.
      *
+     * @param  string  $keyContainer  Key container in base64
+     * @param  string  $password
      * @return void
      */
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if ($this->isReadonly) {
             return;
         }
@@ -474,7 +478,7 @@ abstract class DiagnosticReportComponent extends Component
             $signedContent = signatureService()->signData(
                 $requestData,
                 $validatedCipher['knedp'],
-                $validatedCipher['keyContainerUpload'],
+                $validatedCipher['keyContainer'],
                 $validatedCipher['password'],
                 Auth::user()->party->taxId
             );

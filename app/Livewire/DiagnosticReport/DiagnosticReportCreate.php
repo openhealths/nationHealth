@@ -39,9 +39,11 @@ class DiagnosticReportCreate extends DiagnosticReportComponent
     /**
      * Submit encrypted data.
      *
+     * @param  string  $keyContainer  Key container in base64
+     * @param  string  $password
      * @return void
      */
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
         if (Auth::user()->cannot('create', DiagnosticReport::class)) {
             Session::flash('error', __('diagnostic-reports.policy.create'));
@@ -49,7 +51,7 @@ class DiagnosticReportCreate extends DiagnosticReportComponent
             return;
         }
 
-        parent::sign();
+        parent::sign($keyContainer, $password);
     }
 
     /**

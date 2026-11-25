@@ -177,9 +177,8 @@ class CarePlanLifecycleTest extends TestCase
             ->set('form.category', 'class_1')
             ->call('startSigningProcess')->assertHasErrors(['form.category'])
             ->assertSet('showSignatureModal', false)
-            ->set('form.knedp', 'test-authority')->set('form.password', 'test-password')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.jks', 100))
-            ->call('sign')->assertHasErrors(['form.category'])
+            ->set('form.knedp', 'test-authority')
+            ->call('sign', base64_encode('key-container'), 'test-password')->assertHasErrors(['form.category'])
             ->assertSet('showSignatureModal', false);
 
         $this->assertSame(0, CarePlan::wherePersonId($this->person->id)->count());
@@ -282,9 +281,7 @@ class CarePlanLifecycleTest extends TestCase
             ->set('form.termsOfService', '736382003')
             ->set('form.periodStart', now()->format('d.m.Y'))
             ->set('form.knedp', '1.2.3.4')
-            ->set('form.password', 'secret')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.jks', 100))
-            ->call('sign')
+            ->call('sign', base64_encode('key-container'), 'secret')
             ->assertHasNoErrors();
 
         // Verify Care Plan is in DB
@@ -352,10 +349,8 @@ class CarePlanLifecycleTest extends TestCase
 
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
             ->set('form.knedp', '1.2.3.4')
-            ->set('form.password', 'secret')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.jks', 100))
             ->call('openSignatureModal', 'sign_activity', $activity->id)
-            ->call('sign')
+            ->call('sign', base64_encode('key-container'), 'secret')
             ->assertHasNoErrors();
 
         // Verify Activity is now SIGNED in local DB
@@ -668,11 +663,9 @@ class CarePlanLifecycleTest extends TestCase
 
         Livewire::test(\App\Livewire\CarePlan\CarePlanShow::class, ['carePlan' => $carePlan])
             ->set('form.knedp', '1.2.3.4')
-            ->set('form.password', 'secret')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.jks', 100))
             ->call('openSignatureModal', 'cancel_activity', $activity->id)
             ->set('statusReason', 'typo')
-            ->call('sign')
+            ->call('sign', base64_encode('key-container'), 'secret')
             ->assertHasNoErrors();
 
         $this->assertSame('scheduled', $activity->fresh()->status);
@@ -785,9 +778,7 @@ class CarePlanLifecycleTest extends TestCase
             ->set('form.informWith', 'SMS')
             ->set('form.periodStart', now()->format('d.m.Y'))
             ->set('form.knedp', '1.2.3.4')
-            ->set('form.password', 'secret')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.jks', 100))
-            ->call('sign')
+            ->call('sign', base64_encode('key-container'), 'secret')
             ->assertHasNoErrors();
 
         // Check payload did NOT contain instantiates_protocol, but did contain inform_with
@@ -840,9 +831,7 @@ class CarePlanLifecycleTest extends TestCase
             ->set('form.title', 'Signed Updated Plan')
             ->set('form.termsOfService', 'PROVIDING_CONDITION_SIGNED')
             ->set('form.knedp', '1.2.3.4')
-            ->set('form.password', 'secret')
-            ->set('form.keyContainerUpload', \Illuminate\Http\UploadedFile::fake()->create('key.jks', 100))
-            ->call('sign')
+            ->call('sign', base64_encode('key-container'), 'secret')
             ->assertHasNoErrors();
 
         // Check payload did NOT contain instantiates_protocol

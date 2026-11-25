@@ -104,14 +104,24 @@ trait CarePlanManager
         }
     }
 
-    public function sign(CarePlanRepository $repository, CarePlanActivityRepository $activityRepository): void
-    {
+    public function sign(
+        CarePlanRepository $repository,
+        CarePlanActivityRepository $activityRepository,
+        string $keyContainer = '',
+        string $password = ''
+    ): void {
+        $this->form->useSigningSecrets($keyContainer, $password);
         $this->authorizeCarePlanWrite();
         if (in_array($this->actionType, ['cancel', 'complete'], true) && $this->guardPlanLifecycleAccess($this->actionType)) {
             return;
         }
+        $signingData = [];
         try {
             $validated = $this->validate($this->rulesForSigning());
+
+            if ($this->requiresDigitalSignature()) {
+                $signingData = $this->form->validate($this->form->signingRules());
+            }
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -120,7 +130,7 @@ trait CarePlanManager
         }
 
         if ($this->actionType === 'sign_activity') {
-            $this->signActivity($repository, $activityRepository);
+            $this->signActivity($repository, $activityRepository, $signingData);
 
             return;
         }
@@ -139,7 +149,7 @@ trait CarePlanManager
                 return;
             }
 
-            $this->signEPrescription();
+            $this->signEPrescription($signingData);
 
             return;
         }
@@ -152,13 +162,13 @@ trait CarePlanManager
                 return;
             }
 
-            $this->signReferral();
+            $this->signReferral($signingData);
 
             return;
         }
 
         if (in_array($this->actionType, ['complete_activity', 'cancel_activity'])) {
-            $this->signStatusActivity($activityRepository);
+            $this->signStatusActivity($activityRepository, $signingData);
 
             return;
         }
@@ -172,7 +182,7 @@ trait CarePlanManager
             }
 
             // eHealth medication-request flow in this app uses reject (no separate cancel signer).
-            $this->signRejectPrescription();
+            $this->signRejectPrescription($signingData);
 
             return;
         }
@@ -185,7 +195,7 @@ trait CarePlanManager
                 return;
             }
 
-            $this->signCancelReferral();
+            $this->signCancelReferral($signingData);
 
             return;
         }
@@ -198,7 +208,7 @@ trait CarePlanManager
                 return;
             }
 
-            $this->signRecallReferral();
+            $this->signRecallReferral($signingData);
 
             return;
         }
@@ -209,7 +219,7 @@ trait CarePlanManager
 
                 return;
             }
-            $this->signPlan($repository);
+            $this->signPlan($repository, $signingData);
 
             return;
         }
@@ -263,9 +273,9 @@ trait CarePlanManager
 
             $signedContent = signatureService()->signData(
                 $payloadForSign,
-                $this->form['knedp'],
-                $this->form['keyContainerUpload'],
-                $this->form['password'],
+                $signingData['knedp'],
+                $signingData['keyContainer'],
+                $signingData['password'],
                 Auth::user()->party->taxId
             );
 
@@ -331,13 +341,13 @@ trait CarePlanManager
         }
     }
 
-    protected function signPlan(CarePlanRepository $repository): void
+    protected function signPlan(CarePlanRepository $repository, array $signingData): void
     {
         try {
             $repository->assertDraftSigningReady($this->carePlan);
             $resource = $repository->getResource($this->carePlan->id);
             $payload = CarePlanForm::buildCreateContent($resource);
-            $signedContent = signatureService()->signData($payload, $this->form['knedp'], $this->form['keyContainerUpload'], $this->form['password'], Auth::user()->party->taxId);
+            $signedContent = signatureService()->signData($payload, $signingData['knedp'], $signingData['keyContainer'], $signingData['password'], Auth::user()->party->taxId);
             $result = $this->submitClinicalOperation($this->carePlan, ['status' => CarePlanStatus::PENDING->value], fn () => EHealth::carePlan()->create($this->carePlan->person->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']));
             if ($result === null) {
                 $this->activateAfterSubmission = true;
@@ -444,8 +454,11 @@ trait CarePlanManager
         }
     }
 
-    protected function signActivity(CarePlanRepository $repository, CarePlanActivityRepository $activityRepository): void
-    {
+    protected function signActivity(
+        CarePlanRepository $repository,
+        CarePlanActivityRepository $activityRepository,
+        array $signingData
+    ): void {
         $this->authorizeCarePlanActivityWrite();
         try {
             $activity = $this->ownedActivity((int) $this->activityToSign);
@@ -460,7 +473,7 @@ trait CarePlanManager
             }
             $resource = $activityRepository->getResource($activity->id);
             $payload = CarePlanActivityForm::buildCreateContent($resource);
-            $signedContent = signatureService()->signData($payload, $this->form['knedp'], $this->form['keyContainerUpload'], $this->form['password'], Auth::user()->party->taxId);
+            $signedContent = signatureService()->signData($payload, $signingData['knedp'], $signingData['keyContainer'], $signingData['password'], Auth::user()->party->taxId);
             $result = $this->submitClinicalOperation($activity, ['status' => 'scheduled'], fn () => EHealth::carePlanActivity()->create($this->carePlan->person->uuid, $this->carePlan->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']));
             if ($result === null) {
                 $this->redirectRoute('care-plans.activities.show', [legalEntity(), $this->carePlan->id, $activity->id], navigate: true);
@@ -480,7 +493,7 @@ trait CarePlanManager
         }
     }
 
-    protected function signStatusActivity(CarePlanActivityRepository $activityRepository): void
+    protected function signStatusActivity(CarePlanActivityRepository $activityRepository, array $signingData): void
     {
         $this->authorizeCarePlanActivityWrite();
         if (!$this->activityToSign) {
@@ -513,7 +526,7 @@ trait CarePlanManager
             } else {
                 $snapshot = $this->fetchActivityCancelSnapshot($this->carePlan->person->uuid, $this->carePlan->uuid, $activity->uuid);
                 $content = CarePlanActivityForm::buildCancelContent($snapshot, $reason);
-                $signed = signatureService()->signData($content, $this->form['knedp'], $this->form['keyContainerUpload'], $this->form['password'], Auth::user()->party->taxId);
+                $signed = signatureService()->signData($content, $signingData['knedp'], $signingData['keyContainer'], $signingData['password'], Auth::user()->party->taxId);
                 $result = $this->submitClinicalOperation($activity, ['status' => 'cancelled', 'statusReason' => $reason], fn () => $api->cancel($this->carePlan->person->uuid, $this->carePlan->uuid, $activity->uuid, ['signed_data' => $signed, 'signed_data_encoding' => 'base64']));
             }
             if ($result === null) {

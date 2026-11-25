@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\MedicationRequest;
 
+use App\Core\BaseForm;
 use App\Exceptions\EHealth\EHealthValidationException;
 use App\Exceptions\Signature\SignatureException;
 use App\Models\LegalEntity;
@@ -13,12 +14,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 
 class MedicationRequestForm extends Component
 {
-    use WithFileUploads;
-
     #[Locked]
     public LegalEntity $legalEntity;
 
@@ -40,13 +38,7 @@ class MedicationRequestForm extends Component
      */
     public array $draftContent = [];
 
-    /** @var array<string, mixed> */
-    public array $form = [
-        'knedp' => '',
-        'keyContainerUpload' => null,
-        'keyContainerFileName' => '',
-        'password' => '',
-    ];
+    public BaseForm $form;
 
     /** @var array<string, string> */
     protected array $rules = [
@@ -133,26 +125,27 @@ class MedicationRequestForm extends Component
         $this->showSignatureModal = true;
     }
 
-    public function sign(MedicationRequestLifecycleService $service): void
-    {
+    public function sign(
+        MedicationRequestLifecycleService $service,
+        string $keyContainer = '',
+        string $password = ''
+    ): void {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if (!$this->isDraftCreated || $this->draftId === null) {
             $this->failWith(__('care-plan.draft_required_before_signing'));
 
             return;
         }
 
-        $this->validate([
-            'form.knedp' => 'required|string',
-            'form.keyContainerUpload' => 'required|file|max:1024',
-            'form.password' => 'required|string',
-        ]);
+        $validated = $this->form->validate($this->form->signingRules());
 
         try {
             $signedContent = signatureService()->signData(
                 $this->draftContent,
-                $this->form['knedp'],
-                $this->form['keyContainerUpload'],
-                $this->form['password'],
+                $validated['knedp'],
+                $validated['keyContainer'],
+                $validated['password'],
                 (string) Auth::user()?->party?->taxId
             );
 
@@ -172,8 +165,6 @@ class MedicationRequestForm extends Component
             $this->failWith($e->getMessage());
 
             return;
-        } finally {
-            $this->resetSigningFields();
         }
 
         $this->showSignatureModal = false;
@@ -185,13 +176,6 @@ class MedicationRequestForm extends Component
     public function render()
     {
         return view('livewire.medication-request.medication-request-form');
-    }
-
-    private function resetSigningFields(): void
-    {
-        $this->form['password'] = '';
-        $this->form['keyContainerUpload'] = null;
-        $this->form['keyContainerFileName'] = '';
     }
 
     private function failWith(string $message): void

@@ -37,7 +37,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Livewire\WithFileUploads;
 use Livewire\Attributes\Locked;
 use RuntimeException;
 use Throwable;
@@ -47,7 +46,6 @@ class CarePlanCreate extends BasePatientComponent
     use SynchronizesCarePlans;
     use SubmitsClinicalOperations;
 
-    use WithFileUploads;
     use InteractsWithApprovals;
     use \App\Livewire\CarePlan\Concerns\HandlesCarePlanApprovalSms;
 
@@ -266,17 +264,6 @@ class CarePlanCreate extends BasePatientComponent
     protected function validateCategoryForSigning(): void
     {
         app(CarePlanRepository::class)->assertCategoryForEncounter($this->form->category, $this->form->encounter, (int) $this->personId);
-    }
-
-    public function updatedFormKeyContainerUpload(): void
-    {
-        $upload = $this->form->keyContainerUpload ?? null;
-
-        if ($upload && method_exists($upload, 'getClientOriginalName')) {
-            $this->form->keyContainerFileName = $upload->getClientOriginalName();
-        } elseif ($upload === null) {
-            $this->form->keyContainerFileName = '';
-        }
     }
 
     protected function refreshAuthorDisplay(): void
@@ -912,8 +899,10 @@ class CarePlanCreate extends BasePatientComponent
     /**
      * Sign with KEP and send to eHealth.
      */
-    public function sign(CarePlanRepository $repository): void
+    public function sign(CarePlanRepository $repository, string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if (Auth::user()?->cannot('create', CarePlan::class)) {
             $msg = __('care-plan.no_permission_create');
             Session::flash('error', $msg);
@@ -924,7 +913,7 @@ class CarePlanCreate extends BasePatientComponent
         $generatedUuid = null;
         try {
             $this->synchronizeSystemFields();
-            $this->form->validate($this->form->rulesForSigning());
+            $validated = $this->form->validate($this->form->rulesForSigning());
             $this->validateCategoryForSigning();
         } catch (ValidationException $exception) {
             $this->handleValidationFailed($exception, closeModal: true);
@@ -968,9 +957,9 @@ class CarePlanCreate extends BasePatientComponent
 
             $signedContent = signatureService()->signData(
                 $carePlanPayload,
-                $this->form->knedp,
-                $this->form->keyContainerUpload,
-                $this->form->password,
+                $validated['knedp'],
+                $validated['keyContainer'],
+                $validated['password'],
                 Auth::user()->party->taxId
             );
 

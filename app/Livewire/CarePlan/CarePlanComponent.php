@@ -6,6 +6,7 @@ namespace App\Livewire\CarePlan;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Core\BaseForm;
 use App\Enums\CarePlanStatus;
 use App\Enums\MedicalProgram\Type;
 use App\Enums\Person\ServiceRequestStatus;
@@ -30,11 +31,9 @@ use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 
 abstract class CarePlanComponent extends Component
 {
-    use WithFileUploads;
     use InteractsWithApprovals;
 
     // Everything the server derives is #[Locked]: it is sent to the browser on every request
@@ -223,12 +222,7 @@ abstract class CarePlanComponent extends Component
         'product_codeable_concept' => '',
     ];
 
-    public array $form = [
-        'knedp' => '',
-        'keyContainerUpload' => null,
-        'keyContainerFileName' => '',
-        'password' => '',
-    ];
+    public BaseForm $form;
 
     public string $outcomeCode = ''; // For outcomeCodeableConcept
 
@@ -569,12 +563,6 @@ abstract class CarePlanComponent extends Component
             'statusReason' => $statusReasonOptional ? 'nullable|string' : 'required|string',
         ];
 
-        if ($this->requiresDigitalSignature()) {
-            $rules['form.knedp'] = 'required|string';
-            $rules['form.keyContainerUpload'] = 'required|file|max:1024';
-            $rules['form.password'] = 'required|string';
-        }
-
         if ($this->actionType === 'recall_referral') {
             $rules['referralExplanatoryLetter'] = 'required|string|min:3';
         }
@@ -611,17 +599,6 @@ abstract class CarePlanComponent extends Component
         }
 
         return $this->dictionaries['care_plan_cancel_reasons'] ?? [];
-    }
-
-    public function updatedFormKeyContainerUpload(): void
-    {
-        $upload = $this->form['keyContainerUpload'] ?? null;
-
-        if ($upload && method_exists($upload, 'getClientOriginalName')) {
-            $this->form['keyContainerFileName'] = $upload->getClientOriginalName();
-        } elseif ($upload === null) {
-            $this->form['keyContainerFileName'] = '';
-        }
     }
 
     public function updatedSelectedProgram(): void

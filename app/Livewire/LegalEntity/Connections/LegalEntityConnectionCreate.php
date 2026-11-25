@@ -8,7 +8,6 @@ use RuntimeException;
 use App\Enums\Status;
 use App\Models\Connection;
 use App\Models\LegalEntity;
-use Livewire\WithFileUploads;
 use Livewire\Attributes\Title;
 use App\Models\LegalEntityType;
 use Livewire\Attributes\Locked;
@@ -28,8 +27,7 @@ use App\Livewire\LegalEntity\Connections\Form\ConnectionForm;
 
 class LegalEntityConnectionCreate extends LegalEntityConnectionComponent
 {
-    use BatchLegalEntityQueries,
-        WithFileUploads;
+    use BatchLegalEntityQueries;
 
     protected const array LEGAL_ENTITY_TYPES = [
         LegalEntity::TYPE_PRIMARY_CARE,
@@ -137,22 +135,24 @@ class LegalEntityConnectionCreate extends LegalEntityConnectionComponent
         $this->showSignatureModal = true;
     }
 
-    public function sign()
+    public function sign(string $keyContainer = '', string $password = '')
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if (Auth::user()->cannot('create', Connection::class)) {
             session()->flash('error', __('legal-entity-connection.policy.restrict.create'));
 
             return;
         }
 
-        $this->form->validate($this->form->rulesForSign());
+        $validated = $this->form->validate($this->form->rulesForSign());
 
         try {
             $signedData = signatureService()->signData(
                 $this->dataToSign,
-                $this->form->knedp,
-                $this->form->keyContainerUpload,
-                $this->form->password,
+                $validated['knedp'],
+                $validated['keyContainer'],
+                $validated['password'],
                 $this->form->taxId
             );
         } catch (SignatureException $exception) {

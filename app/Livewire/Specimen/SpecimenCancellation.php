@@ -86,10 +86,14 @@ class SpecimenCancellation extends Component
     /**
      * Sign the specimen as it is stored in eHealth, marked as entered in error, and send it.
      *
+     * @param  string  $keyContainer  Key container in base64
+     * @param  string  $password
      * @return void
      */
-    public function cancel(): void
+    public function cancel(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         try {
             $validated = $this->form->validate([
                 ...$this->form->cancellationRules(),
@@ -122,7 +126,7 @@ class SpecimenCancellation extends Component
             $signedContent = signatureService()->signData(
                 Fhir::specimen()->toCancellationPackage($response->getData(), $validated['cancellationReason']),
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -132,8 +136,6 @@ class SpecimenCancellation extends Component
 
             return;
         }
-
-        $this->form->resetSigningFields();
 
         try {
             EHealth::specimen()->cancel($this->patientId, $this->specimenId, [
@@ -161,7 +163,6 @@ class SpecimenCancellation extends Component
         $this->showSignatureModal = false;
         $this->specimenId = '';
         $this->form->reset('cancellationReason');
-        $this->form->resetSigningFields();
 
         $this->resetErrorBag();
     }

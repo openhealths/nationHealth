@@ -388,7 +388,7 @@ trait DrivesCompositionWizard
                 'episode_uuid' => $this->episodeUuid,
                 'author_uuid' => $authorUuid,
                 'requestData' => [
-                    'form' => \Illuminate\Support\Arr::except($this->form->toArray(), ['password', 'knedp', 'keyContainerUpload']),
+                    'form' => \Illuminate\Support\Arr::except($this->form->toArray(), ['password', 'knedp', 'keyContainer']),
                     'selectedEncounter' => $this->selectedEncounter,
                 ],
             ]);
@@ -497,7 +497,7 @@ trait DrivesCompositionWizard
         $operation = app(CompositionOperationRepository::class)->findForWizard($this->patient(), $this->asyncJobId, $this->conclusionType(), Auth::user());
         abort_unless($operation !== null, 404);
         $formData = $operation->job->request_data['form'] ?? [];
-        $this->form->fill(\Illuminate\Support\Arr::except($formData, ['password', 'knedp', 'keyContainerUpload']));
+        $this->form->fill(\Illuminate\Support\Arr::except($formData, ['password', 'knedp', 'keyContainer']));
         $this->form->encounterUuid = $operation->encounterUuid;
         $this->selectedEncounter = $operation->job->request_data['selectedEncounter'] ?? null;
         $this->episodeUuid = $operation->episodeUuid;
@@ -596,12 +596,12 @@ trait DrivesCompositionWizard
 
     public function openSigningModal(): void
     {
-        $this->form->resetSigningFields();
         $this->showSignatureModal = true;
     }
 
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
         $composition = Composition::whereUuid($this->compositionUuid)->first();
 
         if (!$composition) {
@@ -620,7 +620,7 @@ trait DrivesCompositionWizard
         }
 
         try {
-            $this->form->validate($this->form->signingRules());
+            $signingData = $this->form->validate($this->form->signingRules());
         } catch (ValidationException $exception) {
             $this->setErrorBag($exception->validator->getMessageBag());
 
@@ -636,9 +636,9 @@ trait DrivesCompositionWizard
         try {
             $signedContent = signatureService()->signData(
                 $this->compositionDetail,
-                $this->form->knedp,
-                $this->form->keyContainerUpload,
-                $this->form->password,
+                $signingData['knedp'],
+                $signingData['keyContainer'],
+                $signingData['password'],
                 Auth::user()->party->taxId
             );
 
@@ -651,13 +651,12 @@ trait DrivesCompositionWizard
                 'episode_uuid' => $composition->episodeOfCareUuid,
                 'author_uuid' => $composition->authorUuid,
                 'requestData' => [
-                    'form' => \Illuminate\Support\Arr::except($this->form->toArray(), ['password', 'knedp', 'keyContainerUpload']),
+                    'form' => \Illuminate\Support\Arr::except($this->form->toArray(), ['password', 'knedp', 'keyContainer']),
                     'selectedEncounter' => $this->selectedEncounter,
                 ],
             ]);
 
             $this->showSignatureModal = false;
-            $this->form->resetSigningFields();
             $this->asyncJobId = $job['id'];
             $this->asyncJobStatus = (string) ($job['status'] ?? CompositionJobStatus::PENDING->value);
             $this->asyncJobErrors = [];
@@ -684,7 +683,6 @@ trait DrivesCompositionWizard
      */
     protected function resetWizard(array $extra = []): void
     {
-        $this->form->resetSigningFields();
         $this->reset(array_merge([
             'step',
             'showEncounterPicker',

@@ -158,7 +158,6 @@ class EncounterReferralFlowTest extends TestCase
         $component->encounterReferralRequestIdToSign = $record->uuid;
         $component->encounterReferralSubmission = ['status' => \App\Enums\JobStatus::PENDING->value];
         $component->form = Mockery::mock(\App\Core\BaseForm::class);
-        $component->form->shouldReceive('resetSigningFields')->once();
 
         $ownership = Mockery::mock(new \App\Services\MedicalEvents\MedicalRequestOwnership());
         $ownership->shouldReceive('serviceForEncounter')->once()->with($record->uuid, $component->encounter)->andReturn($record);

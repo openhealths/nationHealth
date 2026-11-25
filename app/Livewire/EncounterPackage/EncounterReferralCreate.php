@@ -132,8 +132,10 @@ class EncounterReferralCreate extends EncounterDocumentCreate
         $this->validateEncounterReferral();
     }
 
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if ($this->actionType === 'sign_referral') {
             $this->signEncounterReferral();
         }

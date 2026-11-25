@@ -138,10 +138,14 @@ class PatientVerification extends BasePatientComponent
     /**
      * Sign the death verification decision and send it to eHealth.
      *
+     * @param  string  $keyContainer  Key container in base64
+     * @param  string  $password
      * @return void
      */
-    public function signDeathVerification(): void
+    public function signDeathVerification(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if (Auth::user()->cannot('update', [PersonVerificationDetail::class, $this->patient()])) {
             Session::flash('error', __('patient-verifications.policy.update'));
 
@@ -153,16 +157,16 @@ class PatientVerification extends BasePatientComponent
         $validated['deathDate'] = convertToYmd($validated['deathDate']);
 
         $dracsDeath = [
-            'dracs_death' => removeEmptyKeys(
-                Arr::toSnakeCase(Arr::only($validated, array_keys($dracsDeathRules)))
-            )
+            'dracs_death' => Arr::only($validated, array_keys($dracsDeathRules))
+                |> Arr::toSnakeCase(...)
+                |> removeEmptyKeys(...)
         ];
 
         try {
             $signedContent = signatureService()->signData(
                 $dracsDeath,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -196,7 +200,6 @@ class PatientVerification extends BasePatientComponent
             return;
         }
 
-        $this->form->resetSigningFields();
         $this->showSignatureModal = false;
 
         Session::flash('success', __('patient-verifications.messages.status_updated'));

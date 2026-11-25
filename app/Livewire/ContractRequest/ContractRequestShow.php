@@ -82,8 +82,10 @@ class ContractRequestShow extends Component
         $this->showSignatureModal = true;
     }
 
-    public function submitSignedAction(): void
+    public function submitSignedAction(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         match ($this->pendingAction) {
             'approve' => $this->approve(),
             'sign' => $this->sign(),
@@ -115,7 +117,7 @@ class ContractRequestShow extends Component
             $signedContent = signatureService()->signData(
                 $dataToSign,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -208,7 +210,7 @@ class ContractRequestShow extends Component
                 return signatureService()->signBase64Data(
                     $base64Payload,
                     $validated['knedp'],
-                    $validated['keyContainerUpload'],
+                    $validated['keyContainer'],
                     $validated['password'],
                     Auth::user()->party->taxId
                 );
@@ -228,7 +230,7 @@ class ContractRequestShow extends Component
         return signatureService()->signData(
             $this->buildJsonDataToSign(),
             $validated['knedp'],
-            $validated['keyContainerUpload'],
+            $validated['keyContainer'],
             $validated['password'],
             Auth::user()->party->taxId
         );

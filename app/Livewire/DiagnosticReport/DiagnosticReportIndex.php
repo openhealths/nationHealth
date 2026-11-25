@@ -332,8 +332,10 @@ class DiagnosticReportIndex extends BasePatientComponent
         $this->showSignatureModal = true;
     }
 
-    public function cancelSelectedDiagnosticReport(): void
+    public function cancelSelectedDiagnosticReport(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if ($this->cancellingDiagnosticReportId === null) {
             Session::flash('error', __('diagnostic-reports.messages.not_found'));
 
@@ -382,7 +384,7 @@ class DiagnosticReportIndex extends BasePatientComponent
             $signedContent = signatureService()->signData(
                 $signedPayload,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -392,8 +394,6 @@ class DiagnosticReportIndex extends BasePatientComponent
 
             return;
         }
-
-        $this->form->resetSigningFields();
 
         $cancellationReason = FhirResource::make()
             ->coding('eHealth/cancellation_reasons', $validated['cancellationReason'])
@@ -546,10 +546,6 @@ class DiagnosticReportIndex extends BasePatientComponent
 
         if (isset($this->form->knedp)) {
             $this->form->knedp = '';
-        }
-
-        if (isset($this->form->password)) {
-            $this->form->password = '';
         }
 
         $this->resetErrorBag();

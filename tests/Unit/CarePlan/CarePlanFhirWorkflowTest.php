@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\CarePlan;
 
+use App\Core\BaseForm;
 use App\Livewire\CarePlan\CarePlanComponent;
 use App\Livewire\CarePlan\CarePlanShow;
 use App\Livewire\CarePlan\Concerns\CarePlanManager;
@@ -31,7 +32,11 @@ class CarePlanFhirWorkflowTest extends TestCase
             {
                 return ['actionType' => 'in:sign_plan'];
             }
-            protected function signPlan(CarePlanRepository $repository): void
+            protected function requiresDigitalSignature(): bool
+            {
+                return false;
+            }
+            protected function signPlan(CarePlanRepository $repository, array $signingData): void
             {
                 $this->signedPlan = true;
             }
@@ -40,6 +45,7 @@ class CarePlanFhirWorkflowTest extends TestCase
                 return null;
             }
         };
+        $component->form = new BaseForm($component, 'form');
         $component->carePlan = new CarePlan(['uuid' => '8d08ce22-82dd-4ac4-bdb9-432fd5aad5dd', 'status' => 'draft']);
         $component->actionType = 'sign_plan';
         $repository = Mockery::mock(CarePlanRepository::class);
@@ -55,14 +61,13 @@ class CarePlanFhirWorkflowTest extends TestCase
     {
         $component = new CarePlanShow();
         $rules = new ReflectionMethod($component, 'rulesForSigning');
+        $requiresSignature = new ReflectionMethod($component, 'requiresDigitalSignature');
         foreach (['complete', 'complete_activity'] as $action) {
             $component->actionType = $action;
-            $actual = $rules->invoke($component);
-            $this->assertSame('required|string', $actual['statusReason']);
-            $this->assertArrayNotHasKey('form.keyContainerUpload', $actual);
-            $this->assertArrayNotHasKey('form.password', $actual);
+            $this->assertSame('required|string', $rules->invoke($component)['statusReason']);
+            $this->assertFalse($requiresSignature->invoke($component));
         }
         $component->actionType = 'cancel';
-        $this->assertArrayHasKey('form.keyContainerUpload', $rules->invoke($component));
+        $this->assertTrue($requiresSignature->invoke($component));
     }
 }

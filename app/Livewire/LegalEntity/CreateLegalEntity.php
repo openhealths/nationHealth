@@ -506,8 +506,9 @@ class CreateLegalEntity extends LegalEntity
         return true;
     }
 
-    public function createLegalEntity()
+    public function createLegalEntity(string $keyContainer = '', string $password = '')
     {
+        $this->legalEntityForm->useSigningSecrets($keyContainer, $password);
         $this->stepSignificancy();
 
         // Validate All the data from the form

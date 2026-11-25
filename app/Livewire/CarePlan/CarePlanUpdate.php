@@ -19,12 +19,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
-use Livewire\WithFileUploads;
 
 class CarePlanUpdate extends CarePlanCreate
 {
-    use WithFileUploads;
-
     #[\Livewire\Attributes\Locked]
     public CarePlan $carePlan;
 
@@ -163,8 +160,10 @@ class CarePlanUpdate extends CarePlanCreate
     /**
      * Sign with KEP and send to eHealth (Update current plan).
      */
-    public function sign(CarePlanRepository $repository): void
+    public function sign(CarePlanRepository $repository, string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if (Auth::user()?->cannot('update', $this->carePlan)) {
             Session::flash('error', __('care-plan.no_permission_update'));
 
@@ -173,7 +172,7 @@ class CarePlanUpdate extends CarePlanCreate
 
         try {
             $this->synchronizeSystemFields();
-            $this->form->validate($this->form->rulesForSigning());
+            $validated = $this->form->validate($this->form->rulesForSigning());
             $this->validateCategoryForSigning();
             $repository->assertDraftSubmissionAllowed($this->carePlan);
         } catch (ValidationException $exception) {
@@ -200,9 +199,9 @@ class CarePlanUpdate extends CarePlanCreate
 
             $signedContent = signatureService()->signData(
                 $carePlanPayload,
-                $this->form->knedp,
-                $this->form->keyContainerUpload,
-                $this->form->password,
+                $validated['knedp'],
+                $validated['keyContainer'],
+                $validated['password'],
                 Auth::user()->party->taxId
             );
 

@@ -429,7 +429,7 @@ trait ManagesEncounterEPrescription
                 [
                     'password' => $validated['password'],
                     'knedp' => $validated['knedp'],
-                    'keyContainerUpload' => $validated['keyContainerUpload'],
+                    'keyContainer' => $validated['keyContainer'],
                     'medication_unit' => $this->encounterEPrescriptionForm['medication_unit'] ?? 'од.',
                     'signer_tax_id' => Auth::user()?->party?->taxId,
                 ],
@@ -441,7 +441,6 @@ trait ManagesEncounterEPrescription
             $this->actionType = null;
             $this->encounterEPrescriptionRequestIdToSign = null;
             $this->encounterEPrescriptionDraftForm = [];
-            $this->form->resetSigningFields();
 
             $message = $result['success_message']
                 ?? __('Електронний рецепт успішно створено без плану лікування.');

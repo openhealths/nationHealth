@@ -445,8 +445,10 @@ class PatientReferrals extends BasePatientComponent
         $this->showSignatureModal = true;
     }
 
-    public function sign(): void
+    public function sign(string $keyContainer = '', string $password = ''): void
     {
+        $this->form->useSigningSecrets($keyContainer, $password);
+
         if (in_array($this->actionType, ['sign_referral', 'sign_devicerequest'], true)) {
             $this->signDraft();
 
@@ -536,7 +538,7 @@ class PatientReferrals extends BasePatientComponent
             $signedContent = signatureService()->signData(
                 Arr::toSnakeCase($payload),
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -551,7 +553,6 @@ class PatientReferrals extends BasePatientComponent
             $this->actionType = null;
             $this->requestIdToSign = null;
             $this->referralExplanatoryLetter = '';
-            $this->form->resetSigningFields();
             $this->loadReferrals();
             Session::flash('success', __('care-plan.referral_recall_success'));
         } catch (EHealthValidationException $exception) {
@@ -599,7 +600,7 @@ class PatientReferrals extends BasePatientComponent
             $signedContent = signatureService()->signData(
                 Arr::toSnakeCase($payload),
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -613,7 +614,6 @@ class PatientReferrals extends BasePatientComponent
             $this->showSignatureModal = false;
             $this->actionType = null;
             $this->requestIdToSign = null;
-            $this->form->resetSigningFields();
             $this->loadReferrals();
             Session::flash('success', __('care-plan.referral_cancel_success'));
         } catch (EHealthValidationException $exception) {
@@ -690,7 +690,7 @@ class PatientReferrals extends BasePatientComponent
             $signedContent = signatureService()->signData(
                 $signPayload,
                 $validated['knedp'],
-                $validated['keyContainerUpload'],
+                $validated['keyContainer'],
                 $validated['password'],
                 Auth::user()->party->taxId
             );
@@ -716,7 +716,6 @@ class PatientReferrals extends BasePatientComponent
             $this->showSignatureModal = false;
             $this->actionType = null;
             $this->requestIdToSign = null;
-            $this->form->resetSigningFields();
             $this->loadReferrals();
             Session::flash(
                 'success',
