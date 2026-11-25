@@ -5,23 +5,18 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\EHealthDateCast;
-use Eloquence\Behaviours\HasCamelCasing;
-use Illuminate\Database\Eloquent\Model;
 
 /**
  * Locally stored application to create a care plan.
  */
-class CarePlanRequest extends Model
+class CarePlanRequest extends BaseCarePlan
 {
-    use HasCamelCasing;
-
     /**
      * Keep calendar dates in the editor format when read and store clinical selections as JSON.
      *
      * @var array<string, string>
      */
     protected $casts = [
-        'addresses' => 'array',
         'period_start' => EHealthDateCast::class,
         'period_end' => EHealthDateCast::class,
         'co_authors' => 'array',

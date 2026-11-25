@@ -11,10 +11,7 @@ use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
 use App\Models\MedicalEvents\Sql\Period;
-use App\Models\Person\Person;
-use Eloquence\Behaviours\HasCamelCasing;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -24,10 +21,10 @@ use Illuminate\Support\Str;
 use App\Repositories\Repository;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 
-class CarePlan extends Model implements SubmittedToEHealth
+/** A care plan with clinical relationships and its existing eHealth submission lifecycle. */
+class CarePlan extends BaseCarePlan implements SubmittedToEHealth
 {
     use HasFactory;
-    use HasCamelCasing;
     public const string RESOURCE_TYPE = 'care_plan';
 
     protected $fillable = [
@@ -64,10 +61,10 @@ class CarePlan extends Model implements SubmittedToEHealth
         'details_synced_at',
     ];
 
+    /** Cast plan-specific dates and supporting information. */
     protected $casts = [
         'period_start' => 'date',
         'period_end' => 'date',
-        'addresses' => 'array',
         'supporting_info' => 'array',
 
         'details_synced_at' => 'datetime',
@@ -104,19 +101,9 @@ class CarePlan extends Model implements SubmittedToEHealth
         return $this->belongsTo(CodeableConcept::class, 'status_reason_id');
     }
 
-    public function person(): BelongsTo
-    {
-        return $this->belongsTo(Person::class);
-    }
-
     public function author(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'author_id');
-    }
-
-    public function legalEntity(): BelongsTo
-    {
-        return $this->belongsTo(LegalEntity::class);
     }
 
     public function encounter(): BelongsTo

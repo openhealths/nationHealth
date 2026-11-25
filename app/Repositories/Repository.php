@@ -123,12 +123,6 @@ final class Repository
         return app(CarePlanRepository::class);
     }
 
-    /** Resolve the repository that persists local care plan requests. */
-    public static function carePlanRequest(): CarePlanRequestRepository
-    {
-        return app(CarePlanRequestRepository::class);
-    }
-
     public static function carePlanActivity(): CarePlanActivityRepository
     {
         return app(CarePlanActivityRepository::class);

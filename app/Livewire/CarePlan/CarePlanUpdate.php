@@ -4,36 +4,28 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan;
 
-use App\Classes\eHealth\EHealth;
+use App\Livewire\CarePlan\Forms\CarePlanForm;
 use App\Enums\CarePlanStatus;
+use App\Classes\eHealth\EHealth;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
-use App\Exceptions\MedicalEvents\ClinicalStorageException;
 use App\Exceptions\Signature\SignatureException;
-use App\Livewire\CarePlan\Forms\CarePlanForm;
+use App\Exceptions\EHealth\EHealthValidationException;
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
 use App\Repositories\CarePlanRepository;
 use App\Repositories\Repository;
-use App\Services\MedicalEvents\Fhir;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
-use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
-use Throwable;
 
-/**
- * Edit and submit an existing care plan draft using the shared editor form.
- */
-class CarePlanUpdate extends CarePlanFormComponent
+class CarePlanUpdate extends CarePlanCreate
 {
     use WithFileUploads;
 
-    /** Existing plan being edited by the legacy draft workflow. */
-    #[Locked]
+    #[\Livewire\Attributes\Locked]
     public CarePlan $carePlan;
 
     public function hydrate(): void
@@ -69,7 +61,7 @@ class CarePlanUpdate extends CarePlanFormComponent
 
         parent::mount($legalEntity, $this->carePlan->personId);
         $resource = $repository->getResource($this->carePlan->id);
-        $fields = Fhir::carePlan()->fromFhir($resource, ['timezone' => config('app.timezone'), 'dateFormat' => config('app.date_format')]);
+        $fields = \App\Services\MedicalEvents\Fhir::carePlan()->fromFhir($resource, ['timezone' => config('app.timezone'), 'dateFormat' => config('app.date_format')]);
         foreach ($fields as $field => $value) {
             if (property_exists($this->form, $field)) {
                 $this->form->{$field} = $value ?? '';
@@ -136,7 +128,7 @@ class CarePlanUpdate extends CarePlanFormComponent
                 'note' => $this->form->note ?: null,
                 'inform_with' => $this->form->informWith ?: null,
             ]);
-        } catch (ClinicalStorageException $exception) {
+        } catch (\App\Exceptions\MedicalEvents\ClinicalStorageException $exception) {
             Session::flash('error', $exception->getMessage());
 
             return;
@@ -203,7 +195,7 @@ class CarePlanUpdate extends CarePlanFormComponent
                 'author' => $author?->uuid,
                 'addresses' => $encounterData['addresses'],
             ]), $this->carePlan->id);
-            $carePlanResource = Fhir::carePlan()->toFhir($mapping['data'], $mapping['context']);
+            $carePlanResource = \App\Services\MedicalEvents\Fhir::carePlan()->toFhir($mapping['data'], $mapping['context']);
             $carePlanPayload = CarePlanForm::buildCreateContent($carePlanResource);
 
             $signedContent = signatureService()->signData(
@@ -241,13 +233,13 @@ class CarePlanUpdate extends CarePlanFormComponent
                 : 'Помилка від ЕСОЗ: ' . $exception->getMessage();
             Session::flash('error', $msg);
             $this->showSignatureModal = false;
-        } catch (ClinicalStorageException $exception) {
+        } catch (\App\Exceptions\MedicalEvents\ClinicalStorageException $exception) {
             Session::flash('error', $exception->getMessage());
             $this->showSignatureModal = false;
         } catch (SignatureException $exception) {
             $exception->handle('Error when signing care plan');
             $this->showSignatureModal = false;
-        } catch (Throwable $exception) {
+        } catch (\Throwable $exception) {
             Log::error('CarePlan: unexpected error: ' . $exception->getMessage(), [
                 'file' => $exception->getFile(),
                 'line' => $exception->getLine(),
@@ -256,5 +248,11 @@ class CarePlanUpdate extends CarePlanFormComponent
             Session::flash('error', __('care-plan.unexpected_error'));
             $this->showSignatureModal = false;
         }
+    }
+
+    public function render()
+    {
+        // Reuse the same view as Create
+        return view('livewire.care-plan.care-plan-create');
     }
 }

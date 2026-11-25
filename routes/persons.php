@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Livewire\CarePlan\CarePlanCreate;
+use App\Livewire\CarePlanRequest\CarePlanRequestCreate;
 use App\Livewire\ClinicalImpression\ClinicalImpressionIndex;
 use App\Livewire\ClinicalImpression\ClinicalImpressionView;
 use App\Livewire\Composition\CompositionCreate;
@@ -275,10 +276,15 @@ Route::prefix('persons')->whereNumber('person')
         });
 
         Route::prefix('{person}')->name('persons.encounters.')->group(function () {
-            Route::get('/encounters/{encounter}/care-plans/create', CarePlanCreate::class)
+            Route::get('/encounters/{encounter}/care-plans/create', CarePlanRequestCreate::class)
+                ->can('view', ['encounter', 'person'])
                 ->can('create', CarePlan::class)
                 ->whereNumber('encounter')
                 ->name('care-plans.create');
+            Route::get('/encounters/{encounter}/care-plans/create-and-sign', CarePlanCreate::class)
+                ->can('create', CarePlan::class)
+                ->whereNumber('encounter')
+                ->name('care-plans.create-and-sign');
             Route::get('/encounters/{encounter}/eprescriptions/create', EncounterEPrescriptionCreate::class)
                 ->can('createMedicationRequest', ['encounter', 'person', 'legalEntity'])
                 ->whereNumber('encounter')
