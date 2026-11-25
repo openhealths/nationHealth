@@ -215,6 +215,7 @@
                         bindValue="uuid"
                         bindParam="name"
                         :label="__('episodes.plural')"
+                        allow-custom
                     />
 
                     <x-forms.combobox
@@ -223,6 +224,7 @@
                         bindValue="uuid"
                         bindParam="name"
                         :label="__('encounters.label')"
+                        allow-custom
                     />
                 </div>
 
@@ -233,6 +235,7 @@
                         bindValue="uuid"
                         bindParam="displayValue"
                         :label="__('diagnostic-reports.label')"
+                        allow-custom
                     />
 
                     <x-forms.combobox
@@ -241,6 +244,7 @@
                         bindValue="uuid"
                         bindParam="name"
                         :label="__('devices.plural')"
+                        allow-custom
                     />
 
                     <x-forms.combobox
@@ -249,6 +253,7 @@
                         bindValue="uuid"
                         bindParam="name"
                         :label="__('observations.specimen')"
+                        allow-custom
                     />
                 </div>
             </div>
