@@ -92,10 +92,6 @@ class EncounterPackageComponent extends Component
 
     public DetectedIssueForm $detectedIssueForm;
 
-    public bool $showSignatureModal = false;
-
-    public ?string $actionType = null;
-
     /**
      * Person ID (set when the patient is a person).
      *
@@ -1104,13 +1100,13 @@ class EncounterPackageComponent extends Component
      */
     public function updatedFormEpisodeId(?string $episodeId): void
     {
-        $keptIndexes = array_flip(array_keys(array_filter(
+        $keptConditions = array_filter(
             $this->conditionForm->conditions,
             static fn (array $condition): bool => !($condition['fromEpisode'] ?? false)
-        )));
+        );
 
-        $this->conditionForm->conditions = array_values(array_intersect_key($this->conditionForm->conditions, $keptIndexes));
-        $this->form->encounter['diagnoses'] = array_values(array_intersect_key($this->form->encounter['diagnoses'], $keptIndexes));
+        $this->conditionForm->conditions = array_values($keptConditions);
+        $this->form->encounter['diagnoses'] = array_values(array_intersect_key($this->form->encounter['diagnoses'], $keptConditions));
         $this->episodePrimaryDiagnosisCode = '';
 
         if (empty($episodeId)) {
@@ -1553,7 +1549,7 @@ class EncounterPackageComponent extends Component
             ])
             ->toArray();
 
-        $this->adjustDictionary('eHealth/encounter_types', array_merge(...array_values($this->encounterClassTypes)));
+        $this->adjustDictionary('eHealth/encounter_types', Arr::flatten($this->encounterClassTypes));
 
         $selectedClassTypes = $this->encounterClassTypes[$this->form->encounter['classCode'] ?? ''] ?? [];
 
@@ -1664,7 +1660,7 @@ class EncounterPackageComponent extends Component
             ->asCodeDescription()
             ->all();
 
-        $items = collect($deviceDispenses)
+        return collect($deviceDispenses)
             ->flatMap(static fn (array $dispense): array => $dispense['details'] ?? [])
             ->map(static function (array $detail) use ($definitions, $typeNames, $unitNames): string {
                 $modelId = data_get($detail, 'device.identifier.value');
@@ -1682,8 +1678,6 @@ class EncounterPackageComponent extends Component
             })
             ->values()
             ->all();
-
-        return $items;
     }
 
     /**

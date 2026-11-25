@@ -35,6 +35,10 @@ class EncounterPackageCreate extends EncounterPackageComponent
 
     public ?int $prepersonId = null;
 
+    public bool $showSignatureModal = false;
+
+    public ?string $actionType = null;
+
     public function boot(): void
     {
         parent::boot();
