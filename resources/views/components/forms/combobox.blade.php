@@ -62,6 +62,11 @@
         and set no requirement if combobox has been hidden
         Example: isRequired=false (default)
 
+    - allowCustom (boolean, optional):
+        Allow adding a typed identifier to the bound value without a local option.
+        The dropdown still supports selecting local records by label or identifier.
+        Example: allow-custom
+
     Example usage:
         <x-forms.combobox
             :options="$legalEntities"
@@ -86,7 +91,8 @@
     'bindParam' => '',
     'label' => '',
     'limit' => 50,
-    'isRequired' => false
+    'isRequired' => false,
+    'allowCustom' => false
 ])
 
 @php
@@ -103,7 +109,8 @@
          modelKey: '{{ $modelKey }}',
          value: '{{ $bindValue }}',
          param: '{{ $bindParam }}',
-         limit: {{ (int) $limit }}
+         limit: {{ (int) $limit }},
+         allowCustom: @js((bool) $allowCustom)
      })"
      @reset-comboboxes.window="reset()"
 >
@@ -118,6 +125,9 @@
            class="input {{ $hasSearchError  ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
            @focus="open = true"
            @input="typing = true; value = ''"
+           @if ($allowCustom)
+               @keydown.enter.prevent="addCustomValue()"
+           @endif
            @mousedown="open = !open"
            @keydown.escape.window="open = false;"
            @blur="typing = false; setTimeout(() => open = false, 100)"
@@ -133,6 +143,20 @@
         :id="$id('listbox')"
         class="py-2 text-sm text-gray-700 dark:text-gray-200 absolute z-50 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-400 dark:border-gray-600 rounded shadow max-h-60 overflow-auto"
     >
+        @if ($allowCustom)
+            <li class="px-4 py-2">
+                <button
+                    type="button"
+                    @mousedown.prevent
+                    @click="addCustomValue()"
+                    :disabled="! search.trim()"
+                    class="button-primary px-4! py-2! text-xs!"
+                >
+                    {{ __('forms.add_to_search') }}
+                </button>
+            </li>
+        @endif
+
         <template x-if="filtered.length > 0">
             <template x-for="option in filtered" :key="option.index">
                 <li @mousedown.prevent="select(option.label, option.index)"
@@ -164,7 +188,7 @@
 
 @push('scripts')
     <script>
-        function combobox({ options, entangled, model, modelKey, value, param, limit }) {
+        function combobox({ options, entangled, model, modelKey, value, param, limit, allowCustom = false }) {
             const usesModel = model !== null && model !== undefined;
 
             return {
@@ -177,6 +201,7 @@
                 valueName: value,
                 param: param,
                 limit: limit,
+                allowCustom: allowCustom,
                 open: false,
                 typing: false,
 
@@ -186,6 +211,8 @@
 
                         if (selected) {
                             this.search = selected[this.param];
+                        } else if (this.allowCustom) {
+                            this.search = this.value;
                         }
                     }
 
@@ -207,9 +234,15 @@
 
                     const matches = this.options
                         .map((option, index) => ({ label: option[this.param], index }))
-                        .filter((item) => this.options[item.index][this.param].toLowerCase().includes(this.search.toLowerCase()));
+                        .filter((item) => {
+                            const option = this.options[item.index];
+                            const search = this.allowCustom ? this.search.trim().toLowerCase() : this.search.toLowerCase();
 
-                    if (matches.length === 0) {
+                            return String(option[this.param] ?? '').toLowerCase().includes(search)
+                                || (this.allowCustom && String(option[this.valueName] ?? '').toLowerCase().includes(search));
+                        });
+
+                    if (matches.length === 0 && !this.allowCustom) {
                         this.value = '';
                     }
 
@@ -219,6 +252,23 @@
                 select(label, index) {
                     this.search = label;
                     this.value = this.options.find((option, currentIndex) => currentIndex === index && option[this.param] === label)[this.valueName];
+                    this.open = false;
+                    this.typing = false;
+                },
+
+                addCustomValue() {
+                    const value = this.search.trim();
+
+                    if (!this.allowCustom || !value) {
+                        return;
+                    }
+
+                    const selected = this.options.find((option) =>
+                        String(option[this.valueName] ?? '').toLowerCase() === value.toLowerCase()
+                    );
+
+                    this.value = selected ? selected[this.valueName] : value;
+                    this.search = selected ? selected[this.param] : value;
                     this.open = false;
                     this.typing = false;
                 },
