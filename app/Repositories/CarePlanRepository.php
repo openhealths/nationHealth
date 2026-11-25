@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Models\CarePlanRequest;
 use App\Repositories\Repository;
 use App\Enums\CarePlanStatusFilter;
 use App\Enums\CarePlanCompletenessFilter;
@@ -17,6 +18,7 @@ use App\Enums\CarePlanStatus;
 use App\Models\CarePlan;
 use App\Repositories\MedicalEvents\Repository as MedicalEventsRepository;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use App\Models\Employee\Employee;
 use App\Enums\Person\EncounterStatus;
@@ -65,6 +67,32 @@ class CarePlanRepository extends MedicalEventsBaseRepository
     private function uiRelations(): array
     {
         return [...self::FHIR_RELATIONS, 'person.names', 'author.party', 'encounter.episode', 'encounter.diagnoses.condition.type.coding', 'approvals.grantedTo.type.coding', ...array_map(static fn (string $relation): string => 'activities.'.$relation, CarePlanActivityRepository::FHIR_RELATIONS), 'activities.author.party'];
+    }
+
+    /**
+     * Insert a mapped local request before any eHealth submission.
+     *
+     * @param  CarePlanRequest  $createPlanRequest  Request prepared by the component with its UUID and ownership.
+     * @return CarePlanRequest The local row, including the original row on a repeat submission.
+     */
+    public function createRequest(CarePlanRequest $createPlanRequest): CarePlanRequest
+    {
+        $createPlanRequest->version = 1;
+
+        try {
+            $createPlanRequest->saveOrFail();
+        } catch (UniqueConstraintViolationException $exception) {
+            // A second click can arrive before the first request returns its saved ID.
+            return CarePlanRequest::query()
+                ->whereUuid($createPlanRequest->uuid)
+                ->whereUserId($createPlanRequest->userId)
+                ->whereLegalEntityId($createPlanRequest->legalEntityId)
+                ->wherePersonId($createPlanRequest->personId)
+                ->whereEncounter($createPlanRequest->encounter)
+                ->first() ?? throw $exception;
+        }
+
+        return $createPlanRequest;
     }
 
     public function formContext(array $form, ?int $localId = null): array

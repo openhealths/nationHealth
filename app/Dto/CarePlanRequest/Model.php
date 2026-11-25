@@ -7,7 +7,6 @@ namespace App\Dto\CarePlanRequest;
 use App\Livewire\CarePlan\Forms\CarePlanForm;
 use App\Models\CarePlanRequest;
 use Symfony\Component\ObjectMapper\Attribute\Map;
-use Symfony\Component\ObjectMapper\Condition\SourceClass;
 use Symfony\Component\ObjectMapper\Condition\TargetClass;
 
 /**
@@ -40,19 +39,19 @@ class Model
     public string $periodEnd = '';
 
     /** Local start time in hours and minutes. */
-    #[Map]
+    #[Map(if: new TargetClass(CarePlanRequest::class))]
     public string $periodStartTime = '';
 
     /** Optional local end time in hours and minutes. */
-    #[Map]
+    #[Map(if: new TargetClass(CarePlanRequest::class))]
     public string $periodEndTime = '';
 
     /** eHealth UUID of the selected encounter. */
     #[Map]
     public string $encounter;
 
-    /** Free-text clinical context. */
-    #[Map]
+    /** Optional encounter context code reserved for the extended editor. */
+    #[Map(if: new TargetClass(CarePlanRequest::class))]
     public string $context = '';
 
     /** Free-text treatment description. */
@@ -64,7 +63,7 @@ class Model
     public string $note = '';
 
     /** Selected patient notification method identifier, if supplied. */
-    #[Map]
+    #[Map(if: new TargetClass(CarePlanRequest::class))]
     public string $informWith = '';
 
     /**
@@ -72,16 +71,15 @@ class Model
      *
      * @var list<string>
      */
-    #[Map(if: new SourceClass(CarePlanForm::class), transform: [self::class, 'selectedCoAuthors'])]
     #[Map(if: new TargetClass(CarePlanRequest::class))]
     public array $coAuthors = [];
 
     /**
-     * Supporting episodes with the labels shown in the editor.
+     * Supporting episodes derived from the current encounter.
      *
      * @var list<array{uuid?: string|null, name?: string|null, date?: string|null}>
      */
-    #[Map]
+    #[Map(if: new TargetClass(CarePlanRequest::class))]
     public array $episodes = [];
 
     /**
@@ -89,7 +87,7 @@ class Model
      *
      * @var list<array{uuid?: string|null, name?: string|null, date?: string|null}>
      */
-    #[Map]
+    #[Map(if: new TargetClass(CarePlanRequest::class))]
     public array $medicalRecords = [];
 
     /** eHealth UUID of the employee selected by the facility and terms of service. */
@@ -107,15 +105,4 @@ class Model
      */
     #[Map(if: new TargetClass(CarePlanRequest::class))]
     public array $addresses = [];
-
-    /**
-     * Keep the selected UUIDs from the form and discard empty co-author rows.
-     *
-     * @param  list<string|null>  $coAuthors
-     * @return list<string>
-     */
-    public static function selectedCoAuthors(array $coAuthors): array
-    {
-        return array_values(array_filter($coAuthors));
-    }
 }
