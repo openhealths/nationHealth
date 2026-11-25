@@ -6,7 +6,6 @@ namespace App\Livewire\Declaration;
 
 use Throwable;
 use Exception;
-use App\Core\Arr;
 use App\Models\User;
 use Livewire\Component;
 use App\Enums\User\Role;
@@ -47,6 +46,8 @@ use App\Enums\Declaration\ReorganizedStatus;
 use Illuminate\Pagination\LengthAwarePaginator;
 use App\Notifications\DeclarationSyncCompleted;
 use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Dto\DeclarationRequest\Ehealth as EhealthData;
+use App\Dto\DeclarationRequest\Model as DeclarationRequestData;
 
 class DeclarationIndex extends Component
 {
@@ -567,11 +568,9 @@ class DeclarationIndex extends Component
         }
 
         try {
-            $response = EHealth::declaration()->getMany(query: $query, groupByEntities: true);
+            $response = EHealth::declaration()->getMany(query: $query);
 
-            $declarations = $response->validate();
-
-            Repository::declaration()->storeMany($declarations);
+            Repository::declaration()->sync($response->validate(), $legalEntity);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error while syncing declaration requests');
 
@@ -771,16 +770,18 @@ class DeclarationIndex extends Component
 
         $reorganizedPerson = Person::find($reorganizedDeclaration->personId);
 
-        $resignRequestData = [
-            'person_id' => $reorganizedPerson->uuid,
-            'employee_id' => $currentEmployee->uuid,
-            'division_id' => $currentEmployee->division->uuid,
-            'authorize_with' => $reorganizedDeclaration->authorizeWith,
-            'parent_declaration_id' => $reorganizedDeclaration->declarationUuid
-        ];
+        $resignRequestData = DeclarationRequestData::fromReorganization(
+            $reorganizedDeclaration,
+            $reorganizedPerson,
+            $currentEmployee
+        );
 
         try {
-            $response = EHealth::declarationRequest()->create(removeEmptyKeys(Arr::toSnakeCase($resignRequestData)));
+            $payload = objectMapper()
+                ->map($resignRequestData, EhealthData::class)
+                ->toArray();
+
+            $response = EHealth::declarationRequest()->create($payload);
 
             $responseData = $response->validate();
 
@@ -789,7 +790,7 @@ class DeclarationIndex extends Component
             try {
                 $declarationRequest = DB::transaction(function () use ($resignRequestData, $responseData) {
                     $declarationRequest = Repository::declarationRequest()
-                        ->store(array_merge($resignRequestData, ['status' => EntityStatus::DRAFT->value]));
+                        ->store($resignRequestData);
 
                     Repository::declarationRequest()->update($declarationRequest->id, $responseData);
                     Repository::declarationRequest()->cancelPendingRequests($declarationRequest->personId, $declarationRequest->id);

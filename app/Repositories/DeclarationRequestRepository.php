@@ -19,6 +19,7 @@ use App\Models\Relations\AuthenticationMethod;
 use App\Models\Relations\Document;
 use App\Models\Relations\Party;
 use App\Models\Relations\Phone;
+use App\Dto\DeclarationRequest\Model as DeclarationRequestData;
 use BackedEnum;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -29,17 +30,19 @@ use Throwable;
 class DeclarationRequestRepository
 {
     /**
-     * Store data during first request or local saving.
+     * Store declaration request data during creation or local saving.
      *
-     * @param  array  $validatedData
-     * @return DeclarationRequest
+     * @throws Throwable
      */
-    public function store(array $validatedData): DeclarationRequest
+    public function store(DeclarationRequestData $data): DeclarationRequest
     {
-        $validatedData['legal_entity_id'] = legalEntity()->id;
-        $validatedData = $this->mapUuidsToIds($validatedData);
+        $declarationRequest = objectMapper()->map($data, DeclarationRequest::class);
 
-        return DeclarationRequest::create($validatedData);
+        $this->setRelationshipIds($data, $declarationRequest);
+
+        $declarationRequest->saveOrFail();
+
+        return $declarationRequest;
     }
 
     /**
@@ -488,6 +491,25 @@ class DeclarationRequestRepository
         }
 
         return $changed;
+    }
+
+    /**
+     * Resolve declaration request relationship UUIDs to local database IDs.
+     */
+    private function setRelationshipIds(DeclarationRequestData $data, DeclarationRequest $declarationRequest): void {
+        $declarationRequest->legalEntityId = legalEntity()->id;
+
+        $declarationRequest->employeeId = Employee::whereUuid($data->employeeId)
+            ->pluck('id')
+            ->firstOrFail();
+
+        $declarationRequest->personId = Person::whereUuid($data->personId)
+            ->value('id');
+
+        if (!empty($data->divisionId)) {
+            $declarationRequest->divisionId = Division::whereUuid($data->divisionId)
+                ->value('id');
+        }
     }
 
     /**

@@ -10,6 +10,7 @@ use App\Models\LegalEntity;
 use App\Models\Person\Person;
 use App\Repositories\Repository;
 use App\Enums\Declaration\RequestStatus;
+use App\Dto\DeclarationRequest\Model as DeclarationRequestData;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 
@@ -29,7 +30,7 @@ class DeclarationCreate extends DeclarationComponent
         $this->setDivisionId();
 
         try {
-            $validated = $this->form->validate($this->form->rulesForCreating());
+            $this->form->validate($this->form->rulesForCreating());
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -38,9 +39,7 @@ class DeclarationCreate extends DeclarationComponent
         }
 
         try {
-            $validated['status'] = RequestStatus::DRAFT->value;
-
-            Repository::declarationRequest()->store(Arr::toSnakeCase($validated));
+            Repository::declarationRequest()->store(objectMapper()->map($this->form, DeclarationRequestData::class));
 
             $this->redirectRoute('declaration.index', [legalEntity()], navigate: true);
         } catch (Exception $exception) {

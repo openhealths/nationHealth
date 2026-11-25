@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
-use App\Core\Arr;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\DeclarationErrorTranslator;
+use App\Classes\eHealth\Api\Responses\Collections\DeclarationGet;
+use App\Classes\eHealth\Api\Responses\Collections\DeclarationGetMany;
 use App\Contracts\ApiErrorTranslator;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -21,11 +22,6 @@ class Declaration extends Request
     protected const string URL = '/api/declarations';
 
     /**
-     * If true, groups the response by entities associated with the declaration, e.g., Declaration itself, DeclarationRequest, Persons, etc.
-     */
-    public bool $groupByEntities = false;
-
-    /**
      * Get shortened details about declarations.
      *
      * @param  array{
@@ -37,24 +33,20 @@ class Declaration extends Request
      *     page?: int,
      *     page_size?: int
      * }  $query
-     * @param  bool  $groupByEntities
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
-    public function getMany($query = null, bool $groupByEntities = false): PromiseInterface|EHealthResponse
-    {
+    public function getMany(array $query = []): PromiseInterface|EHealthResponse {
         $this->setValidator($this->validateMany(...));
-
-        $this->groupByEntities = $groupByEntities;
 
         $this->setDefaultPageSize();
 
         $mergedQuery = array_merge(
             $this->options['query'] ?? [],
-            $query ?? []
+            $query
         );
 
-        return $this->get(self::URL, $mergedQuery);
+        return parent::get(self::URL, $mergedQuery);
     }
 
     /**
@@ -65,11 +57,10 @@ class Declaration extends Request
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      */
-    public function getDeclarationById(string $uuid, $query = null): PromiseInterface|EHealthResponse
-    {
+    public function get(string $uuid, $query = null): PromiseInterface|EHealthResponse {
         $this->setValidator($this->validateOne(...));
 
-        return $this->get(self::URL . "/$uuid", $query);
+        return parent::get(self::URL . "/$uuid", $query);
     }
 
     /**
@@ -86,49 +77,44 @@ class Declaration extends Request
      * Validates the response for a list of declarations
      *
      * @param  EHealthResponse  $response  The response from the eHealth API
-     * @return array The validated and transformed data.
+     * @return DeclarationGetMany The validated and transformed data.
      */
-    protected function validateMany(EHealthResponse $response): array
+    protected function validateMany(EHealthResponse $response): DeclarationGetMany
     {
-        $transformedData = [];
-        foreach ($response->getData() as $item) {
-            $transformedData[] = self::replaceEHealthPropNames($item);
-        }
-
-        $validator = Validator::make($transformedData, [
+        $validator = Validator::make($response->getData(), [
             '*' => 'required|array',
             '*.declaration_number' => 'required|string',
-            '*.declaration_request_uuid' => 'required|uuid',
+            '*.declaration_request_id' => 'required|uuid',
 
             '*.division' => 'nullable|array',
-            '*.division.uuid' => 'nullable|uuid',
+            '*.division.id' => 'nullable|uuid',
             '*.division.name' => 'nullable|string',
 
             '*.employee' => 'required|array',
             '*.employee.employee_type' => 'required|string',
-            '*.employee.uuid' => 'required|uuid',
+            '*.employee.id' => 'required|uuid',
             '*.employee.position' => 'required|string',
 
-            "*.end_date" => 'required|date',
-            '*.uuid' => 'required|uuid',
-            "*.inserted_at" => 'required|date',
+            '*.end_date' => 'required|date',
+            '*.id' => 'required|uuid',
+            '*.inserted_at' => 'required|date',
 
             '*.legal_entity' => 'required|array',
             '*.legal_entity.edrpou' => 'required|string',
-            '*.legal_entity.uuid' => 'required|uuid',
+            '*.legal_entity.id' => 'required|uuid',
             '*.legal_entity.name' => 'required|string',
             '*.legal_entity.short_name' => 'nullable|string',
 
             '*.person' => 'sometimes|array',
             '*.person.birth_date' => 'nullable|date_format:Y-m-d',
             '*.person.first_name' => 'required|string',
-            '*.person.uuid' => 'required|uuid',
+            '*.person.id' => 'required|uuid',
             '*.person.last_name' => 'nullable|string',
             '*.person.second_name' => 'nullable|string',
             '*.person.verification_status' => 'required|string',
 
-            "*.reason" => 'nullable|string',
-            "*.reason_description" => 'nullable|string',
+            '*.reason' => 'nullable|string',
+            '*.reason_description' => 'nullable|string',
             '*.start_date' => 'required|date',
             '*.status' => 'required|string',
             '*.updated_at' => 'required|date'
@@ -136,56 +122,41 @@ class Declaration extends Request
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error(
-                'EHealth Employee validation failed: ' . implode(', ', $validator->errors()->all())
+                'EHealth Declaration validation failed: ' . implode(', ', $validator->errors()->all())
             );
         }
 
-        $validated = $validator->validated();
-
-        if (!$this->groupByEntities) {
-            return $validated;
-        }
-
-        $declarationRequestsUuids = Arr::pluck($validated, 'declaration_request_uuid');
-        $personUuids = array_unique(Arr::pluck($validated, 'person.uuid'));
-
-        return [
-            'declarations' => $validated,
-            'declarationRequestUuids' => $declarationRequestsUuids,
-            'personUuids' => $personUuids
-        ];
+        return new DeclarationGetMany($validator->validated());
     }
 
     /**
      * Validates the response for a single declaration
      *
      * @param  EHealthResponse  $response  The response from the eHealth API
-     * @return array The validated and transformed data.
+     * @return DeclarationGet The validated data.
      */
-    protected function validateOne(EHealthResponse $response): array
+    protected function validateOne(EHealthResponse $response): DeclarationGet
     {
-        $transformedData = self::replaceEHealthPropNames($response->getData());
-
-        $validator = Validator::make($transformedData, [
+        $validator = Validator::make($response->getData(), [
             'declaration_number' => 'required|string',
-            'declaration_request_uuid' => 'required|uuid',
+            'declaration_request_id' => 'required|uuid',
 
             'division' => 'nullable|array',
-            'division.uuid' => 'nullable|uuid',
+            'division.id' => 'nullable|uuid',
             'division.name' => 'nullable|string',
 
             'employee' => 'required|array',
             'employee.employee_type' => 'required|string',
-            'employee.uuid' => 'required|uuid',
+            'employee.id' => 'required|uuid',
             'employee.position' => 'required|string',
 
-            "end_date" => 'required|date',
-            'uuid' => 'required|uuid',
-            "inserted_at" => 'required|date',
+            'end_date' => 'required|date',
+            'id' => 'required|uuid',
+            'inserted_at' => 'required|date',
 
             'legal_entity' => 'required|array',
             'legal_entity.edrpou' => 'required|string',
-            'legal_entity.uuid' => 'required|uuid',
+            'legal_entity.id' => 'required|uuid',
             'legal_entity.name' => 'required|string',
             'legal_entity.short_name' => 'nullable|string',
 
@@ -193,6 +164,10 @@ class Declaration extends Request
             'person.birth_country' => 'required|string',
             'person.birth_date' => 'nullable|date_format:Y-m-d',
             'person.birth_settlement' => 'required|string',
+            'person.first_name' => 'required|string',
+            'person.gender' => 'required|string',
+            'person.id' => 'required|uuid',
+            'person.last_name' => 'nullable|string',
 
             'person.confidant_person' => 'nullable|array',
             'person.confidant_person.*.relation_type' => 'nullable|string',
@@ -232,10 +207,6 @@ class Declaration extends Request
             'person.emergency_contact.phones.*.type' => 'required_with:person.emergency_contact.phones|string',
             'person.emergency_contact.phones.*.number' => 'required_with:person.emergency_contact.phones|string',
 
-            'person.first_name' => 'required|string',
-            'person.gender' => 'required|string',
-            'person.uuid' => 'required|uuid',
-            'person.last_name' => 'nullable|string',
             'person.tax_id' => 'nullable|string',
             'person.phones' => 'nullable|array',
             'person.phones.*.type' => 'required_with:person.phones|string',
@@ -254,63 +225,13 @@ class Declaration extends Request
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error(
-                'EHealth Employee validation failed: ' . implode(', ', $validator->errors()->all())
+                'EHealth Declaration validation failed: ' . implode(', ', $validator->errors()->all())
             );
         }
 
-        return $validator->validated();
-    }
-
-    /**
-     * Replaces eHealth property names with the ones used in the application (e.g., id -> uuid).
-     *
-     * @param  array  $properties  Raw properties from a single API item.
-     * @return array Properties with application-friendly names.
-     */
-    protected static function replaceEHealthPropNames(array $properties): array
-    {
-        $replaced = [];
-
-        foreach ($properties as $name => $value) {
-            switch ($name) {
-                case 'id':
-                    $replaced['uuid'] = $value;
-                    break;
-                case 'declaration_request_id':
-                    $replaced['declaration_request_uuid'] = $value;
-                    break;
-                case 'division':
-                    if (\is_array($value) && \array_key_exists('id', $value)) {
-                        $value['uuid'] = $value['id'];
-                        unset($value['id']);
-                    }
-                    $replaced['division'] = $value;
-                    break;
-                case 'employee':
-                    if (is_array($value)) {
-                        $value['uuid'] = $value['id'];
-                        unset($value['id']);
-                    }
-                    $replaced['employee'] = $value;
-                    break;
-                case 'legal_entity':
-                    if (is_array($value)) {
-                        $value['uuid'] = $value['id'];
-                        unset($value['id']);
-                    }
-                    $replaced['legal_entity'] = $value;
-                    break;
-                case 'person':
-                    $value['uuid'] = $value['id'];
-                    unset($value['id']);
-                    $replaced['person'] = $value;
-                    break;
-                default:
-                    $replaced[$name] = $value;
-                    break;
-            }
-        }
-
-        return $replaced;
+        return new DeclarationGet([
+            ...$validator->validated(),
+            'authentication_method_current' => $response->getUrgent()['authentication_method_current'] ?? null,
+        ]);
     }
 }

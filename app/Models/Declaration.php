@@ -70,6 +70,17 @@ class Declaration extends Model
     }
 
     /**
+     * Filter declarations by declaration request assignment.
+     */
+    #[Scope]
+    protected function forRequestAssignment(Builder $query, DeclarationRequest $request): Builder {
+        return $query
+            ->wherePersonId($request->personId)
+            ->whereDivisionId($request->divisionId)
+            ->whereEmployeeId($request->employeeId);
+    }
+
+    /**
      * Active declarations of the patient with one of the user's employees in the legal entity, which open all
      * the patient's data. A preperson never has a declaration.
      *

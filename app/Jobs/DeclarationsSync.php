@@ -42,7 +42,9 @@ class DeclarationsSync extends EHealthJob
                 ->firstOrFail()->uuid;
         }
 
-        return EHealth::declaration()->withToken($token)->getMany(query: $query, groupByEntities: true);
+        return EHealth::declaration()
+            ->withToken($token)
+            ->getMany(query: $query);
     }
 
     /**
@@ -51,11 +53,14 @@ class DeclarationsSync extends EHealthJob
      * @param  EHealthResponse|null  $response
      * @throws \Throwable
      */
-    protected function processResponse(?EHealthResponse $response): void
-    {
-        $declarations = $response->validate();
+    protected function processResponse(?EHealthResponse $response): void {
+        $declarations = $response?->validate();
 
-        Repository::declaration()->storeMany($declarations, $this->legalEntity);
+        if ($declarations === null || $declarations->isEmpty()) {
+            return;
+        }
+
+        Repository::declaration()->sync($declarations, $this->legalEntity);
     }
 
     /**
