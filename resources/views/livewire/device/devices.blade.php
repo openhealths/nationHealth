@@ -136,6 +136,7 @@
                         bind="filterEncounterId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('encounters.plural')"
                     />
 
@@ -144,6 +145,7 @@
                         bind="filterEpisodeId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('episodes.plural')"
                     />
 
@@ -152,6 +154,7 @@
                         bind="filterRecorder"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('devices.recorder')"
                     />
                 </div>
@@ -262,6 +265,7 @@
                         bind="filterRecorderLegalEntityId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('devices.recorder_legal_entity_id')"
                     />
                 </div>

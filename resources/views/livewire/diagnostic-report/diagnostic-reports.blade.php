@@ -74,6 +74,7 @@
                     bind="filterCode"
                     bindValue="id"
                     bindParam="name"
+                    allow-custom
                     :label="__('diagnostic-reports.code')"
                 />
             </div>
@@ -194,6 +195,7 @@
                         bind="filterSpecimenId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('diagnostic-reports.specimen_id')"
                     />
 
@@ -202,6 +204,7 @@
                         bind="filterBasedOn"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('diagnostic-reports.based_on')"
                     />
                 </div>
@@ -216,6 +219,7 @@
                         bind="filterContextEpisodeId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('diagnostic-reports.context_episode_id')"
                     />
 
@@ -224,6 +228,7 @@
                         bind="filterOriginEpisodeId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('diagnostic-reports.origin_episode_id')"
                     />
 
@@ -232,6 +237,7 @@
                         bind="filterEncounterId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('diagnostic-reports.encounter_id')"
                     />
                 </div>
@@ -242,6 +248,7 @@
                         bind="filterManagingOrganizationId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('diagnostic-reports.managing_organization_id')"
                     />
                 </div>

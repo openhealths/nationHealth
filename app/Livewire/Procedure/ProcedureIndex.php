@@ -62,9 +62,9 @@ class ProcedureIndex extends BasePatientComponent
 
     public array $basedOnRequests = [];
 
-    public array $services = [];
+    protected array $services = [];
 
-    public array $serviceCodes = [];
+    protected array $serviceCodes = [];
 
     public array $encounters = [];
 
@@ -183,6 +183,7 @@ class ProcedureIndex extends BasePatientComponent
             'isSearching'
         ]);
 
+        $this->resetValidation();
         $this->resetPage();
     }
 
@@ -571,8 +572,6 @@ class ProcedureIndex extends BasePatientComponent
      */
     private function loadFilterOptions(): void
     {
-        $this->getServices();
-
         $this->episodes = Repository::episode()->getByPersonId($this->patient());
         $this->originEpisodes = $this->episodes;
 
@@ -733,6 +732,12 @@ class ProcedureIndex extends BasePatientComponent
 
     public function render(): View
     {
-        return view('livewire.procedure.procedures');
+        // Keep the service dictionary out of Livewire's serialized request payload.
+        $this->getServices();
+
+        return view('livewire.procedure.procedures', [
+            'services' => $this->services,
+            'serviceCodes' => $this->serviceCodes
+        ]);
     }
 }

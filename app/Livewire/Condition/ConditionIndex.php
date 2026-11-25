@@ -224,6 +224,7 @@ class ConditionIndex extends BasePatientComponent
             'isSearching'
         ]);
 
+        $this->resetValidation();
         $this->resetPage();
     }
 
@@ -361,8 +362,8 @@ class ConditionIndex extends BasePatientComponent
                 'string',
                 new InDictionary(['eHealth/ICPC2/condition_codes', 'eHealth/ICD10_AM/condition_codes'])
             ],
-            'filterEncounterId' => ['nullable', 'string', 'max:255'],
-            'filterEpisodeId' => ['nullable', 'string', 'max:255'],
+            'filterEncounterId' => ['nullable', 'uuid'],
+            'filterEpisodeId' => ['nullable', 'uuid'],
             'filterOnsetDateFrom' => ['nullable', 'date_format:' . config('app.date_format')],
             'filterOnsetDateTo' => ['nullable', 'date_format:' . config('app.date_format')]
         ];

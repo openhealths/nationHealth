@@ -217,6 +217,7 @@ class ImmunizationIndex extends BasePatientComponent
             'isSearching'
         ]);
 
+        $this->resetValidation();
         $this->resetPage();
     }
 
