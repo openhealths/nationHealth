@@ -62,6 +62,32 @@ class CarePlanForm extends Form
     }
 
     /**
+     * Validate the local editor fields and the reference descriptors saved with the request.
+     *
+     * @return array<string, string>
+     */
+    public function rulesForLocalRequest(): array
+    {
+        return [
+            ...$this->rules(),
+            'periodStartTime' => 'nullable|date_format:H:i',
+            'periodEndTime' => 'nullable|date_format:H:i',
+            'coAuthors' => 'array|list',
+            'coAuthors.*' => 'nullable|uuid',
+            'episodes' => 'array|list',
+            'episodes.*' => 'array:uuid,name,date',
+            'episodes.*.uuid' => 'nullable|uuid',
+            'episodes.*.name' => 'nullable|string',
+            'episodes.*.date' => 'nullable|string',
+            'medicalRecords' => 'array|list',
+            'medicalRecords.*' => 'array:uuid,name,date',
+            'medicalRecords.*.uuid' => 'nullable|uuid',
+            'medicalRecords.*.name' => 'nullable|string',
+            'medicalRecords.*.date' => 'nullable|string',
+        ];
+    }
+
+    /**
      * Validation rules for signing.
      */
     public function rulesForSigning(): array
