@@ -8,6 +8,7 @@ use App\Dto\Coding\Ehealth as CodingEhealth;
 use App\Dto\EhealthMapping;
 use App\Dto\Identifier\Ehealth as IdentifierEhealth;
 use App\Dto\Transform\Ehealth\Reference;
+use App\Dto\Transform\LocalDateTime;
 use App\Enums\Episode\Status;
 use App\Enums\ResourceType;
 use App\Livewire\Episode\Forms\EpisodeForm;
@@ -66,6 +67,6 @@ class Ehealth
      */
     public static function period(string $startDate, EpisodeForm $form): array
     {
-        return ['start' => convertToEHealthISO8601("$startDate $form->startTime")];
+        return ['start' => LocalDateTime::toUtc($startDate, $form->startTime)];
     }
 }

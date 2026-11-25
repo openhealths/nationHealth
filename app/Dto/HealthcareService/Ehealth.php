@@ -21,14 +21,14 @@ class Ehealth
 
     public ?string $divisionId = null;
 
-    #[Map(source: 'category', transform: [CodeableConceptEhealth::class, 'map'])]
+    #[Map(source: 'categoryCode', transform: [self::class, 'category'])]
     public CodeableConceptEhealth $category;
 
     public ?string $specialityType = null;
 
     public ?string $providingCondition = null;
 
-    #[Map(source: 'type', transform: [CodeableConceptEhealth::class, 'map'])]
+    #[Map(source: 'typeCode', transform: [self::class, 'type'])]
     public ?CodeableConceptEhealth $type = null;
 
     public ?string $licenseId = null;
@@ -40,4 +40,30 @@ class Ehealth
 
     #[Map(source: 'notAvailable', transform: [Availability::class, 'notAvailable'])]
     public ?array $notAvailable = null;
+
+    /**
+     * Category code from the form as a codeable concept of the healthcare service categories dictionary.
+     *
+     * @param  string  $categoryCode
+     * @return CodeableConceptEhealth|null
+     */
+    public static function category(string $categoryCode): ?CodeableConceptEhealth
+    {
+        return CodeableConceptEhealth::map(['coding' => [['system' => 'HEALTHCARE_SERVICE_CATEGORIES', 'code' => $categoryCode]]]);
+    }
+
+    /**
+     * Type code from the form as a codeable concept of the types dictionary of the chosen category, null when no type is chosen.
+     * The category is read from the form, since a transform receives the source along with the mapped value.
+     *
+     * @param  string|null  $typeCode
+     * @param  HealthcareServiceForm  $form
+     * @return CodeableConceptEhealth|null
+     */
+    public static function type(?string $typeCode, HealthcareServiceForm $form): ?CodeableConceptEhealth
+    {
+        return CodeableConceptEhealth::map([
+            'coding' => [['system' => "HEALTHCARE_SERVICE_{$form->categoryCode}_TYPES", 'code' => $typeCode]]
+        ]);
+    }
 }

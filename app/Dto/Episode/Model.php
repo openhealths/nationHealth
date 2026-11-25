@@ -6,6 +6,7 @@ namespace App\Dto\Episode;
 
 use App\Dto\Coding\Model as CodingModel;
 use App\Dto\Identifier\Model as IdentifierModel;
+use App\Dto\Transform\LocalDateTime;
 use App\Dto\Transform\Model\Reference;
 use App\Enums\Episode\Status;
 use App\Enums\ResourceType;
@@ -67,6 +68,6 @@ class Model
      */
     public static function periodStart(string $startDate, EpisodeForm $form): string
     {
-        return convertToEHealthISO8601("$startDate $form->startTime");
+        return LocalDateTime::toUtc($startDate, $form->startTime);
     }
 }

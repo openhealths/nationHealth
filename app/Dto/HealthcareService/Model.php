@@ -65,11 +65,11 @@ class Model
     public bool $isActive = false;
 
     #[Map(source: '[category]', if: new SourceClass(HealthcareServiceDetails::class), transform: [CodeableConceptModel::class, 'map'])]
-    #[Map(source: 'category', if: new SourceClass(HealthcareServiceForm::class), transform: [CodeableConceptModel::class, 'map'])]
+    #[Map(source: 'categoryCode', if: new SourceClass(HealthcareServiceForm::class), transform: [self::class, 'category'])]
     public CodeableConceptModel $category;
 
     #[Map(source: '[type]', if: new SourceClass(HealthcareServiceDetails::class), transform: [CodeableConceptModel::class, 'map'])]
-    #[Map(source: 'type', if: new SourceClass(HealthcareServiceForm::class), transform: [CodeableConceptModel::class, 'map'])]
+    #[Map(source: 'typeCode', if: new SourceClass(HealthcareServiceForm::class), transform: [self::class, 'type'])]
     public ?CodeableConceptModel $type = null;
 
     #[Map(source: '[coverage_area]', if: new SourceClass(HealthcareServiceDetails::class))]
@@ -105,4 +105,30 @@ class Model
     #[Map(source: '[updated_by]', if: new SourceClass(HealthcareServiceDetails::class))]
     #[Map(if: new TargetClass(HealthcareService::class))]
     public ?string $ehealthUpdatedBy = null;
+
+    /**
+     * Category code from the form as a codeable concept of the healthcare service categories dictionary.
+     *
+     * @param  string  $categoryCode
+     * @return CodeableConceptModel|null
+     */
+    public static function category(string $categoryCode): ?CodeableConceptModel
+    {
+        return CodeableConceptModel::map(['coding' => [['system' => 'HEALTHCARE_SERVICE_CATEGORIES', 'code' => $categoryCode]]]);
+    }
+
+    /**
+     * Type code from the form as a codeable concept of the types dictionary of the chosen category, null when no type is chosen.
+     * The category is read from the form, since a transform receives the source along with the mapped value.
+     *
+     * @param  string|null  $typeCode
+     * @param  HealthcareServiceForm  $form
+     * @return CodeableConceptModel|null
+     */
+    public static function type(?string $typeCode, HealthcareServiceForm $form): ?CodeableConceptModel
+    {
+        return CodeableConceptModel::map([
+            'coding' => [['system' => "HEALTHCARE_SERVICE_{$form->categoryCode}_TYPES", 'code' => $typeCode]]
+        ]);
+    }
 }

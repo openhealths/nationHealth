@@ -28,7 +28,7 @@ class HealthcareServiceView extends HealthcareServiceComponent
         $this->healthcareServiceId = $healthcareService->id;
 
         $healthcareService->loadMissing(['category.coding', 'type.coding']);
-        $this->form->fill(objectMapper()->map($healthcareService, FormData::class)->toArray());
+        $this->form->fill(objectMapper()->map($healthcareService, FormData::class));
     }
 
     /**
@@ -59,9 +59,7 @@ class HealthcareServiceView extends HealthcareServiceComponent
 
             $this->healthcareService->load(['category.coding', 'type.coding']);
 
-            // An absent type is left out of the form values, so the previous one is reset to the empty select structure first
-            $this->form->reset('type');
-            $this->form->fill(objectMapper()->map($this->healthcareService, FormData::class)->toArray());
+            $this->form->fill(objectMapper()->map($this->healthcareService, FormData::class));
 
             Session::flash('success', __('healthcare-services.success.sync_updated'));
         } catch (Throwable $exception) {

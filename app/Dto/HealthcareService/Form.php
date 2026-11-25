@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Dto\HealthcareService;
 
 use App\Core\Arr;
-use App\Dto\CodeableConcept\Form as CodeableConceptForm;
+use App\Dto\Transform\LocalDateTime;
 use App\Models\HealthcareService;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
 use Symfony\Component\ObjectMapper\Attribute\Map;
 
 /**
@@ -16,15 +17,15 @@ use Symfony\Component\ObjectMapper\Attribute\Map;
 #[Map(source: HealthcareService::class)]
 class Form
 {
-    #[Map(source: '[category]', transform: [CodeableConceptForm::class, 'map'])]
-    public CodeableConceptForm $category;
+    #[Map(source: '[category]', transform: [self::class, 'code'])]
+    public string $categoryCode;
 
     public ?string $specialityType = null;
 
     public ?string $providingCondition = null;
 
-    #[Map(source: '[type]', transform: [CodeableConceptForm::class, 'map'])]
-    public ?CodeableConceptForm $type = null;
+    #[Map(source: '[type]', transform: [self::class, 'code'])]
+    public ?string $typeCode = null;
 
     public ?string $licenseId = null;
 
@@ -33,7 +34,19 @@ class Form
     #[Map(source: '[availableTime]', transform: [self::class, 'camelCaseAvailableTime'])]
     public ?array $availableTime = null;
 
+    #[Map(source: '[notAvailable]', transform: [self::class, 'notAvailable'])]
     public ?array $notAvailable = null;
+
+    /**
+     * Code the stored codeable concept holds, null when the service has none.
+     *
+     * @param  CodeableConcept|null  $codeableConcept
+     * @return string|null
+     */
+    public static function code(?CodeableConcept $codeableConcept): ?string
+    {
+        return $codeableConcept?->coding->first()?->code;
+    }
 
     /**
      * Available time is stored with snake_case keys, while the form fields use camelCase.
@@ -47,23 +60,30 @@ class Form
     }
 
     /**
-     * Values for filling the form.
-     * An absent type is left out, so the form keeps its empty coding structure for the type select.
+     * Periods the service is not available, stored in UTC, as the dates and times the form shows in the application timezone.
      *
-     * @return array
+     * @param  array|null  $notAvailable
+     * @return array|null
      */
-    public function toArray(): array
+    public static function notAvailable(?array $notAvailable): ?array
     {
-        $values = [
-            'category' => $this->category->toArray(),
-            'specialityType' => $this->specialityType,
-            'providingCondition' => $this->providingCondition,
-            'licenseId' => $this->licenseId,
-            'comment' => $this->comment,
-            'availableTime' => $this->availableTime,
-            'notAvailable' => $this->notAvailable
-        ];
+        if ($notAvailable === null) {
+            return null;
+        }
 
-        return $this->type === null ? $values : [...$values, 'type' => $this->type->toArray()];
+        return array_map(static function (array $item): array {
+            $start = LocalDateTime::toLocal($item['during']['start']);
+            $end = LocalDateTime::toLocal($item['during']['end']);
+
+            return [
+                ...$item,
+                'during' => [
+                    'startDate' => $start['date'],
+                    'startTime' => $start['time'],
+                    'endDate' => $end['date'],
+                    'endTime' => $end['time']
+                ]
+            ];
+        }, $notAvailable);
     }
 }

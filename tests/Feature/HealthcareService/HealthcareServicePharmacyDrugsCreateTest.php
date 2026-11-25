@@ -29,9 +29,9 @@ use Tests\TestCase;
  */
 class HealthcareServicePharmacyDrugsCreateTest extends TestCase
 {
+    use MocksBasicDictionaries;
     use RefreshDatabase;
     use WithFaker;
-    use MocksBasicDictionaries;
 
     /**
      * Outpatient legal entity the user works in.
@@ -119,9 +119,9 @@ class HealthcareServicePharmacyDrugsCreateTest extends TestCase
 
         Livewire::actingAs($this->owner)
             ->test(HealthcareServiceCreate::class, ['legalEntity' => $this->legalEntity, 'division' => $this->division])
-            ->set('form.category.coding.0.code', 'PHARMACY_DRUGS')
+            ->set('form.categoryCode', 'PHARMACY_DRUGS')
             ->call('create')
-            ->assertHasErrors(['form.type.coding.0.code', 'form.licenseId'])
+            ->assertHasErrors(['form.typeCode', 'form.licenseId'])
             ->assertNoRedirect();
 
         $this->assertSame([], $eHealth->receivedRequests);
@@ -199,8 +199,8 @@ class HealthcareServicePharmacyDrugsCreateTest extends TestCase
     {
         return Livewire::actingAs($this->owner)
             ->test(HealthcareServiceCreate::class, ['legalEntity' => $this->legalEntity, 'division' => $this->division])
-            ->set('form.category.coding.0.code', 'PHARMACY_DRUGS')
-            ->set('form.type.coding.0.code', 'SALE')
+            ->set('form.categoryCode', 'PHARMACY_DRUGS')
+            ->set('form.typeCode', 'SALE')
             ->set('form.licenseId', $this->license->uuid);
     }
 

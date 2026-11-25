@@ -7,6 +7,7 @@ namespace App\Dto\Episode;
 use App\Dto\CodeableConcept\Ehealth as CodeableConceptEhealth;
 use App\Dto\EhealthMapping;
 use App\Dto\Transform\Ehealth\DictionaryConcept;
+use App\Dto\Transform\LocalDateTime;
 use App\Livewire\Episode\Forms\EpisodeClosingForm;
 use Symfony\Component\ObjectMapper\Attribute\Map;
 
@@ -38,6 +39,6 @@ class EhealthClose
      */
     public static function period(string $closingDate, EpisodeClosingForm $form): array
     {
-        return ['end' => convertToEHealthISO8601("$closingDate $form->closingTime")];
+        return ['end' => LocalDateTime::toUtc($closingDate, $form->closingTime)];
     }
 }
