@@ -11,9 +11,7 @@ trait ReadsClinicalSnapshots
 {
     protected function fetchCarePlanDetails(string $patientUuid, string $planUuid): array
     {
-        $data = EHealth::carePlan()->getDetails($patientUuid, $planUuid, preserveApiKeys: true)->validate();
-
-        return array_is_list($data) && count($data) === 1 ? $data[0] : $data;
+        return EHealth::carePlan()->getDetails($patientUuid, $planUuid)->validate()->toArray();
     }
 
     protected function fetchCarePlanCancelSnapshot(string $patientUuid, string $planUuid): array

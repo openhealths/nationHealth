@@ -59,6 +59,11 @@ class CarePlan extends BaseCarePlan implements SubmittedToEHealth
         'part_of_id',
 
         'details_synced_at',
+        'status_history',
+        'ehealth_inserted_at',
+        'ehealth_inserted_by',
+        'ehealth_updated_at',
+        'ehealth_updated_by',
     ];
 
     /** Cast plan-specific dates and supporting information. */
@@ -68,6 +73,9 @@ class CarePlan extends BaseCarePlan implements SubmittedToEHealth
         'supporting_info' => 'array',
 
         'details_synced_at' => 'datetime',
+        'status_history' => 'array',
+        'ehealth_inserted_at' => 'immutable_datetime',
+        'ehealth_updated_at' => 'immutable_datetime',
     ];
 
     public function displayTitle(): string

@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 namespace App\Services\MedicalEvents;
-
+use App\Core\Arr;
+use App\Exceptions\EHealth\EHealthValidationException;
+use App\Exceptions\EHealth\EHealthResponseException;
+use Picqer\Barcode\BarcodeGeneratorPNG;
 use App\Classes\eHealth\Api\DeviceRequest;
 use App\Classes\eHealth\EHealth;
 use App\Contracts\EHealthRequestLifecycleContract;
@@ -128,8 +131,8 @@ class DeviceRequestLifecycleService extends EHealthRequestLifecycleService imple
             $this->invalid('activity', __('care-plan.full_sync_required'));
         }
         Gate::authorize('manageActivities', $localPlan);
-        $plan = \App\Core\Arr::toSnakeCase(EHealth::carePlan()->getDetails($person->uuid, $carePlanUuid)->validate());
-        $activity = \App\Core\Arr::toSnakeCase(EHealth::carePlanActivity()->getDetails($person->uuid, $carePlanUuid, $activityUuid)->validate());
+        $plan = EHealth::carePlan()->getDetails($person->uuid, $carePlanUuid)->validate()->toArray();
+        $activity = Arr::toSnakeCase(EHealth::carePlanActivity()->getDetails($person->uuid, $carePlanUuid, $activityUuid)->validate());
         $detail = $activity['detail'] ?? $activity;
         if (($plan['status'] ?? '') !== 'active'
             || !in_array($detail['status'] ?? $activity['status'] ?? '', ['scheduled', 'in-progress', 'active'], true)
@@ -678,11 +681,11 @@ class DeviceRequestLifecycleService extends EHealthRequestLifecycleService imple
             app(EHealthJobResolver::class)->resolve($result);
             DB::table('device_request_sms_resends')->where('device_request_uuid', $id)->update(['confirmed_at' => now()]);
             DeviceRequestRequest::whereUuid($id)->wherePersonId($person->id)->update(['sms_resent_at' => now()]);
-        } catch (\App\Exceptions\EHealth\EHealthValidationException $exception) {
+        } catch (EHealthValidationException $exception) {
             // An explicit rejection is safe to retry. Timeouts/transport failures retain the claim.
             DB::table('device_request_sms_resends')->where('device_request_uuid', $id)->delete();
             throw $exception;
-        } catch (\App\Exceptions\EHealth\EHealthResponseException $exception) {
+        } catch (EHealthResponseException $exception) {
             if ($exception->response->status() < 500) {
                 DB::table('device_request_sms_resends')->where('device_request_uuid', $id)->delete();
             }
@@ -728,7 +731,7 @@ class DeviceRequestLifecycleService extends EHealthRequestLifecycleService imple
         if ($programId && !in_array(data_get($urgent, 'authentication_method_current.type'), ['OTP', 'THIRD_PERSON'], true) && empty($urgent['verification_code'])) {
             $this->invalid('printout', __('device-requests.validation.print_code_unavailable'));
         }
-        $generator = new \Picqer\Barcode\BarcodeGeneratorPNG();
+        $generator = new BarcodeGeneratorPNG();
         $barcode = base64_encode($generator->getBarcode($remote['requisition'], $generator::TYPE_CODE_128_A, 2, 50));
 
         return view('livewire.device-request.printout', [

@@ -6,18 +6,22 @@ namespace App\Traits;
 
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
+use App\Classes\eHealth\Api\Responses\Collections\CarePlanGetMany;
+use App\Dto\CarePlan\Model as CarePlanData;
 use App\Repositories\Repository;
 use Illuminate\Validation\ValidationException;
 
 trait SynchronizesCarePlans
 {
-    protected function synchronizeResources(array $summaries, ?int $personId, int $legalEntityId, ?string $patientUuid = null, ?string $token = null): void
+    protected function synchronizeResources(array|CarePlanGetMany $summaries, ?int $personId, int $legalEntityId, ?string $patientUuid = null, ?string $token = null): void
     {
-        $summaries = $summaries['data'] ?? $summaries;
+        // Existing local refreshes provide UUIDs, while list requests supply validated GetMany.
+        $summaries = $summaries instanceof CarePlanGetMany
+            ? $summaries
+            : new CarePlanGetMany(Arr::toSnakeCase($summaries['data'] ?? $summaries));
         $repository = Repository::carePlan();
         $planApi = EHealth::carePlan();
         foreach ($summaries as $summary) {
-            $summary = Arr::toCamelCase($summary);
             $patient = $repository->resolvePatientContext($personId, $patientUuid ?? data_get($summary, 'subject.identifier.value'));
             if ($token !== null) {
                 $planApi->withToken($token);
@@ -27,7 +31,8 @@ trait SynchronizesCarePlans
                 throw ValidationException::withMessages(['id' => 'Care Plan details do not match the requested resource.']);
             }
             $activities = $this->fetchAllActivityResources($patient['uuid'], $resource['id'], token: $token);
-            $repository->storeAggregate($resource, $activities, $patient['id'], $legalEntityId);
+            $data = objectMapper()->map($resource, CarePlanData::class);
+            $repository->storeAggregate($data, $activities, $patient['id'], $legalEntityId);
         }
     }
 
@@ -43,7 +48,7 @@ trait SynchronizesCarePlans
         $this->synchronizeResources($summaries, null, $legalEntityId);
     }
 
-    private function collectSummaries(callable $fetch): array
+    private function collectSummaries(callable $fetch): CarePlanGetMany
     {
         $summaries = [];
         $seen = [];
@@ -51,7 +56,6 @@ trait SynchronizesCarePlans
             $response = $fetch($page);
             $items = $response->validate();
             foreach ($items as $item) {
-                $item = Arr::toCamelCase($item);
                 if (isset($seen[$item['id']])) {
                     throw ValidationException::withMessages(['paging' => 'Care Plan pagination repeated a resource.']);
                 }
@@ -59,12 +63,12 @@ trait SynchronizesCarePlans
                 $summaries[] = $item;
             }
             $lastPage = $response->getPaging()['total_pages'] ?? null;
-            if ($items === [] || ($lastPage !== null && $page >= (int) $lastPage)) {
+            if ($items->isEmpty() || ($lastPage !== null && $page >= (int) $lastPage)) {
                 break;
             }
         }
 
-        return $summaries;
+        return new CarePlanGetMany($summaries);
     }
 
     protected function fetchAllActivityResources(string $patientUuid, string $planUuid, array $query = [], ?string $token = null): array

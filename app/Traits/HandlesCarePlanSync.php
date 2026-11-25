@@ -52,7 +52,7 @@ trait HandlesCarePlanSync
             if ($firstPageSynchronously) {
                 $response = EHealth::carePlan()->withToken($token)->getBySearchParams($person->uuid, ['page' => 1]);
                 $summaries = $response->validate();
-                Repository::carePlan()->storeSummaries($summaries, $person->id, $legalEntity->id);
+                Repository::carePlan()->sync($summaries, $person->id, $legalEntity->id);
                 $jobs = CarePlanFullSync::detailJobs($summaries, $legalEntity, $patientContext);
                 if ($response->isNotLast()) {
                     $jobs[] = new CarePlanFullSync($legalEntity, page: 2, standalone: true, patientContext: $patientContext);

@@ -11,4 +11,5 @@ enum ResourceType: string
 {
     case EMPLOYEE = 'employee';
     case LEGAL_ENTITY = 'legal_entity';
+    case ENCOUNTER = 'encounter';
 }

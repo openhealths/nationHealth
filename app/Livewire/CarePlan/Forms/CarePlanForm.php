@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Validator;
 
 use App\Core\Arr;
 use App\Core\BaseForm;
+use App\Classes\eHealth\Api\Responses\Collections\CarePlanDetails;
+use App\Dto\CarePlan\Ehealth as EhealthData;
+use App\Dto\CarePlan\EhealthUpdate as EhealthUpdateData;
 
 use Carbon\CarbonImmutable;
 
@@ -112,6 +115,7 @@ class CarePlanForm extends BaseForm
 
     public static function buildCreateContent(array $resource): array
     {
+        $resource = Arr::toCamelCase($resource);
         Validator::make($resource, [
             'id' => ['required', 'uuid'], 'title' => ['required', 'string'],
             'category.coding' => ['required', 'array', 'min:1'],
@@ -121,34 +125,18 @@ class CarePlanForm extends BaseForm
             'addresses' => ['required', 'array', 'min:1'],
             'termsOfService.coding' => ['required', 'array', 'min:1'],
         ])->validate();
-        $content = array_intersect_key($resource, array_flip(['id', 'category', 'title', 'description', 'period', 'supportingInfo', 'note', 'encounter', 'addresses', 'author', 'contributor', 'termsOfService', 'informWith']));
-        $content['intent'] = 'order';
-        $content['status'] = 'new';
+        $data = objectMapper()->map(new CarePlanDetails(Arr::toSnakeCase($resource)), EhealthData::class);
+        $data->id = $resource['id'];
+        $data->addresses = $resource['addresses'];
+        $data->informWith = $resource['informWith'] ?? null;
 
-        return self::resourcePayload($content);
+        return $data->toArray();
     }
 
     public static function buildCancelContent(array $snapshot, array $statusReason): array
     {
         Validator::make($snapshot, ['id' => ['required', 'uuid']])->validate();
-        unset($snapshot['activities']);
-        $snapshot['status_reason'] = $statusReason;
 
-        return $snapshot;
-    }
-
-    private static function resourcePayload(array $data): array
-    {
-        $result = [];
-        foreach (Arr::toSnakeCase($data) as $key => $value) {
-            if (is_array($value)) {
-                $value = self::resourcePayload($value);
-            }
-            if ($value !== null && $value !== '' && $value !== []) {
-                $result[$key] = $value;
-            }
-        }
-
-        return array_is_list($data) ? array_values($result) : $result;
+        return new EhealthUpdateData(new CarePlanDetails($snapshot), $statusReason)->toArray();
     }
 }

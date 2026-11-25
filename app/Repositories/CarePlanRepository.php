@@ -4,7 +4,15 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Classes\eHealth\Api\Responses\Collections\CarePlanDetails;
+use App\Classes\eHealth\Api\Responses\Collections\CarePlanGetMany;
+use App\Classes\eHealth\Api\Responses\Collections\CarePlanSummary;
+use App\Dto\CarePlan\Model as CarePlanData;
+use App\Dto\CarePlanRequest\Model as CarePlanRequestData;
+use App\Dto\CodeableConcept\Model as CodeableConceptData;
 use App\Models\CarePlanRequest;
+use App\Models\MedicalEvents\Sql\Procedure;
+use Closure;
 use App\Repositories\Repository;
 use App\Enums\CarePlanStatusFilter;
 use App\Enums\CarePlanCompletenessFilter;
@@ -22,6 +30,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use App\Models\Employee\Employee;
 use App\Enums\Person\EncounterStatus;
+use App\Enums\Person\ProcedureStatus;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MedicalEvents\Sql\Condition;
@@ -69,6 +78,14 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         return [...self::FHIR_RELATIONS, 'person.names', 'author.party', 'encounter.episode', 'encounter.diagnoses.condition.type.coding', 'approvals.grantedTo.type.coding', ...array_map(static fn (string $relation): string => 'activities.'.$relation, CarePlanActivityRepository::FHIR_RELATIONS), 'activities.author.party'];
     }
 
+    /** Map validated editor fields into the local request and persist them through the existing insert. */
+    public function saveRequest(CarePlanRequestData $data, CarePlanRequest $request): CarePlanRequest
+    {
+        objectMapper()->map($data, $request);
+
+        return $this->createRequest($request);
+    }
+
     /**
      * Insert a mapped local request before any eHealth submission.
      *
@@ -93,6 +110,71 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         }
 
         return $createPlanRequest;
+    }
+
+    /**
+     * Prepare a plan once for the request owner, holding the request row until the local write commits.
+     *
+     * @param  Closure(CarePlanRequest): CarePlan  $prepare
+     * @return CarePlan|null The prepared plan, or null if the current context cannot open the request.
+     */
+    public function withLockedRequest(
+        string $requestUuid,
+        int $userId,
+        int $legalEntityId,
+        int $personId,
+        string $encounterUuid,
+        Closure $prepare,
+    ): ?CarePlan {
+        return $this->storageTransaction(static function () use ($requestUuid, $userId, $legalEntityId, $personId, $encounterUuid, $prepare): ?CarePlan {
+            $request = CarePlanRequest::query()
+                ->whereUuid($requestUuid)
+                ->whereUserId($userId)
+                ->whereLegalEntityId($legalEntityId)
+                ->wherePersonId($personId)
+                ->whereEncounter($encounterUuid)
+                ->lockForUpdate()
+                ->first();
+
+            return $request === null ? null : $prepare($request);
+        });
+    }
+
+    /**
+     * List readable, completed procedures and final diagnostic reports in the selected encounter.
+     *
+     * @return array<string, array{type: string, uuid: string, name: string}>
+     */
+    public function requestMedicalRecords(Person $person, Encounter $encounter, User $user): array
+    {
+        $procedures = $person->filterRecordsWithMerged(Procedure::query())
+            ->forEncounter($encounter->uuid)
+            ->whereStatus(ProcedureStatus::COMPLETED->value)
+            ->whereNotNull('uuid')
+            ->with('code')
+            ->get();
+        $reports = $person->filterRecordsWithMerged(DiagnosticReport::query())
+            ->forEncounter($encounter->uuid)
+            ->final()
+            ->whereNotNull('uuid')
+            ->with('code')
+            ->get();
+
+        $records = [];
+        foreach (['procedure' => $procedures, 'diagnostic_report' => $reports] as $type => $items) {
+            foreach ($items as $record) {
+                if (Str::isUuid($record->uuid) && $user->can('view', [$record, $person])) {
+                    $label = $record->code?->displayValue ?: ($record->code?->value ?: '#'.$record->id);
+                    $records[$type.':'.$record->uuid] = [
+                        'type' => $type,
+                        'uuid' => $record->uuid,
+                        'name' => __('care-plan.emz_type.'.$type).' · '.$label,
+                    ];
+                }
+            }
+        }
+
+        return $records;
     }
 
     public function formContext(array $form, ?int $localId = null): array
@@ -219,40 +301,57 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         return ['id' => $person->id, 'uuid' => $person->uuid];
     }
 
-    /** Save list entries without treating a summary as a complete clinical resource. */
-    public function storeSummaries(array $summaries, int $personId, int $legalEntityId): void
+    /** Sync validated short entries, preserving detail-only fields of previously imported plans. */
+    public function sync(CarePlanGetMany $summaries, int $personId, int $legalEntityId): void
     {
-        foreach ($summaries as $summary) {
-            $summary = Arr::toCamelCase($summary);
-            $plan = CarePlan::firstOrCreate([
-                'person_id' => $personId,
-                'legal_entity_id' => $legalEntityId,
-                'uuid' => $summary['id'],
-            ], [
-                'title' => $summary['title'] ?? $summary['id'],
-                'status' => $summary['status'],
-                'requisition' => $summary['requisition'] ?? null,
-            ]);
-            if (!$plan->wasRecentlyCreated) {
-                CarePlan::whereKey($plan->id)->update(['status' => $summary['status']]);
-                CarePlan::whereKey($plan->id)->whereNull('details_synced_at')->update([
-                    'title' => $summary['title'] ?? $plan->title,
-                    'requisition' => $summary['requisition'] ?? $plan->requisition,
+        $this->storageTransaction(function () use ($summaries, $personId, $legalEntityId): void {
+            $items = $summaries->toBase()->map(
+                static fn (CarePlanSummary $summary): CarePlanData => objectMapper()->map($summary, CarePlanData::class)
+            )->sortBy('uuid');
+
+            foreach ($items as $data) {
+                $this->resolvePatientContext($personId, $data->patientUuid);
+                $plan = CarePlan::query()->lockForUpdate()->firstOrCreate([
+                    'person_id' => $personId,
+                    'legal_entity_id' => $legalEntityId,
+                    'uuid' => $data->uuid,
+                ], [
+                    'title' => $data->title ?? $data->uuid,
+                    'status' => $data->status,
+                    'requisition' => $data->requisition,
                 ]);
+                $plan->status = $data->status;
+                if ($plan->detailsSyncedAt === null) {
+                    $plan->title = $data->title ?? ($plan->title ?? $data->uuid);
+                    $plan->requisition = $data->requisition ?? $plan->requisition;
+                }
+                $plan->saveOrFail();
             }
-        }
+        });
     }
 
-    public function storeAggregate(array $resource, array $activities, int $personId, int $legalEntityId): CarePlan
+    /** Existing local callers can supply list arrays; API callers use sync() with validated GetMany. */
+    public function storeSummaries(array|CarePlanGetMany $summaries, int $personId, int $legalEntityId): void
+    {
+        $this->sync(
+            $summaries instanceof CarePlanGetMany ? $summaries : new CarePlanGetMany(Arr::toSnakeCase($summaries)),
+            $personId,
+            $legalEntityId
+        );
+    }
+
+    public function storeAggregate(CarePlanData|array $resource, array $activities, int $personId, int $legalEntityId): CarePlan
     {
         return $this->storageTransaction(function () use ($resource, $activities, $personId, $legalEntityId): CarePlan {
-            $plan = $this->storeResource($resource, $personId, $legalEntityId);
+            $plan = $resource instanceof CarePlanData
+                ? $this->save($resource, new CarePlan(['person_id' => $personId, 'legal_entity_id' => $legalEntityId]))
+                : $this->storeResource($resource, $personId, $legalEntityId);
             $activityRepository = Repository::carePlanActivity();
             foreach ($activities as $activityResource) {
                 $activity = $activityRepository->storeResource($activityResource, $plan);
                 $this->reconcileSubmissionFromResource($activity, $activityResource, 'detail.status');
             }
-            $this->reconcileSubmissionFromResource($plan, $resource);
+            $this->reconcileSubmissionFromResource($plan, $resource instanceof CarePlanData ? ['id' => $resource->uuid, 'status' => $resource->status] : $resource);
 
             return $plan->unsetRelations();
         });
@@ -364,50 +463,60 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         ], $beforeSubmission ? 'clinical-storage.submission_update_required' : 'clinical-storage.update_required');
     }
 
-    /** Store a complete, normalized resource. This method performs no remote requests. */
+    /** Adapt existing local FHIR callers to the same Model DTO used by validated API details. */
     public function storeResource(array $resource, int $personId, int $legalEntityId, ?int $localId = null): CarePlan
     {
         if (!isset($resource['id'], $resource['title'], $resource['status'], $resource['period']['start'])) {
             throw new InvalidArgumentException('A complete Care Plan requires id, title, status and period.start.');
         }
 
-        return $this->storageTransaction(function () use ($resource, $personId, $legalEntityId, $localId): CarePlan {
+        $data = objectMapper()->map(new CarePlanDetails(Arr::toSnakeCase($resource) + ['addresses' => []]), CarePlanData::class);
+        $plan = new CarePlan(['person_id' => $personId, 'legal_entity_id' => $legalEntityId]);
+        if ($localId !== null) {
+            $plan->id = $localId;
+        }
+
+        return $this->save($data, $plan);
+    }
+
+    /** Persist a prepared Model DTO, clinical relations and eHealth audit in one locked transaction. */
+    public function save(CarePlanData $data, CarePlan $carePlan): CarePlan
+    {
+        if ($data->title === null || empty($data->period['start'])) {
+            throw new InvalidArgumentException('Full Care Plan data is required for saving clinical relations.');
+        }
+
+        return $this->storageTransaction(function () use ($data, $carePlan): CarePlan {
+            $personId = $carePlan->personId;
+            $legalEntityId = $carePlan->legalEntityId;
+            $this->resolvePatientContext($personId, $data->patientUuid);
             $query = CarePlan::wherePersonId($personId)->whereLegalEntityId($legalEntityId)->lockForUpdate();
-            $plan = $localId === null ? $query->whereUuid($resource['id'])->first() : $query->findOrFail($localId);
-            if ($plan?->uuid !== null && $plan->uuid !== $resource['id']) {
+            $plan = $carePlan->id === null ? $query->whereUuid($data->uuid)->first() : $query->findOrFail($carePlan->id);
+            if ($plan?->uuid !== null && $plan->uuid !== $data->uuid) {
                 throw new InvalidArgumentException('Cannot replace an existing Care Plan identity.');
             }
-            $plan ??= new CarePlan();
-            $plan->personId = $personId;
-            $plan->legalEntityId = $legalEntityId;
-            $authorUuid = data_get($resource, 'author.identifier.value');
-            $encounterUuid = data_get($resource, 'encounter.identifier.value');
-            $attributes = [
-                'uuid' => $resource['id'],
-                'status' => $resource['status'],
-                'title' => $resource['title'],
-                'intent' => $resource['intent'] ?? null,
-                'context' => $resource['context'] ?? null,
-                'informWith' => data_get($resource, 'informWith.authMethodId'),
-                'statusReasonId' => isset($resource['statusReason']) ? $this->syncCodeableConcept($plan->exists ? $plan : null, $resource['statusReason'], 'statusReasonConcept')->id : null,
-                'description' => $resource['description'] ?? null,
-                'note' => $resource['note'] ?? null,
-                'addresses' => $resource['addresses'] ?? [],
-                'requisition' => $resource['requisition'] ?? null,
-                'authorId' => $authorUuid ? Employee::whereUuid($authorUuid)->whereLegalEntityId($legalEntityId)->value('id') : null,
-                'encounterId' => $encounterUuid ? Encounter::whereUuid($encounterUuid)->value('id') : null,
-                'detailsSyncedAt' => now(),
-            ];
-            foreach (['category' => ['categoryConcept', 'categoryId'], 'termsOfService' => ['termsOfServiceConcept', 'termsOfServiceConceptId']] as $field => [$relation, $attribute]) {
-                $attributes[$attribute] = isset($resource[$field]) ? $this->syncCodeableConcept($plan->exists ? $plan : null, $resource[$field], $relation)?->id : null;
+            $plan ??= $carePlan;
+            objectMapper()->map($data, $plan);
+            $plan->authorId = $data->authorUuid ? Employee::whereUuid($data->authorUuid)->whereLegalEntityId($legalEntityId)->value('id') : null;
+            $plan->encounterId = $data->encounterUuid ? Encounter::whereUuid($data->encounterUuid)->value('id') : null;
+            $plan->addresses = array_map(static fn (CodeableConceptData $concept): array => $concept->toArray(), $data->addresses);
+            $plan->detailsSyncedAt = now();
+
+            foreach (['category' => ['categoryConcept', 'categoryId'], 'termsOfService' => ['termsOfServiceConcept', 'termsOfServiceConceptId'], 'statusReason' => ['statusReasonConcept', 'statusReasonId']] as $field => [$relation, $attribute]) {
+                $concept = $data->{$field};
+                $plan->{$attribute} = $concept === null ? null : $this->syncCodeableConcept(
+                    $plan->exists ? $plan : null,
+                    $concept->toArray(),
+                    $relation
+                )?->id;
             }
             foreach (['author' => ['authorReference', 'authorReferenceId'], 'basedOn' => ['basedOn', 'basedOnId'], 'partOf' => ['partOf', 'partOfId'], 'encounter' => ['encounterIdentifier', 'encounterIdentifierId'], 'careManager' => ['careManager', 'careManagerId'], 'managingOrganization' => ['managingOrganization', 'managingOrganizationId'], 'subject' => ['subjectReference', 'subjectReferenceId']] as $field => [$relation, $attribute]) {
-                $attributes[$attribute] = isset($resource[$field]) ? $this->syncIdentifier($plan->exists ? $plan : null, $resource[$field], $relation)?->id : null;
+                $plan->{$attribute} = $this->syncIdentifier($plan->exists ? $plan : null, $data->{$field}, $relation)?->id;
             }
-            $plan->forceFill($attributes)->save();
-            MedicalEventsRepository::period()->sync($plan, !empty($resource['period']) ? $resource['period'] + ['start' => null] : null, 'effectivePeriod');
-            $this->syncPivot($plan, 'supportingInfoReferences', $this->syncIdentifiers($plan, $resource['supportingInfo'] ?? [], 'supportingInfoReferences'));
-            $this->syncPivot($plan, 'contributors', $this->syncIdentifiers($plan, $resource['contributor'] ?? [], 'contributors'));
+            $plan->saveOrFail();
+            MedicalEventsRepository::period()->sync($plan, $data->period, 'effectivePeriod');
+            $this->syncPivot($plan, 'supportingInfoReferences', $this->syncIdentifiers($plan, $data->supportingInfo ?? [], 'supportingInfoReferences'));
+            $this->syncPivot($plan, 'contributors', $this->syncIdentifiers($plan, $data->contributor ?? [], 'contributors'));
 
             return $plan->unsetRelations();
         });
@@ -431,6 +540,11 @@ class CarePlanRepository extends MedicalEventsBaseRepository
             'note' => $plan->note,
             'addresses' => $plan->addresses ?? [],
             'requisition' => $plan->requisition,
+            'statusHistory' => $plan->statusHistory,
+            'insertedAt' => $plan->ehealthInsertedAt?->toISOString(),
+            'insertedBy' => $plan->ehealthInsertedBy,
+            'updatedAt' => $plan->ehealthUpdatedAt?->toISOString(),
+            'updatedBy' => $plan->ehealthUpdatedBy,
             'period' => $plan->effectivePeriod ? MedicalEventsRepository::period()->toResource($plan->effectivePeriod) : null,
             'supportingInfo' => $plan->supportingInfoReferences->map(fn ($reference): array => MedicalEventsRepository::identifier()->toReference($reference))->all(),
             'contributor' => $plan->contributors->map(fn ($reference): array => MedicalEventsRepository::identifier()->toReference($reference))->all(),
@@ -724,10 +838,21 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         return Episode::with('period')->whereUuid($uuid)->first();
     }
 
-    public function activeEpisodes(Person $person): array
+    /**
+     * List active patient episodes. For a request editor, include only episodes the clinician can view.
+     *
+     * @return list<array{uuid: string, name: string, date: string}>
+     */
+    public function activeEpisodes(Person $person, ?User $user = null): array
     {
         return Episode::forPatient($person)->whereStatus('active')->with('period')->get()
-            ->map(fn ($episode): array => ['uuid' => $episode->uuid, 'name' => $episode->name, 'date' => $episode->period?->start ? Carbon::parse($episode->period->start)->format('d.m.Y') : ''])->all();
+            ->filter(fn (Episode $episode): bool => $user === null
+                || (Str::isUuid($episode->uuid) && $user->can('view', [$episode, $person])))
+            ->map(fn (Episode $episode): array => [
+                'uuid' => $episode->uuid,
+                'name' => $episode->name,
+                'date' => $episode->period?->start ? Carbon::parse($episode->period->start)->format('d.m.Y') : '',
+            ])->values()->all();
     }
 
     public function findCondition(string $uuid, ?int $personId = null): ?Condition
