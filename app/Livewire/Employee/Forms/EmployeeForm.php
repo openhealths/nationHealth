@@ -18,6 +18,7 @@ use App\Rules\HasIdentityDocumentRule;
 use App\Rules\UniquePassportRule;
 use Carbon\Carbon;
 use Closure;
+use Exception;
 use Livewire\Component;
 use Livewire\Form;
 use App\Rules\Name;
@@ -229,6 +230,7 @@ class EmployeeForm extends Form
             'party.email.ascii' => __('validation.custom.party.email_must_be_latin'),
             'party.workingExperience.min' => __('validation.custom.party.working_experience_min'),
             'documents.*.type.in' => __('validation.custom.employee.document_type_not_allowed'),
+            'documents.*.issuedBy' => __('validation.custom.employee.document_issuer_required'),
             'documents.min' => __('validation.custom.identity_document_required'),
         ];
     }
@@ -285,7 +287,7 @@ class EmployeeForm extends Form
                     }
                 }
             ],
-            'documents.*.issuedBy' => ['present', 'nullable', 'string'],
+            'documents.*.issuedBy' => ['bail', 'required', 'string', 'regex:/\S/u'],
             'documents.*.issuedAt' => [
                 'nullable',
                 new DateFormat(),
@@ -868,7 +870,7 @@ class EmployeeForm extends Form
             }
             try {
                 return Carbon::parse($value)->format('Y-m-d');
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 return null;
             }
         };

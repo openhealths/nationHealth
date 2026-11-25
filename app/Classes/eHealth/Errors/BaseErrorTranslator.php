@@ -79,6 +79,7 @@ class BaseErrorTranslator implements ApiErrorTranslator
             'Division is not in current legal entity' => __('errors.ehealth.messages.division_of_another_legal_entity'),
             'value is not allowed in enum' => __('errors.ehealth.messages.value_not_allowed_in_enum'),
             'Request validation fails' => __('errors.ehealth.messages.validation_error'),
+            'required property issued_by was not present' => __('validation.custom.employee.document_issuer_required'),
             'Validation error' => __('errors.ehealth.messages.request_parameters_validation_error'),
             'Employee not found' => __('errors.ehealth.messages.employee_not_found'),
             'Invalid author employee type' => __('errors.ehealth.messages.invalid_author_employee_type'),
