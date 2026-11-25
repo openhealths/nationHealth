@@ -287,6 +287,14 @@ class LegalEntity extends Model
     }
 
     /**
+     * Determine whether the legal entity has been reorganized.
+     */
+    public function isReorganized(): bool
+    {
+        return $this->status === Status::REORGANIZED->value;
+    }
+
+    /**
      * Pharmacy legal entities dispense e-prescriptions; they do not issue referrals.
      */
     public function isPharmacy(): bool

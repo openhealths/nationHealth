@@ -213,7 +213,7 @@ class DeclarationIndex extends Component
 
         $ownEmployees = $user->party->employees()
             ->filterByLegalEntityId($legalEntity->id)
-            ->active()
+            ->active($legalEntity)
             ->get(['id', 'uuid', 'employee_type']);
 
         // Use only the current user's doctor employee UUIDs for the default doctor filter.
@@ -562,7 +562,7 @@ class DeclarationIndex extends Component
             $query['employee_id'] = Employee::forParty($user->partyId)
                 ->filterByLegalEntityId($legalEntity->id)
                 ->doctor()
-                ->active()
+                ->active($legalEntity)
                 ->firstOrFail()->uuid;
         }
 
