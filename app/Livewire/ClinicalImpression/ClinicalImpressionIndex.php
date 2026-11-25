@@ -244,6 +244,7 @@ class ClinicalImpressionIndex extends BasePatientComponent
             'isSearching'
         ]);
 
+        $this->resetValidation();
         $this->resetPage();
     }
 
@@ -353,8 +354,8 @@ class ClinicalImpressionIndex extends BasePatientComponent
     {
         return [
             'filterCode' => ['nullable', 'string', new InDictionary('eHealth/clinical_impression_patient_categories')],
-            'filterEncounterId' => ['nullable', 'string', 'max:255'],
-            'filterEpisodeId' => ['nullable', 'string', 'max:255'],
+            'filterEncounterId' => ['nullable', 'uuid'],
+            'filterEpisodeId' => ['nullable', 'uuid'],
             'filterStatus' => ['nullable', Rule::in(Status::values())],
             'filterEffectiveDateFrom' => ['nullable', 'date_format:' . config('app.date_format')],
             'filterEffectiveDateTo' => ['nullable', 'date_format:' . config('app.date_format')],

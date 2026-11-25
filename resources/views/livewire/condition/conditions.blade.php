@@ -183,6 +183,7 @@
                         bind="filterEncounterId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('encounters.plural')"
                     />
 
@@ -191,6 +192,7 @@
                         bind="filterEpisodeId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('episodes.plural')"
                     />
 

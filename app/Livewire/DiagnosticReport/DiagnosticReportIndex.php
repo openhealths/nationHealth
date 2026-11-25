@@ -189,6 +189,7 @@ class DiagnosticReportIndex extends BasePatientComponent
             'isSearching'
         ]);
 
+        $this->resetValidation();
         $this->loadServices();
 
         $this->resetPage();

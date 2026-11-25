@@ -318,6 +318,7 @@ class DeviceIndex extends BasePatientComponent
             'isSearching'
         ]);
 
+        $this->resetValidation();
         $this->resetPage();
     }
 

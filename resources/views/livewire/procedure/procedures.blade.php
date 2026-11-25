@@ -82,6 +82,7 @@
                     bind="filterCode"
                     bindValue="id"
                     bindParam="name"
+                    allow-custom
                     :label="__('procedures.code')"
                     x-init="allProcedureServices = options"
                     x-effect="options = category ? allProcedureServices.filter(service => service.category === category) : allProcedureServices"
@@ -174,6 +175,7 @@
                         bind="filterEpisodeId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('procedures.episode_id')"
                     />
 
@@ -182,6 +184,7 @@
                         bind="filterEncounterId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('procedures.encounter_id')"
                     />
                 </div>
@@ -192,6 +195,7 @@
                         bind="filterOriginEpisodeId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('procedures.origin_episode_id')"
                     />
 
@@ -200,6 +204,7 @@
                         bind="filterBasedOn"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('procedures.based_on')"
                     />
 
@@ -208,6 +213,7 @@
                         bind="filterUsedReferenceId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('procedures.used_reference_id')"
                     />
                 </div>
@@ -218,6 +224,7 @@
                         bind="filterDeviceId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('procedures.device_id')"
                     />
                 </div>

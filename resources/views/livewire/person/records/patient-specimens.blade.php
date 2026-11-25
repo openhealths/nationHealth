@@ -145,6 +145,7 @@
                         bind="filterRegisteredBy"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('specimens.employee_created_record')"
                     />
                     <div class="form-group group">
@@ -179,6 +180,7 @@
                         bind="filterParent"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('specimens.parent_specimen')"
                     />
                     <x-forms.combobox
@@ -186,6 +188,7 @@
                         bind="filterRequest"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('specimens.electronic_referral')"
                     />
                     <x-forms.combobox
@@ -193,6 +196,7 @@
                         bind="filterEncounter"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('specimens.encounter')"
                     />
                 </div>

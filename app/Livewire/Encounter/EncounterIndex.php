@@ -182,6 +182,7 @@ class EncounterIndex extends BasePatientComponent
             'filterOriginEpisodeId',
             'isSearching'
         ]);
+        $this->resetValidation();
         $this->resetPage();
     }
 

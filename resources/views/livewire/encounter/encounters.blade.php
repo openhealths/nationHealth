@@ -96,6 +96,7 @@
                     bind="filterEpisodeId"
                     bindValue="uuid"
                     bindParam="name"
+                    allow-custom
                     :label="__('episodes.plural')"
                 />
             </div>
@@ -165,6 +166,7 @@
                         bind="filterIncomingReferralId"
                         bindValue="uuid"
                         bindParam="displayValue"
+                        allow-custom
                         :label="__('encounters.incoming_referral')"
                     />
 
@@ -173,6 +175,7 @@
                         bind="filterOriginEpisodeId"
                         bindValue="uuid"
                         bindParam="displayValue"
+                        allow-custom
                         :label="__('encounters.origin_episode')"
                     />
                 </div>

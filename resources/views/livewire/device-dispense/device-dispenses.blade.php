@@ -48,6 +48,7 @@
                     bind="filterDeviceId"
                     bindValue="uuid"
                     bindParam="name"
+                    allow-custom
                     :label="__('devices.device_id')"
                     x-on:input="deviceIdSearch = $event.target.value"
                     x-bind:inert="deviceCodeSearch.trim() !== '' || deviceCode !== ''"
@@ -147,6 +148,7 @@
                         bind="filterEpisodeId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('episodes.id')"
                     />
 
@@ -155,6 +157,7 @@
                         bind="filterOrganization"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('devices.legal_entity')"
                     />
 
@@ -163,6 +166,7 @@
                         bind="filterEncounterId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('patients.encounter_id')"
                     />
                 </div>
@@ -173,6 +177,7 @@
                         bind="filterProcedureId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('device-dispenses.procedure_id')"
                     />
 
@@ -189,6 +194,7 @@
                         bind="filterRelatedEpisodeId"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('device-dispenses.related_prescription_episode_id')"
                     />
                 </div>
@@ -299,6 +305,7 @@
                         bind="filterPractitioner"
                         bindValue="uuid"
                         bindParam="name"
+                        allow-custom
                         :label="__('forms.employee')"
                     />
                 </div>

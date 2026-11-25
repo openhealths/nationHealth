@@ -158,6 +158,7 @@ class DeviceDispenses extends BasePatientComponent
             'isSearching'
         ]);
 
+        $this->resetValidation();
         $this->resetPage();
     }
 
