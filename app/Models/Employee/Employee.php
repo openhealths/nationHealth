@@ -144,15 +144,31 @@ class Employee extends BaseEmployee
     }
 
     /**
-     * Scope to the employees that are approved and still working.
+     * Scope to employees with is_active = true and, by default, status APPROVED.
+     *
+     * Declaration listing and synchronization must also recognize a doctor's employee record
+     * after its status changes to REORGANIZED. Pass the target legal entity explicitly in
+     * these workflows: when that entity is REORGANIZED, this scope accepts both APPROVED
+     * and REORGANIZED employees. The is_active requirement applies in either case.
+     *
+     * Omitting the argument, or passing an entity with another status, keeps the original
+     * APPROVED-only behavior. Medical record performer selection and authorization checks,
+     * including forUserInLegalEntity(), intentionally omit it so this declaration-specific
+     * exception does not make reorganized employees eligible for those operations.
      *
      * @param  Builder  $query
+     * @param  LegalEntity|null  $legalEntity Target entity for declaration listing or synchronization; omit for APPROVED-only selection.
      * @return Builder
      */
     #[Scope]
-    protected function active(Builder $query): Builder
+    protected function active(Builder $query, ?LegalEntity $legalEntity = null): Builder
     {
-        return $query->whereStatus(Status::APPROVED)->whereIsActive(true);
+        $includeReorganized = $legalEntity?->isReorganized() ?? false;
+
+        return $query->whereIn('status', $includeReorganized
+            ? [Status::APPROVED, Status::REORGANIZED]
+            : [Status::APPROVED])
+            ->whereIsActive(true);
     }
 
     #[Scope]

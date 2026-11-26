@@ -38,7 +38,7 @@ class DeclarationsSync extends EHealthJob
             $query['employee_id'] = Employee::forParty($this->user->partyId)
                 ->filterByLegalEntityId($this->legalEntity->id)
                 ->doctor()
-                ->active()
+                ->active($this->legalEntity)
                 ->firstOrFail()->uuid;
         }
 
