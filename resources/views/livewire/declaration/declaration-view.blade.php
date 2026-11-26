@@ -107,35 +107,29 @@
 
             <div class="form-row-2">
                 <div class="form-group group">
-                    <label for="reason" class="label">
+                    <span id="reasonLabel" class="label">
                         {{ __('declarations.change_reason_if_exist') }}
-                    </label>
-                    <input
-                        value="{{ $declaration->reason ? ($declarationReasons[$declaration->reason]) : '' }}"
-                        type="text"
-                        name="reason"
+                    </span>
+                    <div
                         id="reason"
-                        class="input peer"
-                        placeholder=" "
-                        disabled
-                        autocomplete="off"
-                    />
+                        role="textbox"
+                        aria-readonly="true"
+                        aria-labelledby="reasonLabel"
+                        class="input h-auto min-h-10.5 whitespace-normal wrap-break-word"
+                    >{{ $declarationReasons[$declaration->reason] ?? $declaration->reason }}</div>
                 </div>
 
                 <div class="form-group group">
-                    <label for="reasonDescription" class="label">
+                    <span id="reasonDescriptionLabel" class="label">
                         {{ __('declarations.change_reason_description_if_exist') }}
-                    </label>
-                    <input
-                        value="{{ $declaration->reasonDescription }}"
-                        type="text"
-                        name="reasonDescription"
+                    </span>
+                    <div
                         id="reasonDescription"
-                        class="input peer"
-                        placeholder=" "
-                        disabled
-                        autocomplete="off"
-                    />
+                        role="textbox"
+                        aria-readonly="true"
+                        aria-labelledby="reasonDescriptionLabel"
+                        class="input h-auto min-h-10.5 whitespace-pre-wrap wrap-break-word"
+                    >{{ $declaration->reasonDescription }}</div>
                 </div>
             </div>
 
