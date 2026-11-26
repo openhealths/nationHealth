@@ -21,7 +21,9 @@ class ErrorHandler
                     }
 
                     $description = $rule['description'] ?? 'No description';
-                    $errorMessages[] = "Error in entry '{$entry}' (Type: {$entryType}): {$description}";
+                    $errorMessages[] = $description === 'required property issued_by was not present'
+                        ? __('validation.custom.employee.document_issuer_required')
+                        : "Error in entry '{$entry}' (Type: {$entryType}): {$description}";
                 }
             }
         }

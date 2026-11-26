@@ -96,7 +96,7 @@
                         {{ __('licenses.number') }}
                     </label>
                     <input
-                        value="{{ $license->licenseNumber }}"
+                        value="{{ $license->licenseNumber === 'null' ? '' : $license->licenseNumber }}"
                         type="text"
                         name="number"
                         id="number"
