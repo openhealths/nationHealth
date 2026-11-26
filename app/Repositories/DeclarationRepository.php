@@ -221,8 +221,8 @@ class DeclarationRepository
             $data['inserted_at'] = Carbon::parse($declaration['inserted_at'])->format('Y-m-d H:i:s');
             $data['signed_at'] = Declaration::where('uuid', $declaration['uuid'])->value('signed_at')
                 ?? Carbon::createFromDate(1900, 1, 1)->format('Y-m-d');
-            $data['reason'] = $declaration['reason'];
-            $data['reason_description'] = $declaration['reason_description'];
+            $data['reason'] = $declaration['reason'] ?? null;
+            $data['reason_description'] = $declaration['reason_description'] ?? null;
             $data['start_date'] = $declaration['start_date'];
             $data['status'] = $declaration['status'];
             $data['is_active'] = $declaration['status'] === DeclarationStatus::ACTIVE->value;

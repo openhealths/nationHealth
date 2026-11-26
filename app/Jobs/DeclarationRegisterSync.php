@@ -23,7 +23,7 @@ class DeclarationRegisterSync extends DeclarationsSync
 
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse
     {
-        return EHealth::declaration()->withToken($token)->getRegisterPage($this->legalEntity->uuid, $this->page);
+        return EHealth::declaration()->withToken($token)->getRegisterPage($this->legalEntity->uuid, $this->page, $this->status);
     }
 
     protected function processResponse(?EHealthResponse $response): void
@@ -31,7 +31,7 @@ class DeclarationRegisterSync extends DeclarationsSync
         Repository::declaration()->storeRegisterPage($response->validate(), $this->legalEntity);
     }
 
-    protected function getNextEntityJob(): EHealthJob
+    protected function afterAllStatuses(): EHealthJob
     {
         return $this->nextEntity ?? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin);
     }

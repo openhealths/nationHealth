@@ -7,6 +7,7 @@ namespace Tests\Feature\Declaration;
 use App\Classes\eHealth\Api\Declaration as DeclarationApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Enums\JobStatus;
+use App\Enums\Declaration\Status;
 use App\Enums\User\Role;
 use App\Jobs\DeclarationsSync;
 use App\Livewire\Declaration\DeclarationIndex;
@@ -145,6 +146,29 @@ class DeclarationActiveEmployeeTest extends TestCase
         ];
     }
 
+    public function test_sync_fetches_terminated_pages_for_the_same_doctor_after_the_active_list(): void
+    {
+        $job = new DeclarationsSync(legalEntity: $this->legalEntity);
+        $advance = new ReflectionMethod($job, 'getNextEntityJob');
+        $fetch = new ReflectionMethod($job, 'sendRequest');
+        $api = Mockery::mock(DeclarationApi::class);
+        $this->instance(DeclarationApi::class, $api);
+        $api->shouldReceive('withToken')->andReturnSelf();
+        $response = Mockery::mock(EHealthResponse::class);
+
+        foreach (array_slice(Status::cases(), 1) as $status) {
+            $job = $advance->invoke($job);
+            $job->user = $this->user;
+            $api->shouldReceive('getRegisterPage')->once()->with('entity-one', 1, $status, 'active-doctor')->andReturn($response);
+            $this->assertSame($response, $fetch->invoke($job, 'test-token'));
+        }
+
+        $pageTwo = (new ReflectionMethod($job, 'nextPageJob'))->invoke($job);
+        $pageTwo->user = $this->user;
+        $api->shouldReceive('getRegisterPage')->once()->with('entity-one', 2, Status::TERMINATED, 'active-doctor')->andReturn($response);
+        $this->assertSame($response, $fetch->invoke($pageTwo, 'test-token'));
+    }
+
     #[DataProvider('syncCases')]
     public function test_sync_uses_only_an_active_doctor(bool $job, bool $hasActiveDoctor): void
     {
@@ -159,7 +183,7 @@ class DeclarationActiveEmployeeTest extends TestCase
             $response = Mockery::mock(EHealthResponse::class);
             $response->shouldReceive('validate')->andReturn([]);
             $response->shouldReceive('isNotLast')->andReturnFalse();
-            $expected = ['legal_entity_id' => 'entity-one', 'employee_id' => 'active-doctor'];
+            $expected = ['legal_entity_id' => 'entity-one', 'employee_id' => 'active-doctor', 'status' => 'active'];
             if ($job) {
                 $expected['page'] = 2;
                 $api->shouldReceive('withToken')->once()->with('test-token')->andReturnSelf();

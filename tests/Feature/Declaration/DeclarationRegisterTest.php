@@ -6,6 +6,7 @@ namespace Tests\Feature\Declaration;
 
 use App\Classes\eHealth\Api\Declaration as DeclarationApi;
 use App\Jobs\CompleteSync;
+use App\Enums\Declaration\Status;
 use App\Jobs\DeclarationRegisterSync;
 use App\Jobs\LegalEntitySync;
 use App\Models\Declaration;
@@ -35,9 +36,9 @@ class DeclarationRegisterTest extends TestCase
         $this->assertFalse($policy->sync($user, $entity, ['person:read'])->allowed());
 
         $next = new ReflectionMethod(DeclarationRegisterSync::class, 'getNextEntityJob');
-        $this->assertInstanceOf(CompleteSync::class, $next->invoke(new DeclarationRegisterSync($entity)));
+        $this->assertInstanceOf(CompleteSync::class, $next->invoke(new DeclarationRegisterSync($entity, status: Status::TERMINATED)));
         $continuation = new LegalEntitySync($entity);
-        $this->assertSame($continuation, $next->invoke(new DeclarationRegisterSync($entity, $continuation, true)));
+        $this->assertSame($continuation, $next->invoke(new DeclarationRegisterSync($entity, $continuation, true, status: Status::TERMINATED)));
     }
 
     public function test_register_imports_a_terminated_declaration_without_a_patient_and_preserves_enrichment(): void
@@ -63,18 +64,20 @@ class DeclarationRegisterTest extends TestCase
             $this->assertSame('/api/declarations', parse_url($request->url(), PHP_URL_PATH));
             parse_str(parse_url($request->url(), PHP_URL_QUERY), $query);
             $this->assertSame($facility->uuid, $query['legal_entity_id']);
+            $this->assertSame('terminated', $query['status']);
             $this->assertArrayNotHasKey('person_id', $query);
 
             return Http::response(['data' => [$item]]);
         });
-        $page = $api->getRegisterPage($facility->uuid, 1)->validate();
+        $page = $api->getRegisterPage($facility->uuid, 1, Status::TERMINATED)->validate();
         $repository = new DeclarationRepository();
         $repository->storeRegisterPage($page, $facility);
         $declaration = Declaration::sole();
         $this->assertNull($declaration->personId);
         $this->assertSame($item['id'], $declaration->uuid);
 
-        $declaration->update(['person_id' => 42, 'declaration_request_id' => 21, 'signed_at' => '2025-10-01']);
+        $declaration->update(['person_id' => 42, 'declaration_request_id' => 21, 'signed_at' => '2025-10-01',
+            'status' => Status::ACTIVE, 'is_active' => true]);
         $page[0]['reason_description'] = 'Updated reason';
         $repository->storeRegisterPage($page, $facility);
         $declaration = Declaration::sole();
@@ -82,6 +85,8 @@ class DeclarationRegisterTest extends TestCase
         $this->assertEquals(21, $declaration->declarationRequestId);
         $this->assertSame('2025-10-01', $declaration->signedAt);
         $this->assertSame('Updated reason', $declaration->reasonDescription);
+        $this->assertSame(Status::TERMINATED, $declaration->status);
+        $this->assertFalse((bool) $declaration->isActive);
 
         $foreign = (new LegalEntity())->forceFill(['id' => 2]);
         $this->assertSame($item['id'], Declaration::facilityRegister($facility, [$employee], ['terminated'], '1234-5678')->sole()->uuid);

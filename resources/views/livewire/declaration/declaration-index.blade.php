@@ -10,7 +10,7 @@
     $register = Auth::user()->usesFacilityDeclarationRegister();
 @endphp
 
-<div>
+<div @if ($syncStatus === JobStatus::PROCESSING->value) wire:poll.10s @endif>
     <livewire:components.x-message :key="now()->timestamp" />
 
     <x-header-navigation x-data="{ showFilter: false }">
@@ -39,12 +39,10 @@
                             <p class="default-p">{{ __('declarations.search') }}</p>
                         </div>
 
-                        @isset($countActive)
                             <div class="flex items-center gap-4 pl-30">
                                 <p class="default-p">{{ __('declarations.count_active') }}:</p>
-                                <span class="badge-green">{{ $countActive }}</span>
+                                <span class="badge-green">{{ $this->countActive }}</span>
                             </div>
-                        @endisset
                     </div>
                     <div class="mt-1 flex items-end gap-3">
                         @unless ($register)

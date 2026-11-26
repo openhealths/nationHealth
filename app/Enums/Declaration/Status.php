@@ -19,6 +19,13 @@ enum Status: string
     case REJECTED = 'rejected';
     case TERMINATED = 'terminated';
 
+    public function nextForSync(): ?self
+    {
+        $statuses = self::cases();
+
+        return $statuses[array_search($this, $statuses, true) + 1] ?? null;
+    }
+
     public function label(): string
     {
         return match ($this) {

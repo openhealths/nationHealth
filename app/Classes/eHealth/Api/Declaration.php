@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Classes\eHealth\Api;
 
 use App\Core\Arr;
+use App\Enums\Declaration\Status;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\DeclarationErrorTranslator;
@@ -57,8 +58,8 @@ class Declaration extends Request
         return $this->get(self::URL, $mergedQuery);
     }
 
-    /** Fetch only the fields used by the facility declaration register. */
-    public function getRegisterPage(string $legalEntityUuid, int $page): PromiseInterface|EHealthResponse
+    /** Fetch declaration fields without requiring access to the patient's record. */
+    public function getRegisterPage(string $legalEntityUuid, int $page, Status $status, ?string $employeeUuid = null): PromiseInterface|EHealthResponse
     {
         $this->setValidator(fn (EHealthResponse $response): array => Validator::make($response->getData(), [
             '*.id' => 'required|uuid',
@@ -73,11 +74,13 @@ class Declaration extends Request
             '*.reason_description' => 'nullable|string',
         ])->validate());
 
-        return $this->get(self::URL, [
+        return $this->get(self::URL, array_filter([
             'legal_entity_id' => $legalEntityUuid,
+            'status' => $status->value,
+            'employee_id' => $employeeUuid,
             'page' => $page,
             self::QUERY_PARAM_PAGE_SIZE => config('ehealth.api.page_size'),
-        ]);
+        ], static fn ($value) => $value !== null));
     }
 
     /**

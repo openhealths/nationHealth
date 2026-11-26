@@ -21,7 +21,6 @@ use Livewire\WithPagination;
 use App\Models\Person\Person;
 use App\Jobs\DeclarationsSync;
 use App\Jobs\DeclarationRegisterSync;
-use App\Jobs\DeclarationRequestsSync;
 use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
 use App\Enums\Declaration\Channel;
@@ -112,13 +111,6 @@ class DeclarationIndex extends Component
      * @var Collection
      */
     public Collection $doctors;
-
-    /**
-     * Count of active declarations.
-     *
-     * @var int
-     */
-    public int $countActive;
 
     public array $employeeIds;
 
@@ -232,13 +224,17 @@ class DeclarationIndex extends Component
             $this->doctorFilter = $this->ownEmployeeUuids;
         }
 
-        $this->countActive = Declaration::query()
-            ->when(!$user->usesFacilityDeclarationRegister(), fn (Builder $q) => $q->forEmployees($this->employeeIds))
+        $this->syncStatus = $this->getSyncStatus();
+    }
+
+    #[Computed]
+    public function countActive(): int
+    {
+        return Declaration::query()
+            ->when(!Auth::user()->usesFacilityDeclarationRegister(), fn (Builder $q) => $q->forEmployees($this->employeeIds))
             ->where('status', Status::ACTIVE)
             ->filterByLegalEntityId(legalEntity()->id)
             ->count();
-
-        $this->syncStatus = $this->getSyncStatus();
     }
 
     public function search(): void
@@ -581,7 +577,7 @@ class DeclarationIndex extends Component
         }
 
         // Get declarations from eHealth filtered by legal entity
-        $query = ['legal_entity_id' => $legalEntity->uuid];
+        $query = ['legal_entity_id' => $legalEntity->uuid, 'status' => Status::ACTIVE->value];
 
         if ($user->hasAllowedRole(Role::DOCTOR)) {
             $query['employee_id'] = Employee::forParty($user->partyId)
@@ -607,61 +603,34 @@ class DeclarationIndex extends Component
             return;
         }
 
-        // Check if there are more pages to process
-        if ($response->isNotLast()) {
-            Bus::batch([
-                new DeclarationsSync(
-                    legalEntity: $legalEntity,
-                    nextEntity: null,
-                    page: 2
-                )
-            ])
-                ->withOption('legal_entity_id', $legalEntity->id)
-                ->withOption('token', Crypt::encryptString($token))
-                ->withOption('user', $user)
-                ->withOption('sync_entity', LegalEntity::ENTITY_DECLARATION)
-                ->catch(callback: function (Batch $batch, Throwable $err) use ($user) {
-                    $message = __('declarations.sync.failed');
+        $nextPage = $response->isNotLast()
+            ? new DeclarationsSync(legalEntity: $legalEntity, page: 2)
+            : new DeclarationsSync(legalEntity: $legalEntity, status: Status::ACTIVE->nextForSync());
 
-                    Log::error('Declaration sync batch failed.', [
-                        'batch_id' => $batch->id,
-                        'exception' => $err
-                    ]);
+        $batch = Bus::batch([$nextPage])
+            ->withOption('legal_entity_id', $legalEntity->id)
+            ->withOption('token', Crypt::encryptString($token))
+            ->withOption('user', $user)
+            ->withOption('sync_entity', LegalEntity::ENTITY_DECLARATION)
+            ->catch(callback: function (Batch $batch, Throwable $err) use ($user) {
+                $message = __('declarations.sync.failed');
 
-                    $user->notify(new DeclarationSyncCompleted($message, 'error'));
-                })
-                ->onQueue('sync')
-                ->name(self::BATCH_NAME)
-                ->dispatch();
+                Log::error('Declaration sync batch failed.', [
+                    'batch_id' => $batch->id,
+                    'exception' => $err
+                ]);
 
-            legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DECLARATION);
+                $user->notify(new DeclarationSyncCompleted($message, 'error'));
+            })
+            ->onQueue('sync')
+            ->name(self::BATCH_NAME);
 
-            Session::flash('success', __('declarations.sync.started'));
-        } else {
-            // Approved requests wait for the doctor signature, so they are synced even without declarations
-            Bus::batch([new DeclarationRequestsSync(legalEntity: $legalEntity)])
-                ->withOption('legal_entity_id', $legalEntity->id)
-                ->withOption('token', Crypt::encryptString($token))
-                ->withOption('user', $user)
-                ->withOption('sync_entity', LegalEntity::ENTITY_DECLARATION)
-                ->catch(callback: function (Batch $batch, Throwable $err) use ($user) {
-                    $message = __('declarations.sync.failed');
+        DB::transaction(static function () use ($legalEntity, $batch): void {
+            $legalEntity->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DECLARATION);
+            $batch->dispatch();
+        });
 
-                    Log::error('DeclarationRequest sync batch failed.', [
-                        'batch_id' => $batch->id,
-                        'exception' => $err
-                    ]);
-
-                    $user->notify(new DeclarationSyncCompleted($message, 'error'));
-                })
-                ->onQueue('sync')
-                ->name(DeclarationRequestsSync::BATCH_NAME)
-                ->dispatch();
-
-            legalEntity()->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DECLARATION);
-
-            Session::flash('success', __('declarations.sync.started'));
-        }
+        Session::flash('success', __('declarations.sync.started'));
     }
 
     /**
@@ -942,6 +911,8 @@ class DeclarationIndex extends Component
 
     public function render(): View
     {
+        $this->syncStatus = $this->getSyncStatus();
+
         return view('livewire.declaration.declaration-index', ['declarations' => $this->declarations]);
     }
 }

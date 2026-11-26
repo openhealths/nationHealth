@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Core\EHealthJob;
 use App\Enums\User\Role;
+use App\Enums\Declaration\Status;
 use App\Models\LegalEntity;
 use App\Models\Employee\Employee;
 use App\Classes\eHealth\EHealth;
@@ -27,6 +28,26 @@ class DeclarationsSync extends EHealthJob
 
     public const string ENTITY = LegalEntity::ENTITY_DECLARATION;
 
+    // Without a status filter the eHealth list defaults to active declarations.
+    protected Status $status = Status::ACTIVE;
+
+    public function __construct(
+        ?LegalEntity $legalEntity = null,
+        ?EHealthJob $nextEntity = null,
+        bool $isFirstLogin = false,
+        int $page = 1,
+        bool $standalone = false,
+        Status $status = Status::ACTIVE,
+    ) {
+        parent::__construct($legalEntity, $nextEntity, $isFirstLogin, $page, $standalone);
+        $this->status = $status;
+    }
+
+    protected function nextPageJob(): static
+    {
+        return new static($this->legalEntity, $this->nextEntity, $this->isFirstLogin, $this->page + 1, $this->standalone, $this->status);
+    }
+
     /**
      * Get declarations data from EHealth API
      * OWNER, REORGANIZATION_OWNER and ADMIN sync all declarations of the legal entity.
@@ -37,7 +58,7 @@ class DeclarationsSync extends EHealthJob
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse
     {
-        $query = ['page' => $this->page, 'legal_entity_id' => $this->legalEntity->uuid];
+        $query = ['page' => $this->page, 'legal_entity_id' => $this->legalEntity->uuid, 'status' => $this->status->value];
 
         if ($this->user->hasAllowedRole(Role::DOCTOR) && !$this->user->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN])) {
             $query['employee_id'] = Employee::forParty($this->user->partyId)
@@ -47,7 +68,14 @@ class DeclarationsSync extends EHealthJob
                 ->firstOrFail()->uuid;
         }
 
-        return EHealth::declaration()->withToken($token)->getMany(query: $query, groupByEntities: true);
+        $api = EHealth::declaration()->withToken($token);
+
+        // Once a declaration ends the doctor may no longer receive its patient's data.
+        if ($this->status !== Status::ACTIVE) {
+            return $api->getRegisterPage($this->legalEntity->uuid, $this->page, $this->status, $query['employee_id'] ?? null);
+        }
+
+        return $api->getMany(query: $query, groupByEntities: true);
     }
 
     /**
@@ -59,6 +87,12 @@ class DeclarationsSync extends EHealthJob
     protected function processResponse(?EHealthResponse $response): void
     {
         $declarations = $response->validate();
+
+        if ($this->status !== Status::ACTIVE) {
+            Repository::declaration()->storeRegisterPage($declarations, $this->legalEntity);
+
+            return;
+        }
 
         Repository::declaration()->storeMany($declarations, $this->legalEntity);
     }
@@ -85,6 +119,16 @@ class DeclarationsSync extends EHealthJob
      * @return EHealthJob|null
      */
     protected function getNextEntityJob(): ?EHealthJob
+    {
+        $nextStatus = $this->status->nextForSync();
+        if ($nextStatus !== null) {
+            return new static($this->legalEntity, $this->nextEntity, $this->isFirstLogin, 1, $this->standalone, $nextStatus);
+        }
+
+        return $this->afterAllStatuses();
+    }
+
+    protected function afterAllStatuses(): EHealthJob
     {
         return $this->standalone
             ? new CompleteSync($this->legalEntity, isFirstLogin: $this->isFirstLogin)
