@@ -145,4 +145,13 @@ class Declaration extends Model
     {
         return $this->declarationRequest?->parentDeclarationUuid !== null;
     }
+
+    public function statusLabel(): string
+    {
+        if ($this->status === Status::ACTIVE && $this->hasParentDeclaration()) {
+            return __('declarations.status.resigned');
+        }
+
+        return $this->status->label();
+    }
 }
