@@ -1,6 +1,7 @@
 @use('App\Enums\Status')
 @use('App\Enums\User\Role')
 @use('App\Enums\JobStatus')
+@use('App\Enums\Party\VerificationStatus')
 @use('App\Models\Employee\Employee')
 @use('App\Models\Employee\EmployeeRequest')
 
@@ -222,7 +223,7 @@
                                             class="input peer text-gray-500 dark:bg-gray-800 dark:text-gray-400"
                                         >
                                             <option value="">{{ __('forms.all_verification_statuses') }}</option>
-                                            @foreach (\App\Enums\Party\VerificationStatus::cases() as $verificationStatus)
+                                            @foreach (VerificationStatus::cases() as $verificationStatus)
                                                 <option value="{{ $verificationStatus->value }}">
                                                     {{ $verificationStatus->label() }}
                                                 </option>
@@ -287,7 +288,7 @@
                                 @endif
                                 @if ($party->verification_status)
                                     @php
-                                        $partyVerification = \App\Enums\Party\VerificationStatus::tryFrom($party->verification_status);
+                                        $partyVerification = VerificationStatus::tryFrom($party->verification_status);
                                         $verificationDetails = $this->partyVerificationDetails($party);
                                     @endphp
                                     <span class="flex items-center gap-1"
@@ -401,18 +402,9 @@
                             <div class="flex items-center gap-4">
                                 @if ($employees->isNotEmpty())
                                     @php
-                                        // Find the last active employee of this person to check the rights
-                                        $latestEmployee = $employees->first(); // or through the method by which you get a topical position
-
-                                        // Check if ANY of the employee positions for this party is an OWNER
                                         $isOwner = $employees->contains(fn ($emp) => $emp->employeeType === Role::OWNER->value);
-                                        $hasUserLinked = $latestEmployee && !empty($latestEmployee->userId);
-
-                                        // We check the possibility of editing personal data according to your rules:
-                                        // 1. Not the owner 3. Not exempt
-                                        $canEditParty = $latestEmployee
-                                            && !$isOwner
-                                            && $latestEmployee->status !== Status::DISMISSED;
+                                        $canEditParty = !$isOwner
+                                            && $employees->contains(fn ($employee) => $employee->status === Status::APPROVED);
                                     @endphp
                                     @can('create', EmployeeRequest::class)
                                         {{-- Edit personal data button --}}

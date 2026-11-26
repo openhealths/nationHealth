@@ -22,6 +22,9 @@ class PartyEdit extends AbstractEmployeeFormManager
     #[Locked]
     public ?int $partyId = null;
 
+    #[Locked]
+    public int $employeeId;
+
     public function mount(LegalEntity $legalEntity, Party $party): void
     {
         $this->loadDictionaries();
@@ -30,21 +33,14 @@ class PartyEdit extends AbstractEmployeeFormManager
         $this->partyId = $party->id;
         $this->pageTitle = __('forms.edit_personal_data') . ' - ' . ($party->fullName ?? '');
 
-        // Fetch the latest employee record strictly within the current Legal Entity
         $employee = $party->employees()
             ->where('legal_entity_id', $legalEntity->id)
+            ->whereStatus(Status::APPROVED)
             ->latest('start_date')
-            ->first();
-
-        // MERGE STRATEGY
-        $existingDraft = null;
-        if ($employee) {
-            $existingDraft = EmployeeRequest::where('employee_id', $employee->id)
-                ->whereNull('uuid')
-                ->whereNull('applied_at')
-                ->latest()
-                ->first();
-        }
+            ->latest('id')
+            ->firstOrFail();
+        $this->employeeId = $employee->id;
+        $existingDraft = Repository::employee()->latestDraftForEmployee($employee);
 
         if ($existingDraft) {
             $this->employeeRequestId = $existingDraft->id;
@@ -52,11 +48,10 @@ class PartyEdit extends AbstractEmployeeFormManager
             $this->form->hydrate($existingDraft);
             session()->flash('info', __('forms.draft_loaded_automatically'));
         } else {
-            // Hydrate from Employee if exists (within this LE), otherwise Party
-            $this->form->hydrate($employee ?? $party);
+            $this->form->hydrate($employee);
         }
 
-        $this->isPartyDataPartiallyLocked = true;
+        $this->applyImmutableFieldLocks($employee);
         $this->isPositionDataLocked = true;
     }
 
@@ -84,38 +79,41 @@ class PartyEdit extends AbstractEmployeeFormManager
     protected function handleDraftPersistence(): EmployeeRequest
     {
         $employee = $this->party->employees()
-            ->where('status', '!=', Status::DISMISSED->value)
-            ->latest('start_date')
-            ->firstOrFail();
+            ->where('legal_entity_id', legalEntity()->id)
+            ->whereStatus(Status::APPROVED)
+            ->findOrFail($this->employeeId);
 
-        $preparedData = $this->form->getPreparedData();
+        $preparedData = $this->prepareEmployeeUpdateData($employee);
         $nestedDataForRevision = $this->mapRevisionData($preparedData);
         $nestedDataForRevision['employee_uuid'] = $employee->uuid;
 
-        // Data for Request Model (System fields)
-        // Since PartyEdit view blocks position fields, preparedData has them from hydrate (which got them from Draft or Employee)
         $employeeRequestData = [
             'user_id' => $employee->user_id,
             'party_id' => $this->party->id,
             'employee_id' => $employee->id,
-            'position' => $preparedData['position'] ?? $employee->position, // Use form data if present (from merged draft)
-            'employee_type' => $preparedData['employee_type'] ?? $employee->employee_type,
-            'start_date' => $preparedData['start_date'] ?? $employee->start_date?->format('Y-m-d'),
-            'division_id' => $preparedData['division_id'] ?? $employee->division_id,
-            'email' => $preparedData['email']
+            'position' => $preparedData['position'],
+            'employee_type' => $preparedData['employee_type'],
+            'start_date' => $preparedData['start_date'],
+            'division_id' => $preparedData['division_id'] ?? $employee->divisionId,
+            'email' => $preparedData['email'],
         ];
 
         if ($this->employeeRequestId) {
             $existingRequest = EmployeeRequest::find($this->employeeRequestId);
-            if ($existingRequest && is_null($existingRequest->uuid)) {
+            if ($existingRequest?->isLocalDraft() && Repository::employee()->requestMatchesEmployee($existingRequest, $employee)) {
                 $existingRequest->fill($employeeRequestData)->save();
-                $existingRequest->revision?->update(['data' => $nestedDataForRevision]);
+
+                if ($existingRequest->revision) {
+                    $existingRequest->revision->update(['data' => $nestedDataForRevision]);
+                } else {
+                    $this->saveRevisionForRequest($existingRequest, $nestedDataForRevision);
+                }
 
                 return $existingRequest;
             }
         }
 
-        $newRequest = Repository::employee()->createEmployeeRequestDraft($employeeRequestData, legalEntity());
+        $newRequest = Repository::employee()->createEmployeeRequestDraft($employeeRequestData, legalEntity(), $employee);
         $this->saveRevisionForRequest($newRequest, $nestedDataForRevision);
 
         return $newRequest;

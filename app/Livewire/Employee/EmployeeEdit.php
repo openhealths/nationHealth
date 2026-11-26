@@ -29,16 +29,10 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         $this->employee = $employee;
         $this->employeeId = $employee->id;
 
-        // Check if the Party of this employee holds the Owner position
-        $isOwnerParty = $employee->party->employees()
-            ->where('employee_type', \App\Enums\User\Role::OWNER->value)
-            ->exists();
-
-        $this->isPersonalDataLocked = $isOwnerParty;
         // Keep division / professional blocks editable; lock only immutable core fields via applyImmutableFieldLocks().
         $this->isPositionDataLocked = false;
         $this->loadDivisions($legalEntity);
-        $this->applyImmutableFieldLocks();
+        $this->applyImmutableFieldLocks($employee);
 
         $positionName = $this->dictionaries['POSITION'][$employee->position] ?? $employee->position;
         $this->pageTitle = __('forms.edit_employee') . ' "' . $positionName . '" - ' . ($employee->party->fullName ?? '');
@@ -66,22 +60,10 @@ class EmployeeEdit extends AbstractEmployeeFormManager
 
     protected function handleDraftPersistence(): EmployeeRequest
     {
-        $preparedData = $this->form->getPreparedData();
+        $preparedData = $this->prepareEmployeeUpdateData($this->employee);
 
-        // Backend enforcement: immutable fields per 3.23.1.7
+        // The main speciality is retained when updating an existing position.
         if ($this->employee && $this->employee->id) {
-            $preparedData['position'] = $this->employee->position;
-            $preparedData['employee_type'] = $this->employee->employeeType;
-            if ($this->employee->startDate) {
-                $preparedData['start_date'] = toIsoDate($this->employee->startDate);
-            }
-
-            $preparedData['tax_id'] = $this->employee->party->taxId;
-            $preparedData['no_tax_id'] = $this->employee->party->noTaxId;
-            if ($this->employee->party->birthDate) {
-                $preparedData['birth_date'] = toIsoDate($this->employee->party->birthDate);
-            }
-
             $originalPrimarySpeciality = $this->employee->specialities()
                 ->where('speciality_officio', true)
                 ->first();

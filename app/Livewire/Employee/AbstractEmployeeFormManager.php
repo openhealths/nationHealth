@@ -59,9 +59,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         );
     }
 
-    /**
-     * blocking only first_name, last_name, date_of_birth, tax_id
-     */
+    /** Blocks changes to birth_date and the tax or passport identifier. */
     public bool $isPartyDataPartiallyLocked = false;
 
     /**
@@ -302,32 +300,6 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         $employeeChunk = Arr::only($flatData, ['position', 'employee_type', 'start_date', 'end_date', 'division_id']);
         $partyChunk = Arr::only($flatData, ['last_name', 'first_name', 'second_name', 'gender', 'birth_date', 'tax_id', 'no_tax_id', 'email', 'working_experience', 'about_myself']);
 
-        // Backend enforcement: a locked party cannot swap its ІПН.
-        // Someone who refused an ІПН must stay no_tax_id, with tax_id equal to the identity document number.
-        // Forcing no_tax_id=false sends that document number as an ІПН and eHealth rejects it.
-        if ($this->isPartyDataPartiallyLocked) {
-            $party = $this->employee?->party ?? $this->employeeRequest?->party;
-            $noTaxId = (bool) ($party?->noTaxId ?? false);
-
-            if ($noTaxId) {
-                $partyChunk['no_tax_id'] = true;
-                $documentNumber = $this->identityDocumentNumber($flatData['documents'] ?? []);
-
-                if ($documentNumber !== null) {
-                    $partyChunk['tax_id'] = $documentNumber;
-                } elseif (is_string($party?->taxId) && $party->taxId !== '') {
-                    $partyChunk['tax_id'] = $party->taxId;
-                }
-            } else {
-                $originalTaxId = $party?->taxId;
-
-                if (is_string($originalTaxId) && $originalTaxId !== '') {
-                    $partyChunk['tax_id'] = $originalTaxId;
-                    $partyChunk['no_tax_id'] = false;
-                }
-            }
-        }
-
         $documentsChunk = $flatData['documents'] ?? [];
         $phonesChunk = $flatData['phones'] ?? [];
 
@@ -383,31 +355,6 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         }
 
         return $result;
-    }
-
-    /**
-     * Number of the identity document that eHealth stores in tax_id when the person has no ІПН.
-     *
-     * @param  list<array<string, mixed>>  $documents
-     */
-    private function identityDocumentNumber(array $documents): ?string
-    {
-        $allowedDocumentTypes = config('ehealth.no_tax_id_document_types', []);
-
-        foreach ($documents as $document) {
-            if (!is_array($document)) {
-                continue;
-            }
-
-            $type = $document['type'] ?? null;
-            $number = $document['number'] ?? null;
-
-            if (is_string($type) && in_array($type, $allowedDocumentTypes, true) && is_string($number) && $number !== '') {
-                return $number;
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -581,10 +528,6 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         return $requestToSign;
     }
 
-    /**
-     * Applies locks to fields that cannot be changed in eHealth for an existing employee.
-     * Call this in the mount() method of child components.
-     */
     protected function authorizeEmployeeFormAction(): void
     {
         if ($this->employee instanceof Employee) {
@@ -598,24 +541,39 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
         $this->authorize('create', $party ? [EmployeeRequest::class, $party] : EmployeeRequest::class);
     }
 
-    protected function applyImmutableFieldLocks(): void
+    /** Applies the existing employee's form locks on mount. */
+    protected function applyImmutableFieldLocks(Employee $employee): void
     {
-        // Check if we are editing a draft linked to an existing employee OR editing the employee directly
-        $isExistingEmployee =
-            ($this->employee && $this->employee->id) ||
-            ($this->employeeRequest && $this->employeeRequest->employee_id);
+        $this->isPersonalDataLocked = $this->partyHoldsOwnerPosition($employee->party);
+        $this->isPartyDataPartiallyLocked = true;
+        $this->isCorePositionDataLocked = true;
+    }
 
-        if ($isExistingEmployee) {
-            // 1. Lock Immutable Party Data
-            // Blocks: first_name, last_name, birth_date, tax_id
-            // Allows: second_name, gender, phones, email, documents (if needed), about_myself, working_experience
-            $this->isPartyDataPartiallyLocked = true;
+    protected function prepareEmployeeUpdateData(Employee $employee): array
+    {
+        $preparedData = $this->form->getPreparedData();
+        $party = $employee->party;
 
-            // 2. Lock Immutable Position Data
-            // Blocks: position, employee_type, start_date
-            // Allows: division_id
-            $this->isCorePositionDataLocked = true;
+        $preparedData['position'] = $employee->position;
+        $preparedData['employee_type'] = $employee->employeeType;
+        $preparedData['start_date'] = toIsoDate($employee->startDate);
+
+        // eHealth identifies the existing party by birth date and tax ID (or passport number).
+        $preparedData['birth_date'] = toIsoDate($party->birthDate);
+        $preparedData['tax_id'] = $party->taxId;
+        $preparedData['no_tax_id'] = $party->noTaxId;
+
+        if ($this->partyHoldsOwnerPosition($party)) {
+            $preparedData['first_name'] = $party->firstName;
+            $preparedData['last_name'] = $party->lastName;
         }
+
+        return $preparedData;
+    }
+
+    protected function partyHoldsOwnerPosition(Party $party): bool
+    {
+        return $party->employees()->whereEmployeeType(Role::OWNER->value)->exists();
     }
 
     /**

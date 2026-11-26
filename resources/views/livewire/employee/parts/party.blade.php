@@ -13,11 +13,14 @@
                     class="peer input text-gray-500"
                     placeholder=" "
                     required
-                    :disabled="$wire.isPersonalDataLocked || $wire.isPartyDataPartiallyLocked"
+                    @error('form.party.lastName')
+                        aria-invalid="true"
+                        aria-describedby="last-name-error"
+                    @enderror
                 />
                 <label for="lastName" class="label">{{ __('forms.last_name') }}</label>
                 @error('form.party.lastName')
-                    <p class="text-error">{{ $message }}</p>
+                    <p id="last-name-error" class="text-error">{{ $message }}</p>
                 @enderror
             </div>
             <div class="form-group">
@@ -29,11 +32,14 @@
                     class="peer input text-gray-500"
                     placeholder=" "
                     required
-                    :disabled="$wire.isPersonalDataLocked || $wire.isPartyDataPartiallyLocked"
+                    @error('form.party.firstName')
+                        aria-invalid="true"
+                        aria-describedby="first-name-error"
+                    @enderror
                 />
                 <label for="firstName" class="label">{{ __('forms.first_name') }}</label>
                 @error('form.party.firstName')
-                    <p class="text-error">{{ $message }}</p>
+                    <p id="first-name-error" class="text-error">{{ $message }}</p>
                 @enderror
             </div>
         </div>

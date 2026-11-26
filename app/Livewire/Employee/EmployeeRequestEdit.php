@@ -33,19 +33,14 @@ class EmployeeRequestEdit extends AbstractEmployeeFormManager
 
         $this->form->hydrate($this->employeeRequest);
 
-        // LOCK LOGIC:
+        if ($employee = $employee_request->employee) {
+            $this->applyImmutableFieldLocks($employee);
+        }
+
         if (!is_null($employee_request->uuid)) {
             // Signed Request: Lock Position fully
             $this->isPositionDataLocked = true;
             session()?->flash('info', __('forms.signed_request_can_edit_party_only'));
-        } else {
-            // Draft: Allow editing mutable fields, but LOCK immutable ones if linked to Employee
-            $this->isPositionDataLocked = false;
-            $this->isPersonalDataLocked = false;
-
-            // This sets isCorePositionDataLocked = true AND isPartyDataPartiallyLocked = true
-            // IF employee_id is present.
-            $this->applyImmutableFieldLocks();
         }
     }
 
@@ -59,7 +54,8 @@ class EmployeeRequestEdit extends AbstractEmployeeFormManager
 
     protected function handleDraftPersistence(): EmployeeRequest
     {
-        if ($this->employeeRequest->employeeId && !Repository::employee()->employeeForRequest($this->employeeRequest)) {
+        $employee = Repository::employee()->employeeForRequest($this->employeeRequest);
+        if ($this->employeeRequest->employeeId && !$employee) {
             throw ValidationException::withMessages(['employeeRequestId' => __('employees.request_employee_mismatch')]);
         }
 
@@ -71,12 +67,11 @@ class EmployeeRequestEdit extends AbstractEmployeeFormManager
             $selectedUser = $this->resolvePositionEmailUser($this->employeeRequest->party);
         }
 
-        $preparedData = $this->form->getPreparedData();
+        $preparedData = $employee ? $this->prepareEmployeeUpdateData($employee) : $this->form->getPreparedData();
         $nestedDataForRevision = $this->mapRevisionData($preparedData);
 
-        // ---Ensure employee_uuid is present if linked to an employee ---
-        if ($this->employeeRequest->employeeId && $this->employeeRequest->employee) {
-            $nestedDataForRevision['employee_uuid'] = $this->employeeRequest->employee->uuid;
+        if ($employee) {
+            $nestedDataForRevision['employee_uuid'] = $employee->uuid;
         }
 
         // If it's a SIGNED request being corrected -> Create NEW Draft (Standard logic)
@@ -89,7 +84,7 @@ class EmployeeRequestEdit extends AbstractEmployeeFormManager
             $newRequest = Repository::employee()->createEmployeeRequestDraft(
                 $employeeRequestData,
                 legalEntity(),
-                $this->employeeRequest->employee
+                $employee
             );
 
             $this->saveRevisionForRequest($newRequest, $nestedDataForRevision);
