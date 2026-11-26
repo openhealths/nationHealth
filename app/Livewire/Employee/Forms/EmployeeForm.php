@@ -648,6 +648,7 @@ class EmployeeForm extends BaseForm
         if ($employee->party) {
             $this->populatePartyData($employee->party);
         }
+        $this->party['email'] = Repository::employee()->emailForEmployee($employee) ?? $this->party['email'];
         $this->position = $employee->position;
         $this->employeeType = $employee->employeeType;
         $this->startDate = convertToAppDateFormat($employee->startDate);
@@ -797,9 +798,11 @@ class EmployeeForm extends BaseForm
                 $partyDataFromRevision['birthDate'] = convertToAppDateFormat($partyDataFromRevision['birthDate']);
             }
 
+            unset($partyDataFromRevision['email']);
             $this->party = array_merge($this->party, $partyDataFromRevision);
         }
 
+        $this->party['email'] = $request->emailForForm() ?? $this->party['email'];
         $this->syncPositionEntryMode();
 
         // --- Phones ---

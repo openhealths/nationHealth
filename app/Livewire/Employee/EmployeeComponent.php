@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Livewire\Employee;
 
 use App\Classes\eHealth\EHealth;
-use App\Enums\Employee\RequestStatus;
-use App\Enums\Employee\RevisionStatus;
 use App\Enums\Status;
 use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
 use App\Repositories\Repository;
+use App\Services\Employee\EmployeeRequestProcessor;
 use App\Traits\FormTrait;
+use Exception;
 use Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -21,6 +21,7 @@ use App\Livewire\Employee\Forms\EmployeeForm as Form;
 use Log;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
+use RuntimeException;
 use Throwable;
 
 abstract class EmployeeComponent extends Component
@@ -243,7 +244,7 @@ abstract class EmployeeComponent extends Component
         try {
             $token = session()->get(config('ehealth.api.oauth.bearer_token'));
             if (!$token) {
-                throw new \RuntimeException('Сесія eHealth не активна. Будь ласка, перезайдіть.');
+                throw new RuntimeException('Сесія eHealth не активна. Будь ласка, перезайдіть.');
             }
 
             // 2. API Request
@@ -276,7 +277,7 @@ abstract class EmployeeComponent extends Component
 
             return true;
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Single Employee Sync Failed', [
                 'employee_id' => $employee->id,
                 'error' => $e->getMessage()
@@ -293,7 +294,7 @@ abstract class EmployeeComponent extends Component
 
     /**
      * Checks hanging requests (NEW with uuid, or legacy SIGNED) for this employee in eHealth.
-     * If the request in eHealth is already APPROVED/REJECTED, updates the local status.
+     * Applies decisions through the same processor as the background sync.
      *
      * @param  Employee  $employee
      * @param  string  $token
@@ -303,13 +304,12 @@ abstract class EmployeeComponent extends Component
     {
         $pendingRequests = EmployeeRequest::query()
             ->where('employee_id', $employee->id)
+            ->filterByLegalEntityId($employee->legalEntityId)
+            ->whereNotNull('uuid')
             ->pendingEhealth()
             ->get();
 
-        if ($pendingRequests->isEmpty()) {
-            return;
-        }
-
+        $remoteRequests = [];
         foreach ($pendingRequests as $request) {
             try {
                 // Fetch specific request status from eHealth by UUID
@@ -320,36 +320,16 @@ abstract class EmployeeComponent extends Component
                 $data = $response->validate();
                 $remoteRequestData = $data[0] ?? null;
 
-                if (!$remoteRequestData) {
-                    continue;
+                if (($remoteRequestData['uuid'] ?? null) === $request->uuid) {
+                    $remoteRequests[] = $remoteRequestData;
                 }
-
-                $remoteStatus = $remoteRequestData['status'] ?? null;
-
-                // Update local status based on remote status
-                if ($remoteStatus === 'APPROVED') {
-                    $request->update(
-                        [
-                            'status' => RequestStatus::APPROVED,
-                            'applied_at' => now(),
-                        ]
-                    );
-                    $request->revision?->update(['status' => RevisionStatus::APPLIED]);
-
-                } elseif (in_array($remoteStatus, ['REJECTED', 'EXPIRED'])) {
-                    $newStatus = ($remoteStatus === 'REJECTED') ? RequestStatus::REJECTED : RequestStatus::EXPIRED;
-                    $request->update(
-                        [
-                            'status' => $newStatus,
-                            'applied_at' => now(),
-                        ]
-                    );
-                }
-
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::warning("Failed to check status for request {$request->uuid}: " . $e->getMessage());
-                // Continue to next request without stopping the flow
             }
+        }
+
+        if ($remoteRequests !== []) {
+            app(EmployeeRequestProcessor::class)->processBatch($remoteRequests, $employee->legalEntity, $token);
         }
     }
 

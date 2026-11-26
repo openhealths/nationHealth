@@ -14,12 +14,16 @@ use App\Models\Division;
 use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
+use App\Models\User;
 use App\Repositories\Repository;
 use App\Traits\BatchLegalEntityQueries;
+use BackedEnum;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
+use Throwable;
 
 class EmployeeRequestProcessor
 {
@@ -62,7 +66,7 @@ class EmployeeRequestProcessor
             ->getDetails($request->uuid)
             ->validate();
 
-        $remoteStatus = $remoteData['status'] instanceof \BackedEnum
+        $remoteStatus = $remoteData['status'] instanceof BackedEnum
             ? $remoteData['status']->value
             : $remoteData['status'];
 
@@ -152,12 +156,11 @@ class EmployeeRequestProcessor
 
     /**
      * Applies data from an APPROVED eHealth request to the local Employee entity.
-     * Since the User Token response does not contain the created 'employee_id',
-     * this method resolves the UUID by searching eHealth via Tax ID.
+     * A registration without a local target must supply the resolved employee UUID.
      *
      * @param  EmployeeRequest  $request  The local request entity.
      * @param  array  $eHealthData  Data array from the API response (primarily for status confirmation).
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function applyApprovedRequest(EmployeeRequest $request, array $eHealthData): void
     {
@@ -168,7 +171,7 @@ class EmployeeRequestProcessor
 
         DB::transaction(function () use ($request, $eHealthData) {
             // 1. Prepare Local Data (Source of Truth for content)
-            $revisionData = $request->revision->data;
+            $revisionData = $request->revision?->data ?? [];
             $mappedLocalData = EHealth::employeeRequest()->mapCreate($revisionData);
 
             $taxId = $mappedLocalData['party']['tax_id'] ?? null;
@@ -178,31 +181,28 @@ class EmployeeRequestProcessor
                     '[EmployeeRequestProcessor] Critical: Tax ID is missing in revision data for approved request.',
                     ['request_id' => $request->id]
                 );
-                // [EN: Throw an exception to halt the transaction if Tax ID is missing]
-                throw new \RuntimeException('Cannot apply approved request: Tax ID is missing.');
+                throw new RuntimeException('Cannot apply approved request: Tax ID is missing.');
             }
 
-            // 2. Resolve Employee UUID (from eHealth request details or Tax ID search)
-            $employeeUuid = $eHealthData['employee_id']
-                ?? $eHealthData['employee_uuid']
-                ?? $this->resolveEmployeeUuid($request, $taxId);
-
-            if (!$employeeUuid) {
-                throw new \RuntimeException(
-                    "Critical: Could not resolve Employee UUID from eHealth by searching Tax ID for Request {$request->id}"
-                );
+            // An update already has a local target even when the eHealth list only reports request status.
+            $employee = Repository::employee()->employeeForRequest($request);
+            $remoteEmployeeUuid = $eHealthData['employee_id'] ?? ($eHealthData['employee_uuid'] ?? null);
+            if ($request->employeeId !== null && (blank($employee?->uuid)
+                || (filled($remoteEmployeeUuid) && $remoteEmployeeUuid !== $employee->uuid))) {
+                throw new RuntimeException('Cannot apply employee request to a different employee or position.');
             }
 
-            // 3. Find existing Employee by UUID or instantiate a new one
-            $employee = Employee::where('uuid', $employeeUuid)->first();
+            $employeeUuid = $employee?->uuid ?? $remoteEmployeeUuid;
 
-            // Fallback for update scenarios (if we have a local link)
-            if (!$employee && $request->employeeId) {
-                $employee = Employee::find($request->employeeId);
+            if (blank($employeeUuid)) {
+                throw new RuntimeException("Cannot resolve Employee UUID for request {$request->id}.");
             }
+
+            // 3. Find an already imported employee when applying a registration request.
+            $employee ??= Employee::whereUuid($employeeUuid)->first();
 
             if ($employee && !Repository::employee()->requestMatchesEmployee($request, $employee)) {
-                throw new \RuntimeException('Cannot apply employee request to a different employee or position.');
+                throw new RuntimeException('Cannot apply employee request to a different employee or position.');
             }
 
             $isNew = false;
@@ -260,15 +260,7 @@ class EmployeeRequestProcessor
 
             Log::info("[EmployeeRequestProcessor] Employee Saved. ID: {$employee->id}");
 
-            // 8. Link Request to Employee
-            if ($request->employeeId !== $employee->id) {
-                $request->update([
-                                     'employee_id' => $employee->id,
-                                     'party_id' => $employee->partyId ?? $request->partyId,
-                                 ]);
-            }
-
-            // 9. Update Details (Party, Documents, Phones...)
+            // 8. Update Details (Party, Documents, Phones...)
             $partyData = $mappedLocalData['party'];
             if (!$isNew && $employee->partyId) {
                 // A revision UUID may predate a confirmed canonical-party relink.
@@ -286,10 +278,10 @@ class EmployeeRequestProcessor
                 $mappedLocalData['scienceDegree'] ?? null
             );
 
-            // 10. Assign Roles to User
+            // 9. Assign Roles to User
             $this->assignUserRoles($employee, $request->legalEntityId, $request->userId);
 
-            // 11. Finalize Request Status (applied_at/inserted_at = remote updated_at for role windows)
+            // 10. Finalize Request Status (applied_at/inserted_at = remote updated_at for role windows)
             $appliedAt = $this->remoteAppliedAt($eHealthData);
             if (blank($employee->insertedAt)) {
                 $employee->insertedAt = $appliedAt;
@@ -297,6 +289,8 @@ class EmployeeRequestProcessor
             }
 
             $request->update([
+                'employee_id' => $employee->id,
+                'party_id' => $employee->partyId,
                 'status' => LocalStatus::APPROVED,
                 'applied_at' => $appliedAt,
                 'inserted_at' => $appliedAt,
@@ -356,18 +350,6 @@ class EmployeeRequestProcessor
     }
 
     /**
-     * Resolves the Employee UUID by searching eHealth using Tax ID.
-     * Since User Token endpoints do not return the created ID, we must find it
-     * by matching Tax ID + Position + Start Date within the current Legal Entity.
-     */
-    private function resolveEmployeeUuid(EmployeeRequest $request, string $taxId): ?string
-    {
-        $remote = $this->matcher->findApprovedForRequest($request, $taxId, legalEntity()->uuid);
-
-        return $remote['uuid'] ?? null;
-    }
-
-    /**
      * Among approved local requests, keep only the newest per employee_id.
      * Creates (no employee_id) are kept individually. Older superseded edits are returned separately.
      *
@@ -408,7 +390,7 @@ class EmployeeRequestProcessor
     /**
      * Processes a batch of remote Employee Request data from eHealth.
      */
-    public function processBatch(array $eHealthData, LegalEntity $legalEntity): void
+    public function processBatch(array $eHealthData, LegalEntity $legalEntity, ?string $token = null): void
     {
         // Fix for single object response vs array response
         // If eHealth returns a single associative array (has 'uuid' or 'id'), wrap it in a list.
@@ -453,7 +435,9 @@ class EmployeeRequestProcessor
                 if ($remoteStatus === 'APPROVED') {
                     // Keep payload only in the batch map ($eHealthRequests). Do not setAttribute a
                     // pseudo-column — Eloquent update() would try to persist it and abort PG.
-                    $approvedLocals->push($localRequest);
+                    if ($localRequest->revision) {
+                        $approvedLocals->push($localRequest);
+                    }
                 } elseif (in_array($remoteStatus, ['REJECTED', 'EXPIRED'], true)) {
                     $newStatus = match ($remoteStatus) {
                         'REJECTED' => LocalStatus::REJECTED,
@@ -473,7 +457,7 @@ class EmployeeRequestProcessor
                         );
                     }
                 }
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error(
                     "[EmployeeRequestProcessor] Failed to process request ID {$localRequest->id}: ".$e->getMessage(),
                     ['exception' => $e]
@@ -487,6 +471,15 @@ class EmployeeRequestProcessor
         foreach ($partition['apply'] as $localRequest) {
             try {
                 $remoteRequestData = $eHealthRequests->get($localRequest->uuid);
+                // A registration can require an employee search before it has a local link.
+                if ($localRequest->employeeId === null && blank($remoteRequestData['employee_id'] ?? ($remoteRequestData['employee_uuid'] ?? null))) {
+                    $taxId = data_get($localRequest->revision?->data, 'party.tax_id');
+                    if (is_string($taxId) && filled($taxId)) {
+                        $matchedEmployee = $this->matcher->findApprovedForRequest($localRequest, $taxId, $legalEntity->uuid, $token);
+                        $remoteRequestData['employee_id'] = $matchedEmployee['uuid'] ?? null;
+                    }
+                }
+
                 // Capture the group before applying: a create request can acquire employeeId during apply.
                 $supersededRequests = $supersededByEmployee->get($localRequest->employeeId, collect());
 
@@ -503,7 +496,7 @@ class EmployeeRequestProcessor
                         $supersededRequest->revision?->update(['status' => RevisionStatus::OUTDATED]);
                     }
                 });
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error(
                     "[EmployeeRequestProcessor] Failed to process request ID {$localRequest->id}: ".$e->getMessage(),
                     ['exception' => $e]
@@ -550,7 +543,7 @@ class EmployeeRequestProcessor
     {
         // Link User to Party if missing (critical for the User->Employee relation)
         if ($requestUserId && $employee->partyId) {
-            $user = \App\Models\User::find($requestUserId);
+            $user = User::find($requestUserId);
             if ($user && !$user->partyId) {
                 $user->partyId = $employee->partyId;
                 $user->save();
@@ -560,7 +553,7 @@ class EmployeeRequestProcessor
         $users = $employee->party->users()->get();
 
         if ($users->isEmpty() && $requestUserId) {
-            $requestUser = \App\Models\User::find($requestUserId);
+            $requestUser = User::find($requestUserId);
 
             if ($requestUser) {
                 $users = collect([$requestUser]);
@@ -572,6 +565,7 @@ class EmployeeRequestProcessor
         }
 
         $roleName = $employee->employeeType;
+        setPermissionsTeamId($legalEntityId);
 
         foreach ($users as $user) {
             $employee->users()->syncWithoutDetaching([$user->id]);
@@ -583,7 +577,6 @@ class EmployeeRequestProcessor
 
             // Assign Role based on Employee Type
             if ($roleName && !$user->hasRole($roleName)) {
-                setPermissionsTeamId($legalEntityId);
                 $user->assignRole($roleName);
             }
         }

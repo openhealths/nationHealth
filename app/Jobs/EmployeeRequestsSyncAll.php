@@ -48,7 +48,7 @@ class EmployeeRequestsSyncAll extends EHealthJob
 
         // Use the service to process the data
         $processor = app(EmployeeRequestProcessor::class);
-        $processor->processBatch($validatedData, $this->legalEntity);
+        $processor->processBatch($validatedData, $this->legalEntity, $this->token);
     }
 
     protected function getAdditionalMiddleware(): array

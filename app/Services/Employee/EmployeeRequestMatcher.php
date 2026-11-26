@@ -6,8 +6,10 @@ namespace App\Services\Employee;
 
 use App\Classes\eHealth\EHealth;
 use App\Models\Employee\EmployeeRequest;
+use BackedEnum;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Shared matching rules for linking local employee requests to eHealth employees.
@@ -25,7 +27,7 @@ class EmployeeRequestMatcher
      */
     public static function isRemoteStillPending(mixed $status): bool
     {
-        $value = $status instanceof \BackedEnum ? $status->value : $status;
+        $value = $status instanceof BackedEnum ? $status->value : $status;
 
         return is_string($value) && in_array($value, ['NEW', 'SIGNED'], true);
     }
@@ -42,7 +44,7 @@ class EmployeeRequestMatcher
 
         try {
             return Carbon::parse($localDate)->isSameDay(Carbon::parse($remoteDate));
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
     }
@@ -104,7 +106,8 @@ class EmployeeRequestMatcher
     public function findApprovedForRequest(
         EmployeeRequest $request,
         string $taxId,
-        string $legalEntityUuid
+        string $legalEntityUuid,
+        ?string $token = null
     ): ?array {
         Log::info("[EmployeeRequestMatcher] Searching eHealth for Employee by TaxID: {$taxId}");
 
@@ -127,7 +130,12 @@ class EmployeeRequestMatcher
                 $params['employee_type'] = $employeeType;
             }
 
-            $employeesList = EHealth::employee()->getMany($params, withIdentity: true)->validate();
+            $client = EHealth::employee();
+            if ($token !== null) {
+                $client->withToken($token);
+            }
+
+            $employeesList = $client->getMany($params, withIdentity: true)->validate();
 
             if (empty($employeesList)) {
                 Log::warning(
@@ -138,7 +146,7 @@ class EmployeeRequestMatcher
             }
 
             return $this->pickFromApprovedList($request, $employeesList);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error(
                 '[EmployeeRequestMatcher] Search failed: ' . $e->getMessage(),
                 ['exception' => $e, 'tax_id' => $taxId]

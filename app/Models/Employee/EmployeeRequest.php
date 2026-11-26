@@ -116,6 +116,17 @@ class EmployeeRequest extends BaseEmployee
         return blank($this->uuid) && $this->status === RequestStatus::NEW;
     }
 
+    public function emailForForm(): ?string
+    {
+        $revisionEmail = data_get($this->revision?->data, 'party.email');
+
+        if (is_string($revisionEmail) && filled($revisionEmail)) {
+            return $revisionEmail;
+        }
+
+        return filled($this->email) ? $this->email : null;
+    }
+
     /**
      * Submitted to eHealth, awaiting APPROVED/REJECTED/EXPIRED.
      * Includes legacy rows that still use local SIGNED status.

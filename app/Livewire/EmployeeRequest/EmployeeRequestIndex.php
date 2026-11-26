@@ -6,6 +6,7 @@ namespace App\Livewire\EmployeeRequest;
 
 use App\Exceptions\EHealth\EHealthConnectionException;
 use Auth;
+use Exception;
 use App\Models\User;
 use App\Enums\JobStatus;
 use Illuminate\Bus\Batch;
@@ -187,7 +188,7 @@ class EmployeeRequestIndex extends EmployeeComponent
             ]);
 
             unset($this->requests);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('[SyncOne] ERROR: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             $this->dispatch('flashMessage', [
                 'message' => __('employees.sync.employee_request_failed', ['error' => $e->getMessage()]),
@@ -255,7 +256,7 @@ class EmployeeRequestIndex extends EmployeeComponent
             $this->dispatch('flashMessage', ['message' => 'Помилка API ЕСОЗ: ' . $e->getMessage(), 'type' => 'error']);
 
             return;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Employee Request sync failed: Unexpected error.', ['error' => $e->getMessage()]);
             $this->dispatch('flashMessage', ['message' => 'Виникла помилка при ініціалізації синхронізації', 'type' => 'error']);
 
@@ -264,7 +265,7 @@ class EmployeeRequestIndex extends EmployeeComponent
 
         // 2. Process Page 1 immediately
         $validatedData = $response->validate();
-        $processor->processBatch($validatedData, legalEntity());
+        $processor->processBatch($validatedData, $this->legalEntity, $token);
         // Store result for dispatched jobs
         $batch = null;
 

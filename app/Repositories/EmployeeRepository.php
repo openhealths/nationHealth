@@ -74,6 +74,43 @@ readonly class EmployeeRepository
         return $employee && $this->requestMatchesEmployee($request, $employee) ? $employee : null;
     }
 
+    public function emailForEmployee(Employee $employee): ?string
+    {
+        if ($employee->userId !== null) {
+            $email = User::query()
+                ->whereKey($employee->userId)
+                ->where(fn (Builder $query) => $query->wherePartyId($employee->partyId)->orWhereNull('party_id'))
+                ->value('email');
+
+            if (filled($email)) {
+                return $email;
+            }
+        }
+
+        // The invitation stores the address before the user is linked to the party on first login.
+        $requests = EmployeeRequest::whereEmployeeId($employee->id)
+            ->whereLegalEntityId($employee->legalEntityId)
+            ->whereNotNull('uuid')
+            ->whereIn('status', [RequestStatus::APPROVED, RequestStatus::NEW, RequestStatus::SIGNED])
+            ->with('revision')
+            ->orderByRaw('case when status = ? then 0 else 1 end', [RequestStatus::APPROVED->value])
+            ->latest('id')
+            ->get();
+
+        foreach ($requests as $request) {
+            // A pending edit may hold a replacement address that eHealth has not accepted yet.
+            if ($request->isPendingEhealth() && filled(data_get($request->revision?->data, 'employee_uuid'))) {
+                continue;
+            }
+
+            if ($this->requestMatchesEmployee($request, $employee) && ($email = $request->emailForForm()) !== null) {
+                return $email;
+            }
+        }
+
+        return null;
+    }
+
     public function latestDraftForEmployee(Employee $employee): ?EmployeeRequest
     {
         return EmployeeRequest::whereEmployeeId($employee->id)

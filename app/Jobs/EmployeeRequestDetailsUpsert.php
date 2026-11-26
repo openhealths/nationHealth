@@ -17,6 +17,7 @@ use App\Classes\eHealth\EHealth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Queue\SerializesModels;
 use App\Classes\eHealth\EHealthResponse;
+use App\Enums\Employee\RequestStatus;
 use App\Enums\Employee\RevisionStatus;
 use App\Models\Employee\EmployeeRequest;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -63,6 +64,13 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
     protected function processResponse(?EHealthResponse $response): void
     {
         $validatedData = $response->validate();
+        $remoteStatus = $validatedData['status'];
+        $revision = $this->employeeRequest->revision;
+
+        // Leave an approved submission retryable until the processor applies its local revision.
+        if ($remoteStatus === RequestStatus::APPROVED->value && $this->employeeRequest->isPendingEhealth() && $revision) {
+            return;
+        }
 
         $validatedData['inserted_at'] = Carbon::parse($validatedData['inserted_at'])->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s');
 
@@ -74,13 +82,12 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
 
         $employeeRequestUser = User::where('email', $userEmail)->first();
 
-        $employeeRequestPartyId = $employeeRequestUser?->partyId;
+        $employeeRequestPartyId = $this->employeeRequest->partyId ?? $employeeRequestUser?->partyId;
 
-        $remoteStatus = $validatedData['status'] ?? null;
-        $isTerminal = in_array($remoteStatus, ['APPROVED', 'REJECTED', 'EXPIRED'], true);
+        $isTerminal = in_array($remoteStatus, [RequestStatus::APPROVED->value, RequestStatus::REJECTED->value, RequestStatus::EXPIRED->value], true);
 
         $fillData = array_merge(
-            $response->map($validatedData, $this->legalEntity, $employeeRequestUser?->id ?? null, $employeeRequestPartyId ?? null),
+            $response->map($validatedData, $this->legalEntity, $employeeRequestUser?->id, $employeeRequestPartyId),
             [
                 'sync_status' => JobStatus::COMPLETED->value,
                 'inserted_at' => Carbon::parse($validatedData['inserted_at'])->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? Carbon::now(),
@@ -98,9 +105,18 @@ class EmployeeRequestDetailsUpsert extends EHealthJob
 
         $this->employeeRequest->save();
 
-        $revisionData['data'] = Ehealth::employeeRequest()->mapRevisionData($response);
+        $revisionData['data'] = EHealth::employeeRequest()->mapRevisionData($response);
+        if ($employeeUuid = data_get($revision?->data, 'employee_uuid')) {
+            $revisionData['data']['employee_uuid'] = $employeeUuid;
+        }
         $revisionData['ehealth_response'] = [ 'data' => $response->getData()];
-        $revisionData['status'] = RevisionStatus::APPLIED->value;
+        $revisionData['status'] = match ($remoteStatus) {
+            RequestStatus::APPROVED->value => $revision?->status === RevisionStatus::OUTDATED
+                ? RevisionStatus::OUTDATED
+                : RevisionStatus::APPLIED,
+            RequestStatus::REJECTED->value, RequestStatus::EXPIRED->value => RevisionStatus::OUTDATED,
+            default => RevisionStatus::SENT,
+        };
 
         Repository::revision()->saveRevision($this->employeeRequest, $revisionData);
     }
