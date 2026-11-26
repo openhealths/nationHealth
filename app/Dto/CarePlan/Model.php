@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 namespace App\Dto\CarePlan;
 
-use App\Classes\eHealth\Api\Responses\Collections\CarePlanDetails;
 use App\Dto\CodeableConcept\Model as CodeableConceptData;
 use App\Dto\Identifier\Model as IdentifierData;
 use App\Dto\Input\FormCodeableConcept;
 use App\Dto\Input\FormIdentifier;
 use App\Enums\CarePlanStatus;
-use App\Livewire\CarePlan\Forms\CarePlanForm;
+use App\Livewire\CarePlan\Forms\CarePlanDraftForm;
 use App\Models\CarePlan;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Symfony\Component\ObjectMapper\Attribute\Map;
-use Symfony\Component\ObjectMapper\Condition\SourceClass;
 use Symfony\Component\ObjectMapper\Condition\TargetClass;
 use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 
@@ -26,12 +24,10 @@ use Symfony\Component\ObjectMapper\ObjectMapperInterface;
  * through attribute access instead of declared properties. The remaining values
  * are used to build the related concepts, identifiers and period.
  */
-#[Map(source: CarePlanForm::class)]
-#[Map(source: CarePlanDetails::class)]
+#[Map(source: CarePlanDraftForm::class)]
 #[Map(target: CarePlan::class)]
 class Model
 {
-    #[Map(source: '[id]', if: new SourceClass(CarePlanDetails::class))]
     #[Map(if: new TargetClass(CarePlan::class))]
     public string $uuid;
 
@@ -42,54 +38,34 @@ class Model
     public int $legalEntityId;
 
     #[Map(if: new TargetClass(CarePlan::class))]
-    public ?int $authorId = null;
+    public int $authorId;
 
     public string $authorUuid;
 
     #[Map(if: new TargetClass(CarePlan::class))]
-    public ?int $encounterId = null;
+    public int $encounterId;
 
-    #[Map(source: '[status]', if: new SourceClass(CarePlanDetails::class))]
     #[Map(if: new TargetClass(CarePlan::class))]
     public string $status = CarePlanStatus::DRAFT->value;
 
-    #[Map(source: '[intent]', if: new SourceClass(CarePlanDetails::class))]
-    #[Map(source: 'intent', if: new SourceClass(CarePlanForm::class))]
     #[Map(if: new TargetClass(CarePlan::class))]
     public string $intent = 'order';
 
-    #[Map(source: '[title]', if: new SourceClass(CarePlanDetails::class))]
-    #[Map(source: 'title', if: new SourceClass(CarePlanForm::class))]
     #[Map(if: new TargetClass(CarePlan::class))]
     public string $title = '';
-
-    #[Map(source: '[requisition]', if: new SourceClass(CarePlanDetails::class))]
-    #[Map(if: new TargetClass(CarePlan::class))]
-    public ?string $requisition = null;
 
     public string $category = '';
 
     public string $termsOfService = '';
 
-    #[Map(source: '[context]', if: new SourceClass(CarePlanDetails::class))]
-    #[Map(source: 'context', if: new SourceClass(CarePlanForm::class))]
     #[Map(if: new TargetClass(CarePlan::class))]
     public ?string $context = null;
 
-    #[Map(source: '[description]', if: new SourceClass(CarePlanDetails::class))]
-    #[Map(source: 'description', if: new SourceClass(CarePlanForm::class))]
     #[Map(if: new TargetClass(CarePlan::class))]
     public ?string $description = null;
 
-    #[Map(source: '[note]', if: new SourceClass(CarePlanDetails::class))]
-    #[Map(source: 'note', if: new SourceClass(CarePlanForm::class))]
     #[Map(if: new TargetClass(CarePlan::class))]
     public ?string $note = null;
-
-    #[Map(source: '[inform_with?][auth_method_id?]', if: new SourceClass(CarePlanDetails::class))]
-    #[Map(source: 'informWith', if: new SourceClass(CarePlanForm::class))]
-    #[Map(if: new TargetClass(CarePlan::class))]
-    public ?string $informWith = null;
 
     public string $periodStart = '';
 
@@ -159,49 +135,9 @@ class Model
 
             return $this->identifier($mapper, $uuid, $type);
         }));
-        foreach (['context', 'description', 'note', 'informWith'] as $field) {
+        foreach (['context', 'description', 'note'] as $field) {
             $this->{$field} = $this->{$field} === '' ? null : $this->{$field};
         }
-    }
-
-    /** @var array<string, CodeableConceptData|null> */
-    public array $remoteConcepts;
-
-    /** @var array<string, array|null> */
-    public array $remoteReferences;
-
-    /** @var array<string, list<array>> */
-    public array $remoteReferenceLists;
-
-    /** Prepare the validated relations for normalized persistence. */
-    public function prepareResponse(CarePlanDetails $details): void
-    {
-        $this->status = $details->status()->value;
-        $this->remoteConcepts = [
-            'categoryConcept' => CodeableConceptData::map($details->get('category')),
-            'termsOfServiceConcept' => CodeableConceptData::map($details->get('terms_of_service')),
-            'statusReasonConcept' => CodeableConceptData::map($details->statusReason()),
-        ];
-        $this->prepareResourceRelations($details->toResource());
-    }
-
-    protected function prepareResourceRelations(array $resource): void
-    {
-        $this->remoteReferences = [
-            'subjectReference' => $resource['subject'] ?? null,
-            'authorReference' => $resource['author'] ?? null,
-            'encounterIdentifier' => $resource['encounter'] ?? null,
-            'managingOrganization' => $resource['managingOrganization'] ?? null,
-            'basedOn' => $resource['basedOn'] ?? null,
-            'partOf' => $resource['partOf'] ?? null,
-            'careManager' => $resource['careManager'] ?? null,
-        ];
-        $this->remoteReferenceLists = [
-            'supportingInfoReferences' => $resource['supportingInfo'] ?? [],
-            'contributors' => $resource['contributor'] ?? [],
-        ];
-        $this->period = $resource['period'];
-        $this->addresses = $resource['addresses'];
     }
 
     protected function concept(ObjectMapperInterface $mapper, string $system, string $code): CodeableConceptData

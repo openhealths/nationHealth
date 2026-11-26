@@ -7,6 +7,9 @@ namespace App\Repositories;
 use App\Repositories\Repository;
 use App\Dto\CarePlan\Model as CarePlanData;
 use App\Dto\Identifier\Model as IdentifierData;
+use App\Enums\Episode\Status as EpisodeStatus;
+use App\Enums\Person\ProcedureStatus;
+use App\Models\MedicalEvents\Sql\Procedure;
 use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use App\Enums\CarePlanStatusFilter;
 use App\Enums\CarePlanCompletenessFilter;
@@ -68,6 +71,108 @@ class CarePlanRepository extends MedicalEventsBaseRepository
     private function uiRelations(): array
     {
         return [...self::FHIR_RELATIONS, 'person.names', 'author.party', 'encounter.episode', 'encounter.diagnoses.condition.type.coding', 'approvals.grantedTo.type.coding', ...array_map(static fn (string $relation): string => 'activities.'.$relation, CarePlanActivityRepository::FHIR_RELATIONS), 'activities.author.party'];
+    }
+
+    /**
+     * Insert the mapped draft and its relations atomically. Retried submissions use the same UUID.
+     */
+    public function createDraft(CarePlanData $data, ObjectMapperInterface $mapper): CarePlan
+    {
+        return $this->storageTransaction(function () use ($data, $mapper): CarePlan {
+            // Serialize requests for this patient before the draft row exists.
+            Person::whereKey($data->personId)->lockForUpdate()->firstOrFail();
+            $existing = CarePlan::whereUuid($data->uuid)->lockForUpdate()->first();
+            if ($existing !== null) {
+                if ((int) $existing->personId !== $data->personId || (int) $existing->legalEntityId !== $data->legalEntityId
+                    || (int) $existing->authorId !== $data->authorId) {
+                    throw ValidationException::withMessages(['form.title' => __('care-plan.document_context_unavailable')]);
+                }
+
+                return $existing;
+            }
+
+            $draft = new CarePlan();
+            $mapper->map($data, $draft);
+            $concepts = MedicalEventsRepository::codeableConcept();
+            $identifiers = MedicalEventsRepository::identifier();
+            foreach (['categoryConcept', 'termsOfServiceConcept'] as $relation) {
+                $draft->{$relation}()->associate($concepts->store($data->{$relation}));
+            }
+            foreach (['authorReference', 'subjectReference', 'encounterIdentifier', 'managingOrganization'] as $relation) {
+                $draft->{$relation}()->associate($identifiers->store($data->{$relation}));
+            }
+
+            // Mark the normalized local draft as complete for readers that require the FHIR backfill marker.
+            $draft->detailsSyncedAt = now();
+            $draft->saveOrFail();
+            MedicalEventsRepository::period()->sync($draft, $data->period, 'effectivePeriod');
+
+            $supportingIds = $data->supportingInfoReferences->map(function (IdentifierData $reference) use ($data, $identifiers): int {
+                $identifier = $identifiers->store($reference);
+                $key = $reference->type->coding[0]->code.':'.$reference->value;
+                if (isset($data->medicalRecordLabels[$key])) {
+                    $identifier->displayValue = $data->medicalRecordLabels[$key];
+                    $identifier->saveOrFail();
+                }
+
+                return $identifier->id;
+            });
+            $this->syncPivot($draft, 'supportingInfoReferences', $supportingIds->all());
+            $contributorIds = $data->contributors->map(fn (IdentifierData $reference): int => $identifiers->store($reference)->id);
+            $this->syncPivot($draft, 'contributors', $contributorIds->all());
+
+            return $draft;
+        });
+    }
+
+    /** Resolve a finished encounter in the current facility that the clinician may read. */
+    public function draftEncounter(string $uuid, Person $person, User $user, LegalEntity $legalEntity): ?Encounter
+    {
+        if (!Str::isUuid($uuid)) {
+            return null;
+        }
+        $encounter = $this->findEncounter($uuid, $person->id);
+        if ($encounter === null || $encounter->status !== EncounterStatus::FINISHED
+            || $user->cannot('view', [$encounter, $person])) {
+            return null;
+        }
+
+        $episode = $person->filterRecordsWithMerged(Episode::query())
+            ->whereUuid($encounter->episode?->value)
+            ->whereHas('managingOrganization', fn (Builder $query) => $query->whereValue($legalEntity->uuid))
+            ->exists();
+
+        return $episode ? $encounter : null;
+    }
+
+    /** @return list<string> */
+    public function draftEpisodeUuids(Person $person, Encounter $encounter, User $user): array
+    {
+        return $person->filterRecordsWithMerged(Episode::query())
+            ->where(fn (Builder $query) => $query->whereStatus(EpisodeStatus::ACTIVE)->orWhere('uuid', $encounter->episode?->value))
+            ->get()
+            ->filter(fn (Episode $episode): bool => $user->can('view', [$episode, $person]))
+            ->pluck('uuid')->values()->all();
+    }
+
+    /** @return array<string, string> */
+    public function draftMedicalRecordLabels(Person $person, Encounter $encounter, User $user): array
+    {
+        $procedures = $person->filterRecordsWithMerged(Procedure::forEncounter($encounter->uuid))
+            ->whereStatus(ProcedureStatus::COMPLETED)
+            ->with('code')->get()->toBase();
+        $reports = $person->filterRecordsWithMerged(DiagnosticReport::forEncounter($encounter->uuid))
+            ->final()
+            ->with('code')->get()->toBase();
+
+        return $procedures->concat($reports)
+            ->filter(fn (Procedure|DiagnosticReport $record): bool => $user->can('view', [$record, $person]))
+            ->mapWithKeys(function (Procedure|DiagnosticReport $record): array {
+                $type = $record instanceof Procedure ? 'procedure' : 'diagnostic_report';
+                $label = $record->code?->displayValue ?: ($record->code?->value ?: $record->uuid);
+
+                return [$type.':'.$record->uuid => __('care-plan.emz_type.'.$type).' — '.$label];
+            })->all();
     }
 
     public function formContext(array $form, ?int $localId = null): array
@@ -386,137 +491,6 @@ class CarePlanRepository extends MedicalEventsBaseRepository
 
             return $plan->unsetRelations();
         });
-    }
-
-    public function draftRevision(array $resource): string
-    {
-        return hash('sha256', json_encode($resource, JSON_THROW_ON_ERROR));
-    }
-
-    /** @return array{plan: CarePlan, resource: array} */
-    public function createDraft(CarePlanData $data, ObjectMapperInterface $mapper): array
-    {
-        return $this->storageTransaction(function () use ($data, $mapper): array {
-            // There is no draft row to lock before the first save.
-            Person::whereKey($data->personId)->lockForUpdate()->firstOrFail();
-            if (CarePlan::whereUuid($data->uuid)->exists()) {
-                throw ValidationException::withMessages(['form.title' => __('care-plan.document_context_unavailable')]);
-            }
-
-            return $this->storeDraft($data, new CarePlan(), $mapper);
-        });
-    }
-
-    /**
-     * @param callable(CarePlan, string): ?CarePlanData $prepare
-     * @return array{plan: CarePlan, resource: array}|null
-     */
-    public function updateDraft(
-        int $draftId,
-        int $personId,
-        int $legalEntityId,
-        callable $prepare,
-        ObjectMapperInterface $mapper
-    ): ?array {
-        return $this->storageTransaction(function () use ($draftId, $personId, $legalEntityId, $prepare, $mapper): ?array {
-            $draft = CarePlan::with(self::FHIR_RELATIONS)
-                ->wherePersonId($personId)
-                ->whereLegalEntityId($legalEntityId)
-                ->whereStatus(CarePlanStatus::DRAFT->value)
-                ->lockForUpdate()
-                ->find($draftId);
-            if ($draft === null || $draft->requiresFhirImport()) {
-                return null;
-            }
-
-            $revision = $this->draftRevision($this->getResource($draft));
-            $data = $prepare($draft, $revision);
-            if ($data === null) {
-                return null;
-            }
-
-            $data->requisition = $draft->requisition;
-
-            return $this->storeDraft($data, $draft, $mapper);
-        });
-    }
-
-    /** @return array{plan: CarePlan, resource: array} */
-    protected function storeDraft(CarePlanData $data, CarePlan $plan, ObjectMapperInterface $mapper): array
-    {
-        $existing = $plan->exists ? $plan : null;
-        $mapper->map($data, $plan);
-
-        foreach (['categoryConcept', 'termsOfServiceConcept'] as $relation) {
-            if ($existing?->{$relation}?->coding->first()?->code !== $data->{$relation}->coding[0]->code) {
-                $plan->{$relation}()->associate($this->syncCodeableConcept($existing, $data->{$relation}->toArray(), $relation));
-            }
-        }
-        foreach (['authorReference', 'subjectReference', 'encounterIdentifier', 'managingOrganization'] as $relation) {
-            if ($existing?->{$relation}?->value !== $data->{$relation}->value) {
-                $plan->{$relation}()->associate($this->syncIdentifier($existing, $this->draftReference($data->{$relation}), $relation));
-            }
-        }
-
-        $plan->detailsSyncedAt = now();
-        $plan->saveOrFail();
-        MedicalEventsRepository::period()->sync($plan, $data->period, 'effectivePeriod');
-
-        $supportingInfo = $data->supportingInfoReferences->map(function (IdentifierData $reference) use ($data): array {
-            $key = $reference->type->coding[0]->code.':'.$reference->value;
-
-            return $this->draftReference($reference) + ['displayValue' => $data->medicalRecordLabels[$key] ?? null];
-        })->all();
-        $this->syncPivot($plan, 'supportingInfoReferences', $this->syncIdentifiers($existing, $supportingInfo, 'supportingInfoReferences'));
-        $contributors = $data->contributors->map($this->draftReference(...))->all();
-        $this->syncPivot($plan, 'contributors', $this->syncIdentifiers($existing, $contributors, 'contributors'));
-
-        $plan->unsetRelations();
-
-        return ['plan' => $plan, 'resource' => $this->getResource($plan)];
-    }
-
-    protected function draftReference(IdentifierData $reference): array
-    {
-        return ['identifier' => ['value' => $reference->value, 'type' => $reference->type->toArray()]];
-    }
-
-    /** Store the mapped attributes and relations of a confirmed eHealth response. */
-    protected function saveConfirmedResource(CarePlanData $data, CarePlan $plan): CarePlan
-    {
-        if ($plan->uuid !== $data->uuid) {
-            throw ValidationException::withMessages(['id' => __('care-plan.document_context_unavailable')]);
-        }
-
-        $data->context ??= $plan->context;
-        $data->personId = $plan->personId;
-        $data->legalEntityId = $plan->legalEntityId;
-
-        $authorUuid = data_get($data->remoteReferences, 'authorReference.identifier.value');
-        $encounterUuid = data_get($data->remoteReferences, 'encounterIdentifier.identifier.value');
-        $data->authorId = $authorUuid === null ? null : Employee::whereUuid($authorUuid)->whereLegalEntityId($data->legalEntityId)->value('id');
-        $data->encounterId = $encounterUuid === null ? null : Encounter::whereUuid($encounterUuid)->value('id');
-        objectMapper()->map($data, $plan);
-
-        $existing = $plan->exists ? $plan : null;
-        foreach ($data->remoteConcepts as $relation => $concept) {
-            $plan->{$relation}()->associate($this->syncCodeableConcept($existing, $concept?->toArray(), $relation));
-        }
-        foreach ($data->remoteReferences as $relation => $reference) {
-            if ($relation === 'managingOrganization' && !isset($reference['identifier']['value'])) {
-                continue;
-            }
-
-            $plan->{$relation}()->associate($this->syncIdentifier($existing, $reference, $relation));
-        }
-        $plan->detailsSyncedAt = now();
-        $plan->saveOrFail();
-        MedicalEventsRepository::period()->sync($plan, $data->period, 'effectivePeriod');
-        foreach ($data->remoteReferenceLists as $relation => $references) {
-            $this->syncPivot($plan, $relation, $this->syncIdentifiers($plan, $references, $relation));
-        }
-
-        return $plan->unsetRelations();
     }
 
     public function getResource(int|CarePlan $id): array
@@ -1323,9 +1297,9 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         });
     }
 
-    public function beginSubmission(CarePlan|CarePlanActivity $record, array $changes, array $operationContext = []): EhealthLink
+    public function beginSubmission(CarePlan|CarePlanActivity $record, array $changes): EhealthLink
     {
-        return $this->storageTransaction(function () use ($record, $changes, $operationContext) {
+        return $this->storageTransaction(function () use ($record, $changes) {
             $record = $record->newQuery()->whereKey($record->id)->lockForUpdate()->firstOrFail();
             if ($this->hasPendingSubmission($record)) {
                 throw ValidationException::withMessages(['submission' => __('care-plan.submission_pending')]);
@@ -1333,34 +1307,14 @@ class CarePlanRepository extends MedicalEventsBaseRepository
 
             $resource = $record instanceof CarePlan ? $this->getResource($record->id) : Repository::carePlanActivity()->getResource($record->id);
 
-            if ($record instanceof CarePlan && ($changes['status'] ?? null) === CarePlanStatus::PENDING->value) {
-                if (CarePlanStatus::fromStored($record->status) !== CarePlanStatus::DRAFT
-                    || (isset($operationContext['expectedRevision'])
-                        && !hash_equals($operationContext['expectedRevision'], $this->draftRevision($resource)))) {
-                    throw ValidationException::withMessages(['form.title' => __('care-plan.cannot_edit_non_draft')]);
-                }
-            }
-
             return RemoteEHealthLinksProcessing::startSubmission($record, ['changes' => $changes, 'resource' => $resource]);
         });
     }
 
     /** Apply only a confirmed response; the request is never evidence that eHealth accepted it. */
-    public function applySubmissionResult(EhealthLink $link, array $jobData, ?CarePlanData $confirmedPlan = null): void
+    public function applySubmissionResult(EhealthLink $link, array $jobData): void
     {
         $record = $link->linkable;
-        $isCreation = $record instanceof CarePlan
-            && data_get($link->job->request_data, 'resource.status') === CarePlanStatus::DRAFT->value
-            && data_get($link->job->request_data, 'changes.status') === CarePlanStatus::PENDING->value;
-        if ($isCreation) {
-            if ($confirmedPlan === null) {
-                throw new InvalidArgumentException('A processed CarePlan creation requires validated full details.');
-            }
-
-            $this->saveConfirmedResource($confirmedPlan, $record);
-
-            return;
-        }
         $data = $jobData['response_data'] ?? $jobData['result'] ?? $jobData['data'] ?? [];
         $data = $data[0] ?? $data;
         $data = $data['response_data'] ?? $data['result'] ?? $data['data'] ?? $data;
@@ -1396,21 +1350,16 @@ class CarePlanRepository extends MedicalEventsBaseRepository
         }
     }
 
-    public function finishSubmission(EhealthLink $link, array $jobData, bool $queueInpatientApproval = false, ?CarePlanData $confirmedPlan = null): bool
+    public function finishSubmission(EhealthLink $link, array $jobData, bool $queueInpatientApproval = false): bool
     {
-        return $this->storageTransaction(function () use ($link, $jobData, $queueInpatientApproval, $confirmedPlan): bool {
-            if ($confirmedPlan !== null && $link->linkable instanceof CarePlan) {
-                // The draft and sync paths take the plan lock before updating its submission.
-                CarePlan::whereKey($link->linkable->id)->lockForUpdate()->firstOrFail();
-            }
-
+        return $this->storageTransaction(function () use ($link, $jobData, $queueInpatientApproval): bool {
             $link = EhealthLink::whereKey($link->id)->lockForUpdate()->firstOrFail();
             if ($link->status !== JobStatus::PENDING->value) {
                 return false;
             }
             $processed = strtolower((string) ($jobData['status'] ?? '')) === 'processed';
             if ($processed) {
-                $this->applySubmissionResult($link, $jobData, $confirmedPlan);
+                $this->applySubmissionResult($link, $jobData);
                 if ($link->linkable instanceof CarePlanActivity && isset($jobData['carePlanResource'])) {
                     $plan = $link->linkable->carePlan;
                     $this->storeResource($jobData['carePlanResource'], $plan->personId, $plan->legalEntityId, $plan->id);

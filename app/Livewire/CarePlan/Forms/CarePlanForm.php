@@ -4,18 +4,17 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan\Forms;
 
+use Illuminate\Support\Facades\Validator;
+
 use App\Core\Arr;
 use App\Core\BaseForm;
+
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class CarePlanForm extends BaseForm
 {
     public string $patient = '';
-    /** Read-only number displayed by the CarePlan form. */
-    public string $medicalNumber = '';
+    public string $medical_number = '';
     public string $author = '';
     public array $coAuthors = [];
     public string $category = '';
@@ -58,89 +57,12 @@ class CarePlanForm extends BaseForm
         ];
     }
 
-    /** Validate the draft fields and the choices resolved for the current patient and facility. */
-    public function validateDraft(array $authorUuids, array $episodeUuids, array $medicalRecordKeys): array
-    {
-        $validated = $this->validate([
-            ...$this->rules(),
-            'title' => 'required|string|max:255',
-            'context' => 'nullable|string|max:255',
-            'informWith' => 'nullable|string|max:255',
-            'periodStartTime' => 'nullable|date_format:H:i,H:i:s',
-            'periodEndTime' => 'nullable|date_format:H:i,H:i:s',
-            'coAuthors' => 'array|list',
-            'episodes' => 'array|list',
-            'medicalRecords' => 'array|list',
-            'coAuthors.*' => ['nullable', 'uuid', Rule::in($authorUuids)],
-            'episodes.*' => 'array',
-            'episodes.*.uuid' => ['required', 'uuid', 'distinct', Rule::in($episodeUuids)],
-            'medicalRecords.*' => 'array',
-        ]);
-
-        $start = $this->periodStartIsoDate().' '.str_pad($this->periodStartTime ?: '00:00', 8, ':00');
-        $end = $this->periodEndIsoDate();
-        if ($end !== null && $end.' '.str_pad($this->periodEndTime ?: '23:59:59', 8, ':00') < $start) {
-            throw ValidationException::withMessages(['form.periodEnd' => __('care-plan.period_end_before_start')]);
-        }
-
-        $validated['episodes'] = array_column($validated['episodes'], 'uuid');
-        $validated['medicalRecords'] = collect($validated['medicalRecords'])->map(static function (array $record): string {
-            $type = $record['type'] ?? data_get($record, 'identifier.type.coding.0.code', '');
-            $uuid = $record['uuid'] ?? data_get($record, 'identifier.value', '');
-
-            return is_string($type) && is_string($uuid) ? $type.':'.$uuid : '';
-        })->unique()->values()->all();
-        if (array_diff($validated['medicalRecords'], $medicalRecordKeys) !== []) {
-            throw ValidationException::withMessages(['form.medicalRecords' => __('validation.exists', [
-                'attribute' => __('care-plan.medical_record'),
-            ])]);
-        }
-
-        $validated['coAuthors'] = array_values(array_unique(array_filter($validated['coAuthors'])));
-
-        return $validated;
-    }
-
+    /**
+     * Validation rules for signing.
+     */
     public function rulesForSigning(): array
     {
         return array_merge($this->rules(), $this->signingRules());
-    }
-
-    /** Reject edits to a draft changed since the form was opened. */
-    public function validateRevision(string $expectedRevision, string $currentRevision): void
-    {
-        if (!hash_equals($expectedRevision, $currentRevision)) {
-            throw ValidationException::withMessages(['form.title' => __('care-plan.document_context_unavailable')]);
-        }
-    }
-
-    public function validateCreatePayload(array $payload): void
-    {
-        Validator::make($payload, [
-            'id' => 'required|uuid',
-            'title' => 'required|string',
-            'intent' => 'required|in:order',
-            'status' => 'required|in:new',
-            'category.coding' => 'required|array|min:1',
-            'period.start' => 'required|date',
-            'period.end' => 'sometimes|nullable|date|after_or_equal:period.start',
-            'encounter.identifier.value' => 'required|uuid',
-            'author.identifier.value' => 'required|uuid',
-            'addresses' => 'required|array|min:1',
-            'terms_of_service.coding' => 'required|array|min:1',
-            'based_on' => 'sometimes|nullable|array',
-            'part_of' => 'sometimes|nullable|array',
-            'description' => 'sometimes|nullable|string',
-            'note' => 'sometimes|nullable|string',
-            'supporting_info' => 'sometimes|nullable|array',
-            'supporting_info.*.identifier.value' => 'required|uuid',
-            'supporting_info.*.identifier.type.coding' => 'required|array|min:1',
-            'supporting_info.*.identifier.type.coding.*.code' => 'required|in:episode_of_care,procedure,diagnostic_report',
-            'contributor' => 'sometimes|nullable|array',
-            'contributor.*.identifier.value' => 'required|uuid',
-            'inform_with' => 'sometimes|nullable|array',
-            'inform_with.auth_method_id' => 'sometimes|nullable|uuid',
-        ])->validate();
     }
 
     public function periodStartIsoDate(): string
@@ -168,11 +90,6 @@ class CarePlanForm extends BaseForm
             'periodStart' => __('care-plan.date_and_time_start'),
             'periodEnd' => __('care-plan.date_and_time_end'),
             'encounter' => __('care-plan.encounter'),
-            'periodStartTime' => __('care-plan.date_and_time_start'),
-            'periodEndTime' => __('care-plan.date_and_time_end'),
-            'coAuthors.*' => __('care-plan.co-author'),
-            'episodes.*' => __('care-plan.episode'),
-            'medicalRecords.*' => __('care-plan.medical_record'),
             'description' => __('care-plan.extended_description'),
             'note' => __('care-plan.notes'),
             'informWith' => __('care-plan.inform_with'),

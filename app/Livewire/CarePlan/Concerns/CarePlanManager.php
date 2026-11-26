@@ -42,9 +42,6 @@ use App\Jobs\CarePlanFullSync;
 use App\Models\LegalEntity;
 use Illuminate\Support\Facades\Crypt;
 
-/**
- * @deprecated Legacy actions for the CarePlan details page. Migrate them before removing this trait.
- */
 trait CarePlanManager
 {
     use HandlesCarePlanApprovalSms;

@@ -17,7 +17,7 @@ use App\Livewire\Auth\Register;
 use App\Livewire\Auth\ResetPassword;
 use App\Livewire\Auth\VerifyEmail;
 use App\Livewire\Auth\VerifyPersonality;
-use App\Livewire\CarePlan\CarePlanEdit;
+use App\Livewire\CarePlan\CarePlanDraftCreate;
 use App\Livewire\Contract\CapitationContractCreate;
 use App\Livewire\Contract\ContractIndex;
 use App\Livewire\Contract\ContractShow;
@@ -70,6 +70,7 @@ use App\Livewire\Specimen\SpecimenCreate;
 use App\Livewire\Specimen\SpecimenIndex;
 use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Relations\Party;
+use App\Models\CarePlan;
 use App\Models\Connection;
 use App\Models\Declaration;
 use App\Models\Division;
@@ -335,9 +336,9 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
             Route::get('/specimens/create', SpecimenCreate::class)
                 ->can('create', Specimen::class)
                 ->name('specimens.create');
-            Route::get('/care-plans/create/{personId?}', \App\Livewire\CarePlan\CarePlanCreate::class)
+            Route::get('/care-plans/create/{personId?}', CarePlanDraftCreate::class)
                 ->name('care-plans.create')
-                ->can('create', \App\Models\CarePlan::class);
+                ->can('create', CarePlan::class);
             $redirectEncounterCarePlan = static function (\App\Models\LegalEntity $legalEntity, \App\Models\MedicalEvents\Sql\Encounter $encounter) {
                 $person = Repository::carePlan()->findPatient((int) $encounter->person_id) ?? abort(404);
                 \Illuminate\Support\Facades\Gate::authorize('view', [$encounter, $person]);
@@ -346,10 +347,10 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
             };
             Route::get('/encounters/{encounter}/care-plan/create', $redirectEncounterCarePlan)
                 ->whereNumber('encounter')
-                ->can('create', \App\Models\CarePlan::class);
+                ->can('create', CarePlan::class);
             Route::get('/encounter/{encounter}/care-plan/create', $redirectEncounterCarePlan)
                 ->whereNumber('encounter')
-                ->can('create', \App\Models\CarePlan::class);
+                ->can('create', CarePlan::class);
             Route::get('/care-plans/{carePlan}', \App\Livewire\CarePlan\CarePlanShow::class)
                 ->whereNumber('carePlan')
                 ->can('view', 'carePlan')
@@ -359,10 +360,9 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
                 ->scopeBindings()
                 ->can('view', 'carePlan')
                 ->name('care-plans.activities.show');
-            Route::get('/care-plans/{carePlan}/edit', CarePlanEdit::class)
+            Route::get('/care-plans/{carePlan}/edit', \App\Livewire\CarePlan\CarePlanUpdate::class)
                 ->whereNumber('carePlan')
                 ->can('view', 'carePlan')
-                ->can('update', 'carePlan')
                 ->name('care-plans.edit');
 
             Route::prefix('equipment')->name('equipment.')->group(static function () {

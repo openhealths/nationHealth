@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Livewire\CarePlan\CarePlanCreate;
+use App\Livewire\CarePlan\CarePlanDraftCreate;
 use App\Livewire\ClinicalImpression\ClinicalImpressionIndex;
 use App\Livewire\ClinicalImpression\ClinicalImpressionView;
 use App\Livewire\Composition\CompositionCreate;
@@ -275,8 +275,9 @@ Route::prefix('persons')->whereNumber('person')
         });
 
         Route::prefix('{person}')->name('persons.encounters.')->group(function () {
-            Route::get('/encounters/{encounter}/care-plans/create', CarePlanCreate::class)
+            Route::get('/encounters/{encounter}/care-plans/create', CarePlanDraftCreate::class)
                 ->can('create', CarePlan::class)
+                ->can('view', ['encounter', 'person'])
                 ->whereNumber('encounter')
                 ->name('care-plans.create');
             Route::get('/encounters/{encounter}/eprescriptions/create', EncounterEPrescriptionCreate::class)
@@ -312,7 +313,7 @@ Route::prefix('persons')->whereNumber('person')
                 ->name('edit');
         });
 
-        Route::get('/{personId}/care-plan/create', CarePlanCreate::class)
+        Route::get('/{personId}/care-plan/create', CarePlanDraftCreate::class)
             ->can('create', CarePlan::class)
             ->whereNumber('personId')
             ->name('care-plan.create');
