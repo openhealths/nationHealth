@@ -35,6 +35,8 @@ class EmployeeRequestEdit extends AbstractEmployeeFormManager
 
         if ($employee = $employee_request->employee) {
             $this->applyImmutableFieldLocks($employee);
+        } elseif ($party = $employee_request->party) {
+            $this->applyPartyIdentityLocks($party);
         }
 
         if (!is_null($employee_request->uuid)) {

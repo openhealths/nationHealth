@@ -31,6 +31,9 @@
         @enderror
 
         @foreach ($this->form->documents ?? [] as $index => $document)
+            @error("form.documents.{$index}.type")
+                <p class="text-error -mt-2 mb-2">{{ $message }}</p>
+            @enderror
             @error("form.documents.{$index}.issuedBy")
                 <p id="form.documents.{{ $index }}.issuedBy" class="text-error -mt-2 mb-2">{{ $document['number'] ?? '' }} — {{ $message }}</p>
             @enderror
@@ -135,7 +138,7 @@
 
                                         <button
                                             type="button"
-                                            :disabled="$wire.isPersonalDataLocked"
+                                            :disabled="$wire.isPersonalDataLocked || $wire.isPartyDataPartiallyLocked"
                                             @click.prevent="
                                                 documents.splice(index, 1);
                                                 close($refs.button);
@@ -157,7 +160,7 @@
             {{-- Button to trigger the modal --}}
             <button
                 type="button"
-                :disabled="$wire.isPersonalDataLocked"
+                :disabled="$wire.isPersonalDataLocked || $wire.isPartyDataPartiallyLocked"
                 @click="
                         openModal = true; {{-- Open the Modal --}}
                         if (newDocument !== true) {
@@ -254,7 +257,7 @@
                                             id="documentType"
                                             class="input-modal"
                                             type="text"
-                                            :disabled="$wire.isPersonalDataLocked"
+                                            :disabled="$wire.isPersonalDataLocked || $wire.isPartyDataPartiallyLocked"
                                             required
                                         >
                                             <option value="">{{ __('forms.select_document_type') }}</option>
@@ -275,7 +278,7 @@
                                             name="documentNumber"
                                             id="documentNumber"
                                             class="input-modal"
-                                            :readonly="$wire.isPersonalDataLocked"
+                                            :readonly="$wire.isPersonalDataLocked || $wire.isPartyDataPartiallyLocked"
                                             required
                                         />
                                     </div>

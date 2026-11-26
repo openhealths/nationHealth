@@ -32,8 +32,6 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         // Keep position-specific fields editable and lock party data except document issuance details.
         $this->isPositionDataLocked = false;
         $this->loadDivisions($legalEntity);
-        $this->applyImmutableFieldLocks($employee);
-        $this->isPersonalDataLocked = true;
 
         $positionName = $this->dictionaries['POSITION'][$employee->position] ?? $employee->position;
         $this->pageTitle = __('forms.edit_employee') . ' "' . $positionName . '" - ' . ($employee->party->fullName ?? '');
@@ -50,6 +48,9 @@ class EmployeeEdit extends AbstractEmployeeFormManager
             // No draft, load fresh from Employee
             $this->form->hydrate($this->employee);
         }
+
+        $this->applyImmutableFieldLocks($employee);
+        $this->isPersonalDataLocked = true;
     }
 
     public function boot(): void

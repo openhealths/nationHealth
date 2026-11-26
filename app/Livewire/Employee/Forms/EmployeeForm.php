@@ -359,6 +359,73 @@ class EmployeeForm extends BaseForm
         ];
     }
 
+    public function fillPartyIdentity(Party $party): void
+    {
+        $this->party['taxId'] = $party->taxId;
+        $this->party['noTaxId'] = (bool) $party->noTaxId;
+
+        if ($party->documents->isEmpty()) {
+            return;
+        }
+
+        // Retain issuance corrections from a draft, but restore persisted document identities.
+        $documentsByType = collect($this->documents)->keyBy('type');
+        $this->documents = $party->documents->map(function ($document) use ($documentsByType): array {
+            $draftDocument = $documentsByType->get($document->type);
+
+            if (data_get($draftDocument, 'number') !== $document->number) {
+                $draftDocument = null;
+            }
+
+            return [
+                'type' => $document->type,
+                'number' => $document->number,
+                'issuedBy' => data_get($draftDocument, 'issuedBy', $document->issuedBy),
+                'issuedAt' => data_get($draftDocument, 'issuedAt', $document->issuedAt),
+            ];
+        })->all();
+    }
+
+    public function validateRetainedPartyIdentity(Party $party): void
+    {
+        $message = __('employees.identity_fields_locked');
+        $rules = [
+            'party.taxId' => [Rule::in([$party->taxId])],
+            'party.noTaxId' => [function (string $attribute, mixed $value, Closure $fail) use ($party, $message): void {
+                if ($value !== (bool) $party->noTaxId) {
+                    $fail($message);
+                }
+            }],
+        ];
+
+        $originalDocuments = $party->documents->keyBy('type');
+
+        if ($originalDocuments->isNotEmpty()) {
+            $rules['documents'] = ['size:' . $originalDocuments->count()];
+
+            foreach ($this->documents as $index => $document) {
+                $rules["documents.{$index}.type"] = [Rule::in($originalDocuments->keys()->all())];
+                $rules["documents.{$index}.number"] = [Rule::in([$originalDocuments->get($document['type'])?->number])];
+            }
+        } elseif ((bool) $party->noTaxId) {
+            // Older parties may have a passport identifier before their documents are imported.
+            foreach ($this->documents as $index => $document) {
+                if (in_array($document['type'], config('ehealth.no_tax_id_document_types', []), true)) {
+                    $rules["documents.{$index}.number"] = [Rule::in([$party->taxId])];
+
+                    break;
+                }
+            }
+        }
+
+        $this->validate($rules, [
+            'party.taxId.in' => $message,
+            'documents.size' => $message,
+            'documents.*.type.in' => $message,
+            'documents.*.number.in' => $message,
+        ]);
+    }
+
     /**
      * The single "smart" method to populate the form from any data source.
      */

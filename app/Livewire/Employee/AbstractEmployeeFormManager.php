@@ -63,6 +63,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     }
 
     /** Blocks changes to birth_date and the tax or passport identifier. */
+    #[Locked]
     public bool $isPartyDataPartiallyLocked = false;
 
     /**
@@ -92,6 +93,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->applyEmployeeTypeBusinessRules();
             // The validation call is now dynamic
             $this->form->validate($this->form->rulesForSave($this));
+            $this->validatePartyIdentity();
             $this->validatePartyDataConsistency();
 
             $this->employeeRequest = $this->handleDraftPersistence();
@@ -112,6 +114,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             $this->authorizeEmployeeFormAction();
             $this->applyEmployeeTypeBusinessRules();
             $this->form->validate($this->form->rulesForSave($this));
+            $this->validatePartyIdentity();
             $this->validatePartyDataConsistency();
             $this->employeeRequest = $this->handleDraftPersistence();
             $this->employeeRequestId = $this->employeeRequest->id;
@@ -159,6 +162,7 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
             // 1. Validate the form
             $this->applyEmployeeTypeBusinessRules();
             $this->form->validate($this->form->rulesForSave($this));
+            $this->validatePartyIdentity();
             $this->validatePartyDataConsistency();
             // 2. Persist the draft using the component's specific logic
             $this->employeeRequest = $this->handleDraftPersistence();
@@ -548,8 +552,27 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     protected function applyImmutableFieldLocks(Employee $employee): void
     {
         $this->isPersonalDataLocked = $this->partyHoldsOwnerPosition($employee->party);
-        $this->isPartyDataPartiallyLocked = true;
+        $this->applyPartyIdentityLocks($employee->party);
         $this->isCorePositionDataLocked = true;
+    }
+
+    protected function applyPartyIdentityLocks(Party $party): void
+    {
+        $party->loadMissing('documents');
+        $this->isPartyDataPartiallyLocked = true;
+        $this->form->fillPartyIdentity($party);
+    }
+
+    protected function validatePartyIdentity(): void
+    {
+        // Use persisted relations, never client-supplied form IDs or lock flags.
+        $employee = $this->employee ?? $this->employeeRequest?->employee;
+        $party = $employee?->party ?? ($this->party ?? $this->employeeRequest?->party);
+
+        if ($party) {
+            $party->loadMissing('documents');
+            $this->form->validateRetainedPartyIdentity($party);
+        }
     }
 
     protected function prepareEmployeeUpdateData(Employee $employee): array

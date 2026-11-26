@@ -31,6 +31,7 @@ class EmployeePositionAdd extends AbstractEmployeeFormManager
         $this->partyId = $party->id;
         $this->form->hydrate($this->party);
         $this->form->resetPositionFields();
+        $this->applyPartyIdentityLocks($party);
         $this->pageTitle = __('forms.add_position') . ' - ' . ($party->fullName ?? '');
 
         $users = $party->usersWithEmployeeInLegalEntity($legalEntity->id);

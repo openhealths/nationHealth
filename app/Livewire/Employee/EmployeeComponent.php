@@ -340,6 +340,10 @@ abstract class EmployeeComponent extends Component
     #[Computed]
     public function canEnableNoTaxId(): bool
     {
+        if ($this->isPartyDataPartiallyLocked) {
+            return false;
+        }
+
         return array_any(
             $this->form->documents,
             fn ($document) => !empty($document['number']) && in_array(
@@ -366,6 +370,10 @@ abstract class EmployeeComponent extends Component
      */
     public function toggleNoTaxId(): void
     {
+        if ($this->isPartyDataPartiallyLocked) {
+            return;
+        }
+
         if ($this->canEnableNoTaxId) {
             $this->form->party['noTaxId'] = !$this->form->party['noTaxId'];
             $this->syncTaxIdFromDocument();
@@ -381,6 +389,10 @@ abstract class EmployeeComponent extends Component
      */
     public function syncTaxIdFromDocument(): void
     {
+        if ($this->isPartyDataPartiallyLocked) {
+            return;
+        }
+
         if (($this->form->party['noTaxId'] ?? false) === false) {
             return;
         }
