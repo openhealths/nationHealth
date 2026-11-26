@@ -173,7 +173,6 @@ class CarePlanDraftCreate extends BasePatientComponent
             $data->encounterId = $encounter->id;
             $data->addresses = $addresses;
             $data->prepareLocal(
-                $mapper,
                 $person->uuid,
                 $legalEntity->uuid,
                 $fields['coAuthors'],

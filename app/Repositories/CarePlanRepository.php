@@ -105,7 +105,11 @@ class CarePlanRepository extends MedicalEventsBaseRepository
             // Mark the normalized local draft as complete for readers that require the FHIR backfill marker.
             $draft->detailsSyncedAt = now();
             $draft->saveOrFail();
-            MedicalEventsRepository::period()->sync($draft, $data->period, 'effectivePeriod');
+            MedicalEventsRepository::period()->sync(
+                $draft,
+                ['start' => $data->periodStart, 'end' => $data->periodEnd ?: null],
+                'effectivePeriod'
+            );
 
             $supportingIds = $data->supportingInfoReferences->map(function (IdentifierData $reference) use ($data, $identifiers): int {
                 $identifier = $identifiers->store($reference);

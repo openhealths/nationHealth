@@ -56,9 +56,8 @@ class CarePlanDraftForm extends Form
             'medicalRecords.*' => 'array',
         ]);
 
-        $start = $this->periodStartIsoDate().' '.str_pad($this->periodStartTime ?: '00:00', 8, ':00');
-        $end = $this->periodEndIsoDate();
-        if ($end !== null && $end.' '.str_pad($this->periodEndTime ?: '23:59:59', 8, ':00') < $start) {
+        $end = $this->getLocalPeriodEnd();
+        if ($end !== null && $end < $this->getLocalPeriodStart()) {
             throw ValidationException::withMessages(['form.periodEnd' => __('care-plan.period_end_before_start')]);
         }
 
@@ -80,16 +79,23 @@ class CarePlanDraftForm extends Form
         return $validated;
     }
 
-    protected function periodStartIsoDate(): string
+    public function getLocalPeriodStart(): string
     {
-        return CarbonImmutable::createFromFormat('!'.config('app.date_format'), $this->periodStart)->format('Y-m-d');
+        return $this->localDateAndTime($this->periodStart, $this->periodStartTime ?: '00:00');
     }
 
-    protected function periodEndIsoDate(): ?string
+    public function getLocalPeriodEnd(): ?string
     {
-        return $this->periodEnd !== ''
-            ? CarbonImmutable::createFromFormat('!'.config('app.date_format'), $this->periodEnd)->format('Y-m-d')
-            : null;
+        return $this->periodEnd === ''
+            ? null
+            : $this->localDateAndTime($this->periodEnd, $this->periodEndTime ?: '23:59:59');
+    }
+
+    protected function localDateAndTime(string $date, string $time): string
+    {
+        $date = CarbonImmutable::createFromFormat('!'.config('app.date_format'), $date)->format('Y-m-d');
+
+        return $date.' '.str_pad($time, 8, ':00');
     }
 
     /**

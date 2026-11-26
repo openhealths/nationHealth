@@ -6,16 +6,14 @@ namespace App\Dto\CarePlan;
 
 use App\Dto\CodeableConcept\Model as CodeableConceptData;
 use App\Dto\Identifier\Model as IdentifierData;
-use App\Dto\Input\FormCodeableConcept;
-use App\Dto\Input\FormIdentifier;
 use App\Enums\CarePlanStatus;
+use App\Enums\ResourceType;
 use App\Livewire\CarePlan\Forms\CarePlanDraftForm;
 use App\Models\CarePlan;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Symfony\Component\ObjectMapper\Attribute\Map;
+use Symfony\Component\ObjectMapper\Condition\SourceClass;
 use Symfony\Component\ObjectMapper\Condition\TargetClass;
-use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 
 /**
  * Map the validated form to the attributes and relations of a local CarePlan draft.
@@ -24,8 +22,7 @@ use Symfony\Component\ObjectMapper\ObjectMapperInterface;
  * through attribute access instead of declared properties. The remaining values
  * are used to build the related concepts, identifiers and period.
  */
-#[Map(source: CarePlanDraftForm::class)]
-#[Map(target: CarePlan::class)]
+#[Map(source: CarePlanDraftForm::class, target: CarePlan::class)]
 class Model
 {
     #[Map(if: new TargetClass(CarePlan::class))]
@@ -67,13 +64,12 @@ class Model
     #[Map(if: new TargetClass(CarePlan::class))]
     public ?string $note = null;
 
-    public string $periodStart = '';
+    #[Map(source: 'localPeriodStart', if: new SourceClass(CarePlanDraftForm::class), transform: 'convertToEHealthISO8601')]
+    public string $periodStart;
 
-    public string $periodStartTime = '';
-
+    #[Map(source: 'localPeriodEnd', if: new SourceClass(CarePlanDraftForm::class), transform: 'convertToEHealthISO8601')]
     public string $periodEnd = '';
 
-    public string $periodEndTime = '';
     public string $encounter = '';
 
     /** @var list<array<string, mixed>> */
@@ -86,9 +82,6 @@ class Model
     public IdentifierData $subjectReference;
     public IdentifierData $encounterIdentifier;
     public IdentifierData $managingOrganization;
-
-    /** @var array{start: string, end: string|null} */
-    public array $period;
 
     /** @var Collection<int, IdentifierData> */
     public Collection $supportingInfoReferences;
@@ -107,63 +100,43 @@ class Model
      * @param array<string, string> $medicalRecordLabels
      */
     public function prepareLocal(
-        ObjectMapperInterface $mapper,
         string $patientUuid,
         string $legalEntityUuid,
         array $coAuthors,
         array $episodeUuids,
         array $medicalRecordLabels,
     ): void {
-        $this->categoryConcept = $this->concept($mapper, 'eHealth/care_plan_categories', $this->category);
-        $this->termsOfServiceConcept = $this->concept($mapper, 'PROVIDING_CONDITION', $this->termsOfService);
-        $this->authorReference = $this->identifier($mapper, $this->authorUuid, 'employee');
-        $this->subjectReference = $this->identifier($mapper, $patientUuid, 'patient');
-        $this->encounterIdentifier = $this->identifier($mapper, $this->encounter, 'encounter');
-        $this->managingOrganization = $this->identifier($mapper, $legalEntityUuid, 'legal_entity');
-        $this->period = [
-            'start' => $this->localDateTimeToUtcIso8601($this->periodStart, $this->periodStartTime),
-            'end' => $this->periodEnd === '' ? null : $this->localDateTimeToUtcIso8601($this->periodEnd, $this->periodEndTime ?: '23:59:59'),
-        ];
+        $this->categoryConcept = CodeableConceptData::map([
+            'coding' => [['system' => 'eHealth/care_plan_categories', 'code' => $this->category]],
+        ]);
+        $this->termsOfServiceConcept = CodeableConceptData::map([
+            'coding' => [['system' => 'PROVIDING_CONDITION', 'code' => $this->termsOfService]],
+        ]);
+        $this->authorReference = $this->identifier($this->authorUuid, ResourceType::EMPLOYEE->value);
+        $this->subjectReference = $this->identifier($patientUuid, 'patient');
+        $this->encounterIdentifier = $this->identifier($this->encounter, 'encounter');
+        $this->managingOrganization = $this->identifier($legalEntityUuid, ResourceType::LEGAL_ENTITY->value);
         $this->medicalRecordLabels = $medicalRecordLabels;
         $this->contributors = collect($coAuthors)->map(
-            fn (string $uuid): IdentifierData => $this->identifier($mapper, $uuid, 'employee')
+            fn (string $uuid): IdentifierData => $this->identifier($uuid, ResourceType::EMPLOYEE->value)
         );
         $this->supportingInfoReferences = collect($episodeUuids)->map(
-            fn (string $uuid): IdentifierData => $this->identifier($mapper, $uuid, 'episode_of_care')
-        )->concat(collect(array_keys($medicalRecordLabels))->map(function (string $key) use ($mapper): IdentifierData {
+            fn (string $uuid): IdentifierData => $this->identifier($uuid, 'episode_of_care')
+        )->concat(collect(array_keys($medicalRecordLabels))->map(function (string $key): IdentifierData {
             [$type, $uuid] = explode(':', $key, 2);
 
-            return $this->identifier($mapper, $uuid, $type);
+            return $this->identifier($uuid, $type);
         }));
         foreach (['context', 'description', 'note'] as $field) {
             $this->{$field} = $this->{$field} === '' ? null : $this->{$field};
         }
     }
 
-    protected function concept(ObjectMapperInterface $mapper, string $system, string $code): CodeableConceptData
+    protected function identifier(string $uuid, string $type): IdentifierData
     {
-        return $mapper->map(new FormCodeableConcept([
-            'coding' => [['system' => $system, 'code' => $code]],
-            'text' => null,
-        ]), CodeableConceptData::class);
-    }
-
-    protected function identifier(ObjectMapperInterface $mapper, string $uuid, string $type): IdentifierData
-    {
-        return $mapper->map(new FormIdentifier([
+        return IdentifierData::map([
             'value' => $uuid,
-            'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => $type]], 'text' => null],
-        ]), IdentifierData::class);
-    }
-
-    /** Format the local form date and time as an ISO 8601 timestamp in UTC. */
-    protected function localDateTimeToUtcIso8601(string $date, string $time): string
-    {
-        $time = $time === '' ? '00:00' : $time;
-        $format = strlen($time) === 5 ? 'H:i' : 'H:i:s';
-
-        return CarbonImmutable::createFromFormat(
-            '!'.config('app.date_format').' '.$format, $date.' '.$time, config('app.timezone')
-        )->utc()->toIso8601String();
+            'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => $type]]],
+        ]);
     }
 }
