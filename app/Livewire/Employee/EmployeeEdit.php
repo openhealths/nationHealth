@@ -29,10 +29,11 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         $this->employee = $employee;
         $this->employeeId = $employee->id;
 
-        // Keep division / professional blocks editable; lock only immutable core fields via applyImmutableFieldLocks().
+        // Keep position-specific fields editable and lock party data except document issuance details.
         $this->isPositionDataLocked = false;
         $this->loadDivisions($legalEntity);
         $this->applyImmutableFieldLocks($employee);
+        $this->isPersonalDataLocked = true;
 
         $positionName = $this->dictionaries['POSITION'][$employee->position] ?? $employee->position;
         $this->pageTitle = __('forms.edit_employee') . ' "' . $positionName . '" - ' . ($employee->party->fullName ?? '');

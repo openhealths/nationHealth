@@ -46,6 +46,9 @@ abstract class AbstractEmployeeFormManager extends EmployeeComponent
     protected ?BaseEmployee $employeeRequest = null;
     protected ?BaseEmployee $employee = null;
 
+    #[Locked]
+    public bool $isDocumentDetailsEditable = true;
+
     /**
      * Only server-loaded employees may supply retained certificate values.
      * A request revision is user-editable and is never an authoritative source.

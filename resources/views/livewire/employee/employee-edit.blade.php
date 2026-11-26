@@ -43,7 +43,7 @@
                 {{--  3: Party (disables, isPersonalDataLocked=true) --}}
                 @include('livewire.employee.parts.party')
 
-                {{--  4: Documents (disabled) --}}
+                {{--  4: Documents (issuance details remain editable) --}}
                 @include('livewire.employee.parts.documents')
 
                 {{--  5: Buttons --}}

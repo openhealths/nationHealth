@@ -2,7 +2,7 @@
     <fieldset
         class="fieldset"
         id="section-documents"
-        :disabled="$wire.isPersonalDataLocked ?? false"
+        :disabled="$wire.isPersonalDataLocked && ! $wire.isDocumentDetailsEditable"
         x-data="{
                   documents: [],
                   openModal: false,
@@ -50,7 +50,9 @@
                 <tr>
                     <th scope="col" class="td-input">{{ __('forms.document_type') }}</th>
                     <th scope="col" class="td-input">{{ __('forms.number') }}</th>
-                    <th scope="col" class="td-input">{{ __('forms.issued_by') }}</th>
+                    <th scope="col" class="td-input">
+                        {{ __('forms.issued_by') }}<span class="text-red-600" aria-hidden="true"> *</span>
+                    </th>
                     <th scope="col" class="td-input">{{ __('forms.issued_at') }}</th>
                     <th scope="col" class="td-input">{{ __('forms.actions') }}</th>
                 </tr>
@@ -133,6 +135,7 @@
 
                                         <button
                                             type="button"
+                                            :disabled="$wire.isPersonalDataLocked"
                                             @click.prevent="
                                                 documents.splice(index, 1);
                                                 close($refs.button);
@@ -154,6 +157,7 @@
             {{-- Button to trigger the modal --}}
             <button
                 type="button"
+                :disabled="$wire.isPersonalDataLocked"
                 @click="
                         openModal = true; {{-- Open the Modal --}}
                         if (newDocument !== true) {
@@ -250,6 +254,7 @@
                                             id="documentType"
                                             class="input-modal"
                                             type="text"
+                                            :disabled="$wire.isPersonalDataLocked"
                                             required
                                         >
                                             <option value="">{{ __('forms.select_document_type') }}</option>
@@ -270,6 +275,7 @@
                                             name="documentNumber"
                                             id="documentNumber"
                                             class="input-modal"
+                                            :readonly="$wire.isPersonalDataLocked"
                                             required
                                         />
                                     </div>

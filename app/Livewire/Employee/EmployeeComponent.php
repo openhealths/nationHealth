@@ -32,6 +32,10 @@ abstract class EmployeeComponent extends Component
     public bool $isPersonalDataLocked = false;
     public bool $isPositionDataLocked = false;
 
+    /** Editors may complete issuance details while the rest of the party data is locked. */
+    #[Locked]
+    public bool $isDocumentDetailsEditable = false;
+
     // Locks only IMMUTABLE fields (Position, Type, StartDate)
     // Allows editing: Division
     public bool $isCorePositionDataLocked = false;
