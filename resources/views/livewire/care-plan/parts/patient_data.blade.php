@@ -139,7 +139,7 @@
                     class="input peer"
                     placeholder=" "
                     autocomplete="off"
-                    wire:model="form.medical_number"
+                    wire:model="form.medicalNumber"
                     readonly
                     required
                 />
@@ -147,8 +147,8 @@
                 <label for="medical_number" class="label">
                     {{ __('care-plan.medical_number') ?? 'Медичний запис №' }}
                 </label>
-                @error('form.medical_number')
-                    <p class="text-error" id="error-form-medical_number">{{ $message }}</p>
+                @error('form.medicalNumber')
+                    <p class="text-error" id="error-form-medicalNumber">{{ $message }}</p>
                 @enderror
             </div>
         </div>

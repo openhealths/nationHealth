@@ -208,6 +208,18 @@ class Episode extends Model implements SubmittedToEHealth
         );
     }
 
+    /** Select episodes of the patient and their confirmed merges for a care plan encounter. */
+    #[Scope]
+    protected function forCarePlanEncounters(Builder $query, Person $patient, bool $forDraftCreation = false): Builder
+    {
+        return $patient->filterRecordsWithMerged($query)
+            ->managedByLegalEntity()
+            ->when($forDraftCreation, static fn (Builder $episode): Builder => $episode->whereIn('status', [
+                Status::ACTIVE,
+                Status::CLOSED,
+            ]));
+    }
+
     /**
      * Episodes of the patient the user may read: with access to all the patient's data (an active declaration or
      * approval) all of them, including the ones of the persons and prepersons merged into a person, otherwise only

@@ -4,95 +4,46 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan;
 
-use App\Traits\SynchronizesCarePlans;
-use App\Livewire\Concerns\SubmitsClinicalOperations;
-
-use App\Classes\eHealth\EHealth;
-use App\Core\Arr;
-use App\Enums\CarePlanStatus;
-use App\Enums\CarePlanTermsOfService;
-use App\Enums\Status;
-use App\Enums\User\Role;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\Signature\SignatureException;
-use App\Exceptions\EHealth\EHealthValidationException;
-use App\Livewire\CarePlan\Forms\CarePlanForm;
-use App\Livewire\CarePlan\Forms\PatientSearchForm;
-use App\Livewire\Person\Records\BasePatientComponent;
+use App\Enums\Episode\Status as EpisodeStatus;
+use App\Enums\Person\ProcedureStatus;
 use App\Models\CarePlan;
-use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\Condition;
+use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
+use App\Models\MedicalEvents\Sql\Episode;
+use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\Person\Person;
-use App\Repositories\CarePlanRepository;
-use App\Repositories\MedicalEvents\Repository;
-use App\Services\MedicalEvents\CarePlanApprovalService;
-use App\Traits\InteractsWithApprovals;
+use App\Models\User;
+use App\Repositories\Repository;
 use Carbon\Carbon;
-use Exception;
+use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
-use RuntimeException;
-use Throwable;
 
-class CarePlanCreate extends BasePatientComponent
+class CarePlanCreate extends CarePlanComponent
 {
-    use SynchronizesCarePlans;
-    use SubmitsClinicalOperations;
-
-    use InteractsWithApprovals;
-    use \App\Livewire\CarePlan\Concerns\HandlesCarePlanApprovalSms;
-
-    public bool $showSignatureModal = false;
-    public bool $showMethodSelectionModal = false;
-    public string $patientUuid = '';
-    public string $conditionUuid = '';
-    public string $medicalRecordType = 'CONDITION';
-    public ?string $carePlanUuid = null;
-
-    public CarePlanForm $form;
-
-    public PatientSearchForm $patientSearch;
-
-    public array $categories = [];
-
-    #[\Livewire\Attributes\Locked]
-    public array $allowedCategoryCodes = [];
-    public array $diagnoses = [];
     #[Locked]
-    public array $authMethods = [];
-    public array $patientSearchResults = [];
-    public bool $allowsPatientChange = false;
-    public bool $showAdditionalSearchParams = false;
-    public ?array $dictionaries = [];
-    public array $doctors = [];
+    public ?string $draftUuid = null;
 
-    /**
-     * Dictionaries to load via FormTrait::getDictionary().
-     */
-    protected array $dictionaryNames = [
-        'eHealth/care_plan_categories',
-        'eHealth/encounter_classes',
-        'PROVIDING_CONDITION',
-    ];
+    #[Locked]
+    public ?int $draftLegalEntityId = null;
 
-    /**
-     * Available encounters that have been confirmed by eHealth (for the encounter selector).
-     */
-    public array $availableEncounters = [];
-    public array $availableEpisodes = [];
+    #[Locked]
+    public ?int $draftOpenedById = null;
 
     public function mount(LegalEntity $legalEntity, $personId = null, $encounter = null, ?Person $person = null): void
     {
+        $this->draftUuid = Str::uuid()->toString();
+        $this->draftLegalEntityId = $legalEntity->id;
+        $this->draftOpenedById = Auth::id();
+
         $routePersonId = $person?->id ?? request()->route('personId');
         $personId ??= $routePersonId;
-        $encounterRouteParam = request()->route('encounter') ?? request()->query('encounter') ?? request()->query('encounterId');
+        $encounterRouteParam = request()->route('encounter') ?? (request()->query('encounter') ?? request()->query('encounterId'));
         $this->allowsPatientChange = empty($routePersonId) && empty($encounterRouteParam);
 
         $resolvedPersonId = null;
@@ -102,9 +53,9 @@ class CarePlanCreate extends BasePatientComponent
 
         if ($encounterRouteParam) {
             if (Str::isUuid((string) $encounterRouteParam)) {
-                $resolvedEncounter = app(CarePlanRepository::class)->findEncounter($encounterRouteParam);
+                $resolvedEncounter = Repository::carePlan()->findEncounter($encounterRouteParam);
             } elseif (is_numeric($encounterRouteParam)) {
-                $resolvedEncounter = app(CarePlanRepository::class)->findEncounter((int) $encounterRouteParam);
+                $resolvedEncounter = Repository::carePlan()->findEncounter((int) $encounterRouteParam);
             }
             if ($resolvedEncounter) {
                 $resolvedPersonId = $resolvedEncounter->person_id;
@@ -113,17 +64,17 @@ class CarePlanCreate extends BasePatientComponent
 
         if ($person !== null && $encounterRouteParam) {
             abort_unless($resolvedEncounter !== null && (int) $resolvedEncounter->person_id === $person->id, 404);
-            $this->authorize('view', [$resolvedEncounter, $person]);
+            abort_unless(Auth::user()?->can('view', [$resolvedEncounter, $person]), 404);
         }
 
         // If personId was passed, use it, unless it was sequential mapping of encounter
-        if (!$resolvedPersonId && $personId && (!ctype_digit((string) $personId) || !app(CarePlanRepository::class)->findPatient((int) $personId))) {
+        if (!$resolvedPersonId && $personId && (!ctype_digit((string) $personId) || !Repository::carePlan()->findPatient((int) $personId))) {
             // Check if $personId is actually an encounter ID or UUID
             $possibleEncounter = null;
             if (Str::isUuid((string) $personId)) {
-                $possibleEncounter = app(CarePlanRepository::class)->findEncounter($personId);
+                $possibleEncounter = Repository::carePlan()->findEncounter($personId);
             } elseif (is_numeric($personId)) {
-                $possibleEncounter = app(CarePlanRepository::class)->findEncounter((int) $personId);
+                $possibleEncounter = Repository::carePlan()->findEncounter((int) $personId);
             }
 
             if ($possibleEncounter) {
@@ -135,164 +86,119 @@ class CarePlanCreate extends BasePatientComponent
         }
 
         $patientId = $resolvedPersonId ?? $personId;
-        $this->personId = ctype_digit((string) $patientId) ? (int) $patientId : 0;
+        $person = ctype_digit((string) $patientId)
+            ? Repository::carePlan()->findPatient((int) $patientId) ?? abort(404)
+            : null;
+        $this->loadPatientForm($legalEntity, $person);
 
-        if ($this->personId > 0) {
-            parent::mount($legalEntity);
-        } else {
-            $this->patientFullName = __('care-plan.new_care_plan');
-            $this->verificationStatus = '';
-            $this->uuid = '';
-            $this->declarationNumber = null;
-        }
-
-        $person = app(CarePlanRepository::class)->findPatient($this->personId);
-        if ($person) {
-            $name = $person->primary_name;
-            $this->form->patient = $name ? trim($name->last_name . ' ' . $name->first_name . ' ' . ($name->second_name ?? '')) : '';
-            $this->form->medical_number = app(CarePlanRepository::class)->nextDisplayNumber();
-
-            $this->availableEpisodes = app(CarePlanRepository::class)->activeEpisodes($person);
-
-            $this->loadPatientAuthMethods($this->uuid);
-        } else {
-            $this->form->medical_number = app(CarePlanRepository::class)->nextDisplayNumber();
-        }
-
-        $this->loadAvailableEncounters();
-
-        $this->conditionUuid = request()->query('conditionUuid', '');
+        $conditionUuid = request()->query('conditionUuid');
+        $this->conditionUuid = is_string($conditionUuid) && Str::isUuid($conditionUuid) ? $conditionUuid : '';
 
         if ($resolvedEncounter) {
             $this->form->encounter = $resolvedEncounter->uuid;
-            $this->form->medical_number = (string) $resolvedEncounter->id;
+            $resolvedEncounter = $person ? $this->draftEncounter($person) : null;
+            abort_if($resolvedEncounter === null, 404);
 
-            // Pre-fill title if empty
-            if (empty($this->form->title)) {
-                $date = $resolvedEncounter->period?->start ? Carbon::parse($resolvedEncounter->period->start)->format('d.m.Y') : now()->format('d.m.Y');
-                $this->form->title = __('План лікування від ') . $date;
-            }
-
-            app(CarePlanRepository::class)->loadEncounter($resolvedEncounter);
-            if ($resolvedEncounter->episode?->value) {
-                $episode = app(CarePlanRepository::class)->findEpisode($resolvedEncounter->episode->value);
-                if ($episode) {
-                    $this->form->episodes = [
-                        [
-                            'uuid' => $episode->uuid,
-                            'name' => $episode->name,
-                            'date' => $episode->period?->start ? Carbon::parse($episode->period->start)->format('d.m.Y') : '',
-                        ]
-                    ];
-                }
-            }
-
-            // Pre-fill diagnoses for the UI list
-            app(CarePlanRepository::class)->loadEncounter($resolvedEncounter);
-            $this->diagnoses = $resolvedEncounter->diagnoses->map(function ($d) {
-                $conditionUuid = $d->condition?->value;
-                $actualCondition = null;
-                if ($conditionUuid) {
-                    $actualCondition = app(CarePlanRepository::class)->findCondition($conditionUuid, $this->personId);
-                    if (!$actualCondition) {
-                        Log::info('CarePlanCreate mount: condition not found in local SQL DB, attempting to fetch from eHealth', [
-                            'condition_uuid' => $conditionUuid
-                        ]);
-                        try {
-                            $conditionData = EHealth::condition()->getById($this->uuid, $conditionUuid)->validate();
-                            Repository::condition()->store([Arr::toCamelCase($conditionData)], $person);
-                            $actualCondition = app(CarePlanRepository::class)->findCondition($conditionUuid, $this->personId);
-                        } catch (Exception $e) {
-                            Log::error('CarePlanCreate mount: failed to fetch condition from eHealth', [
-                                'condition_uuid' => $conditionUuid,
-                                'error' => $e->getMessage()
-                            ]);
-                        }
-                    }
-                }
-
-                return [
-                    'date' => $actualCondition?->asserted_date
-                        ? Carbon::parse($actualCondition->asserted_date)->format('d.m.Y')
-                        : '-',
-                    'name' => ($actualCondition?->code?->text ?: null)
-                        ?? ($actualCondition?->code?->coding?->first()?->code ?: null)
-                        ?? '-',
-                ];
-            })->toArray();
+            $this->applyEncounterToForm($resolvedEncounter);
         }
 
         $this->form->periodStart = now()->format(config('app.date_format'));
         $this->form->periodStartTime = now()->format('H:i');
-
         $this->synchronizeSystemFields();
-        $this->loadDoctorsAndDictionaries();
         $this->refreshCategoryOptions();
     }
 
-    /**
-     * Re-resolve the care plan writer employee for the currently selected terms_of_service and
-     * refresh the read-only "Автор" display field. eHealth ties the author to a specific
-     * healthcare_service.providing_condition, so the effective author can change when the user
-     * switches "умови надання послуг" (terms_of_service).
-     */
-    public function updatedFormTermsOfService(): void
+    protected function afterDraftSaved(int $draftId): void
     {
-        $this->synchronizeSystemFields();
+        Session::flash('success', __('care-plan.draft_saved'));
+        $this->redirectRoute('care-plans.edit', [legalEntity(), $draftId], navigate: true);
     }
 
-    protected function synchronizeSystemFields(): void
+    protected function persistDraft(): ?int
     {
-        $this->form->intent = 'order';
-        $this->form->termsOfService = app(CarePlanRepository::class)->encounterTermsOfService(
-            $this->form->encounter,
-            (int) $this->personId
-        );
-        $this->refreshAuthorDisplay();
-    }
-
-    protected function refreshCategoryOptions(): void
-    {
-        $this->resolveEncounterData();
-        $this->allowedCategoryCodes = app(CarePlanRepository::class)->categoryCodesForEncounter($this->form->encounter, (int) $this->personId);
-        $this->resetValidation('form.category');
-        if (!in_array($this->form->category, $this->allowedCategoryCodes, true)) {
-            $this->form->category = count($this->allowedCategoryCodes) === 1 ? $this->allowedCategoryCodes[0] : '';
-        }
-    }
-
-    protected function validateCategoryForSigning(): void
-    {
-        app(CarePlanRepository::class)->assertCategoryForEncounter($this->form->category, $this->form->encounter, (int) $this->personId);
-    }
-
-    protected function refreshAuthorDisplay(): void
-    {
-        $employee = Auth::user()?->getCarePlanWriterEmployee($this->form->termsOfService ?: null);
-        if ($employee) {
-            $party = $employee->party;
-            $this->form->author = implode(' ', array_filter([
-                $party?->last_name, $party?->first_name, $party?->second_name,
-            ]));
-        }
-    }
-
-    private function loadDoctorsAndDictionaries(): void
-    {
-        // Load doctors for co-authors
+        $user = Auth::user();
         $legalEntity = legalEntity();
-        if ($legalEntity) {
-            $this->doctors = app(CarePlanRepository::class)->doctors($legalEntity->id);
+        if ($user === null || $legalEntity === null || $this->draftUuid === null
+            || !$this->draftContextMatches($user) || $user->cannot('create', CarePlan::class)) {
+            Session::flash('error', __('care-plan.no_permission_create'));
+
+            return null;
         }
 
-        // Load dictionaries via FormTrait pattern
-        try {
-            $this->getDictionary();
-            $this->categories = $this->dictionaries['eHealth/care_plan_categories'] ?? [];
-        } catch (Exception $exception) {
-            report($exception);
-            Log::warning('CarePlanCreate: failed to load dictionaries: ' . $exception->getMessage());
+        $repository = Repository::carePlan();
+
+        $person = $repository->findPatient((int) $this->personId);
+        if ($person === null || !Str::isUuid((string) $person->uuid)) {
+            throw ValidationException::withMessages(['form.patient' => __('validation.required', [
+                'attribute' => __('care-plan.patient'),
+            ])]);
         }
+        $encounter = $this->prepareDraftEncounter($person);
+
+        $coAuthors = array_column($repository->doctors($legalEntity->id), 'uuid');
+        $episodes = $this->draftEpisodes($person, $encounter, $user);
+        $medicalRecords = $this->form->medicalRecords === [] ? collect() : $this->draftMedicalRecords($person, $encounter, $user);
+        $validated = $this->form->validateDraft($coAuthors, $episodes->keys()->all(), $medicalRecords->keys()->all());
+
+        $mapper = objectMapper();
+        $draft = $this->mapDraftForm($mapper, $user, $person, $encounter);
+        $draft->uuid = $this->draftUuid;
+        $draft->personId = $person->id;
+        $draft->legalEntityId = $legalEntity->id;
+        $draft->prepareLocal(
+            $mapper,
+            $person->uuid,
+            $legalEntity->uuid,
+            $validated['coAuthors'],
+            $validated['episodes'],
+            array_intersect_key($medicalRecords->all(), array_flip($validated['medicalRecords'])),
+        );
+
+        return $repository->saveLocally(collect([$draft]), $mapper)->first()?->id;
+    }
+
+    protected function draftContextMatches(User $user): bool
+    {
+        return $this->draftOpenedById === $user->id
+            && $this->draftLegalEntityId !== null
+            && $this->draftLegalEntityId === legalEntity()?->id;
+    }
+
+    protected function draftEpisodes(Person $person, Encounter $encounter, User $user): Collection
+    {
+        return $person->filterRecordsWithMerged(Episode::query())
+            ->where(fn ($query) => $query->whereStatus(EpisodeStatus::ACTIVE)->orWhere('uuid', $encounter->episode?->value))
+            ->get()
+            ->toBase()
+            ->filter(fn (Episode $episode): bool => $user->can('view', [$episode, $person]))
+            ->mapWithKeys(fn (Episode $episode): array => [$episode->uuid => $episode->name]);
+    }
+
+    protected function draftMedicalRecords(Person $person, Encounter $encounter, User $user): Collection
+    {
+        $procedures = $person->filterRecordsWithMerged(Procedure::forEncounter($encounter->uuid))
+            ->whereStatus(ProcedureStatus::COMPLETED)
+            ->with('code')->get()->toBase()
+            ->filter(fn (Procedure $record): bool => $user->can('view', [$record, $person]));
+        $reports = $person->filterRecordsWithMerged(DiagnosticReport::forEncounter($encounter->uuid))
+            ->final()
+            ->with('code')->get()->toBase()
+            ->filter(fn (DiagnosticReport $record): bool => $user->can('view', [$record, $person]));
+
+        return $procedures->concat($reports)->mapWithKeys(function (Procedure|DiagnosticReport $record): array {
+            $type = $record instanceof Procedure ? 'procedure' : 'diagnostic_report';
+            $label = $record->code?->displayValue ?: ($record->code?->value ?: $record->uuid);
+
+            return [$type.':'.$record->uuid => __('care-plan.emz_type.'.$type).' — '.$label];
+        });
+    }
+
+    public function cancel(): void
+    {
+        $encounter = $this->form->encounter === ''
+            ? null
+            : Repository::carePlan()->findEncounter($this->form->encounter, $this->personId);
+        $this->redirectToCarePlanContext($this->personId, $encounter?->id);
     }
 
     /**
@@ -300,6 +206,10 @@ class CarePlanCreate extends BasePatientComponent
      */
     public function searchForPatient(): void
     {
+        if (!$this->allowsPatientChange || !Auth::user()?->can('create', CarePlan::class)) {
+            return;
+        }
+
         try {
             $validated = $this->patientSearch->validate();
         } catch (ValidationException $exception) {
@@ -313,7 +223,7 @@ class CarePlanCreate extends BasePatientComponent
         $lastName = $validated['lastName'];
         $birthDate = convertToYmd($validated['birthDate']);
 
-        $this->patientSearchResults = app(CarePlanRepository::class)->searchPatients($firstName, $lastName, $birthDate);
+        $this->patientSearchResults = Repository::carePlan()->searchPatients($firstName, $lastName, $birthDate);
 
         if ($this->patientSearchResults === []) {
             Session::flash('error', __('patients.nobody_found') . '. ' . __('patients.try_change_search_parameters'));
@@ -325,50 +235,35 @@ class CarePlanCreate extends BasePatientComponent
      */
     public function selectPatient(int $personId): void
     {
-        $person = app(CarePlanRepository::class)->findPatient($personId) ?? abort(404);
+        if (!$this->allowsPatientChange || !Auth::user()?->can('create', CarePlan::class)) {
+            return;
+        }
+
+        $person = Repository::carePlan()->findPatient($personId) ?? abort(404);
 
         $this->personId = $person->id;
         $this->uuid = $person->uuid;
-        $this->patientUuid = $person->uuid;
         $this->patientFullName = $person->fullName;
-        $this->verificationStatus = $person->verificationStatus;
         $this->declarationNumber = $person->declarations->first()?->declarationNumber ?? null;
 
         $birthDate = $person->birth_date
             ? Carbon::parse($person->birth_date)->format(config('app.date_format'))
             : null;
         $this->form->patient = trim($person->fullName . ($birthDate ? ' · ' . $birthDate : ''));
-        $this->form->medical_number = app(CarePlanRepository::class)->nextDisplayNumber();
+        $this->form->medicalNumber = Repository::carePlan()->nextDisplayNumber();
         $this->form->encounter = '';
         $this->form->category = '';
+        $this->form->episodes = [];
+        $this->form->medicalRecords = [];
+        $this->conditionUuid = '';
+        $this->draftUuid = Str::uuid()->toString();
         $this->allowedCategoryCodes = [];
         $this->diagnoses = [];
         $this->patientSearchResults = [];
+        $this->availableEpisodes = Repository::carePlan()->activeEpisodes($person);
         $this->loadAvailableEncounters();
 
-        $this->loadPatientAuthMethods((string) $person->uuid);
-    }
-
-    /**
-     * Load the patient's authentication methods from eHealth.
-     *
-     * These identify how the patient confirms consent, so they may only come from the
-     * registry — a local fallback would fabricate legally significant data.
-     */
-    private function loadPatientAuthMethods(string $personUuid): void
-    {
-        try {
-            $this->authMethods = EHealth::person()->getAuthMethods($personUuid)->validate();
-        } catch (Exception $e) {
-            $this->authMethods = [];
-
-            Log::channel('e_health_errors')->error('CarePlanCreate: failed to load patient auth methods', [
-                'person_uuid' => $personUuid,
-                'exception' => $e->getMessage(),
-            ]);
-
-            Session::flash('error', __('care-plan.auth_methods_unavailable'));
-        }
+        $this->synchronizeSystemFields();
     }
 
     /**
@@ -376,758 +271,30 @@ class CarePlanCreate extends BasePatientComponent
      */
     public function clearSelectedPatient(): void
     {
+        if (!$this->allowsPatientChange || !Auth::user()?->can('create', CarePlan::class)) {
+            return;
+        }
+
         $this->personId = 0;
-        $this->patientUuid = '';
         $this->uuid = '';
         $this->patientFullName = __('care-plan.new_care_plan');
-        $this->verificationStatus = '';
         $this->declarationNumber = null;
         $this->form->patient = '';
         $this->form->encounter = '';
         $this->form->category = '';
+        $this->form->episodes = [];
+        $this->form->medicalRecords = [];
+        $this->conditionUuid = '';
+        $this->draftUuid = Str::uuid()->toString();
         $this->allowedCategoryCodes = [];
         $this->availableEncounters = [];
-        $this->authMethods = [];
+        $this->availableEpisodes = [];
         $this->diagnoses = [];
         $this->patientSearchResults = [];
-        $this->form->medical_number = app(CarePlanRepository::class)->nextDisplayNumber();
+        $this->form->medicalNumber = Repository::carePlan()->nextDisplayNumber();
     }
 
-    /**
-     * Handle validation failure: dispatch flash + scroll events.
-     */
-    protected function handleValidationFailed(ValidationException $exception, bool $closeModal = false): void
-    {
-        $message = $exception->validator->errors()->first() ?: (__('validation.failed'));
-
-        Session::flash('error', $message);
-        $this->setErrorBag($exception->validator->getMessageBag());
-
-        $firstKey = (string) array_key_first($exception->validator->errors()->messages());
-        $selector = match ($firstKey) {
-            'form.category', 'category' => '#category',
-            'form.periodEnd', 'periodEnd' => '#period_end',
-            'form.periodStart', 'periodStart' => '#period_start',
-            default => null,
-        };
-
-        if ($selector !== null) {
-            $this->dispatch('scroll-to-element', selector: $selector);
-        } else {
-            $this->dispatch('scroll-to-error');
-        }
-
-        if ($closeModal) {
-            $this->showSignatureModal = false;
-        }
-    }
-
-    /**
-     * Look up a NEW care_plan approval on the patient-scoped eHealth endpoint.
-     *
-     * GET /api/approvals is rejected by Cloudflare WAF; list by patient instead.
-     *
-     * @return array<string, mixed>|null
-     */
-    private function findNewCarePlanApproval(string $carePlanUuid): ?array
-    {
-        $patientUuid = $this->patientUuid ?: $this->uuid;
-        if ($patientUuid === '' || $carePlanUuid === '') {
-            return null;
-        }
-
-        try {
-            // GET /api/patients/{id}/approvals rejects `status` (422 additional properties).
-            $response = EHealth::approval()->getPatientApprovals($patientUuid, [
-                'granted_resource_type' => 'care_plan',
-                'granted_resources' => $carePlanUuid,
-            ]);
-            $approvals = $response->validate();
-            $approvalsData = is_array($approvals) ? ($approvals['data'] ?? $approvals) : [];
-            if (!is_array($approvalsData) || $approvalsData === []) {
-                return null;
-            }
-
-            foreach ($approvalsData as $approval) {
-                if (!is_array($approval)) {
-                    continue;
-                }
-
-                foreach ($approval['granted_resources'] ?? [] as $resource) {
-                    if (($resource['identifier']['value'] ?? null) === $carePlanUuid) {
-                        return $approval;
-                    }
-                }
-            }
-
-            $first = $approvalsData[0] ?? null;
-
-            return is_array($first) ? $first : null;
-        } catch (Exception $exception) {
-            Log::warning('CarePlanCreate: Failed to fetch approvals: '.$exception->getMessage());
-
-            return null;
-        }
-    }
-
-    public function openActivationManually(): void
-    {
-        $carePlan = $this->carePlanUuid
-            ? app(CarePlanRepository::class)->findByUuid($this->carePlanUuid, (int) legalEntity()->id, $this->personId)
-            : null;
-
-        if ($carePlan === null || !$this->guardApprovalAccess($carePlan)) {
-            return;
-        }
-
-        if ($this->shouldSkipPatientAuthUi($carePlan)) {
-            $this->createApproval('');
-
-            return;
-        }
-
-        if (!$this->approvalId && $this->carePlanUuid) {
-            $matchedApproval = $this->findNewCarePlanApproval($this->carePlanUuid);
-            $this->approvalId = $matchedApproval['id'] ?? null;
-            if (is_array($matchedApproval)) {
-                $this->currentAuthMethod = $matchedApproval['authentication_method_current'] ?? $this->currentAuthMethod;
-            }
-        }
-
-        if ($this->approvalId) {
-            try {
-                $result = app(CarePlanApprovalService::class)->pendingConfirmation($this->patientUuid, $this->approvalId);
-                if ($result->isGranted()) {
-                    Session::flash('success', __('care-plan.approval_verified'));
-                    $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan->id], navigate: true);
-
-                    return;
-                }
-                $this->currentAuthMethod = $result->authMethod;
-                $this->openAuthModal();
-            } catch (Throwable $exception) {
-                Session::flash('error', __('care-plan.approval_result_unavailable'));
-            }
-        } else {
-            $this->openMethodSelectionModal();
-        }
-    }
-
-    public function openMethodSelectionModal(): void
-    {
-        $carePlan = $this->carePlanUuid
-            ? app(CarePlanRepository::class)->findByUuid($this->carePlanUuid, (int) legalEntity()->id, $this->personId)
-            : null;
-
-        if ($carePlan === null || !$this->guardApprovalAccess($carePlan)) {
-            return;
-        }
-
-        if ($this->shouldSkipPatientAuthUi($carePlan)) {
-            $this->createApproval('');
-
-            return;
-        }
-
-        if (!empty($this->form->periodEnd)) {
-            Session::flash('error', __('care-plan.period_end_warning'));
-        }
-
-        try {
-            $this->authMethods = EHealth::person()->getAuthMethods($this->patientUuid)->validate();
-            $this->showMethodSelectionModal = true;
-        } catch (Exception $e) {
-            Log::error('CarePlanCreate: failed to load auth methods: ' . $e->getMessage());
-            Session::flash('error', __('Не вдалося завантажити методи аутентифікації'));
-        }
-    }
-
-    public function selectAuthMethod(string $methodUuid): void
-    {
-        $carePlan = $this->carePlanForSms();
-        if (!$this->guardApprovalAccess($carePlan)) {
-            return;
-        }
-        $this->currentAuthMethod = $this->selectedApprovalAuthMethod($methodUuid);
-        $this->showMethodSelectionModal = false;
-        $this->createApproval($methodUuid);
-    }
-
-    protected function createApproval(string $methodUuid): void
-    {
-        try {
-            // Resolve the employee UUID that will be granted access.
-            // Priority: explicitly selected doctor on the form → authenticated user's DOCTOR/SPECIALIST employee.
-            // If neither resolves, skip approval creation and instruct the user to create it manually.
-            $employeeUuid = (!empty($this->form->doctor) ? $this->form->doctor : null)
-                ?? Auth::user()?->getCarePlanWriterEmployee($this->form->termsOfService ?: null)?->uuid;
-
-            if (!$employeeUuid) {
-                $carePlan = app(CarePlanRepository::class)->findByUuid($this->carePlanUuid, (int) legalEntity()->id, $this->personId);
-                session()->flash('info', __('Не вдалося визначити лікаря для створення дозволу. Перейдіть на вкладку "Дозволи" та створіть дозвіл вручну.'));
-                $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan?->id ?? $this->carePlanUuid], navigate: true);
-
-                return;
-            }
-
-            $carePlan = app(CarePlanRepository::class)->findByUuid($this->carePlanUuid, (int) legalEntity()->id, $this->personId) ?? abort(404);
-            $approvalService = app(CarePlanApprovalService::class);
-            $skipsOtp = $this->shouldSkipPatientAuthUi($carePlan);
-
-            $result = $approvalService->create(
-                carePlan: $carePlan,
-                patientUuid: $this->patientUuid,
-                employeeUuid: $employeeUuid,
-                accessLevel: 'write',
-                authorizeWith: $skipsOtp ? null : ($methodUuid ?: null),
-                user: Auth::user(),
-                bearerToken: Session::get(config('ehealth.api.oauth.bearer_token')),
-            );
-
-            if ($result->isAsync()) {
-                $this->approvalId = $result->approvalId;
-                $this->pollingLinkId = $result->pollingLinkId;
-                $this->isPolling = true;
-
-                return;
-            }
-
-            $this->approvalId = $result->approvalId;
-
-            if ($result->requiresConfirmation() && !$skipsOtp) {
-                $this->currentAuthMethod = $result->authMethod ?? $this->currentAuthMethod;
-                $this->openAuthModal();
-
-                return;
-            }
-
-            Session::flash('success', $skipsOtp
-                ? __('care-plan.approval_inpatient_granted')
-                : __('План лікування успішно активовано.'));
-            $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan->id], navigate: true);
-        } catch (Exception $e) {
-            Log::error('CarePlanCreate: failed to create approval: ' . $e->getMessage());
-            $msg = __('Не вдалося створити запит на дозвіл: ') . $e->getMessage();
-            Session::flash('error', $msg);
-        }
-    }
-
-    /**
-     * Called by wire:poll.2s while $isPolling === true.
-     */
-    public function checkApprovalJobStatus(): void
-    {
-        if (!$this->isPolling || !$this->pollingLinkId) {
-            return;
-        }
-
-        $status = app(CarePlanApprovalService::class)->resolveAsyncJob($this->pollingLinkId);
-
-        if ($status->isPending()) {
-            return;
-        }
-
-        $this->isPolling = false;
-        $this->pollingLinkId = null;
-
-        if ($status->isFailed()) {
-            $msg = $status->errorMessage ?: __('Не вдалося обробити запит на дозвіл. Спробуйте ще раз.');
-            Session::flash('error', $msg);
-
-            return;
-        }
-
-        if ($status->approvalId) {
-            $this->approvalId = $status->approvalId;
-        }
-
-        $carePlan = app(CarePlanRepository::class)->findByUuid($this->carePlanUuid, (int) legalEntity()->id, $this->personId);
-        $skipsOtp = $this->shouldSkipPatientAuthUi($carePlan);
-
-        if ($status->requiresConfirmation() && !$skipsOtp) {
-            $this->currentAuthMethod = $status->authMethod ?? $this->currentAuthMethod;
-            $this->openAuthModal();
-
-            return;
-        }
-
-        Session::flash('success', $skipsOtp
-            ? __('care-plan.approval_inpatient_granted')
-            : __('План лікування успішно активовано.'));
-        $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan?->id ?? $this->carePlanUuid], navigate: true);
-    }
-
-    /**
-     * Save as a local draft (without sending to eHealth).
-     */
-    public function save(CarePlanRepository $repository): void
-    {
-        if (Auth::user()?->cannot('create', CarePlan::class)) {
-            $msg = __('care-plan.no_permission_create');
-            Session::flash('error', $msg);
-
-            return;
-        }
-
-        try {
-            $this->synchronizeSystemFields();
-            $this->form->validate();
-        } catch (ValidationException $exception) {
-            $this->handleValidationFailed($exception);
-
-            return;
-        }
-
-        $legalEntity = legalEntity();
-
-        $encounterData = $this->resolveEncounterData();
-
-        try {
-            $repository->assertFhirStorageReady();
-            $carePlan = $repository->create([
-                'person_id' => $this->resolvePersonId(),
-                'author_id' => Auth::user()?->getCarePlanWriterEmployee($this->form->termsOfService ?: null)?->id,
-                'legal_entity_id' => $legalEntity?->id,
-                'status' => CarePlanStatus::DRAFT->value,
-                'category' => $this->form->category,
-                'co_authors' => $this->form->coAuthors,
-                'context' => $this->form->context ?: null,
-                'title' => $this->form->title,
-                'terms_of_service' => $this->form->termsOfService ?: null,
-                'period_start' => $this->form->periodStartIsoDate(),
-                'period_start_time' => $this->form->periodStartTime,
-                'period_end_time' => $this->form->periodEndTime,
-                'period_end' => $this->form->periodEndIsoDate(),
-                'encounter_id' => $encounterData['id'],
-                'addresses' => $encounterData['addresses'],
-                'supporting_info' => [
-                    'episodes' => $this->form->episodes,
-                    'medical_records' => $this->form->medicalRecords,
-                ],
-                'description' => $this->form->description ?: null,
-                'note' => $this->form->note ?: null,
-                'inform_with' => $this->form->informWith ?: null,
-            ]);
-        } catch (\App\Exceptions\MedicalEvents\ClinicalStorageException $exception) {
-            Session::flash('error', $exception->getMessage());
-
-            return;
-        }
-
-        session()->flash('success', __('care-plan.draft_saved'));
-        $this->redirectRoute('care-plans.edit', [legalEntity(), $carePlan->id], navigate: true);
-    }
-
-    public function cancel(): void
-    {
-        $encounterUuid = $this->form->encounter;
-        if ($encounterUuid) {
-            $encounter = app(CarePlanRepository::class)->findEncounter($encounterUuid, $this->personId);
-            if ($encounter) {
-                $this->redirectRoute('persons.encounters.package.show', [legalEntity(), $this->personId, $encounter->id], navigate: true);
-
-                return;
-            }
-        }
-        if ($this->personId > 0) {
-            $this->redirectRoute('persons.care-plans', [legalEntity(), $this->personId], navigate: true);
-
-            return;
-        }
-
-        $this->redirectRoute('care-plans.index', legalEntity(), navigate: true);
-    }
-
-    protected function loadAvailableEncounters(): void
-    {
-        $this->availableEncounters = $this->personId ? app(CarePlanRepository::class)->encounterChoices($this->personId) : [];
-    }
-
-    public function updatedFormEncounter($value): void
-    {
-        $this->synchronizeSystemFields();
-        if ($value) {
-            $encounter = app(CarePlanRepository::class)->findEncounter($value, $this->personId);
-            if ($encounter) {
-                if (empty($this->form->title)) {
-                    $date = $encounter->period?->start ? Carbon::parse($encounter->period->start)->format('d.m.Y') : now()->format('d.m.Y');
-                    $this->form->title = __('План лікування від ') . $date;
-                }
-
-                if ($encounter->episode?->value) {
-                    $episode = app(CarePlanRepository::class)->findEpisode($encounter->episode->value);
-                    if ($episode) {
-                        $this->form->episodes = [
-                            [
-                                'uuid' => $episode->uuid,
-                                'name' => $episode->name,
-                                'date' => $episode->period?->start ? Carbon::parse($episode->period->start)->format('d.m.Y') : '',
-                            ]
-                        ];
-                    }
-                } else {
-                    $this->form->episodes = [];
-                }
-
-                $this->diagnoses = $this->buildDiagnosesForUi($encounter);
-            }
-        } else {
-            $this->diagnoses = [];
-            $this->form->episodes = [];
-        }
-        $this->refreshCategoryOptions();
-    }
-
-    /**
-     * Build the UI list of diagnoses for an encounter. EncounterDiagnose::condition() resolves to
-     * the Identifier row (its uuid lives in ->value), not the actual Condition, so we look the
-     * Condition up locally and, if missing, fetch and store it from eHealth on the fly.
-     *
-     * @return array<int, array{date: string, name: string}>
-     */
-    protected function buildDiagnosesForUi(Encounter $encounter): array
-    {
-        return $encounter->diagnoses->map(function ($d) {
-            $conditionUuid = $d->condition?->value;
-            $actualCondition = null;
-            if ($conditionUuid) {
-                $actualCondition = app(CarePlanRepository::class)->findCondition($conditionUuid, $this->personId);
-                if (!$actualCondition) {
-                    Log::info('CarePlanCreate: condition not found in local SQL DB, attempting to fetch from eHealth', [
-                        'condition_uuid' => $conditionUuid
-                    ]);
-                    try {
-                        $conditionData = EHealth::condition()->getById($this->uuid, $conditionUuid)->validate();
-                        Repository::condition()->store([Arr::toCamelCase($conditionData)], app(CarePlanRepository::class)->findPatient($this->personId));
-                        $actualCondition = app(CarePlanRepository::class)->findCondition($conditionUuid, $this->personId);
-                    } catch (Exception $e) {
-                        Log::error('CarePlanCreate: failed to fetch condition from eHealth', [
-                            'condition_uuid' => $conditionUuid,
-                            'error' => $e->getMessage()
-                        ]);
-                    }
-                }
-            }
-
-            return [
-                'date' => $actualCondition?->asserted_date
-                    ? Carbon::parse($actualCondition->asserted_date)->format('d.m.Y')
-                    : '-',
-                'name' => ($actualCondition?->code?->text ?: null)
-                    ?? ($actualCondition?->code?->coding?->first()?->code ?: null)
-                    ?? '-',
-            ];
-        })->toArray();
-    }
-
-    /**
-     * Start the signing process by opening the signature modal.
-     */
-    public function startSigningProcess(): void
-    {
-        try {
-            if ($this instanceof CarePlanUpdate) {
-                $this->authorize('update', $this->carePlan);
-            } else {
-                $this->authorize('create', CarePlan::class);
-            }
-            $this->synchronizeSystemFields();
-            $this->form->validate();
-            $this->validateCategoryForSigning();
-        } catch (ValidationException $exception) {
-            $this->handleValidationFailed($exception);
-
-            return;
-        }
-
-        $this->showSignatureModal = true;
-    }
-
-    /**
-     * Verify the SMS code or confirm offline document verification.
-     */
-    public function verify(): void
-    {
-        if ($this->isSmsResending) {
-            Session::flash('info', __('care-plan.sms_resend_processing'));
-
-            return;
-        }
-        $plan = $this->carePlanForSms();
-        if (!$this->guardApprovalAccess($plan)) {
-            return;
-        }
-        app(\App\Services\MedicalEvents\MedicalRequestOwnership::class)->approvalForCarePlan($plan, $this->approvalId ?? '');
-        $this->validate($this->approvalVerificationRules(), $this->approvalVerificationMessages());
-
-        try {
-            $response = app(CarePlanApprovalService::class)->verify(
-                $this->patientUuid,
-                $this->approvalId,
-                $this->isOfflineAuthMethod() ? null : (int) $this->verificationCode,
-            );
-
-            if ($response->successful()) {
-                $this->closeAuthModal();
-                Session::flash('success', __('План лікування успішно активовано.'));
-                $carePlan = app(CarePlanRepository::class)->findByUuid($this->carePlanUuid, (int) legalEntity()->id, $this->personId);
-                $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan?->id ?? $this->carePlanUuid], navigate: true);
-            }
-        } catch (Exception $e) {
-            Log::warning('Care plan approval confirmation failed', ['exceptionType' => $e::class, 'statusCode' => $e->getCode()]);
-            $message = $e instanceof EHealthValidationException ? $e->getFormattedMessage()
-                : ($e instanceof EHealthResponseException && \App\Classes\eHealth\Api\Approval::errorMessage($e->response) === 'Invalid verification code'
-                    ? __('errors.ehealth.messages.invalid_verification_code') : __('care-plan.approval_verify_error'));
-            $this->addError('verificationCode', $message);
-            Session::flash('error', $message);
-        }
-    }
-
-    protected function carePlanForSms(): CarePlan
-    {
-        $plan = app(CarePlanRepository::class)->findByUuid((string) $this->carePlanUuid, (int) legalEntity()->id, $this->personId);
-        abort_unless($plan instanceof CarePlan, 404);
-
-        return $plan;
-    }
-
-    protected function onSmsApprovalAlreadyGranted(): void
-    {
-        $this->redirectRoute('care-plans.show', [legalEntity(), $this->carePlanForSms()->id], navigate: true);
-    }
-
-    /**
-     * Sign with KEP and send to eHealth.
-     */
-    public function sign(CarePlanRepository $repository, string $keyContainer = '', string $password = ''): void
-    {
-        $this->form->useSigningSecrets($keyContainer, $password);
-
-        if (Auth::user()?->cannot('create', CarePlan::class)) {
-            $msg = __('care-plan.no_permission_create');
-            Session::flash('error', $msg);
-
-            return;
-        }
-
-        $generatedUuid = null;
-        try {
-            $this->synchronizeSystemFields();
-            $validated = $this->form->validate($this->form->rulesForSigning());
-            $this->validateCategoryForSigning();
-        } catch (ValidationException $exception) {
-            $this->handleValidationFailed($exception, closeModal: true);
-
-            return;
-        }
-
-        try {
-            $legalEntity = legalEntity();
-            $encounterData = $this->resolveEncounterData();
-            if (empty($encounterData['addresses'])) {
-                throw new RuntimeException(__('Неможливо створити план лікування: у вибраній взаємодії відсутні діагнози (addresses). Будь ласка, переконайтеся, що взаємодія містить діагнози в ЕСОЗ та вони завантажені в локальну БД.'));
-            }
-
-            $termsOfService = $this->form->termsOfService;
-            $author = Auth::user()?->getCarePlanWriterEmployee($termsOfService);
-            $this->logCarePlanAuthorRoleDebug($author, $termsOfService);
-
-            if ($author && !$this->authorHasActiveRoleForTermsOfService($author, $termsOfService)) {
-                // Not a hard block: getCarePlanWriterEmployee() already tried its best to find a
-                // matching employee and fell back to this one. We still submit so eHealth remains
-                // the single source of truth for the "Employee does not have active role..." rule,
-                // but we log loudly here so the real cause is obvious without digging through the
-                // raw eHealth request/response.
-                Log::warning('[CarePlan] submitting with author lacking a matching active role for terms_of_service', [
-                    'author_uuid' => $author->uuid,
-                    'author_position' => $author->position,
-                    'terms_of_service' => $termsOfService,
-                ]);
-            }
-
-            $repository->assertFhirStorageReady(beforeSubmission: true);
-            $mapping = $repository->formContext(array_replace($this->form->toArray(), [
-                'uuid' => $this->carePlanUuid,
-                'author' => $author?->uuid,
-                'addresses' => $encounterData['addresses'],
-            ]));
-            $carePlanResource = \App\Services\MedicalEvents\Fhir::carePlan()->toFhir($mapping['data'], $mapping['context']);
-            $carePlanPayload = CarePlanForm::buildCreateContent($carePlanResource);
-            $generatedUuid = $carePlanPayload['id'];
-
-            $signedContent = signatureService()->signData(
-                $carePlanPayload,
-                $validated['knedp'],
-                $validated['keyContainer'],
-                $validated['password'],
-                Auth::user()->party->taxId
-            );
-
-            $carePlanResource['status'] = CarePlanStatus::DRAFT->value;
-            $carePlan = $repository->storeResource($carePlanResource, (int) $this->personId, (int) legalEntity()->id);
-            $finalResponse = $this->submitClinicalOperation($carePlan, ['status' => CarePlanStatus::PENDING->value], fn () => EHealth::carePlan()->create($this->uuid, ['signed_data' => $signedContent, 'signed_data_encoding' => 'base64']));
-            if ($finalResponse === null) {
-                $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan->id], navigate: true);
-
-                return;
-            }
-
-            $this->showSignatureModal = false;
-            Session::flash('success', __('care-plan.submission_confirmed'));
-            $this->redirectRoute('care-plans.show', [legalEntity(), $carePlan->id], navigate: true);
-
-        } catch (EHealthConnectionException $exception) {
-            $this->carePlanUuid = $generatedUuid ?? $this->carePlanUuid;
-            Log::error('CarePlan: connection error: ' . $exception->getMessage());
-            $msg = __('care-plan.connection_error');
-            Session::flash('error', $msg);
-            $this->showSignatureModal = false;
-        } catch (EHealthValidationException|EHealthResponseException $exception) {
-            $this->carePlanUuid = $generatedUuid ?? $this->carePlanUuid;
-            Log::error('CarePlan: eHealth error: ' . $exception->getMessage());
-            $msg = $exception instanceof EHealthValidationException
-                ? $exception->getFormattedMessage()
-                : __('Помилка від ЕСОЗ: ') . $exception->getMessage();
-
-            if (
-                $generatedUuid && (
-                    str_contains($exception->getMessage(), 'Care plan with such id already exists')
-                || str_contains($msg, 'Care plan with such id already exists')
-                || (isset($exception->details['error']['message']) && str_contains($exception->details['error']['message'], 'Care plan with such id already exists'))
-                )
-            ) {
-                try {
-                    $this->synchronizeResources([['id' => $generatedUuid]], $this->personId, (int) legalEntity()->id, $this->patientUuid ?: $this->uuid);
-                    $localCarePlan = $repository->findByUuid($generatedUuid, (int) legalEntity()->id, $this->personId);
-
-                    session()->flash('success', __('План лікування вже зареєстровано в ЕСОЗ. Ви перенаправлені на сторінку детального перегляду для активації дозволу пацієнта.'));
-                    $this->redirectRoute('care-plans.show', [legalEntity(), $localCarePlan->id], navigate: true);
-
-                    return;
-                } catch (Throwable $innerEx) {
-                    Log::error('CarePlanCreate conflict handling failed: ' . $innerEx->getMessage(), [
-                        'trace' => $innerEx->getTraceAsString(),
-                    ]);
-                }
-            }
-
-            Session::flash('error', $msg);
-            $this->showSignatureModal = false;
-
-            if (!($exception instanceof EHealthValidationException)) {
-                return;
-            }
-
-            // eHealth reports the rule on encounter, but the user must change care plan category.
-            if ($exception->isCarePlanCategoryDiagnosisMismatch()) {
-                $this->addError(
-                    'form.category',
-                    __('errors.ehealth.messages.care_plan_category_diagnosis_mismatch')
-                );
-                $this->dispatch('scroll-to-element', selector: '#category');
-
-                return;
-            }
-
-            if ($exception->isCarePlanPeriodEndBeforeStart()) {
-                $this->addError(
-                    'form.periodEnd',
-                    __('errors.ehealth.messages.period_end_before_start')
-                );
-                $this->dispatch('scroll-to-element', selector: '#period_end');
-            }
-        } catch (\App\Exceptions\MedicalEvents\ClinicalStorageException $exception) {
-            Session::flash('error', $exception->getMessage());
-            $this->showSignatureModal = false;
-        } catch (SignatureException $exception) {
-            $this->carePlanUuid = $generatedUuid ?? $this->carePlanUuid;
-            $exception->handle('Error when signing care plan');
-            $this->showSignatureModal = false;
-        } catch (RuntimeException $exception) {
-            $this->carePlanUuid = $generatedUuid ?? $this->carePlanUuid;
-            Log::error('CarePlan: runtime error: ' . $exception->getMessage());
-            Session::flash('error', $exception->getMessage());
-            $this->showSignatureModal = false;
-        } catch (Throwable $exception) {
-            $this->carePlanUuid = $generatedUuid ?? $this->carePlanUuid;
-            Log::error('CarePlan: unexpected error: ' . $exception->getMessage(), [
-                'file' => $exception->getFile(),
-                'line' => $exception->getLine(),
-                'trace' => $exception->getTraceAsString(),
-            ]);
-            $msg = __('care-plan.unexpected_error');
-            Session::flash('error', $msg);
-            $this->showSignatureModal = false;
-        }
-    }
-
-    /**
-     * Initialize the component.
-     */
-    protected function initializeComponent(): void
-    {
-        // Handled by BasePatientComponent for id, uuid, patientFullName
-        $this->patientUuid = $this->uuid;
-    }
-
-    /**
-     * Resolve the person local ID from uuid.
-     */
-    protected function resolvePersonId(): ?int
-    {
-        return $this->personId;
-    }
-
-    protected function resolveEncounterData(): array
-    {
-        if (!$this->form->encounter) {
-            return ['id' => null, 'addresses' => [], 'period_start' => null];
-        }
-        $encounter = app(CarePlanRepository::class)->findEncounter($this->form->encounter, $this->personId);
-        if ($encounter) {
-            $this->buildDiagnosesForUi($encounter);
-        }
-
-        return app(CarePlanRepository::class)->encounterData($this->form->encounter, $this->personId, $this->conditionUuid ?: null);
-    }
-
-    /**
-     * INPATIENT plans at this facility skip the SMS / method-selection step.
-     * OUTPATIENT (typical PMD) still requires patient OTP.
-     */
-    protected function shouldSkipPatientAuthUi(?CarePlan $carePlan): bool
-    {
-        if ($carePlan && app(CarePlanApprovalService::class)->skipsPatientOtp($carePlan)) {
-            return true;
-        }
-
-        if (strtoupper((string) $this->form->termsOfService) !== CarePlanTermsOfService::INPATIENT->value) {
-            return false;
-        }
-
-        $legalEntity = legalEntity();
-        if ($legalEntity === null) {
-            return false;
-        }
-
-        if ($carePlan === null || $carePlan->legalEntityId === null) {
-            return true;
-        }
-
-        return (int) $carePlan->legalEntityId === (int) $legalEntity->id;
-    }
-
-    protected function authorHasActiveRoleForTermsOfService(Employee $author, string $termsOfService): bool
-    {
-        return app(CarePlanRepository::class)->authorHasActiveRoleForTermsOfService($author, $termsOfService);
-    }
-
-    protected function logCarePlanAuthorRoleDebug(?Employee $author, string $termsOfService): void
-    {
-        Log::debug('Care Plan author role validation', ['employeeUuid' => $author?->uuid, 'termsOfService' => $termsOfService, 'hasMatchingRole' => $author !== null && $this->authorHasActiveRoleForTermsOfService($author, $termsOfService)]);
-    }
-
-    public function render()
+    protected function renderCarePlan(): View
     {
         return view('livewire.care-plan.care-plan-create');
     }
