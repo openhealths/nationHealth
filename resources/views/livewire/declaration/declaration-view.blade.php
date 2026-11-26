@@ -77,7 +77,7 @@
                         {{ __('declarations.status.label') }}
                     </label>
                     <input
-                        value="{{ $declaration->status->label() }}"
+                        value="{{ $declaration->isResigned() ? __('declarations.status.resigned') : $declaration->status->label() }}"
                         type="text"
                         name="status"
                         id="status"

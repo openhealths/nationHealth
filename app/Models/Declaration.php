@@ -136,4 +136,14 @@ class Declaration extends Model
     {
         return $this->declarationRequest?->parentDeclarationUuid !== null;
     }
+
+    /**
+     * Determines whether this declaration is active and has a parent declaration.
+     *
+     * @return bool
+     */
+    public function isResigned(): bool
+    {
+        return $this->status === Status::ACTIVE && $this->hasParentDeclaration();
+    }
 }
