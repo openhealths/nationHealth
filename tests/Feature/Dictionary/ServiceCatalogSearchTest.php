@@ -47,7 +47,9 @@ class ServiceCatalogSearchTest extends TestCase
         ])->set('filterServiceIsActive', '1')->set('filterCodeOrName', $query)->call('search')
             ->assertSee('Медичні послуги')->assertSee('Консультації')->assertSee('Огляд; неврологічний')
             ->assertDontSee('Артрографія')->assertDontSee('Огляд; неврологічний, повторний');
-        $component->call('selectService', 'neurological')->assertDispatched($event, static fn ($name, array $parameters): bool =>
+        $component->call('selectService', 'neurological')->assertDispatched(
+            $event,
+            static fn ($name, array $parameters): bool =>
             $parameters['service']['id'] === 'neurological'
             && $parameters['service']['category'] === 'counselling'
             && $parameters['service']['type'] === 'service'
@@ -55,6 +57,24 @@ class ServiceCatalogSearchTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_referral_catalog_shows_all_filters_without_allowing_ineligible_services(): void
+    {
+        $component = Livewire::test(ServiceCatalog::class, [
+            'legalEntity' => new LegalEntity(), 'selectionMode' => true,
+            'requestAllowedOnly' => true, 'showAllSearchFilters' => true,
+            'selectionEvent' => 'encounter-referral-service-selected',
+        ])->assertSeeHtml('filterAllowedForEn')->assertSeeHtml('showFilter: true')
+            ->assertSee('Огляд; неврологічний')->assertDontSee('Огляд; неврологічний, повторний');
+
+        $component->call('selectService', 'inactive')->assertNotDispatched('encounter-referral-service-selected');
+        $component->call('selectService', 'neurological')->assertDispatched('encounter-referral-service-selected');
+        $component->set('filterRequestAllowed', '0')->call('search')->assertDontSee('Огляд; неврологічний');
+        Http::assertNothingSent();
+
+        Livewire::test(ServiceCatalog::class, [
+            'legalEntity' => new LegalEntity(), 'selectionMode' => true, 'requestAllowedOnly' => true,
+        ])->assertDontSeeHtml('filterAllowedForEn')->assertSeeHtml('showFilter: false');
+    }
     public static function queries(): array
     {
         return [

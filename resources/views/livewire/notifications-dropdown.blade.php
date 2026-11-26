@@ -25,6 +25,7 @@
             return Number(this.$root.dataset.totalUnreadCount) + this.clientNotifications.length;
         },
     }"
+    @click.outside.capture="open = false"
     @open-notifications.window="open = true"
     @show-patient-verification-notification.window="
         addNotification($root.dataset.verificationWarningTitle, $root.dataset.verificationWarningMessage)
@@ -53,7 +54,6 @@
     <div
         x-show="open"
         x-cloak
-        @click.away="open = false"
         class="notification-panel absolute right-0 z-50 mt-2.75 w-80 overflow-hidden rounded-xl bg-white shadow-lg dark:bg-gray-800"
         style="width: 320px; max-width: 320px; min-width: 320px"
     >
