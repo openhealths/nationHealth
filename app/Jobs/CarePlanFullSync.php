@@ -153,7 +153,7 @@ class CarePlanFullSync extends PatientEHealthJob
         }
         if ($this->isPatientRegistrySync() && $this->resourceUuid === null) {
             // Queue one full aggregate per job; a long patient history never runs in one HTTP request.
-            $summaries = $response->validate();
+            $summaries = collect($response->validate())->toArray();
             Repository::carePlan()->storeSummaries($summaries, $this->personId, $this->legalEntity->id);
             $jobs = self::detailJobs($summaries, $this->legalEntity, $this->patientContext);
             if ($jobs !== []) {
@@ -162,11 +162,8 @@ class CarePlanFullSync extends PatientEHealthJob
 
             return;
         }
-        $validatedData = $response?->validate();
-        if (empty($validatedData)) {
-            return;
-        }
         if ($this->isPatientRegistrySync() && $this->resourceUuid !== null) {
+            $validatedData = Arr::toCamelCase(Arr::from($response->validate()));
             if (($validatedData['id'] ?? null) !== $this->resourceUuid) {
                 throw ValidationException::withMessages(['id' => 'Care Plan details do not match the requested resource.']);
             }
@@ -195,7 +192,10 @@ class CarePlanFullSync extends PatientEHealthJob
 
             return;
         }
-        $this->synchronizeResources($validatedData, $this->personId, $this->legalEntity->id, $this->patientUuid, $this->token);
+        $summaries = collect($response->validate())->toArray();
+        if ($summaries !== []) {
+            $this->synchronizeResources($summaries, $this->personId, $this->legalEntity->id, $this->patientUuid, $this->token);
+        }
     }
 
     private function isPatientRegistrySync(): bool

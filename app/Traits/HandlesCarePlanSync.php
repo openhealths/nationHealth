@@ -51,7 +51,7 @@ trait HandlesCarePlanSync
             $jobs = [new CarePlanFullSync($legalEntity, standalone: true, patientContext: $patientContext)];
             if ($firstPageSynchronously) {
                 $response = EHealth::carePlan()->withToken($token)->getBySearchParams($person->uuid, ['page' => 1]);
-                $summaries = $response->validate();
+                $summaries = collect($response->validate())->toArray();
                 Repository::carePlan()->storeSummaries($summaries, $person->id, $legalEntity->id);
                 $jobs = CarePlanFullSync::detailJobs($summaries, $legalEntity, $patientContext);
                 if ($response->isNotLast()) {

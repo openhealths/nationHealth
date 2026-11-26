@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Classes\eHealth\EHealth;
+use App\Core\Arr;
 use Illuminate\Support\Facades\Validator;
 
 trait ReadsClinicalSnapshots
 {
     protected function fetchCarePlanDetails(string $patientUuid, string $planUuid): array
     {
-        $data = EHealth::carePlan()->getDetails($patientUuid, $planUuid, preserveApiKeys: true)->validate();
+        $data = Arr::from(EHealth::carePlan()->getDetails($patientUuid, $planUuid)->validate());
 
         return array_is_list($data) && count($data) === 1 ? $data[0] : $data;
     }

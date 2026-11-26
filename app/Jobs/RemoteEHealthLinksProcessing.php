@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Contracts\SubmittedToEHealth;
+use App\Core\Arr;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
 use App\Enums\ResponseStatus;
@@ -314,15 +315,17 @@ class RemoteEHealthLinksProcessing extends EHealthJob
                     // Medical Events jobs can return only links. Fetch the confirmed resource in the queue.
                     $plan = $record instanceof CarePlan ? $record : $record->carePlan;
                     $responseData['response_data'] = $record instanceof CarePlan
-                        ? EHealth::carePlan()->withToken($this->token)->getDetails($plan->person->uuid, $plan->uuid)->validate()
+                        ? Arr::toCamelCase(Arr::from(EHealth::carePlan()->withToken($this->token)
+                            ->getDetails($plan->person->uuid, $plan->uuid)->validate()))
                         : EHealth::carePlanActivity()->withToken($this->token)->getDetails($plan->person->uuid, $plan->uuid, $record->uuid)->validate();
                 }
                 if ($status === 'processed' && $record instanceof CarePlanActivity
                     && data_get($this->eHealthLink->job->request_data, 'changes.status') === 'scheduled') {
                     // The first registered activity can activate its parent; only the remote detail proves that transition.
                     $plan = $record->carePlan;
-                    $responseData['carePlanResource'] = EHealth::carePlan()->withToken($this->token)
+                    $details = EHealth::carePlan()->withToken($this->token)
                         ->getDetails($plan->person->uuid, $plan->uuid)->validate();
+                    $responseData['carePlanResource'] = Arr::toCamelCase(Arr::from($details));
                 }
                 if ($status === 'processed' && $record instanceof ServiceRequestRequest && !isset($responseData['response_data']) && !isset($responseData['result']) && !isset($responseData['data']) && !empty($responseData['links'])) {
                     $responseData['response_data'] = EHealth::serviceRequest()->withToken($this->token)

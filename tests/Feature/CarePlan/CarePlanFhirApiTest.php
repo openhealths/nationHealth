@@ -7,6 +7,8 @@ namespace Tests\Feature\CarePlan;
 use Tests\TestCase;
 use App\Classes\eHealth\Api\CarePlan as CarePlanApi;
 use App\Classes\eHealth\Api\CarePlanActivity as ActivityApi;
+use App\Classes\eHealth\Api\Responses\Collections\CarePlanGetMany;
+use App\Classes\eHealth\Api\Responses\Collections\CarePlanSummary;
 use App\Models\CarePlan;
 use App\Core\Arr;
 use App\Repositories\CarePlanActivityRepository;
@@ -198,18 +200,28 @@ class CarePlanFhirApiTest extends TestCase
         $this->assertCount(2, $items[0]['author']);
     }
 
-    public function test_plan_list_validates_the_normalized_managing_organization(): void
+    public function test_plan_list_returns_validated_summary_collections(): void
     {
         $plan = $this->fixture('plan');
+        $plan['requisition'] = 'AA00-BB11-CC22-DD33';
+        $plan['subject']['identifier'] = [
+            'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'patient']]],
+            'value' => '923539c6-2d44-4d20-a414-da80127e10bf',
+        ];
         $plan['managingOrganization'] = [
-            'identifier' => ['value' => '346aad58-6164-4e32-98b5-d178cbf850db'],
+            'identifier' => [
+                'type' => ['coding' => [['system' => 'eHealth/resources', 'code' => 'legal_entity']]],
+                'value' => '346aad58-6164-4e32-98b5-d178cbf850db',
+            ],
             'displayValue' => 'Synthetic clinic',
         ];
         Http::fake(['*' => Http::response(['data' => [Arr::toSnakeCase($plan)]])]);
 
         $items = $this->fakeApi(CarePlanApi::class)->getSummary('patient-test')->validate();
 
-        $this->assertSame($plan['managingOrganization'], $items[0]['managingOrganization']);
+        $this->assertInstanceOf(CarePlanGetMany::class, $items);
+        $this->assertInstanceOf(CarePlanSummary::class, $items->first());
+        $this->assertEquals(Arr::toSnakeCase($plan['managingOrganization']), $items[0]['managing_organization']);
         $this->assertSame($plan['period'], $items[0]['period']);
     }
 

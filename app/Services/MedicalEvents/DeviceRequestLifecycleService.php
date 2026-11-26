@@ -7,6 +7,7 @@ namespace App\Services\MedicalEvents;
 use App\Classes\eHealth\Api\DeviceRequest;
 use App\Classes\eHealth\EHealth;
 use App\Contracts\EHealthRequestLifecycleContract;
+use App\Core\Arr;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
@@ -128,8 +129,8 @@ class DeviceRequestLifecycleService extends EHealthRequestLifecycleService imple
             $this->invalid('activity', __('care-plan.full_sync_required'));
         }
         Gate::authorize('manageActivities', $localPlan);
-        $plan = \App\Core\Arr::toSnakeCase(EHealth::carePlan()->getDetails($person->uuid, $carePlanUuid)->validate());
-        $activity = \App\Core\Arr::toSnakeCase(EHealth::carePlanActivity()->getDetails($person->uuid, $carePlanUuid, $activityUuid)->validate());
+        $plan = Arr::from(EHealth::carePlan()->getDetails($person->uuid, $carePlanUuid)->validate());
+        $activity = Arr::toSnakeCase(EHealth::carePlanActivity()->getDetails($person->uuid, $carePlanUuid, $activityUuid)->validate());
         $detail = $activity['detail'] ?? $activity;
         if (($plan['status'] ?? '') !== 'active'
             || !in_array($detail['status'] ?? $activity['status'] ?? '', ['scheduled', 'in-progress', 'active'], true)

@@ -22,7 +22,8 @@ trait SynchronizesCarePlans
             if ($token !== null) {
                 $planApi->withToken($token);
             }
-            $resource = $planApi->getDetails($patient['uuid'], $summary['id'])->validate();
+            $details = $planApi->getDetails($patient['uuid'], $summary['id'])->validate();
+            $resource = Arr::toCamelCase(Arr::from($details));
             if ($resource['id'] !== $summary['id']) {
                 throw ValidationException::withMessages(['id' => 'Care Plan details do not match the requested resource.']);
             }
@@ -49,9 +50,9 @@ trait SynchronizesCarePlans
         $seen = [];
         for ($page = 1; ; $page++) {
             $response = $fetch($page);
-            $items = $response->validate();
+            $items = collect($response->validate());
             foreach ($items as $item) {
-                $item = Arr::toCamelCase($item);
+                $item = Arr::toCamelCase(Arr::from($item));
                 if (isset($seen[$item['id']])) {
                     throw ValidationException::withMessages(['paging' => 'Care Plan pagination repeated a resource.']);
                 }
@@ -59,7 +60,7 @@ trait SynchronizesCarePlans
                 $summaries[] = $item;
             }
             $lastPage = $response->getPaging()['total_pages'] ?? null;
-            if ($items === [] || ($lastPage !== null && $page >= (int) $lastPage)) {
+            if ($items->isEmpty() || ($lastPage !== null && $page >= (int) $lastPage)) {
                 break;
             }
         }
