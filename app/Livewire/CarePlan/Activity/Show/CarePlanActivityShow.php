@@ -7,11 +7,9 @@ namespace App\Livewire\CarePlan\Activity\Show;
 use App\Classes\eHealth\EHealth;
 use App\Livewire\CarePlan\CarePlanComponent;
 use App\Livewire\CarePlan\Concerns\ManagesCarePlanEPrescription;
+use App\Livewire\CarePlan\Concerns\CarePlanManager;
 use App\Livewire\CarePlan\Concerns\ManagesCarePlanReferrals;
 use App\Models\CarePlan;
-use App\Models\LegalEntity;
-use App\Models\Person\Person;
-use App\Models\Preperson;
 use App\Models\CarePlanActivity;
 use App\Enums\JobStatus;
 use App\Repositories\Repository;
@@ -22,6 +20,7 @@ use Livewire\Attributes\Locked;
 class CarePlanActivityShow extends CarePlanComponent
 {
     use ManagesCarePlanEPrescription;
+    use CarePlanManager;
     use ManagesCarePlanReferrals;
 
     #[Locked]
@@ -32,15 +31,8 @@ class CarePlanActivityShow extends CarePlanComponent
     #[Locked]
     public array $submissionStates = [];
 
-    public function mount(
-        ?LegalEntity $legalEntity = null,
-        ?Person $person = null,
-        ?Preperson $preperson = null,
-        ?CarePlan $carePlan = null,
-        ?CarePlanActivity $activity = null
-    ): void {
-        abort_if($carePlan === null || $activity === null, 404);
-
+    public function mount(CarePlan $carePlan, CarePlanActivity $activity): void
+    {
         $this->bootCarePlan($carePlan);
 
         $this->activity = $this->ownedActivity($activity->id);

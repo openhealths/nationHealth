@@ -65,6 +65,8 @@ return [
     'full_sync_required' => 'Full synchronization with eHealth is required before details and clinical actions are available.',
     'draft_backfill_required' => 'This legacy draft requires review and conversion before details and editing are available.',
     'draft_saved' => 'Care plan draft saved successfully.',
+    'draft_updated' => 'Care plan draft updated successfully.',
+    'draft_deleted' => 'Care plan draft deleted successfully.',
     'activity_updated' => 'Care plan activity draft updated successfully.',
     'activity_completed' => 'Care plan activity completed successfully.',
     'activity_cancelled' => 'Care plan activity cancelled successfully.',

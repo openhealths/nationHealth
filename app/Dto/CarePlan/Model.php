@@ -12,8 +12,6 @@ use App\Dto\Input\FormIdentifier;
 use App\Enums\CarePlanStatus;
 use App\Livewire\CarePlan\Forms\CarePlanForm;
 use App\Models\CarePlan;
-use App\Services\MedicalEvents\Fhir;
-use App\Services\MedicalEvents\FhirResource;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Symfony\Component\ObjectMapper\Attribute\Map;
@@ -147,8 +145,8 @@ class Model
         $this->encounterIdentifier = $this->identifier($mapper, $this->encounter, 'encounter');
         $this->managingOrganization = $this->identifier($mapper, $legalEntityUuid, 'legal_entity');
         $this->period = [
-            'start' => $this->instant($this->periodStart, $this->periodStartTime),
-            'end' => $this->periodEnd === '' ? null : $this->instant($this->periodEnd, $this->periodEndTime),
+            'start' => $this->localDateTimeToUtc($this->periodStart, $this->periodStartTime),
+            'end' => $this->periodEnd === '' ? null : $this->localDateTimeToUtc($this->periodEnd, $this->periodEndTime ?: '23:59:59'),
         ];
         $this->medicalRecordLabels = $medicalRecordLabels;
         $this->contributors = collect($coAuthors)->map(
@@ -187,40 +185,6 @@ class Model
         $this->prepareResourceRelations($details->toResource());
     }
 
-    /** Preserve the normalized references and coding from the edited local draft. */
-    public function prepareDraftUpdate(
-        array $stored,
-        array $fields,
-        ObjectMapperInterface $mapper
-    ): void {
-        $fields['medicalRecords'] = collect($fields['medicalRecords'] ?? [])->map(static function (array $reference): array {
-            if (isset($reference['identifier'])) {
-                return $reference;
-            }
-
-            return FhirResource::make()->coding('eHealth/resources', $reference['type'])->toIdentifier($reference['uuid']);
-        })->all();
-        $fields['coAuthors'] = array_values(array_filter($fields['coAuthors'] ?? []));
-        $fields['author'] = $this->authorUuid;
-        $fields['addresses'] = $this->addresses;
-        $resource = Fhir::carePlan()->toFhir($fields, [
-            'resource' => $stored,
-            'timezone' => config('app.timezone'),
-            'dateFormat' => config('app.date_format'),
-        ]);
-
-        $this->uuid = $resource['id'];
-        foreach (['context', 'description', 'note', 'informWith'] as $field) {
-            $this->{$field} = $this->{$field} === '' ? null : $this->{$field};
-        }
-        foreach (['categoryConcept' => 'category', 'termsOfServiceConcept' => 'termsOfService', 'statusReasonConcept' => 'statusReason'] as $relation => $field) {
-            $this->remoteConcepts[$relation] = isset($resource[$field])
-                ? $mapper->map(new FormCodeableConcept($resource[$field]), CodeableConceptData::class)
-                : null;
-        }
-        $this->prepareResourceRelations($resource);
-    }
-
     protected function prepareResourceRelations(array $resource): void
     {
         $this->remoteReferences = [
@@ -256,10 +220,13 @@ class Model
         ]), IdentifierData::class);
     }
 
-    protected function instant(string $date, string $time): string
+    protected function localDateTimeToUtc(string $date, string $time): string
     {
+        $time = $time === '' ? '00:00' : $time;
+        $format = strlen($time) === 5 ? 'H:i' : 'H:i:s';
+
         return CarbonImmutable::createFromFormat(
-            '!'.config('app.date_format').' H:i', $date.' '.($time === '' ? '00:00' : $time), config('app.timezone')
+            '!'.config('app.date_format').' '.$format, $date.' '.$time, config('app.timezone')
         )->utc()->toIso8601String();
     }
 }

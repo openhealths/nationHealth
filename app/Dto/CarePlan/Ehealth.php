@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Dto\CarePlan;
 
+use App\Core\Arr;
 use App\Enums\CarePlanStatus;
 use ArrayObject;
 use Symfony\Component\ObjectMapper\Attribute\Map;
@@ -62,4 +63,18 @@ class Ehealth
 
     #[Map(if: false)]
     public string $status = CarePlanStatus::PENDING->value;
+
+    public function toPayload(): array
+    {
+        return $this->omitEmptyFields(Arr::toSnakeCase(get_object_vars($this)));
+    }
+
+    /** Omit empty optional values recursively and keep JSON lists consecutively indexed. */
+    protected function omitEmptyFields(array $data): array
+    {
+        $data = array_map(fn (mixed $value): mixed => is_array($value) ? $this->omitEmptyFields($value) : $value, $data);
+        $filtered = array_filter($data, static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
+
+        return array_is_list($data) ? array_values($filtered) : $filtered;
+    }
 }

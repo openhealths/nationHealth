@@ -148,7 +148,7 @@
                     {{ __('care-plan.medical_number') ?? 'Медичний запис №' }}
                 </label>
                 @error('form.medicalNumber')
-                    <p class="text-error" id="error-form-medicalNumber">{{ $message }}</p>
+                    <p class="text-error" id="error-form-medical_number">{{ $message }}</p>
                 @enderror
             </div>
         </div>

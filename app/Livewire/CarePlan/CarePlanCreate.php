@@ -4,46 +4,27 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan;
 
-use App\Enums\Episode\Status as EpisodeStatus;
-use App\Enums\Person\ProcedureStatus;
 use App\Models\CarePlan;
 use App\Models\LegalEntity;
-use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
-use App\Models\MedicalEvents\Sql\Episode;
-use App\Models\MedicalEvents\Sql\Procedure;
 use App\Models\Person\Person;
-use App\Models\User;
 use App\Repositories\Repository;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Livewire\Attributes\Locked;
 
-class CarePlanCreate extends CarePlanComponent
+class CarePlanCreate extends CarePlanDraftComponent
 {
-    #[Locked]
-    public ?string $draftUuid = null;
-
-    #[Locked]
-    public ?int $draftLegalEntityId = null;
-
-    #[Locked]
-    public ?int $draftOpenedById = null;
-
     public function mount(LegalEntity $legalEntity, $personId = null, $encounter = null, ?Person $person = null): void
     {
         $this->draftUuid = Str::uuid()->toString();
-        $this->draftLegalEntityId = $legalEntity->id;
-        $this->draftOpenedById = Auth::id();
 
         $routePersonId = $person?->id ?? request()->route('personId');
         $personId ??= $routePersonId;
-        $encounterRouteParam = request()->route('encounter') ?? (request()->query('encounter') ?? request()->query('encounterId'));
+        $encounterRouteParam = request()->route('encounter') ?? ($encounter ?? (request()->query('encounter') ?? request()->query('encounterId')));
         $this->allowsPatientChange = empty($routePersonId) && empty($encounterRouteParam);
 
         $resolvedPersonId = null;
@@ -52,7 +33,9 @@ class CarePlanCreate extends CarePlanComponent
         // Try to resolve encounter from route parameters, query string or sequence-passed personId
 
         if ($encounterRouteParam) {
-            if (Str::isUuid((string) $encounterRouteParam)) {
+            if ($encounterRouteParam instanceof Encounter) {
+                $resolvedEncounter = $encounterRouteParam;
+            } elseif (is_string($encounterRouteParam) && Str::isUuid($encounterRouteParam)) {
                 $resolvedEncounter = Repository::carePlan()->findEncounter($encounterRouteParam);
             } elseif (is_numeric($encounterRouteParam)) {
                 $resolvedEncounter = Repository::carePlan()->findEncounter((int) $encounterRouteParam);
@@ -89,7 +72,10 @@ class CarePlanCreate extends CarePlanComponent
         $person = ctype_digit((string) $patientId)
             ? Repository::carePlan()->findPatient((int) $patientId) ?? abort(404)
             : null;
-        $this->loadPatientForm($legalEntity, $person);
+        if ($person !== null) {
+            parent::mount($legalEntity, $person);
+        }
+        $this->initializeDraftForm($legalEntity, $person);
 
         $conditionUuid = request()->query('conditionUuid');
         $this->conditionUuid = is_string($conditionUuid) && Str::isUuid($conditionUuid) ? $conditionUuid : '';
@@ -108,91 +94,6 @@ class CarePlanCreate extends CarePlanComponent
         $this->refreshCategoryOptions();
     }
 
-    protected function afterDraftSaved(int $draftId): void
-    {
-        Session::flash('success', __('care-plan.draft_saved'));
-        $this->redirectRoute('care-plans.edit', [legalEntity(), $draftId], navigate: true);
-    }
-
-    protected function persistDraft(): ?int
-    {
-        $user = Auth::user();
-        $legalEntity = legalEntity();
-        if ($user === null || $legalEntity === null || $this->draftUuid === null
-            || !$this->draftContextMatches($user) || $user->cannot('create', CarePlan::class)) {
-            Session::flash('error', __('care-plan.no_permission_create'));
-
-            return null;
-        }
-
-        $repository = Repository::carePlan();
-
-        $person = $repository->findPatient((int) $this->personId);
-        if ($person === null || !Str::isUuid((string) $person->uuid)) {
-            throw ValidationException::withMessages(['form.patient' => __('validation.required', [
-                'attribute' => __('care-plan.patient'),
-            ])]);
-        }
-        $encounter = $this->prepareDraftEncounter($person);
-
-        $coAuthors = array_column($repository->doctors($legalEntity->id), 'uuid');
-        $episodes = $this->draftEpisodes($person, $encounter, $user);
-        $medicalRecords = $this->form->medicalRecords === [] ? collect() : $this->draftMedicalRecords($person, $encounter, $user);
-        $validated = $this->form->validateDraft($coAuthors, $episodes->keys()->all(), $medicalRecords->keys()->all());
-
-        $mapper = objectMapper();
-        $draft = $this->mapDraftForm($mapper, $user, $person, $encounter);
-        $draft->uuid = $this->draftUuid;
-        $draft->personId = $person->id;
-        $draft->legalEntityId = $legalEntity->id;
-        $draft->prepareLocal(
-            $mapper,
-            $person->uuid,
-            $legalEntity->uuid,
-            $validated['coAuthors'],
-            $validated['episodes'],
-            array_intersect_key($medicalRecords->all(), array_flip($validated['medicalRecords'])),
-        );
-
-        return $repository->saveLocally(collect([$draft]), $mapper)->first()?->id;
-    }
-
-    protected function draftContextMatches(User $user): bool
-    {
-        return $this->draftOpenedById === $user->id
-            && $this->draftLegalEntityId !== null
-            && $this->draftLegalEntityId === legalEntity()?->id;
-    }
-
-    protected function draftEpisodes(Person $person, Encounter $encounter, User $user): Collection
-    {
-        return $person->filterRecordsWithMerged(Episode::query())
-            ->where(fn ($query) => $query->whereStatus(EpisodeStatus::ACTIVE)->orWhere('uuid', $encounter->episode?->value))
-            ->get()
-            ->toBase()
-            ->filter(fn (Episode $episode): bool => $user->can('view', [$episode, $person]))
-            ->mapWithKeys(fn (Episode $episode): array => [$episode->uuid => $episode->name]);
-    }
-
-    protected function draftMedicalRecords(Person $person, Encounter $encounter, User $user): Collection
-    {
-        $procedures = $person->filterRecordsWithMerged(Procedure::forEncounter($encounter->uuid))
-            ->whereStatus(ProcedureStatus::COMPLETED)
-            ->with('code')->get()->toBase()
-            ->filter(fn (Procedure $record): bool => $user->can('view', [$record, $person]));
-        $reports = $person->filterRecordsWithMerged(DiagnosticReport::forEncounter($encounter->uuid))
-            ->final()
-            ->with('code')->get()->toBase()
-            ->filter(fn (DiagnosticReport $record): bool => $user->can('view', [$record, $person]));
-
-        return $procedures->concat($reports)->mapWithKeys(function (Procedure|DiagnosticReport $record): array {
-            $type = $record instanceof Procedure ? 'procedure' : 'diagnostic_report';
-            $label = $record->code?->displayValue ?: ($record->code?->value ?: $record->uuid);
-
-            return [$type.':'.$record->uuid => __('care-plan.emz_type.'.$type).' — '.$label];
-        });
-    }
-
     public function cancel(): void
     {
         $encounter = $this->form->encounter === ''
@@ -206,7 +107,7 @@ class CarePlanCreate extends CarePlanComponent
      */
     public function searchForPatient(): void
     {
-        if (!$this->allowsPatientChange || !Auth::user()?->can('create', CarePlan::class)) {
+        if ($this->draftId !== null || !$this->allowsPatientChange || !Auth::user()?->can('create', CarePlan::class)) {
             return;
         }
 
@@ -235,7 +136,7 @@ class CarePlanCreate extends CarePlanComponent
      */
     public function selectPatient(int $personId): void
     {
-        if (!$this->allowsPatientChange || !Auth::user()?->can('create', CarePlan::class)) {
+        if ($this->draftId !== null || !$this->allowsPatientChange || !Auth::user()?->can('create', CarePlan::class)) {
             return;
         }
 
@@ -271,7 +172,7 @@ class CarePlanCreate extends CarePlanComponent
      */
     public function clearSelectedPatient(): void
     {
-        if (!$this->allowsPatientChange || !Auth::user()?->can('create', CarePlan::class)) {
+        if ($this->draftId !== null || !$this->allowsPatientChange || !Auth::user()?->can('create', CarePlan::class)) {
             return;
         }
 
@@ -294,7 +195,7 @@ class CarePlanCreate extends CarePlanComponent
         $this->form->medicalNumber = Repository::carePlan()->nextDisplayNumber();
     }
 
-    protected function renderCarePlan(): View
+    public function render(): View
     {
         return view('livewire.care-plan.care-plan-create');
     }

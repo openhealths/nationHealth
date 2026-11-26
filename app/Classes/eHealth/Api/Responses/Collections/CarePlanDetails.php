@@ -16,13 +16,13 @@ use Illuminate\Support\Collection;
  */
 class CarePlanDetails extends Collection
 {
-    /** The native resource, kept intact for signed snapshots. */
-    public array $native;
+    /** Validated API fields before wrapping nested values for ObjectMapper. */
+    protected array $validated;
 
-    public function __construct(iterable|null $items = [], ?array $native = null)
+    public function __construct(iterable|null $items = [])
     {
         parent::__construct($items);
-        $this->native = $native ?? $this->items;
+        $this->validated = $this->items;
 
         foreach (['category', 'terms_of_service', 'status_reason'] as $field) {
             if (is_array($this->get($field))) {
@@ -61,9 +61,9 @@ class CarePlanDetails extends Collection
         return isset($history['status_reason']) ? new EhealthCodeableConcept($history['status_reason']) : null;
     }
 
-    /** Convert validated data for legacy consumers that still use normalized resource arrays. */
+    /** Return the validated fields in the application’s normalized resource format. */
     public function toResource(): array
     {
-        return Arr::toCamelCase(array_replace($this->native, ['status' => $this->status()->value]));
+        return Arr::toCamelCase(array_replace($this->validated, ['status' => $this->status()->value]));
     }
 }

@@ -66,8 +66,8 @@ class CarePlanForm extends BaseForm
             'title' => 'required|string|max:255',
             'context' => 'nullable|string|max:255',
             'informWith' => 'nullable|string|max:255',
-            'periodStartTime' => 'nullable|date_format:H:i',
-            'periodEndTime' => 'nullable|date_format:H:i',
+            'periodStartTime' => 'nullable|date_format:H:i,H:i:s',
+            'periodEndTime' => 'nullable|date_format:H:i,H:i:s',
             'coAuthors' => 'array|list',
             'episodes' => 'array|list',
             'medicalRecords' => 'array|list',
@@ -77,9 +77,9 @@ class CarePlanForm extends BaseForm
             'medicalRecords.*' => 'array',
         ]);
 
-        $start = $this->periodStartIsoDate().' '.($this->periodStartTime ?: '00:00');
+        $start = $this->periodStartIsoDate().' '.str_pad($this->periodStartTime ?: '00:00', 8, ':00');
         $end = $this->periodEndIsoDate();
-        if ($end !== null && ($end.' '.($this->periodEndTime ?: '00:00')) < $start) {
+        if ($end !== null && $end.' '.str_pad($this->periodEndTime ?: '23:59:59', 8, ':00') < $start) {
             throw ValidationException::withMessages(['form.periodEnd' => __('care-plan.period_end_before_start')]);
         }
 
@@ -106,33 +106,41 @@ class CarePlanForm extends BaseForm
         return array_merge($this->rules(), $this->signingRules());
     }
 
-    /** Validate the editable fields against the draft revision locked for this save. */
-    public function validateForUpdate(string $expectedRevision, string $currentRevision): array
+    /** Reject edits to a draft changed since the form was opened. */
+    public function validateRevision(string $expectedRevision, string $currentRevision): void
     {
         if (!hash_equals($expectedRevision, $currentRevision)) {
-            throw ValidationException::withMessages(['submission' => __('care-plan.document_context_unavailable')]);
+            throw ValidationException::withMessages(['form.title' => __('care-plan.document_context_unavailable')]);
         }
-
-        return $this->validate($this->rulesForDraftEdit());
     }
 
-    /** Validate the editable values and reference shapes of an already saved draft. */
-    public function rulesForDraftEdit(): array
+    public function validateCreatePayload(array $payload): void
     {
-        return [
-            ...$this->rules(),
-            'periodStartTime' => 'nullable|date_format:H:i,H:i:s',
-            'periodEndTime' => 'nullable|date_format:H:i,H:i:s',
-            'coAuthors' => 'array',
-            'coAuthors.*' => 'nullable|uuid',
-            'episodes.*' => 'array',
-            'episodes.*.uuid' => 'required|uuid',
-            'medicalRecords.*' => 'array',
-            'medicalRecords.*.identifier' => 'sometimes|array',
-            'medicalRecords.*.displayValue' => 'sometimes|nullable|string',
-            'medicalRecords.*.uuid' => 'required_without:medicalRecords.*.identifier|uuid',
-            'medicalRecords.*.type' => 'required_without:medicalRecords.*.identifier|in:procedure,diagnostic_report',
-        ];
+        Validator::make($payload, [
+            'id' => 'required|uuid',
+            'title' => 'required|string',
+            'intent' => 'required|in:order',
+            'status' => 'required|in:new',
+            'category.coding' => 'required|array|min:1',
+            'period.start' => 'required|date',
+            'period.end' => 'sometimes|nullable|date|after_or_equal:period.start',
+            'encounter.identifier.value' => 'required|uuid',
+            'author.identifier.value' => 'required|uuid',
+            'addresses' => 'required|array|min:1',
+            'terms_of_service.coding' => 'required|array|min:1',
+            'based_on' => 'sometimes|nullable|array',
+            'part_of' => 'sometimes|nullable|array',
+            'description' => 'sometimes|nullable|string',
+            'note' => 'sometimes|nullable|string',
+            'supporting_info' => 'sometimes|nullable|array',
+            'supporting_info.*.identifier.value' => 'required|uuid',
+            'supporting_info.*.identifier.type.coding' => 'required|array|min:1',
+            'supporting_info.*.identifier.type.coding.*.code' => 'required|in:episode_of_care,procedure,diagnostic_report',
+            'contributor' => 'sometimes|nullable|array',
+            'contributor.*.identifier.value' => 'required|uuid',
+            'inform_with' => 'sometimes|nullable|array',
+            'inform_with.auth_method_id' => 'sometimes|nullable|uuid',
+        ])->validate();
     }
 
     public function periodStartIsoDate(): string
