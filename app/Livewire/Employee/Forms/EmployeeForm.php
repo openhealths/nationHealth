@@ -212,6 +212,7 @@ class EmployeeForm extends BaseForm
         return [
             'party.workingExperience.integer' => __('validation.custom.party.working_experience_integer'),
             'party.email.ascii' => __('validation.custom.party.email_must_be_latin'),
+            'party.taxId.regex' => __('validation.custom.employee.tax_id_ehealth_format'),
             'party.workingExperience.min' => __('validation.custom.party.working_experience_min'),
             'documents.*.type.in' => __('validation.custom.employee.document_type_not_allowed'),
             'documents.*.issuedBy' => __('validation.custom.employee.document_issuer_required'),
@@ -230,7 +231,15 @@ class EmployeeForm extends BaseForm
             'party.phones' => ['required', 'array', 'min:1', new PhoneDuplicates()],
             'party.phones.*.number' => ['required', new PhoneNumber()],
             'party.phones.*.type' => ['required', 'string', Rule::in(array_keys($this->component->dictionaries['PHONE_TYPE'] ?? []))],
-            'party.taxId' => ['required', 'string', new TaxId()],
+            'party.taxId' => [
+                'bail',
+                'required',
+                'string',
+                // Create Employee Request v2 accepts Latin I, but not Ukrainian І, in tax_id.
+                // Validate the copied passport identifier without changing the document number.
+                'regex:/^([0-9]{9,10}|[А-ЯЁЇIЄҐ]{2}\d{6})$/u',
+                new TaxId(),
+            ],
             'party.noTaxId' => ['boolean'],
             'party.email' => ['required', 'present', 'email', 'ascii', new UniqueEmailInLegalEntity($this->existingPartyId)],
             'party.workingExperience' => ['nullable', 'integer', 'min:0'],
