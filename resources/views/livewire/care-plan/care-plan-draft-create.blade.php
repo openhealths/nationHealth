@@ -14,16 +14,23 @@
 
     <div class="shift-content mt-6 pl-4">
         <div class="w-full max-w-screen-xl">
+            @if ($errors->any())
+                <p
+                    class="text-error mb-4"
+                    tabindex="-1"
+                    x-data
+                    x-init="$nextTick(() => $el.focus())"
+                >
+                    {{ $errors->first() }}
+                </p>
+            @endif
+
             @include('livewire.care-plan.parts.doctors')
             @include('livewire.care-plan.parts.patient_data', ['medicalNumberField' => 'form.medicalNumber'])
             @include('livewire.care-plan.parts.care_plan_data')
             @include('livewire.care-plan.parts.condition_diagnosis')
             @include('livewire.care-plan.parts.supporting_information')
             @include('livewire.care-plan.parts.additional_info', ['showPlanReferences' => false])
-
-            @if ($errors->any())
-                <p role="alert" class="text-error mt-6">{{ $errors->first() }}</p>
-            @endif
 
             <div class="mt-8 flex items-center gap-4 pt-4">
                 <button

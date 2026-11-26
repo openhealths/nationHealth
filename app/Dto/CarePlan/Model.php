@@ -121,8 +121,8 @@ class Model
         $this->encounterIdentifier = $this->identifier($mapper, $this->encounter, 'encounter');
         $this->managingOrganization = $this->identifier($mapper, $legalEntityUuid, 'legal_entity');
         $this->period = [
-            'start' => $this->localDateTimeToUtc($this->periodStart, $this->periodStartTime),
-            'end' => $this->periodEnd === '' ? null : $this->localDateTimeToUtc($this->periodEnd, $this->periodEndTime ?: '23:59:59'),
+            'start' => $this->localDateTimeToUtcIso8601($this->periodStart, $this->periodStartTime),
+            'end' => $this->periodEnd === '' ? null : $this->localDateTimeToUtcIso8601($this->periodEnd, $this->periodEndTime ?: '23:59:59'),
         ];
         $this->medicalRecordLabels = $medicalRecordLabels;
         $this->contributors = collect($coAuthors)->map(
@@ -156,7 +156,8 @@ class Model
         ]), IdentifierData::class);
     }
 
-    protected function localDateTimeToUtc(string $date, string $time): string
+    /** Format the local form date and time as an ISO 8601 timestamp in UTC. */
+    protected function localDateTimeToUtcIso8601(string $date, string $time): string
     {
         $time = $time === '' ? '00:00' : $time;
         $format = strlen($time) === 5 ? 'H:i' : 'H:i:s';

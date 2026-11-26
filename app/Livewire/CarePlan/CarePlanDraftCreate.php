@@ -26,6 +26,7 @@ use Livewire\Attributes\Locked;
 class CarePlanDraftCreate extends BasePatientComponent
 {
     public CarePlanDraftForm $form;
+    public PatientSearchForm $patientSearch;
 
     #[Locked]
     public string $draftUuid;
@@ -39,35 +40,27 @@ class CarePlanDraftCreate extends BasePatientComponent
     #[Locked]
     public string $conditionUuid = '';
 
-    public string $medicalRecordType = 'CONDITION';
-
-    public PatientSearchForm $patientSearch;
-
-    public array $categories = [];
+    #[Locked]
+    public bool $allowsPatientChange = false;
 
     #[Locked]
     public array $allowedCategoryCodes = [];
-    public array $diagnoses = [];
+
     #[Locked]
     public array $patientSearchResults = [];
-    #[Locked]
-    public bool $allowsPatientChange = false;
-    public array $doctors = [];
 
-    /**
-     * Dictionaries to load via FormTrait::getDictionary().
-     */
+    public array $categories = [];
+    public array $diagnoses = [];
+    public array $doctors = [];
+    public array $availableEncounters = [];
+    public array $availableEpisodes = [];
+    public string $medicalRecordType = 'CONDITION';
+
     protected array $dictionaryNames = [
         'eHealth/care_plan_categories',
         'eHealth/encounter_classes',
         'PROVIDING_CONDITION',
     ];
-
-    /**
-     * Available encounters that have been confirmed by eHealth (for the encounter selector).
-     */
-    public array $availableEncounters = [];
-    public array $availableEpisodes = [];
 
     public function mount(
         LegalEntity $legalEntity,
@@ -126,6 +119,7 @@ class CarePlanDraftCreate extends BasePatientComponent
 
     public function save(): void
     {
+        $this->resetValidation();
         $user = Auth::user();
         $legalEntity = legalEntity();
         if ($user === null || $legalEntity === null || (int) $legalEntity->id !== $this->legalEntityId
