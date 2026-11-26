@@ -145,8 +145,6 @@
 
                                     <td class="td-input">
                                         @php
-                                            $isResigned = $declaration->type === 'declaration'
-                                                && $declaration->hasParentDeclaration();
                                             $isToBeResigned = $declaration->type === 'declaration'
                                                 && $declaration->status === Status::ACTIVE
                                                 && $hasLegators
@@ -158,7 +156,7 @@
                                                 @if ($isToBeResigned)
                                                     {{ __('declarations.status.to_be_resigned') }}
                                                 @else
-                                                    {{ $isResigned ? __('declarations.status.resigned') : $declaration->status->label() }}
+                                                    {{ $declaration->statusLabel() }}
                                                 @endif
                                             @else
                                                 {{ $declaration->status->label() }}

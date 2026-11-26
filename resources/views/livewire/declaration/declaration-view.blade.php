@@ -78,7 +78,7 @@
                         {{ __('declarations.status.label') }}
                     </label>
                     <input
-                        value="{{ $declaration->status->label() }}"
+                        value="{{ $declaration->statusLabel() }}"
                         type="text"
                         name="status"
                         id="status"
