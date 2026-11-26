@@ -8,7 +8,7 @@ use App\Dto\CodeableConcept\Model as CodeableConceptData;
 use App\Dto\Identifier\Model as IdentifierData;
 use App\Enums\CarePlanStatus;
 use App\Enums\ResourceType;
-use App\Livewire\CarePlan\Forms\CarePlanDraftForm;
+use App\Livewire\CarePlan\Forms\CarePlanForm;
 use App\Models\CarePlan;
 use Illuminate\Support\Collection;
 use Symfony\Component\ObjectMapper\Attribute\Map;
@@ -22,26 +22,9 @@ use Symfony\Component\ObjectMapper\Condition\TargetClass;
  * through attribute access instead of declared properties. The remaining values
  * are used to build the related concepts, identifiers and period.
  */
-#[Map(source: CarePlanDraftForm::class, target: CarePlan::class)]
+#[Map(source: CarePlanForm::class, target: CarePlan::class)]
 class Model
 {
-    #[Map(if: new TargetClass(CarePlan::class))]
-    public string $uuid;
-
-    #[Map(if: new TargetClass(CarePlan::class))]
-    public int $personId;
-
-    #[Map(if: new TargetClass(CarePlan::class))]
-    public int $legalEntityId;
-
-    #[Map(if: new TargetClass(CarePlan::class))]
-    public int $authorId;
-
-    public string $authorUuid;
-
-    #[Map(if: new TargetClass(CarePlan::class))]
-    public int $encounterId;
-
     #[Map(if: new TargetClass(CarePlan::class))]
     public string $status = CarePlanStatus::DRAFT->value;
 
@@ -64,10 +47,10 @@ class Model
     #[Map(if: new TargetClass(CarePlan::class))]
     public ?string $note = null;
 
-    #[Map(source: 'localPeriodStart', if: new SourceClass(CarePlanDraftForm::class), transform: 'convertToEHealthISO8601')]
+    #[Map(source: 'localPeriodStart', if: new SourceClass(CarePlanForm::class), transform: 'convertToEHealthISO8601')]
     public string $periodStart;
 
-    #[Map(source: 'localPeriodEnd', if: new SourceClass(CarePlanDraftForm::class), transform: 'convertToEHealthISO8601')]
+    #[Map(source: 'localPeriodEnd', if: new SourceClass(CarePlanForm::class), transform: 'convertToEHealthISO8601')]
     public string $periodEnd = '';
 
     public string $encounter = '';
@@ -100,6 +83,7 @@ class Model
      * @param array<string, string> $medicalRecordLabels
      */
     public function prepareLocal(
+        string $authorUuid,
         string $patientUuid,
         string $legalEntityUuid,
         array $coAuthors,
@@ -112,7 +96,7 @@ class Model
         $this->termsOfServiceConcept = CodeableConceptData::map([
             'coding' => [['system' => 'PROVIDING_CONDITION', 'code' => $this->termsOfService]],
         ]);
-        $this->authorReference = $this->identifier($this->authorUuid, ResourceType::EMPLOYEE->value);
+        $this->authorReference = $this->identifier($authorUuid, ResourceType::EMPLOYEE->value);
         $this->subjectReference = $this->identifier($patientUuid, 'patient');
         $this->encounterIdentifier = $this->identifier($this->encounter, 'encounter');
         $this->managingOrganization = $this->identifier($legalEntityUuid, ResourceType::LEGAL_ENTITY->value);

@@ -6,7 +6,7 @@ namespace App\Livewire\CarePlan;
 
 use App\Dto\CarePlan\Model as CarePlanData;
 use App\Exceptions\MedicalEvents\ClinicalStorageException;
-use App\Livewire\CarePlan\Forms\CarePlanDraftForm;
+use App\Livewire\CarePlan\Forms\CarePlanForm;
 use App\Livewire\CarePlan\Forms\PatientSearchForm;
 use App\Livewire\Person\Records\BasePatientComponent;
 use App\Models\CarePlan;
@@ -25,7 +25,7 @@ use Livewire\Attributes\Locked;
 
 class CarePlanDraftCreate extends BasePatientComponent
 {
-    public CarePlanDraftForm $form;
+    public CarePlanForm $form;
     public PatientSearchForm $patientSearch;
 
     #[Locked]
@@ -49,6 +49,7 @@ class CarePlanDraftCreate extends BasePatientComponent
     #[Locked]
     public array $patientSearchResults = [];
 
+    public string $medicalNumber = '';
     public array $categories = [];
     public array $diagnoses = [];
     public array $doctors = [];
@@ -163,16 +164,10 @@ class CarePlanDraftCreate extends BasePatientComponent
                 throw ValidationException::withMessages(['form.author' => __('care-plan.referral_api_no_active_employee')]);
             }
 
-            $mapper = objectMapper();
-            $data = $mapper->map($this->form, CarePlanData::class);
-            $data->uuid = $this->draftUuid;
-            $data->personId = $person->id;
-            $data->legalEntityId = $legalEntity->id;
-            $data->authorId = $author->id;
-            $data->authorUuid = $author->uuid;
-            $data->encounterId = $encounter->id;
+            $data = objectMapper()->map($this->form, CarePlanData::class);
             $data->addresses = $addresses;
             $data->prepareLocal(
+                $author->uuid,
                 $person->uuid,
                 $legalEntity->uuid,
                 $fields['coAuthors'],
@@ -180,7 +175,13 @@ class CarePlanDraftCreate extends BasePatientComponent
                 array_intersect_key($medicalRecords, array_flip($fields['medicalRecords']))
             );
 
-            $draft = $repository->createDraft($data, $mapper);
+            $draft = $repository->save($data, new CarePlan([
+                'uuid' => $this->draftUuid,
+                'person_id' => $person->id,
+                'legal_entity_id' => $legalEntity->id,
+                'author_id' => $author->id,
+                'encounter_id' => $encounter->id,
+            ]));
         } catch (ValidationException $exception) {
             $this->setErrorBag($exception->validator->getMessageBag());
             Session::flash('error', $exception->validator->errors()->first());
@@ -211,7 +212,7 @@ class CarePlanDraftCreate extends BasePatientComponent
             ? $repository->draftEncounter($this->form->encounter, $person, $user, $legalEntity)
             : null;
         $this->form->encounter = $encounter?->uuid ?? '';
-        $this->form->medicalNumber = $repository->nextDisplayNumber();
+        $this->medicalNumber = $repository->nextDisplayNumber();
 
         if ($encounter !== null) {
             $this->applyEncounterToForm($encounter);
@@ -239,7 +240,7 @@ class CarePlanDraftCreate extends BasePatientComponent
 
     protected function applyEncounterToForm(Encounter $encounter): void
     {
-        $this->form->medicalNumber = (string) $encounter->id;
+        $this->medicalNumber = (string) $encounter->id;
         if ($this->form->title === '') {
             $date = $encounter->period?->start ? Carbon::parse($encounter->period->start)->format('d.m.Y') : now()->format('d.m.Y');
             $this->form->title = __('План лікування від ').$date;
@@ -298,7 +299,7 @@ class CarePlanDraftCreate extends BasePatientComponent
         $birthDate = $person->birth_date ? Carbon::parse($person->birth_date)->format(config('app.date_format')) : null;
         $this->form->patient = $birthDate ? $person->fullName.' · '.$birthDate : $person->fullName;
         $this->declarationNumber = $person->declarations->first()?->declarationNumber;
-        $this->form->medicalNumber = Repository::carePlan()->nextDisplayNumber();
+        $this->medicalNumber = Repository::carePlan()->nextDisplayNumber();
         $this->availableEpisodes = Repository::carePlan()->activeEpisodes($person);
         $this->availableEncounters = Repository::carePlan()->encounterChoices($person->id);
     }
@@ -306,6 +307,7 @@ class CarePlanDraftCreate extends BasePatientComponent
     protected function clearPatientContext(): void
     {
         $this->form->reset();
+        $this->medicalNumber = '';
         $this->personId = 0;
         $this->uuid = '';
         $this->patientFullName = __('care-plan.new_care_plan');

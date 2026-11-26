@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\CarePlan\Forms;
 
-use Illuminate\Support\Facades\Validator;
-
 use App\Core\Arr;
 use App\Core\BaseForm;
-
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class CarePlanForm extends BaseForm
 {
@@ -57,6 +57,47 @@ class CarePlanForm extends BaseForm
         ];
     }
 
+    /** Validate the draft and its selections for the current patient and facility. */
+    public function validateDraft(array $authorUuids, array $episodeUuids, array $medicalRecordKeys): array
+    {
+        $validated = $this->validate([
+            ...$this->rules(),
+            'context' => 'nullable|string|max:255',
+            'title' => 'required|string|max:255',
+            'periodStartTime' => 'nullable|date_format:H:i,H:i:s',
+            'periodEndTime' => 'nullable|date_format:H:i,H:i:s',
+            'coAuthors' => 'array|list',
+            'episodes' => 'array|list',
+            'medicalRecords' => 'array|list',
+            'coAuthors.*' => ['nullable', 'uuid', Rule::in($authorUuids)],
+            'episodes.*' => 'array',
+            'episodes.*.uuid' => ['required', 'uuid', 'distinct', Rule::in($episodeUuids)],
+            'medicalRecords.*' => 'array',
+        ]);
+
+        $end = $this->getLocalPeriodEnd();
+        if ($end !== null && $end < $this->getLocalPeriodStart()) {
+            throw ValidationException::withMessages(['form.periodEnd' => __('care-plan.period_end_before_start')]);
+        }
+
+        $validated['episodes'] = array_column($validated['episodes'], 'uuid');
+        $validated['medicalRecords'] = collect($validated['medicalRecords'])->map(static function (array $record): string {
+            $type = $record['type'] ?? data_get($record, 'identifier.type.coding.0.code', '');
+            $uuid = $record['uuid'] ?? data_get($record, 'identifier.value', '');
+
+            return is_string($type) && is_string($uuid) ? $type.':'.$uuid : '';
+        })->unique()->values()->all();
+        if (array_diff($validated['medicalRecords'], $medicalRecordKeys) !== []) {
+            throw ValidationException::withMessages(['form.medicalRecords' => __('validation.exists', [
+                'attribute' => __('care-plan.medical_record'),
+            ])]);
+        }
+
+        $validated['coAuthors'] = array_values(array_unique(array_filter($validated['coAuthors'])));
+
+        return $validated;
+    }
+
     /**
      * Validation rules for signing.
      */
@@ -77,6 +118,18 @@ class CarePlanForm extends BaseForm
             : null;
     }
 
+    public function getLocalPeriodStart(): string
+    {
+        return $this->periodStartIsoDate().' '.str_pad($this->periodStartTime ?: '00:00', 8, ':00');
+    }
+
+    public function getLocalPeriodEnd(): ?string
+    {
+        $date = $this->periodEndIsoDate();
+
+        return $date === null ? null : $date.' '.str_pad($this->periodEndTime ?: '23:59:59', 8, ':00');
+    }
+
     /**
      * Localized attribute names for validation errors.
      */
@@ -90,6 +143,11 @@ class CarePlanForm extends BaseForm
             'periodStart' => __('care-plan.date_and_time_start'),
             'periodEnd' => __('care-plan.date_and_time_end'),
             'encounter' => __('care-plan.encounter'),
+            'periodStartTime' => __('care-plan.date_and_time_start'),
+            'periodEndTime' => __('care-plan.date_and_time_end'),
+            'coAuthors.*' => __('care-plan.co-author'),
+            'episodes.*' => __('care-plan.episode'),
+            'medicalRecords.*' => __('care-plan.medical_record'),
             'description' => __('care-plan.extended_description'),
             'note' => __('care-plan.notes'),
             'informWith' => __('care-plan.inform_with'),

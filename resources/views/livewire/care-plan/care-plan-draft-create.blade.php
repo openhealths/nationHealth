@@ -26,7 +26,7 @@
             @endif
 
             @include('livewire.care-plan.parts.doctors')
-            @include('livewire.care-plan.parts.patient_data', ['medicalNumberField' => 'form.medicalNumber'])
+            @include('livewire.care-plan.parts.patient_data', ['displayMedicalNumber' => $medicalNumber])
             @include('livewire.care-plan.parts.care_plan_data')
             @include('livewire.care-plan.parts.condition_diagnosis')
             @include('livewire.care-plan.parts.supporting_information')

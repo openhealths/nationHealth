@@ -10,7 +10,6 @@ use App\Dto\Identifier\Model as IdentifierData;
 use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\Person\ProcedureStatus;
 use App\Models\MedicalEvents\Sql\Procedure;
-use Symfony\Component\ObjectMapper\ObjectMapperInterface;
 use App\Enums\CarePlanStatusFilter;
 use App\Enums\CarePlanCompletenessFilter;
 use Illuminate\Validation\ValidationException;
@@ -76,23 +75,23 @@ class CarePlanRepository extends MedicalEventsBaseRepository
     /**
      * Insert the mapped draft and its relations atomically. Retried submissions use the same UUID.
      */
-    public function createDraft(CarePlanData $data, ObjectMapperInterface $mapper): CarePlan
+    public function save(CarePlanData $data, CarePlan $draft): CarePlan
     {
-        return $this->storageTransaction(function () use ($data, $mapper): CarePlan {
+        return $this->storageTransaction(function () use ($data, $draft): CarePlan {
             // Serialize requests for this patient before the draft row exists.
-            Person::whereKey($data->personId)->lockForUpdate()->firstOrFail();
-            $existing = CarePlan::whereUuid($data->uuid)->lockForUpdate()->first();
+            Person::whereKey($draft->personId)->lockForUpdate()->firstOrFail();
+            $existing = CarePlan::whereUuid($draft->uuid)->lockForUpdate()->first();
             if ($existing !== null) {
-                if ((int) $existing->personId !== $data->personId || (int) $existing->legalEntityId !== $data->legalEntityId
-                    || (int) $existing->authorId !== $data->authorId) {
+                if ((int) $existing->personId !== (int) $draft->personId
+                    || (int) $existing->legalEntityId !== (int) $draft->legalEntityId
+                    || (int) $existing->authorId !== (int) $draft->authorId) {
                     throw ValidationException::withMessages(['form.title' => __('care-plan.document_context_unavailable')]);
                 }
 
                 return $existing;
             }
 
-            $draft = new CarePlan();
-            $mapper->map($data, $draft);
+            objectMapper()->map($data, $draft);
             $concepts = MedicalEventsRepository::codeableConcept();
             $identifiers = MedicalEventsRepository::identifier();
             foreach (['categoryConcept', 'termsOfServiceConcept'] as $relation) {
