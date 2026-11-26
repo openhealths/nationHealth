@@ -6,7 +6,9 @@ namespace App\Repositories;
 
 use Log;
 use Throwable;
+use UnexpectedValueException;
 use App\Core\Arr;
+use App\Enums\Status;
 use App\Models\LegalEntity;
 use App\Models\User;
 use App\Models\Relations\Party;
@@ -115,7 +117,7 @@ readonly class EmployeeRepository
             || !$employee->exists
             || (int) $employee->legalEntityId !== $legalEntityId
             || $employee->employeeType !== $employeeType
-            || $employee->status !== \App\Enums\Status::APPROVED) {
+            || $employee->status !== Status::APPROVED) {
             return [];
         }
 
@@ -195,6 +197,7 @@ readonly class EmployeeRepository
      * @param  array|null  $specialities
      * @param  array|null  $qualifications
      * @param  array|null  $scienceDegree
+     * @param  array{uuid: string, status: string, end_date?: string|null}|null  $employment  Selected position from Get Employee details.
      * @return Employee|EmployeeRequest Updated employee
      * @throws Throwable
      */
@@ -207,10 +210,29 @@ readonly class EmployeeRepository
         ?array $specialities = null,
         ?array $qualifications = null,
         ?array $scienceDegree = null,
+        ?array $employment = null,
     ): Employee|EmployeeRequest {
         $model = $employee;
 
-        DB::transaction(function () use ($model, $party, $documents, $phones, $educations, $specialities, $qualifications, $scienceDegree) {
+        DB::transaction(function () use ($model, $party, $documents, $phones, $educations, $specialities, $qualifications, $scienceDegree, $employment) {
+            if ($model instanceof Employee && $employment !== null) {
+                $status = Status::tryFrom(str_replace(' ', '_', $employment['status']));
+                if (!$status?->isEmploymentStatus()) {
+                    throw new UnexpectedValueException('Невідомий статус посади у відповіді ЕСОЗ.');
+                }
+
+                // Reject another position's details or a response overtaken by a concurrent employment update.
+                $model->newQuery()
+                    ->whereKey($model->id)
+                    ->whereUuid(strtolower($employment['uuid']))
+                    ->where('status', $model->getRawOriginal('status'))
+                    ->where('end_date', $model->getRawOriginal('end_date'))
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $model->update(['status' => $status] + Arr::only($employment, ['end_date']));
+            }
+
             $partyAttributes = array_diff_key($party, array_flip(['documents', 'phones']));
 
             $this->updatePartyByUuid($model, $partyAttributes);
