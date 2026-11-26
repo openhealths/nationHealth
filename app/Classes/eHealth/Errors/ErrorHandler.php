@@ -21,7 +21,18 @@ class ErrorHandler
                     }
 
                     $description = $rule['description'] ?? 'No description';
-                    $errorMessages[] = "Error in entry '{$entry}' (Type: {$entryType}): {$description}";
+                    if (
+                        $description === 'required property issued_by was not present'
+                        && preg_match('/^\$\.owner\.documents\[\d+\]\.issued_by$/D', $entry) === 1
+                    ) {
+                        $errorMessages[] = __('errors.ehealth.messages.owner_document_issuer_required');
+                    } else {
+                        $errorMessages[] = __("Помилка в полі ':entry' (Тип: :type): :description", [
+                            'entry' => $entry,
+                            'type' => $entryType,
+                            'description' => $description,
+                        ]);
+                    }
                 }
             }
         }
