@@ -58,6 +58,15 @@ class Declaration extends Model
     }
 
     #[Scope]
+    protected function facilityRegister(Builder $query, LegalEntity $facility, array $employees = [], array $statuses = [], string $number = ''): Builder
+    {
+        return $query->filterByLegalEntityId($facility->id)
+            ->when($employees, fn (Builder $q) => $q->whereHas('employee', fn (Builder $employee) => $employee->whereIn('uuid', $employees)))
+            ->when($statuses, fn (Builder $q) => $q->whereIn('status', $statuses))
+            ->when(trim($number) !== '', fn (Builder $q) => $q->where('declaration_number', trim($number)));
+    }
+
+    #[Scope]
     protected function filterBySyncStatus(Builder $query, JobStatus $status): Builder
     {
         return $query->whereSyncStatus($status);

@@ -21,6 +21,38 @@ use App\Models\ReorganizationEmployeeDeclaration;
 
 class DeclarationRepository
 {
+    /** Merge a facility register page without touching patient, request or signature data. */
+    public function storeRegisterPage(array $items, LegalEntity $legalEntity): void
+    {
+        DB::transaction(static function () use ($items, $legalEntity): void {
+            $employees = $legalEntity->employees()->whereIn('uuid', collect($items)->pluck('employee.id'))
+                ->pluck('id', 'uuid');
+            $divisions = $legalEntity->divisions()->whereIn('uuid', collect($items)->pluck('division.id')->filter())
+                ->pluck('id', 'uuid');
+
+            foreach ($items as $item) {
+                $data = [
+                    'declaration_number' => $item['declaration_number'],
+                    'employee_id' => $employees->get($item['employee']['id'])
+                        ?? throw new \UnexpectedValueException('Declaration employee is missing from the current facility.'),
+                    'start_date' => $item['start_date'],
+                    'end_date' => $item['end_date'],
+                    'inserted_at' => Carbon::parse($item['inserted_at']),
+                    'status' => $item['status'],
+                    'is_active' => $item['status'] === DeclarationStatus::ACTIVE->value,
+                    'reason' => $item['reason'] ?? null,
+                    'reason_description' => $item['reason_description'] ?? null,
+                ];
+
+                if ($divisionId = $divisions->get($item['division']['id'] ?? '')) {
+                    $data['division_id'] = $divisionId;
+                }
+
+                Declaration::updateOrCreate(['legal_entity_id' => $legalEntity->id, 'uuid' => $item['id']], $data);
+            }
+        });
+    }
+
     /**
      * Store data during first request or local saving.
      *

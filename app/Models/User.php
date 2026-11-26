@@ -675,6 +675,12 @@ class User extends Authenticatable implements MustVerifyEmail
             : $names->contains(fn ($name) => $allowedRoles->contains($name)); // Return TRUE if user is assigned to at least of the ONE of incoming roles
     }
 
+    public function usesFacilityDeclarationRegister(?string $guard = null): bool
+    {
+        // Register access requires declaration:read, not every unrelated permission of an assigned role.
+        return $this->hasRole([Role::OWNER->value, Role::REORGANIZATION_OWNER->value, Role::ADMIN->value], $guard ?? Auth::getDefaultDriver());
+    }
+
     /**
      * Whether the user holds an elevated employee-management role in the current legal entity.
      *

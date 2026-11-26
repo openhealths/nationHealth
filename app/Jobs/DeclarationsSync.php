@@ -18,6 +18,11 @@ class DeclarationsSync extends EHealthJob
 {
     public const string BATCH_NAME = 'DeclarationsSync';
 
+    public const array FULL_SYNC_BATCHES = [
+        self::BATCH_NAME, DeclarationDetailsSync::BATCH_NAME, DeclarationRequestsSync::BATCH_NAME,
+        DeclarationRequestDetailsSync::BATCH_NAME, ConfidantPersonSync::BATCH_NAME, PersonAuthMethodSync::BATCH_NAME,
+    ];
+
     public const string SCOPE_REQUIRED = 'declaration:read';
 
     public const string ENTITY = LegalEntity::ENTITY_DECLARATION;

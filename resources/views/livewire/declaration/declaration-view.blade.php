@@ -3,17 +3,18 @@
 
 @php
     $hasLegators = legalEntity()->legators->isNotEmpty();
+    $register = Auth::user()->usesFacilityDeclarationRegister();
 @endphp
 
 <section class="shift-content section-form w-full max-w-7xl">
     <div class="flex items-center justify-between gap-4 flex-wrap w-full">
         <x-header-navigation class="breadcrumb-form flex-1 min-w-0">
             <x-slot name="title">
-                {{ __('declarations.label') }} - {{ $declaration->person->fullName }}
+                {{ __('declarations.label') }} - {{ $register ? $declaration->declarationNumber : $declaration->person?->fullName }}
             </x-slot>
         </x-header-navigation>
 
-        @if (!$declaration->hasParentDeclaration())
+        @if (!$register && $printableContent !== '' && !$declaration->hasParentDeclaration())
             <div class="shrink-0">
                 <button
                     @click="
@@ -111,7 +112,7 @@
                         {{ __('declarations.change_reason_if_exist') }}
                     </label>
                     <input
-                        value="{{ $declaration->reason ? ($declarationReasons[$declaration->reason]) : '' }}"
+                        value="{{ $declarationReasons[$declaration->reason] ?? $declaration->reason }}"
                         type="text"
                         name="reason"
                         id="reason"
@@ -139,6 +140,7 @@
                 </div>
             </div>
 
+            @if (!$register && $declaration->person)
             <div class="form-row-2">
                 <div class="form-group group">
                     <label for="patientFullName" class="label">
@@ -173,6 +175,8 @@
                 </div>
             </div>
 
+            @endif
+
             <div class="form-row-2">
                 <div class="form-group group">
                     <label for="employeeFullName" class="label">
@@ -195,7 +199,7 @@
                         {{ __('employees.doctor_position') }}
                     </label>
                     <input
-                        value="{{ $dictionary[$declaration->employee->position] }}"
+                        value="{{ $dictionary[$declaration->employee->position] ?? $declaration->employee->position }}"
                         type="text"
                         name="employeePosition"
                         id="employeePosition"

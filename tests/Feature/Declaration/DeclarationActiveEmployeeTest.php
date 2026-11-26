@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\PostgresConnection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Bus;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionMethod;
@@ -36,6 +37,8 @@ class DeclarationActiveEmployeeTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Bus::fake();
 
         $base = ['party_id' => 101, 'legal_entity_id' => 1, 'employee_type' => 'DOCTOR', 'status' => 'APPROVED', 'is_active' => true];
         $this->employees = [
@@ -98,6 +101,7 @@ class DeclarationActiveEmployeeTest extends TestCase
         $this->user->setRawAttributes(['id' => 1, 'party_id' => 101]);
         $this->user->setRelation('party', (new Party())->forceFill(['id' => 101]));
         $this->user->shouldReceive('hasAllowedRole')->andReturnUsing(fn ($roles): bool => $roles === Role::DOCTOR);
+        $this->user->shouldReceive('usesFacilityDeclarationRegister')->andReturnFalse();
         $this->user->shouldReceive('cannot')->with('sync', \App\Models\Declaration::class)->andReturnFalse();
         $this->user->shouldReceive('notify')->andReturnNull();
         Auth::shouldReceive('user')->andReturn($this->user);

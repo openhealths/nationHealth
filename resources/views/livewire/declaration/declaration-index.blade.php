@@ -7,6 +7,7 @@
 
 @php
     $hasLegators = legalEntity()->legators->isNotEmpty();
+    $register = Auth::user()->usesFacilityDeclarationRegister();
 @endphp
 
 <div>
@@ -46,6 +47,7 @@
                         @endisset
                     </div>
                     <div class="mt-1 flex items-end gap-3">
+                        @unless ($register)
                         <div class="form-group group top-3 max-w-xs grow">
                             <input
                                 type="text"
@@ -57,6 +59,7 @@
                             />
                             <label for="searchByName" class="label"> {{ __('patients.patient_full_name') }} </label>
                         </div>
+                        @endunless
 
                         <button
                             class="button-minor flex h-11 min-w-max items-center gap-2 px-4"
@@ -71,7 +74,7 @@
 
                     {{-- Show additional filters --}}
                     <div x-show="showFilter" x-cloak x-transition class="mt-8" x-data="{ openType: false }">
-                        @if (Auth::user()->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN]))
+                        @if ($register)
                             @include('livewire.declaration.parts.owner-filters')
                         @else
                             @include('livewire.declaration.parts.basic-filters')
@@ -116,9 +119,13 @@
                     <table class="table-input w-full min-w-250">
                         <thead class="thead-input">
                             <tr>
-                                <th scope="col" class="th-input w-[25%]">{{ __('forms.full_name') }}</th>
+                                @unless ($register)
+                                    <th scope="col" class="th-input w-[25%]">{{ __('forms.full_name') }}</th>
+                                @endunless
                                 <th scope="col" class="th-input w-[15%]">{{ __('forms.number') }}</th>
-                                <th scope="col" class="th-input w-[15%]">{{ __('forms.birth_date_abbreviated') }}</th>
+                                @unless ($register)
+                                    <th scope="col" class="th-input w-[15%]">{{ __('forms.birth_date_abbreviated') }}</th>
+                                @endunless
                                 <th scope="col" class="th-input w-[25%]">{{ __('employees.doctor') }}</th>
                                 <th scope="col" class="th-input w-[15%]">{{ __('forms.status.label') }}</th>
                                 <th scope="col" class="th-input w-[5%]">{{ __('forms.action') }}</th>
@@ -127,11 +134,15 @@
                         <tbody>
                             @foreach ($declarations as $declaration)
                                 <tr wire:key="{{ $declaration->declarationNumber }}">
-                                    <td class="td-input">{{ $declaration->person->fullName }}</td>
+                                    @unless ($register)
+                                        <td class="td-input">{{ $declaration->person?->fullName }}</td>
+                                    @endunless
                                     <td class="td-input">{{ $declaration->declarationNumber }}</td>
+                                    @unless ($register)
                                     <td class="td-input">
-                                        {{ CarbonImmutable::parse($declaration->person->birth_date)->format(config('app.date_format')) }}
+                                        {{ $declaration->person?->birth_date ? CarbonImmutable::parse($declaration->person->birth_date)->format(config('app.date_format')) : '' }}
                                     </td>
+                                    @endunless
                                     <td class="td-input">{{ $declaration->employee->fullName }}</td>
 
                                     <td class="td-input">

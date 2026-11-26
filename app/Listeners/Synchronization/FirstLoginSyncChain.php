@@ -16,6 +16,7 @@ use App\Models\Declaration;
 use App\Jobs\ConnectionSync;
 use App\Jobs\LegalEntitySync;
 use App\Jobs\DeclarationsSync;
+use App\Jobs\DeclarationRegisterSync;
 use App\Jobs\EmployeeRoleSync;
 use App\Jobs\PartyVerificationSync;
 use App\Jobs\EmployeeRequestsSyncAll;
@@ -49,7 +50,8 @@ class FirstLoginSyncChain
         }
 
         if ($user->can('sync', [Declaration::class, $legalEntity, $scopes])) {
-            $nextJob = new DeclarationsSync(
+            $jobClass = $user->usesFacilityDeclarationRegister() ? DeclarationRegisterSync::class : DeclarationsSync::class;
+            $nextJob = new $jobClass(
                 legalEntity: $legalEntity,
                 nextEntity: $nextJob,
                 isFirstLogin: true

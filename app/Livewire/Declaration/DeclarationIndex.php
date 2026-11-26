@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
 use Livewire\WithPagination;
 use App\Models\Person\Person;
 use App\Jobs\DeclarationsSync;
+use App\Jobs\DeclarationRegisterSync;
 use App\Jobs\DeclarationRequestsSync;
 use App\Repositories\Repository;
 use App\Classes\eHealth\EHealth;
@@ -28,8 +29,6 @@ use App\Enums\Declaration\Status;
 use App\Enums\Declaration\RequestStatus;
 use App\Models\Employee\Employee;
 use Livewire\Attributes\Computed;
-use App\Jobs\ConfidantPersonSync;
-use App\Jobs\PersonAuthMethodSync;
 use App\Models\DeclarationRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
@@ -55,8 +54,6 @@ class DeclarationIndex extends Component
     use FormTrait;
 
     protected const string BATCH_NAME = 'DeclarationsSync';
-    protected const string SUB_BATCH_NAME = 'DeclarationDetailsSync';
-    protected const string DEPENDENT_BATCH_NAME = 'DeclarationRequestDetailsSync';
 
     /**
      * Search by patient first and last names.
@@ -229,12 +226,14 @@ class DeclarationIndex extends Component
         $this->doctors = $this->getDoctors();
 
         // A user with a doctor employee defaults to viewing that doctor's declarations.
-        if (!empty($this->ownEmployeeUuids)) {
+        if ($user->usesFacilityDeclarationRegister()) {
+            $this->statusFilter = [];
+        } elseif (!empty($this->ownEmployeeUuids)) {
             $this->doctorFilter = $this->ownEmployeeUuids;
         }
 
         $this->countActive = Declaration::query()
-            ->forEmployees($this->employeeIds)
+            ->when(!$user->usesFacilityDeclarationRegister(), fn (Builder $q) => $q->forEmployees($this->employeeIds))
             ->where('status', Status::ACTIVE)
             ->filterByLegalEntityId(legalEntity()->id)
             ->count();
@@ -253,10 +252,11 @@ class DeclarationIndex extends Component
         $this->searchByName = '';
         $this->searchByNumber = '';
         $this->typeFilter = ['request', 'declaration'];
-        $this->statusFilter = [Status::ACTIVE->value];
+        $register = Auth::user()->usesFacilityDeclarationRegister();
+        $this->statusFilter = $register ? [] : [Status::ACTIVE->value];
         $this->channelFilter = [];
         $this->reorganizationFilter = [];
-        $this->doctorFilter = $this->ownEmployeeUuids;
+        $this->doctorFilter = $register ? [] : $this->ownEmployeeUuids;
 
         $this->isFiltersApplied = false;
 
@@ -271,7 +271,7 @@ class DeclarationIndex extends Component
     #[Computed]
     public function patientRequestsCount(): int
     {
-        if (Auth::user()->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN])) {
+        if (Auth::user()->usesFacilityDeclarationRegister()) {
             return 0;
         }
 
@@ -302,6 +302,19 @@ class DeclarationIndex extends Component
     {
         $user = Auth::user();
 
+        if ($user->usesFacilityDeclarationRegister()) {
+            $this->authorize('viewAny', Declaration::class);
+
+            $query = Declaration::with(['employee.party', 'declarationRequest:id,parent_declaration_uuid', 'reorganizedEmployeeDeclaration'])
+                ->facilityRegister(legalEntity(), $this->isFiltersApplied ? $this->doctorFilter : [],
+                    $this->isFiltersApplied ? $this->statusFilter : [], $this->isFiltersApplied ? $this->searchByNumber : '')
+                ->when($this->isFiltersApplied && $this->reorganizationFilter, fn (Builder $q) => $q->whereHas('declarationRequest',
+                    fn (Builder $request) => $request->whereNotNull('parent_declaration_uuid')));
+
+            return $query->orderByDesc('inserted_at')->orderByDesc('id')->paginate(config('pagination.per_page'))
+                ->through(fn (Declaration $item) => $item->setAttribute('type', 'declaration'));
+        }
+
         $declarations = collect();
         $declarationRequests = collect();
 
@@ -310,8 +323,7 @@ class DeclarationIndex extends Component
         $doctorFilter = $this->doctorFilter;
 
         // Pending filters must not expose another doctor's declarations before a search.
-        if (!$this->isFiltersApplied && $user->hasAllowedRole(Role::DOCTOR)
-            && !$user->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN])) {
+        if (!$this->isFiltersApplied && $user->hasAllowedRole(Role::DOCTOR)) {
             $doctorFilter = $this->ownEmployeeUuids;
         }
 
@@ -348,7 +360,7 @@ class DeclarationIndex extends Component
                     // Current-entity declarations are available in every status, subject to the user's access.
                     $query->where(fn (Builder $currentQuery) => $currentQuery->filterByLegalEntityId(legalEntity()->id)
                         ->when(
-                            !$user->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN]) && !$canSearchAllDoctors,
+                            !$canSearchAllDoctors,
                             fn (Builder $employeeQuery) => $employeeQuery->forEmployees($employeePool)
                         ));
 
@@ -365,8 +377,7 @@ class DeclarationIndex extends Component
                 ->each->setAttribute('type', 'declaration');
         }
 
-        // Don't show declaration requests for owners and administrators
-        if (!$user->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN]) && $user->can('viewAny', DeclarationRequest::class)) {
+        if ($user->can('viewAny', DeclarationRequest::class)) {
             $declarationRequests = DeclarationRequest::with([
                 'person:id,birth_date',
                 'person.names'
@@ -542,12 +553,8 @@ class DeclarationIndex extends Component
 
             // The failed batch could have been restarted by a concurrent request, so don't start a full sync over it
             if ($this->hasRunningBatch([
-                self::BATCH_NAME,
-                self::SUB_BATCH_NAME,
-                self::DEPENDENT_BATCH_NAME,
-                DeclarationRequestsSync::BATCH_NAME,
-                ConfidantPersonSync::BATCH_NAME,
-                PersonAuthMethodSync::BATCH_NAME,
+                ...DeclarationsSync::FULL_SYNC_BATCHES,
+                DeclarationRegisterSync::BATCH_NAME,
             ])) {
                 Session::flash('error', __('forms.errors.sync_already_running'));
 
@@ -555,10 +562,28 @@ class DeclarationIndex extends Component
             }
         }
 
+        if ($user->usesFacilityDeclarationRegister()) {
+            DB::transaction(static function () use ($legalEntity, $token, $user): void {
+                $legalEntity->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_DECLARATION);
+                Bus::batch([new DeclarationRegisterSync(legalEntity: $legalEntity)])
+                    ->withOption('legal_entity_id', $legalEntity->id)
+                    ->withOption('token', Crypt::encryptString($token))
+                    ->withOption('user', $user)
+                    ->withOption('sync_entity', LegalEntity::ENTITY_DECLARATION)
+                    ->onQueue('sync')
+                    ->name(DeclarationRegisterSync::BATCH_NAME)
+                    ->dispatch();
+            });
+
+            Session::flash('success', __('declarations.sync.started'));
+
+            return;
+        }
+
         // Get declarations from eHealth filtered by legal entity
         $query = ['legal_entity_id' => $legalEntity->uuid];
 
-        if ($user->hasAllowedRole(Role::DOCTOR) && !$user->hasAllowedRole([Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN])) {
+        if ($user->hasAllowedRole(Role::DOCTOR)) {
             $query['employee_id'] = Employee::forParty($user->partyId)
                 ->filterByLegalEntityId($legalEntity->id)
                 ->doctor()
@@ -659,14 +684,11 @@ class DeclarationIndex extends Component
         foreach ($failedBatches as $batch) {
             $batchName = $this->baseBatchName($batch->name);
 
-            if (
-                $batchName === self::BATCH_NAME ||
-                $batchName === self::SUB_BATCH_NAME ||
-                $batchName === self::DEPENDENT_BATCH_NAME ||
-                $batchName === DeclarationRequestsSync::BATCH_NAME ||
-                $batchName === ConfidantPersonSync::BATCH_NAME ||
-                $batchName === PersonAuthMethodSync::BATCH_NAME
-            ) {
+            $canResume = $user->usesFacilityDeclarationRegister()
+                ? $batchName === DeclarationRegisterSync::BATCH_NAME
+                : in_array($batchName, DeclarationsSync::FULL_SYNC_BATCHES, true);
+
+            if ($canResume) {
                 Log::info('Resuming Declaration sync batch: ' . $batch->name . ' id: ' . $batch->id);
 
                 if ($this->restartBatch(

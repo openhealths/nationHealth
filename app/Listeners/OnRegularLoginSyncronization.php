@@ -6,6 +6,10 @@ namespace App\Listeners;
 
 use Throwable;
 use App\Enums\JobStatus;
+use App\Jobs\DeclarationRegisterSync;
+use App\Jobs\DeclarationsSync;
+use App\Models\Declaration;
+use Illuminate\Support\Facades\Auth;
 use App\Events\EHealthUserLogin;
 use Illuminate\Support\Facades\Log;
 use App\Notifications\SyncNotification;
@@ -48,17 +52,29 @@ class OnRegularLoginSyncronization implements ShouldQueue
             return;
         }
 
+        setPermissionsTeamId($event->legalEntity->id);
+        Auth::shouldUse($event->guard);
+        $resumed = false;
         foreach ($failedBatches as $batch) {
+            $name = $this->baseBatchName($batch->name);
+            if ($name === DeclarationRegisterSync::BATCH_NAME || in_array($name, DeclarationsSync::FULL_SYNC_BATCHES, true)) {
+                if (($name === DeclarationRegisterSync::BATCH_NAME) !== $event->user->usesFacilityDeclarationRegister()
+                    || $event->user->cannot('sync', [Declaration::class, $event->legalEntity, $event->scopes])) {
+                    continue;
+                }
+            }
             echo 'Found related batch: ' . $batch->name . ' id: ' . $batch->id . PHP_EOL;
 
             if ($batch->name === self::FIRST_LOGIN_BATCH_NAME) {
                 $event->legalEntity?->setEntityStatus(JobStatus::PROCESSING);
             }
 
-            $this->restartBatch($batch, $event->user, $event->token, $event->legalEntity);
+            $resumed = $this->restartBatch($batch, $event->user, $event->token, $event->legalEntity) || $resumed;
         }
 
-        $event->user->notify(new SyncNotification('legal_entity', 'resumed'));
+        if ($resumed) {
+            $event->user->notify(new SyncNotification('legal_entity', 'resumed'));
+        }
     }
 
     /**

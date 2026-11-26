@@ -77,9 +77,11 @@ class DeclarationPolicy
             return Response::denyWithStatus(404);
         }
 
-        $legalEntityWideRoles = [Role::OWNER, Role::REORGANIZATION_OWNER, Role::ADMIN, Role::DOCTOR];
+        if ($user->usesFacilityDeclarationRegister()) {
+            return $declaration->legalEntityId === legalEntity()->id ? Response::allow() : Response::denyWithStatus(404);
+        }
 
-        if ($user->hasAllowedRole($legalEntityWideRoles) && $declaration->legalEntityId === legalEntity()->id) {
+        if ($user->hasAllowedRole(Role::DOCTOR) && $declaration->legalEntityId === legalEntity()->id) {
             return Response::allow();
         }
 
@@ -145,7 +147,9 @@ class DeclarationPolicy
     {
         $grantedScopes = $tokenScopes ?? app(TokenStorage::class)->getTokenScopes();
 
-        foreach (self::SYNC_SCOPES as $scope) {
+        $requiredScopes = $user->usesFacilityDeclarationRegister() ? ['declaration:read'] : self::SYNC_SCOPES;
+
+        foreach ($requiredScopes as $scope) {
             if (!\in_array($scope, $grantedScopes, true)
                 || ($tokenScopes === null && $user->cannot($scope))) {
                 return Response::denyWithStatus(404);

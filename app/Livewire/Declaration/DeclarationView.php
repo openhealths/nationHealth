@@ -32,7 +32,7 @@ class DeclarationView extends Component
      *
      * @var string
      */
-    public string $printableContent;
+    public string $printableContent = '';
 
     public function mount(LegalEntity $legalEntity, Declaration $declaration): void
     {
@@ -40,15 +40,17 @@ class DeclarationView extends Component
         $this->declarationReasons = dictionary()->basics()->byName('DECLARATION_REASONS')->asCodeDescription()->toArray();
 
         $this->declaration = $declaration->load([
-            'declarationRequest:id,data_to_be_signed,parent_declaration_uuid',
             'employee',
-            'person:id,birth_date',
-            'person.names',
             'employee.party:id,last_name,first_name,second_name',
             'division:id,name'
         ]);
 
-        $this->printableContent = $this->declaration->declarationRequest->dataToBeSigned['content'] ?? '';
+        if (!auth()->user()->usesFacilityDeclarationRegister()) {
+            $declaration->load(['person:id,birth_date', 'person.names', 'declarationRequest:id,data_to_be_signed,parent_declaration_uuid']);
+            $this->printableContent = $declaration->declarationRequest?->dataToBeSigned['content'] ?? '';
+        } else {
+            $declaration->load('declarationRequest:id,parent_declaration_uuid');
+        }
     }
 
     public function render(): View

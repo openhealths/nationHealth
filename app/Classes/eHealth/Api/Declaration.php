@@ -57,6 +57,29 @@ class Declaration extends Request
         return $this->get(self::URL, $mergedQuery);
     }
 
+    /** Fetch only the fields used by the facility declaration register. */
+    public function getRegisterPage(string $legalEntityUuid, int $page): PromiseInterface|EHealthResponse
+    {
+        $this->setValidator(fn (EHealthResponse $response): array => Validator::make($response->getData(), [
+            '*.id' => 'required|uuid',
+            '*.employee.id' => 'required|uuid',
+            '*.division.id' => 'nullable|uuid',
+            '*.declaration_number' => 'required|string',
+            '*.start_date' => 'required|date',
+            '*.end_date' => 'required|date',
+            '*.inserted_at' => 'required|date',
+            '*.status' => 'required|string',
+            '*.reason' => 'nullable|string',
+            '*.reason_description' => 'nullable|string',
+        ])->validate());
+
+        return $this->get(self::URL, [
+            'legal_entity_id' => $legalEntityUuid,
+            'page' => $page,
+            self::QUERY_PARAM_PAGE_SIZE => config('ehealth.api.page_size'),
+        ]);
+    }
+
     /**
      * Receive detailed information about person Declaration by declaration ID.
      *
