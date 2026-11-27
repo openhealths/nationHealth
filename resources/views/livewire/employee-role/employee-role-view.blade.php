@@ -207,7 +207,7 @@
 
                 @can('view', $employeeRole->healthcareService)
                     <a
-                        href="{{ route('healthcare-service.view', [legalEntity(), $employeeRole->healthcareService->divisionId, $employeeRole->healthcareService->id]) }}"
+                        href="{{ route('healthcare-services.show', [legalEntity(), $employeeRole->healthcareService->divisionId, $employeeRole->healthcareService->id]) }}"
                         class="button-primary-outline"
                     >
                         {{ __('employee-roles.view_healthcare_service') }}

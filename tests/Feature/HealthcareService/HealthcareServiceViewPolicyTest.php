@@ -33,7 +33,7 @@ class HealthcareServiceViewPolicyTest extends TestCase
         return [
             'owner' => [LegalEntity::TYPE_PRIMARY_CARE, Role::OWNER],
             'admin' => [LegalEntity::TYPE_PRIMARY_CARE, Role::ADMIN],
-            'pharmacy owner' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACY_OWNER]
+            'pharmacy owner' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACY_OWNER],
         ];
     }
 
@@ -51,7 +51,7 @@ class HealthcareServiceViewPolicyTest extends TestCase
             'assistant' => [LegalEntity::TYPE_PRIMARY_CARE, Role::ASSISTANT],
             'receptionist' => [LegalEntity::TYPE_PRIMARY_CARE, Role::RECEPTIONIST],
             'reorganization owner' => [LegalEntity::TYPE_PRIMARY_CARE, Role::REORGANIZATION_OWNER],
-            'pharmacist' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACIST]
+            'pharmacist' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACIST],
         ];
     }
 

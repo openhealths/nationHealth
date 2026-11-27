@@ -34,7 +34,7 @@ final class HealthcareServiceApiFake
      */
     public static function respond(int $status, array $body): self
     {
-        return self::bind(static fn (): PromiseInterface => Factory::response($body, $status));
+        return self::bind(static fn(): PromiseInterface => Factory::response($body, $status));
     }
 
     /**
@@ -59,15 +59,15 @@ final class HealthcareServiceApiFake
 
         app()->bind(
             HealthcareServiceApi::class,
-            static fn (): HealthcareServiceApi => new HealthcareServiceApi(app(Factory::class))
+            static fn(): HealthcareServiceApi => new HealthcareServiceApi(app(Factory::class))
                 ->stub([
                     static function (Request $request) use ($fake, $answer): PromiseInterface {
                         $fake->receivedRequests[] = $request;
 
                         return $answer($request);
-                    }
+                    },
                 ])
-                ->preventStrayRequests()
+                ->preventStrayRequests(),
         );
 
         return $fake;

@@ -38,7 +38,7 @@ class HealthcareServiceCreatePolicyTest extends TestCase
             'emergency owner' => [LegalEntity::TYPE_EMERGENCY, Role::OWNER],
             'pharmacy owner' => [LegalEntity::TYPE_PHARMACY, Role::OWNER],
             'admin' => [LegalEntity::TYPE_PRIMARY_CARE, Role::ADMIN],
-            'pharmacy owner role' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACY_OWNER]
+            'pharmacy owner role' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACY_OWNER],
         ];
     }
 
@@ -62,7 +62,7 @@ class HealthcareServiceCreatePolicyTest extends TestCase
             'med coordinator' => [LegalEntity::TYPE_OUTPATIENT, Role::MED_COORDINATOR],
             'pharmacist' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACIST],
             'msp owner' => [LegalEntity::TYPE_MSP, Role::OWNER],
-            'msp limited owner' => [LegalEntity::TYPE_MSP_LIMITED, Role::OWNER]
+            'msp limited owner' => [LegalEntity::TYPE_MSP_LIMITED, Role::OWNER],
         ];
     }
 

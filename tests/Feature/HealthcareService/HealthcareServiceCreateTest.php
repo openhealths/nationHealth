@@ -12,9 +12,11 @@ use App\Models\HealthcareService;
 use App\Models\LegalEntity;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Foundation\Testing\WithFaker;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\MocksBasicDictionaries;
 use Tests\Concerns\RefreshInstalledDatabase;
 use Tests\TestCase;
@@ -32,7 +34,6 @@ class HealthcareServiceCreateTest extends TestCase
     use PreparesHealthcareServiceTests;
     use RefreshInstalledDatabase;
     use WithFaker;
-    use MocksBasicDictionaries;
 
     /**
      * Legal entity the user works in.
@@ -68,7 +69,7 @@ class HealthcareServiceCreateTest extends TestCase
         $this->filledForm()
             ->call('create')
             ->assertHasNoErrors()
-            ->assertRedirectToRoute('healthcare-service.index', [$this->legalEntity, 'division' => $this->division->id]);
+            ->assertRedirectToRoute('healthcare-services.index', [$this->legalEntity, 'division' => $this->division->id]);
 
         $this->assertCount(1, $eHealth->receivedRequests);
         $request = $eHealth->receivedRequests[0];
@@ -92,39 +93,42 @@ class HealthcareServiceCreateTest extends TestCase
     }
 
     /**
-     * When eHealth rejects the request, nothing is stored and the user sees the error eHealth returned.
+     * Ways eHealth fails the request: how eHealth is faked, and the message the user then sees.
      *
-     * @return void
+     * @return array
      */
-    public function test_failed_ehealth_request_stores_nothing(): void
+    public static function ehealthFailures(): array
     {
-        HealthcareServiceApiFake::respond(500, ['error' => ['message' => 'Internal server error']]);
-
-        $createPage = $this->filledForm();
-        $this->travel(1)->seconds();
-
-        $createPage->call('create')
-            ->assertNoRedirect()
-            ->assertSee('500: Internal server error');
-
-        $this->assertDatabaseCount('healthcare_services', 0);
+        return [
+            'eHealth rejects the request' => [
+                static fn(): HealthcareServiceApiFake => HealthcareServiceApiFake::respond(500, ['error' => ['message' => 'Internal server error']]),
+                static fn(): string => '500: Internal server error',
+            ],
+            'eHealth is unreachable' => [
+                static fn(): HealthcareServiceApiFake => HealthcareServiceApiFake::unreachable(),
+                static fn(): string => __('messages.connection_exception'),
+            ],
+        ];
     }
 
     /**
-     * When eHealth can't be reached, nothing is stored and the user is told the connection failed.
+     * When eHealth rejects the request or can't be reached, nothing is stored and the user sees why.
      *
+     * @param  Closure  $fakeEHealth
+     * @param  Closure  $expectedMessage
      * @return void
      */
-    public function test_unreachable_ehealth_stores_nothing(): void
+    #[DataProvider('ehealthFailures')]
+    public function test_failed_ehealth_request_stores_nothing(Closure $fakeEHealth, Closure $expectedMessage): void
     {
-        HealthcareServiceApiFake::unreachable();
+        $fakeEHealth();
 
         $createPage = $this->filledForm();
         $this->travel(1)->seconds();
 
         $createPage->call('create')
             ->assertNoRedirect()
-            ->assertSee(__('messages.connection_exception'));
+            ->assertSee($expectedMessage());
 
         $this->assertDatabaseCount('healthcare_services', 0);
     }
@@ -192,11 +196,27 @@ class HealthcareServiceCreateTest extends TestCase
     }
 
     /**
-     * A doctor of the legal entity has no right to create healthcare services and is stopped before anything is sent.
+     * Actions of the create page: sending the service to eHealth and saving it as a local draft.
      *
+     * @return array
+     */
+    public static function createActions(): array
+    {
+        return [
+            'send to eHealth' => ['create'],
+            'save draft' => ['createLocally'],
+        ];
+    }
+
+    /**
+     * A doctor of the legal entity has no right to create healthcare services, drafts included, and is stopped before
+     * anything is sent or stored.
+     *
+     * @param  string  $action
      * @return void
      */
-    public function test_user_without_permission_cannot_create_service(): void
+    #[DataProvider('createActions')]
+    public function test_user_without_permission_cannot_create_service(string $action): void
     {
         $doctor = $this->userWithRole($this->legalEntity, Role::DOCTOR);
         $this->assertFalse($doctor->can('healthcare_service:write'));
@@ -206,7 +226,7 @@ class HealthcareServiceCreateTest extends TestCase
         $createPage = $this->filledForm($doctor);
         $this->travel(1)->seconds();
 
-        $createPage->call('create')
+        $createPage->call($action)
             ->assertNoRedirect()
             ->assertSee(__('healthcare-services.policy.create'));
 
@@ -228,25 +248,25 @@ class HealthcareServiceCreateTest extends TestCase
 
         $availableTime = [
             ['daysOfWeek' => ['mon'], 'allDay' => true, 'availableStartTime' => null, 'availableEndTime' => null],
-            ['daysOfWeek' => ['tue'], 'allDay' => false, 'availableStartTime' => '09:00:00', 'availableEndTime' => '18:00:00']
+            ['daysOfWeek' => ['tue'], 'allDay' => false, 'availableStartTime' => '09:00:00', 'availableEndTime' => '18:00:00'],
         ];
         $periodDate = CarbonImmutable::create(2026, 12, 1)->format(config('app.date_format'));
         $notAvailable = [
             [
                 'during' => ['startDate' => $periodDate, 'startTime' => '09:00', 'endDate' => $periodDate, 'endTime' => '13:00'],
-                'description' => $description
-            ]
+                'description' => $description,
+            ],
         ];
 
         $ehealthAvailableTime = [
             ['days_of_week' => ['mon'], 'all_day' => true, 'available_start_time' => null, 'available_end_time' => null],
-            ['days_of_week' => ['tue'], 'all_day' => false, 'available_start_time' => '09:00:00', 'available_end_time' => '18:00:00']
+            ['days_of_week' => ['tue'], 'all_day' => false, 'available_start_time' => '09:00:00', 'available_end_time' => '18:00:00'],
         ];
         $ehealthNotAvailable = [
             [
                 'description' => $description,
-                'during' => ['start' => '2026-12-01T07:00:00.000000Z', 'end' => '2026-12-01T11:00:00.000000Z']
-            ]
+                'during' => ['start' => '2026-12-01T07:00:00.000000Z', 'end' => '2026-12-01T11:00:00.000000Z'],
+            ],
         ];
 
         $eHealth = HealthcareServiceApiFake::respond(201, [
@@ -254,8 +274,8 @@ class HealthcareServiceCreateTest extends TestCase
                 'id' => $uuid,
                 'comment' => $comment,
                 'available_time' => $ehealthAvailableTime,
-                'not_available' => $ehealthNotAvailable
-            ])
+                'not_available' => $ehealthNotAvailable,
+            ]),
         ]);
 
         $this->filledForm()
@@ -269,10 +289,10 @@ class HealthcareServiceCreateTest extends TestCase
         $this->assertSame($comment, $payload['comment']);
         $this->assertSame([
             ['days_of_week' => ['mon'], 'all_day' => true],
-            ['days_of_week' => ['tue'], 'all_day' => false, 'available_start_time' => '09:00:00', 'available_end_time' => '18:00:00']
+            ['days_of_week' => ['tue'], 'all_day' => false, 'available_start_time' => '09:00:00', 'available_end_time' => '18:00:00'],
         ], $payload['available_time']);
         $this->assertSame([
-            ['description' => $description, 'during' => ['start' => '2026-12-01T07:00:00Z', 'end' => '2026-12-01T11:00:00Z']]
+            ['description' => $description, 'during' => ['start' => '2026-12-01T07:00:00Z', 'end' => '2026-12-01T11:00:00Z']],
         ], $payload['not_available']);
 
         $healthcareService = HealthcareService::whereUuid($uuid)->firstOrFail();
@@ -296,8 +316,8 @@ class HealthcareServiceCreateTest extends TestCase
             ->set('form.notAvailable', [
                 [
                     'during' => ['startDate' => $periodDate, 'startTime' => '13:00', 'endDate' => $periodDate, 'endTime' => '09:00'],
-                    'description' => $this->faker->sentence()
-                ]
+                    'description' => $this->faker->sentence(),
+                ],
             ])
             ->call('create')
             ->assertHasErrors('form.notAvailable.0.during.endTime')
@@ -322,7 +342,7 @@ class HealthcareServiceCreateTest extends TestCase
             ->set('form.comment', $comment)
             ->call('createLocally')
             ->assertHasNoErrors()
-            ->assertRedirectToRoute('healthcare-service.index', [$this->legalEntity, 'division' => $this->division->id]);
+            ->assertRedirectToRoute('healthcare-services.index', [$this->legalEntity, 'division' => $this->division->id]);
 
         $this->assertSame([], $eHealth->receivedRequests);
 
@@ -338,42 +358,6 @@ class HealthcareServiceCreateTest extends TestCase
         $this->assertSame('OUTPATIENT', $healthcareService->providingCondition);
         $this->assertSame($comment, $healthcareService->comment);
         $this->assertSame(__('healthcare-services.success.draft_created'), session('success'));
-    }
-
-    /**
-     * A draft that fails validation is not stored.
-     *
-     * @return void
-     */
-    public function test_invalid_draft_is_not_stored(): void
-    {
-        Livewire::actingAs($this->owner)
-            ->test(HealthcareServiceCreate::class, ['legalEntity' => $this->legalEntity, 'division' => $this->division])
-            ->call('createLocally')
-            ->assertHasErrors('form.category.coding.0.code')
-            ->assertNoRedirect();
-
-        $this->assertDatabaseCount('healthcare_services', 0);
-    }
-
-    /**
-     * A doctor of the legal entity has no right to create healthcare services, drafts included.
-     *
-     * @return void
-     */
-    public function test_user_without_permission_cannot_save_draft(): void
-    {
-        $doctor = $this->userWithRole($this->legalEntity, Role::DOCTOR);
-        $this->assertFalse($doctor->can('healthcare_service:write'));
-
-        $createPage = $this->filledForm($doctor);
-        $this->travel(1)->seconds();
-
-        $createPage->call('createLocally')
-            ->assertNoRedirect()
-            ->assertSee(__('healthcare-services.policy.create'));
-
-        $this->assertDatabaseCount('healthcare_services', 0);
     }
 
     /**

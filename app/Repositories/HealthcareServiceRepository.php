@@ -13,6 +13,7 @@ use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Repositories\MedicalEvents\Repository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use Throwable;
 
 class HealthcareServiceRepository
@@ -87,6 +88,7 @@ class HealthcareServiceRepository
      * @param  LegalEntity  $legalEntity
      * @param  HealthcareServiceGetMany  $healthcareServices
      * @return void
+     * @throws RuntimeException When a healthcare service belongs to a division that isn't synchronized yet
      * @throws Throwable
      */
     public function sync(LegalEntity $legalEntity, HealthcareServiceGetMany $healthcareServices): void
@@ -94,15 +96,21 @@ class HealthcareServiceRepository
         DB::transaction(function () use ($legalEntity, $healthcareServices): void {
             // A plain collection holds the mapped DTOs, since the list collection wraps every item it is created with
             $items = $healthcareServices->toBase()->map(
-                static fn (HealthcareServiceDetails $details): HealthcareServiceData => objectMapper()->map($details, HealthcareServiceData::class)
+                static fn(HealthcareServiceDetails $details): HealthcareServiceData => objectMapper()->map($details, HealthcareServiceData::class),
             );
 
             $divisionIds = $legalEntity->divisions()
                 ->whereIn('uuid', $items->pluck('divisionUuid')->unique())
                 ->pluck('id', 'uuid');
 
-            // A service of a division created after the last division sync waits for the next one instead of failing the whole page
-            $items = $items->filter(static fn (HealthcareServiceData $data): bool => $divisionIds->has($data->divisionUuid));
+            $unsyncedDivisionUuids = $items->pluck('divisionUuid')->unique()->diff($divisionIds->keys());
+
+            // A service can't be stored without its division
+            if ($unsyncedDivisionUuids->isNotEmpty()) {
+                throw new RuntimeException(
+                    'Healthcare services of divisions that are not synchronized: ' . $unsyncedDivisionUuids->implode(', '),
+                );
+            }
 
             // Lock in a consistent order so overlapping sync pages read the latest category and type codings.
             /** @var Collection<string, HealthcareService> $existingServices */
@@ -114,18 +122,18 @@ class HealthcareServiceRepository
                 ->keyBy('uuid');
 
             // The upsert bypasses model casts, so the row is taken from the model attributes, already cast for storage
-            $rows = $items->map(fn (HealthcareServiceData $data): array => [
+            $rows = $items->map(fn(HealthcareServiceData $data): array => [
                 ...objectMapper()->map($data, HealthcareService::class)->getAttributes(),
                 'division_id' => $divisionIds[$data->divisionUuid],
                 'legal_entity_id' => $legalEntity->id,
-                ...$this->storeCodeableConcepts($data, $existingServices->get($data->uuid))
+                ...$this->storeCodeableConcepts($data, $existingServices->get($data->uuid)),
             ])->all();
 
             HealthcareService::upsert($rows, 'uuid', new HealthcareService()->getFillable());
 
             // Deleted after the upsert, once no healthcare service references them
-            $removedTypes = $items->filter(static fn (HealthcareServiceData $data): bool => $data->type === null)
-                ->map(static fn (HealthcareServiceData $data): ?CodeableConcept => $existingServices->get($data->uuid)?->type)
+            $removedTypes = $items->filter(static fn(HealthcareServiceData $data): bool => $data->type === null)
+                ->map(static fn(HealthcareServiceData $data): ?CodeableConcept => $existingServices->get($data->uuid)?->type)
                 ->filter();
 
             foreach ($removedTypes as $removedType) {

@@ -56,17 +56,17 @@ class HealthcareServiceSyncTest extends TestCase
         $updatedBy = $this->faker->uuid();
         $availableTime = [
             ['days_of_week' => ['mon', 'tue'], 'all_day' => false, 'available_start_time' => '08:00:00', 'available_end_time' => '17:00:00'],
-            ['days_of_week' => ['sat'], 'all_day' => true]
+            ['days_of_week' => ['sat'], 'all_day' => true],
         ];
         $description = $this->faker->sentence();
         $ehealthNotAvailable = [
-            ['description' => $description, 'during' => ['start' => '2026-12-01T07:00:00Z', 'end' => '2026-12-01T11:00:00Z']]
+            ['description' => $description, 'during' => ['start' => '2026-12-01T07:00:00Z', 'end' => '2026-12-01T11:00:00Z']],
         ];
         $notAvailable = [
             [
                 'description' => $description,
-                'during' => ['startDate' => '01.12.2026', 'startTime' => '09:00', 'endDate' => '01.12.2026', 'endTime' => '13:00']
-            ]
+                'during' => ['startDate' => '01.12.2026', 'startTime' => '09:00', 'endDate' => '01.12.2026', 'endTime' => '13:00'],
+            ],
         ];
 
         $eHealth = HealthcareServiceApiFake::respond(200, $this->ehealthList([
@@ -83,8 +83,8 @@ class HealthcareServiceSyncTest extends TestCase
                 'inserted_at' => '2026-10-30T22:30:00Z',
                 'inserted_by' => $insertedBy,
                 'updated_at' => '2026-11-02T10:00:00Z',
-                'updated_by' => $updatedBy
-            ])
+                'updated_by' => $updatedBy,
+            ]),
         ]));
 
         $listPage = Livewire::actingAs($this->userWithRole($legalEntity, Role::OWNER))
@@ -135,8 +135,8 @@ class HealthcareServiceSyncTest extends TestCase
                 'type' => ['coding' => [['system' => 'HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES', 'code' => 'SALE']]],
                 'speciality_type' => null,
                 'providing_condition' => null,
-                'license_id' => $licenseId
-            ])
+                'license_id' => $licenseId,
+            ]),
         ]));
 
         Livewire::actingAs($this->userWithRole($legalEntity, Role::OWNER))
@@ -169,8 +169,8 @@ class HealthcareServiceSyncTest extends TestCase
                 'id' => $healthcareService->uuid,
                 'comment' => $comment,
                 'status' => Status::INACTIVE->value,
-                'is_active' => false
-            ])
+                'is_active' => false,
+            ]),
         ]));
 
         Livewire::actingAs($this->userWithRole($legalEntity, Role::OWNER))
@@ -210,20 +210,20 @@ class HealthcareServiceSyncTest extends TestCase
     }
 
     /**
-     * A service of a division that is not synchronized yet waits for the next division synchronization and doesn't
-     * prevent the other services of the page from being stored.
+     * A service of a division that is not synchronized yet fails the page: nothing of it is stored, not even the service
+     * of a known division that comes before it, the synchronization isn't completed, and the user is asked to update
+     * the divisions and try again.
      *
      * @return void
      */
-    public function test_service_of_unsynchronized_division_does_not_block_the_page(): void
+    public function test_service_of_unsynchronized_division_fails_the_synchronization(): void
     {
         $legalEntity = LegalEntity::factory()->synced()->create();
         $division = Division::factory()->for($legalEntity)->create();
-        $uuid = $this->faker->uuid();
 
         HealthcareServiceApiFake::respond(200, $this->ehealthList([
+            $this->ehealthHealthcareService($legalEntity, $division),
             $this->ehealthHealthcareService($legalEntity, $division, ['division_id' => $this->faker->uuid()]),
-            $this->ehealthHealthcareService($legalEntity, $division, ['id' => $uuid])
         ]));
 
         $listPage = Livewire::actingAs($this->userWithRole($legalEntity, Role::OWNER))
@@ -231,10 +231,13 @@ class HealthcareServiceSyncTest extends TestCase
         $this->travel(1)->seconds();
 
         $listPage->call('sync')
-            ->assertSee(__('healthcare-services.success.sync_updated'));
+            ->assertSee(__('healthcare-services.error.sync_failed'));
 
-        $this->assertDatabaseCount('healthcare_services', 1);
-        $this->assertTrue(HealthcareService::whereUuid($uuid)->exists());
+        $this->assertDatabaseCount('healthcare_services', 0);
+        $this->assertNotSame(
+            JobStatus::COMPLETED->value,
+            $legalEntity->refresh()->getEntityStatus(LegalEntity::ENTITY_HEALTHCARE_SERVICE),
+        );
     }
 
     /**
@@ -251,7 +254,7 @@ class HealthcareServiceSyncTest extends TestCase
 
         $eHealth = HealthcareServiceApiFake::respond(200, $this->ehealthList(
             [$this->ehealthHealthcareService($legalEntity, $division)],
-            totalPages: 2
+            totalPages: 2,
         ));
 
         $user = $this->userWithRole($legalEntity, Role::OWNER);
@@ -264,8 +267,8 @@ class HealthcareServiceSyncTest extends TestCase
 
         $this->assertSame($division->uuid, $this->requestQuery($eHealth->receivedRequests[0])['division_id']);
         Bus::assertBatched(
-            static fn (PendingBatch $batch): bool => $batch->jobs->first() instanceof HealthcareServiceSync
-                && $batch->options['query'] === ['division_id' => $division->uuid]
+            static fn(PendingBatch $batch): bool => $batch->jobs->first() instanceof HealthcareServiceSync
+                && $batch->options['query'] === ['division_id' => $division->uuid],
         );
     }
 
@@ -283,13 +286,13 @@ class HealthcareServiceSyncTest extends TestCase
         $eHealth = HealthcareServiceApiFake::respond(200, $this->ehealthList(
             [$this->ehealthHealthcareService($legalEntity, $division)],
             pageNumber: 2,
-            totalPages: 2
+            totalPages: 2,
         ));
 
         [$job] = new HealthcareServiceSync($legalEntity, page: 2)->withFakeBatch(options: [
             'token' => Crypt::encryptString($this->faker->sha256()),
             'sync_entity' => LegalEntity::ENTITY_HEALTHCARE_SERVICE,
-            'query' => ['division_id' => $division->uuid]
+            'query' => ['division_id' => $division->uuid],
         ]);
         $this->expectOutputRegex('/Processing Job/');
         $job->handle();
@@ -311,7 +314,7 @@ class HealthcareServiceSyncTest extends TestCase
         $division = Division::factory()->for($legalEntity)->create();
 
         $eHealth = HealthcareServiceApiFake::respond(200, $this->ehealthList([
-            $this->ehealthHealthcareService($legalEntity, $division)
+            $this->ehealthHealthcareService($legalEntity, $division),
         ]));
 
         $user = $this->userWithRole($legalEntity, Role::OWNER);
@@ -355,8 +358,8 @@ class HealthcareServiceSyncTest extends TestCase
                 'page_number' => $pageNumber,
                 'page_size' => 50,
                 'total_entries' => count($healthcareServices),
-                'total_pages' => $totalPages
-            ]
+                'total_pages' => $totalPages,
+            ],
         ];
     }
 

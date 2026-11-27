@@ -64,7 +64,7 @@ trait PreparesHealthcareServiceTests
             'inserted_at' => '2026-10-30T10:00:00Z',
             'inserted_by' => $this->faker->uuid(),
             'updated_at' => '2026-10-30T10:00:00Z',
-            'updated_by' => $this->faker->uuid()
+            'updated_by' => $this->faker->uuid(),
         ], $overrides);
     }
 }

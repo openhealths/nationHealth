@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\Division\HealthcareService;
 
 use App\Classes\eHealth\EHealth;
-use App\Dto\HealthcareService\Model as HealthcareServiceData;
 use App\Enums\JobStatus;
 use App\Enums\Status;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
 use App\Jobs\HealthcareServiceSync;
+use App\Livewire\Division\HealthcareService\Traits\ChangesStatus;
 use App\Models\Division;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;
@@ -37,6 +37,7 @@ use Throwable;
 class HealthcareServiceIndex extends Component
 {
     use BatchLegalEntityQueries;
+    use ChangesStatus;
     use FormTrait;
     use WithPagination;
 
@@ -57,8 +58,17 @@ class HealthcareServiceIndex extends Component
      */
     public string $syncStatus = '';
 
+    #[Url(as: 'speciality_type')]
+    public ?string $filterSpecialityType = null;
+
+    #[Url(as: 'category')]
+    public ?string $filterCategory = null;
+
     #[Url(as: 'type')]
-    public ?string $typeFilter = null;
+    public ?string $filterType = null;
+
+    #[Url(as: 'providing_condition')]
+    public ?string $filterProvidingCondition = null;
 
     /**
      * List of divisions in the current legal entity.
@@ -75,7 +85,13 @@ class HealthcareServiceIndex extends Component
 
     public bool $isFiltersApplied = false;
 
-    public array $dictionaryNames = ['DIVISION_TYPE', 'SPECIALITY_TYPE', 'PROVIDING_CONDITION'];
+    public array $dictionaryNames = [
+        'DIVISION_TYPE',
+        'SPECIALITY_TYPE',
+        'PROVIDING_CONDITION',
+        'HEALTHCARE_SERVICE_CATEGORIES',
+        'HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES',
+    ];
 
     #[Computed]
     public function isSync(): bool
@@ -143,67 +159,12 @@ class HealthcareServiceIndex extends Component
     public function resetFilters(): void
     {
         $this->divisionFilter = null;
-        $this->typeFilter = null;
+        $this->filterSpecialityType = null;
+        $this->filterCategory = null;
+        $this->filterType = null;
+        $this->filterProvidingCondition = null;
         $this->divisionId = null;
         $this->status = [];
-    }
-
-    public function activate(HealthcareService $healthcareService): void
-    {
-        if (Auth::user()->cannot('activate', $healthcareService)) {
-            Session::flash('error', __('healthcare-services.policy.activate'));
-
-            return;
-        }
-
-        try {
-            $response = EHealth::healthcareService()->activate($healthcareService->uuid);
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle("Error when activate $healthcareService->uuid a healthcare service");
-
-            return;
-        }
-
-        try {
-            $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
-
-            Repository::healthcareService()->save($healthcareServiceData, $healthcareService);
-
-            Session::flash('success', __('healthcare-services.success.activated'));
-        } catch (Throwable $exception) {
-            $this->handleDatabaseErrors($exception, "Failed to activate $healthcareService->uuid healthcare service");
-
-            return;
-        }
-    }
-
-    public function deactivate(HealthcareService $healthcareService): void
-    {
-        if (Auth::user()->cannot('deactivate', $healthcareService)) {
-            Session::flash('error', __('healthcare-services.policy.deactivate'));
-
-            return;
-        }
-
-        try {
-            $response = EHealth::healthcareService()->deactivate($healthcareService->uuid);
-        } catch (EHealthException|EHealthConnectionException $exception) {
-            $exception->handle("Error when deactivating $healthcareService->uuid a healthcare service");
-
-            return;
-        }
-
-        try {
-            $healthcareServiceData = objectMapper()->map($response->validate(), HealthcareServiceData::class);
-
-            Repository::healthcareService()->save($healthcareServiceData, $healthcareService);
-
-            Session::flash('success', __('healthcare-services.success.deactivated'));
-        } catch (Throwable $exception) {
-            $this->handleDatabaseErrors($exception, "Failed to deactivate $healthcareService->uuid healthcare service");
-
-            return;
-        }
     }
 
     public function delete(HealthcareService $healthcareService): void
@@ -279,7 +240,7 @@ class HealthcareServiceIndex extends Component
             $this->handleDatabaseErrors(
                 $exception,
                 'Error while synchronizing healthcare services with eHealth: ',
-                __('healthcare-services.error.sync_failed')
+                __('healthcare-services.error.sync_failed'),
             );
 
             return;
@@ -329,7 +290,7 @@ class HealthcareServiceIndex extends Component
                     $user,
                     $encryptedToken,
                     legalEntity(),
-                    fn () => legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_HEALTHCARE_SERVICE)
+                    fn() => legalEntity()?->setEntityStatus(JobStatus::PROCESSING, LegalEntity::ENTITY_HEALTHCARE_SERVICE),
                 )) {
                     return true;
                 }
@@ -353,8 +314,20 @@ class HealthcareServiceIndex extends Component
             $this->divisionUuid = null;
         }
 
-        if (!empty($this->typeFilter)) {
-            $query->whereSpecialityType($this->typeFilter);
+        if (!empty($this->filterSpecialityType)) {
+            $query->whereSpecialityType($this->filterSpecialityType);
+        }
+
+        if (!empty($this->filterCategory)) {
+            $query->forCategory($this->filterCategory);
+        }
+
+        if (!empty($this->filterType)) {
+            $query->forType($this->filterType);
+        }
+
+        if (!empty($this->filterProvidingCondition)) {
+            $query->whereProvidingCondition($this->filterProvidingCondition);
         }
 
         if (!empty($this->status)) {
@@ -387,7 +360,7 @@ class HealthcareServiceIndex extends Component
             ->catch(static function (Batch $batch, Throwable $exception) use ($userId): void {
                 Log::error('Healthcare Service sync batch failed.', [
                     'batch_id' => $batch->id,
-                    'exception' => $exception
+                    'exception' => $exception,
                 ]);
 
                 User::find($userId)?->notify(new SyncNotification('hcs', 'failed'));
@@ -404,9 +377,9 @@ class HealthcareServiceIndex extends Component
         return view('livewire.division.healthcare-service.healthcare-service-index', [
             'healthcareServices' => $this->healthcareServices,
             'specialityTypes' => collect($this->dictionaries['SPECIALITY_TYPE'])
-                ->map(static fn (string $name, string $code): array => ['code' => $code, 'name' => $name])
+                ->map(static fn(string $name, string $code): array => ['code' => $code, 'name' => $name])
                 ->values()
-                ->all()
+                ->all(),
         ]);
     }
 }
