@@ -44,36 +44,36 @@ class HealthcareServiceUpdateTest extends TestCase
         $healthcareService = HealthcareService::factory()->for($division)->create([
             'comment' => $comment,
             'available_time' => [
-                ['days_of_week' => ['mon', 'tue'], 'all_day' => false, 'available_start_time' => '08:00:00', 'available_end_time' => '17:00:00']
+                ['days_of_week' => ['mon', 'tue'], 'all_day' => false, 'available_start_time' => '08:00:00', 'available_end_time' => '17:00:00'],
             ],
             'not_available' => [
-                ['description' => $description, 'during' => ['start' => '2026-12-01T07:00:00Z', 'end' => '2026-12-01T11:00:00Z']]
-            ]
+                ['description' => $description, 'during' => ['start' => '2026-12-01T07:00:00Z', 'end' => '2026-12-01T11:00:00Z']],
+            ],
         ]);
 
         $updatePage = Livewire::actingAs($this->userWithRole($legalEntity, Role::OWNER))
             ->test(HealthcareServiceUpdate::class, [
                 'legalEntity' => $legalEntity,
                 'division' => $division,
-                'healthcareService' => $healthcareService
+                'healthcareService' => $healthcareService,
             ]);
 
         $updatePage->assertSet('form.comment', $comment)
             ->assertSet('form.availableTime', [
-                ['daysOfWeek' => ['mon', 'tue'], 'allDay' => false, 'availableStartTime' => '08:00:00', 'availableEndTime' => '17:00:00']
+                ['daysOfWeek' => ['mon', 'tue'], 'allDay' => false, 'availableStartTime' => '08:00:00', 'availableEndTime' => '17:00:00'],
             ])
             ->assertSet('form.notAvailable', [
                 [
                     'description' => $description,
-                    'during' => ['startDate' => '01.12.2026', 'startTime' => '09:00', 'endDate' => '01.12.2026', 'endTime' => '13:00']
-                ]
+                    'during' => ['startDate' => '01.12.2026', 'startTime' => '09:00', 'endDate' => '01.12.2026', 'endTime' => '13:00'],
+                ],
             ]);
     }
 
     /**
      * The changed comment and schedules go to eHealth in its format, with the not available periods in UTC, and the
-     * service is stored as eHealth returns it. The stored not available periods are read back in local time, as the
-     * form shows them. The stored schedules are compared regardless of the order of keys, since the jsonb columns keep
+     * service is stored as eHealth returns it, after which its details page opens to show the updated values. The
+     * stored not available periods are read back in local time, as the form shows them. The stored schedules are compared regardless of the order of keys, since the jsonb columns keep
      * the keys in an order of their own.
      *
      * @return void
@@ -89,11 +89,11 @@ class HealthcareServiceUpdateTest extends TestCase
         $notAvailable = [
             [
                 'description' => $description,
-                'during' => ['startDate' => '15.12.2026', 'startTime' => '10:00', 'endDate' => '15.12.2026', 'endTime' => '12:30']
-            ]
+                'during' => ['startDate' => '15.12.2026', 'startTime' => '10:00', 'endDate' => '15.12.2026', 'endTime' => '12:30'],
+            ],
         ];
         $ehealthNotAvailable = [
-            ['description' => $description, 'during' => ['start' => '2026-12-15T08:00:00Z', 'end' => '2026-12-15T10:30:00Z']]
+            ['description' => $description, 'during' => ['start' => '2026-12-15T08:00:00Z', 'end' => '2026-12-15T10:30:00Z']],
         ];
 
         $eHealth = HealthcareServiceApiFake::respond(200, [
@@ -101,24 +101,24 @@ class HealthcareServiceUpdateTest extends TestCase
                 'id' => $healthcareService->uuid,
                 'comment' => $comment,
                 'available_time' => $ehealthAvailableTime,
-                'not_available' => $ehealthNotAvailable
-            ])
+                'not_available' => $ehealthNotAvailable,
+            ]),
         ]);
 
         Livewire::actingAs($this->userWithRole($legalEntity, Role::OWNER))
             ->test(HealthcareServiceUpdate::class, [
                 'legalEntity' => $legalEntity,
                 'division' => $division,
-                'healthcareService' => $healthcareService
+                'healthcareService' => $healthcareService,
             ])
             ->set('form.comment', $comment)
             ->set('form.availableTime', [
-                ['daysOfWeek' => ['wed'], 'allDay' => true, 'availableStartTime' => null, 'availableEndTime' => null]
+                ['daysOfWeek' => ['wed'], 'allDay' => true, 'availableStartTime' => null, 'availableEndTime' => null],
             ])
             ->set('form.notAvailable', $notAvailable)
             ->call('update')
             ->assertHasNoErrors()
-            ->assertRedirectToRoute('healthcare-service.index', [$legalEntity]);
+            ->assertRedirectToRoute('healthcare-services.show', [$legalEntity, $division, $healthcareService]);
 
         $this->assertCount(1, $eHealth->receivedRequests);
         $request = $eHealth->receivedRequests[0];
@@ -127,7 +127,7 @@ class HealthcareServiceUpdateTest extends TestCase
         $this->assertSame($comment, $request['comment']);
         $this->assertSame([['days_of_week' => ['wed'], 'all_day' => true]], $request['available_time']);
         $this->assertSame([
-            ['description' => $description, 'during' => ['start' => '2026-12-15T08:00:00Z', 'end' => '2026-12-15T10:30:00Z']]
+            ['description' => $description, 'during' => ['start' => '2026-12-15T08:00:00Z', 'end' => '2026-12-15T10:30:00Z']],
         ], $request['not_available']);
 
         $healthcareService->refresh();
@@ -150,8 +150,8 @@ class HealthcareServiceUpdateTest extends TestCase
             'comment' => $this->faker->sentence(),
             'available_time' => [['days_of_week' => ['mon'], 'all_day' => true]],
             'not_available' => [
-                ['description' => $this->faker->sentence(), 'during' => ['start' => '2026-12-01T07:00:00Z', 'end' => '2026-12-01T11:00:00Z']]
-            ]
+                ['description' => $this->faker->sentence(), 'during' => ['start' => '2026-12-01T07:00:00Z', 'end' => '2026-12-01T11:00:00Z']],
+            ],
         ]);
 
         $eHealth = HealthcareServiceApiFake::respond(200, [
@@ -159,15 +159,15 @@ class HealthcareServiceUpdateTest extends TestCase
                 'id' => $healthcareService->uuid,
                 'comment' => null,
                 'available_time' => [],
-                'not_available' => []
-            ])
+                'not_available' => [],
+            ]),
         ]);
 
         Livewire::actingAs($this->userWithRole($legalEntity, Role::OWNER))
             ->test(HealthcareServiceUpdate::class, [
                 'legalEntity' => $legalEntity,
                 'division' => $division,
-                'healthcareService' => $healthcareService
+                'healthcareService' => $healthcareService,
             ])
             ->set('form.comment', '')
             ->set('form.availableTime', [])
@@ -205,7 +205,7 @@ class HealthcareServiceUpdateTest extends TestCase
             ->test(HealthcareServiceUpdate::class, [
                 'legalEntity' => $legalEntity,
                 'division' => $division,
-                'healthcareService' => $healthcareService
+                'healthcareService' => $healthcareService,
             ])
             ->set('form.comment', $this->faker->sentence());
         $this->travel(1)->seconds();

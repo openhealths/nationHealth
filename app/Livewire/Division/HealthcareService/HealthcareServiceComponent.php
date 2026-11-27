@@ -58,7 +58,7 @@ class HealthcareServiceComponent extends Component
         'HEALTHCARE_SERVICE_CATEGORIES',
         'SPECIALITY_TYPE',
         'PROVIDING_CONDITION',
-        'HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES'
+        'HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES',
     ];
 
     protected function baseMount(LegalEntity $legalEntity, Division $division): void
@@ -67,11 +67,11 @@ class HealthcareServiceComponent extends Component
 
         $this->dictionaries['HEALTHCARE_SERVICE_CATEGORIES'] = $this->getDictionariesFields(
             config('ehealth.healthcare_service.categories.' . legalEntity()->type->name, []),
-            'HEALTHCARE_SERVICE_CATEGORIES'
+            'HEALTHCARE_SERVICE_CATEGORIES',
         );
         $this->dictionaries['PROVIDING_CONDITION'] = $this->getDictionariesFields(
             config('ehealth.legal_entity_' . strtolower(legalEntity()->type->name) . '_providing_conditions', []),
-            'PROVIDING_CONDITION'
+            'PROVIDING_CONDITION',
         );
 
         $this->divisionName = $division->name;
@@ -98,11 +98,11 @@ class HealthcareServiceComponent extends Component
             'license' => array_values(
                 array_filter(
                     $categoryCodes,
-                    static fn (string $categoryCode): bool => filled(
-                        config("ehealth.healthcare_service.license_type.$categoryCode")
-                    )
-                )
-            )
+                    static fn(string $categoryCode): bool => filled(
+                        config("ehealth.healthcare_service.license_type.$categoryCode"),
+                    ),
+                ),
+            ),
         ];
     }
 
@@ -115,7 +115,7 @@ class HealthcareServiceComponent extends Component
     public function specialityTypes(): array
     {
         return collect($this->dictionaries['SPECIALITY_TYPE'])
-            ->map(static fn (string $name, string $code): array => ['code' => $code, 'name' => $name])
+            ->map(static fn(string $name, string $code): array => ['code' => $code, 'name' => $name])
             ->values()
             ->all();
     }

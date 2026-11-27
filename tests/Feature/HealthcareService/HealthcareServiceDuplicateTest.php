@@ -62,7 +62,7 @@ class HealthcareServiceDuplicateTest extends TestCase
     {
         HealthcareService::factory()->for($this->division)->create([
             'speciality_type' => 'FAMILY_DOCTOR',
-            'providing_condition' => 'OUTPATIENT'
+            'providing_condition' => 'OUTPATIENT',
         ]);
 
         $eHealth = HealthcareServiceApiFake::respond(201, []);
@@ -94,7 +94,7 @@ class HealthcareServiceDuplicateTest extends TestCase
             'type_id' => CodeableConcept::factory()->hasCoding(['system' => 'HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES', 'code' => 'SALE']),
             'speciality_type' => null,
             'providing_condition' => null,
-            'license_id' => $license->uuid
+            'license_id' => $license->uuid,
         ]);
 
         $eHealth = HealthcareServiceApiFake::respond(201, []);

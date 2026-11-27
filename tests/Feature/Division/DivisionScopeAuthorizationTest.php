@@ -137,7 +137,7 @@ class DivisionScopeAuthorizationTest extends TestCase
             $this->assertContains($authorization, $middleware, $routeName);
         }
 
-        $middleware = app('router')->getRoutes()->getByName('healthcare-service.create')->gatherMiddleware();
+        $middleware = app('router')->getRoutes()->getByName('healthcare-services.create')->gatherMiddleware();
 
         $this->assertContains('permission:division:read|division:details', $middleware);
     }
@@ -149,7 +149,7 @@ class DivisionScopeAuthorizationTest extends TestCase
         $user->shouldReceive('cannot')->with('division:write')->andReturnFalse();
         $user->shouldReceive('hasAllowedRole')->with([Role::OWNER])->andReturnFalse();
         $user->shouldReceive('cannot')->with('create', Division::class)
-            ->andReturnUsing(fn (): bool => Gate::forUser($user)->denies('create', Division::class));
+            ->andReturnUsing(fn(): bool => Gate::forUser($user)->denies('create', Division::class));
         Auth::shouldReceive('user')->once()->andReturn($user);
         $this->mock(DivisionApi::class)->shouldNotReceive('update')->shouldNotReceive('create');
 
@@ -173,7 +173,7 @@ class DivisionScopeAuthorizationTest extends TestCase
             app(HandleComponents::class),
             $component,
             [['method' => 'divisionUpdate', 'params' => [new Division()]]],
-            new ComponentContext($component)
+            new ComponentContext($component),
         );
     }
 
@@ -184,7 +184,7 @@ class DivisionScopeAuthorizationTest extends TestCase
         $user->shouldReceive('cannot')->with('division:write')->andReturnFalse();
         $user->shouldReceive('hasAllowedRole')->with([Role::OWNER])->andReturnFalse();
         $user->shouldReceive('cannot')->with('create', Division::class)
-            ->andReturnUsing(fn (): bool => Gate::forUser($user)->denies('create', Division::class));
+            ->andReturnUsing(fn(): bool => Gate::forUser($user)->denies('create', Division::class));
         Auth::shouldReceive('user')->once()->andReturn($user);
         $this->mock(DivisionApi::class)->shouldNotReceive('create');
 
@@ -255,7 +255,7 @@ class DivisionScopeAuthorizationTest extends TestCase
 
                 $gate = Gate::forUser($this->userWithScopes(
                     in_array('division:read', $scopes, true),
-                    in_array('division:details', $scopes, true)
+                    in_array('division:details', $scopes, true),
                 ));
 
                 $this->assertTrue($gate->allows('sync', Division::class), "$type / $role: list sync");
@@ -327,7 +327,7 @@ class DivisionScopeAuthorizationTest extends TestCase
     {
         $user = $this->userWithScopes(false, $details, $write);
         $user->shouldReceive('cannot')->once()->with('viewAny', Division::class)
-            ->andReturnUsing(fn (): bool => Gate::forUser($user)->denies('viewAny', Division::class));
+            ->andReturnUsing(fn(): bool => Gate::forUser($user)->denies('viewAny', Division::class));
         Auth::shouldReceive('user')->once()->andReturn($user);
         $this->mock(DivisionApi::class)->shouldNotReceive('getMany');
 

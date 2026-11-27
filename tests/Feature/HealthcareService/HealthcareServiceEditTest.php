@@ -40,23 +40,23 @@ class HealthcareServiceEditTest extends TestCase
         $division = Division::factory()->for($legalEntity)->create();
         $draft = HealthcareService::factory()->for($division)->draft()->create([
             'speciality_type' => 'FAMILY_DOCTOR',
-            'providing_condition' => 'OUTPATIENT'
+            'providing_condition' => 'OUTPATIENT',
         ]);
         $uuid = $this->faker->uuid();
 
         $eHealth = HealthcareServiceApiFake::respond(201, [
-            'data' => $this->ehealthHealthcareService($legalEntity, $division, ['id' => $uuid])
+            'data' => $this->ehealthHealthcareService($legalEntity, $division, ['id' => $uuid]),
         ]);
 
         Livewire::actingAs($this->userWithRole($legalEntity, Role::OWNER))
             ->test(HealthcareServiceEdit::class, [
                 'legalEntity' => $legalEntity,
                 'division' => $division,
-                'healthcareService' => $draft
+                'healthcareService' => $draft,
             ])
             ->call('create')
             ->assertHasNoErrors()
-            ->assertRedirectToRoute('healthcare-service.index', [$legalEntity, 'division' => $division->id]);
+            ->assertRedirectToRoute('healthcare-services.index', [$legalEntity, 'division' => $division->id]);
 
         $this->assertCount(1, $eHealth->receivedRequests);
         $request = $eHealth->receivedRequests[0];

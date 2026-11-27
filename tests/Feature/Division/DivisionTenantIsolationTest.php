@@ -55,7 +55,7 @@ class DivisionTenantIsolationTest extends TestCase
 
         // Keep real Eloquent binding and tenant constraints, but never connect to a development database.
         $this->originalResolver = Model::getConnectionResolver();
-        $connection = new class (fn () => throw new RuntimeException('A live database must not be used by isolation fixtures.'), 'testing') extends PostgresConnection
+        $connection = new class (fn() => throw new RuntimeException('A live database must not be used by isolation fixtures.'), 'testing') extends PostgresConnection
         {
             public \Closure $selectRows;
 
@@ -89,7 +89,7 @@ class DivisionTenantIsolationTest extends TestCase
             preg_match_all('/(?:"[a-z_]+"\.)?"([a-z_]+)" = \?/', $query, $conditions);
             $this->assertCount(count($bindings), $conditions[1], 'Every fixture query binding must be checked.');
 
-            return array_values(array_map(static fn (array $row): object => (object) $row, array_filter(
+            return array_values(array_map(static fn(array $row): object => (object) $row, array_filter(
                 $rows,
                 static function (array $row) use ($conditions, $bindings): bool {
                     foreach ($conditions[1] as $index => $column) {
@@ -99,7 +99,7 @@ class DivisionTenantIsolationTest extends TestCase
                     }
 
                     return true;
-                }
+                },
             )));
         };
         $resolver = new ConnectionResolver(['pgsql' => $connection]);
@@ -121,13 +121,13 @@ class DivisionTenantIsolationTest extends TestCase
         $user = Mockery::mock(User::class)->makePartial();
         $user->id = 101;
         $user->emailVerifiedAt = now();
-        $user->shouldReceive('checkPermissionTo')->andReturnUsing(fn (string $permission): bool => in_array($permission, $scopes, true));
+        $user->shouldReceive('checkPermissionTo')->andReturnUsing(fn(string $permission): bool => in_array($permission, $scopes, true));
         $user->shouldReceive('cannot')->andReturnUsing(
-            fn (string $ability, mixed $arguments = []): bool => str_contains($ability, ':')
+            fn(string $ability, mixed $arguments = []): bool => str_contains($ability, ':')
                 ? !in_array($ability, $scopes, true)
-                : Gate::forUser($user)->denies($ability, $arguments)
+                : Gate::forUser($user)->denies($ability, $arguments),
         );
-        $user->shouldReceive('hasAllowedRole')->andReturnUsing(fn (array $roles): bool => in_array($role, $roles, true));
+        $user->shouldReceive('hasAllowedRole')->andReturnUsing(fn(array $roles): bool => in_array($role, $roles, true));
         $this->actingAs($user, 'ehealth');
         // Membership in both entities must not bypass the eHealth session's legal-entity restriction.
         cache()->put('user_le_ids:101', [1, 2]);
@@ -139,7 +139,7 @@ class DivisionTenantIsolationTest extends TestCase
         $route = app('router')->getRoutes()->getByName($name);
         $action = $route->getAction();
         // Exercise the configured URL, model binding and authorization without rendering unrelated UI.
-        $action['uses'] = static fn (LegalEntity $legalEntity, ?Division $division = null, ?HealthcareService $healthcareService = null) => response()->json([
+        $action['uses'] = static fn(LegalEntity $legalEntity, ?Division $division = null, ?HealthcareService $healthcareService = null) => response()->json([
             'legal_entity_id' => $legalEntity->id,
             'division_id' => $division?->id,
             'healthcare_service_id' => $healthcareService?->id,
@@ -167,7 +167,7 @@ class DivisionTenantIsolationTest extends TestCase
             'hr edit' => ['division.edit', ['division:write'], Role::HR, 200],
             'admin edit' => ['division.edit', ['division:write'], Role::ADMIN, 200],
             'edit requires write' => ['division.edit', ['division:read'], Role::OWNER, 404],
-            'own healthcare service' => ['healthcare-service.view', ['division:details', 'healthcare_service:read'], Role::OWNER, 200],
+            'own healthcare service' => ['healthcare-services.show', ['division:details', 'healthcare_service:read'], Role::OWNER, 200],
         ];
     }
 
@@ -199,16 +199,16 @@ class DivisionTenantIsolationTest extends TestCase
         return [
             ['division.view', 22, null],
             ['division.edit', 22, null],
-            ['healthcare-service.create', 22, null],
-            ['healthcare-service.view', 22, 222],
-            ['healthcare-service.edit', 22, 222],
-            ['healthcare-service.update', 22, 222],
-            ['healthcare-service.view', 11, 222],
-            ['healthcare-service.edit', 11, 222],
-            ['healthcare-service.update', 11, 222],
-            ['healthcare-service.view', 11, 112],
-            ['healthcare-service.edit', 11, 112],
-            ['healthcare-service.update', 11, 112],
+            ['healthcare-services.create', 22, null],
+            ['healthcare-services.show', 22, 222],
+            ['healthcare-services.edit', 22, 222],
+            ['healthcare-services.update', 22, 222],
+            ['healthcare-services.show', 11, 222],
+            ['healthcare-services.edit', 11, 222],
+            ['healthcare-services.update', 11, 222],
+            ['healthcare-services.show', 11, 112],
+            ['healthcare-services.edit', 11, 112],
+            ['healthcare-services.update', 11, 112],
         ];
     }
 
@@ -264,7 +264,7 @@ class DivisionTenantIsolationTest extends TestCase
             app(HandleComponents::class),
             $component,
             [['method' => $method, 'params' => [new LegalEntity(), new Division()]]],
-            new ComponentContext($component)
+            new ComponentContext($component),
         );
     }
 
@@ -295,7 +295,7 @@ class DivisionTenantIsolationTest extends TestCase
             app(HandleComponents::class),
             $component,
             [['method' => 'getFilteredKeysFromConfig', 'params' => ['api.api_key']]],
-            new ComponentContext($component)
+            new ComponentContext($component),
         );
     }
 
@@ -393,9 +393,9 @@ class DivisionTenantIsolationTest extends TestCase
             ->with('division-one')->andReturn($response);
         $this->mock(DivisionRepository::class)->shouldReceive('saveMappedDivision')->once()
             ->with(
-                Mockery::on(fn (DivisionData $data): bool => $data->name === 'Synchronized division'),
-                Mockery::on(fn (Division $division): bool => $division->id === 11 && $division->legalEntityId === 1),
-                $entity
+                Mockery::on(fn(DivisionData $data): bool => $data->name === 'Synchronized division'),
+                Mockery::on(fn(Division $division): bool => $division->id === 11 && $division->legalEntityId === 1),
+                $entity,
             );
 
         $redirect = $component->sync();
@@ -485,7 +485,7 @@ class DivisionTenantIsolationTest extends TestCase
             'workingHours' => [], 'phones' => [], 'addresses' => [],
         ];
         $this->mock(DivisionRepository::class)->shouldReceive('saveMappedDivision')->once()
-            ->with(Mockery::on(fn (DivisionData $data): bool => $data->uuid === null && $data->status === 'DRAFT'), Mockery::type(Division::class), $entity)
+            ->with(Mockery::on(fn(DivisionData $data): bool => $data->uuid === null && $data->status === 'DRAFT'), Mockery::type(Division::class), $entity)
             ->andReturnUsing(function (DivisionData $data, Division $division): Division {
                 $this->assertNull($division->uuid);
                 $division->id = 77;
@@ -602,10 +602,10 @@ class DivisionTenantIsolationTest extends TestCase
         ];
         $this->mock(DivisionRepository::class)->shouldReceive('saveMappedDivision')->once()
             ->with(
-                Mockery::on(fn (DivisionData $data): bool => $data->uuid === 'division-one' && $data->status === 'UNSYNCED'),
-                Mockery::on(fn (Division $division): bool => $division->id === 11 && $division->uuid === 'division-one'),
-                $entity
-            )->andReturnUsing(fn (DivisionData $data, Division $division): Division => $division);
+                Mockery::on(fn(DivisionData $data): bool => $data->uuid === 'division-one' && $data->status === 'UNSYNCED'),
+                Mockery::on(fn(Division $division): bool => $division->id === 11 && $division->uuid === 'division-one'),
+                $entity,
+            )->andReturnUsing(fn(DivisionData $data, Division $division): Division => $division);
 
         $this->assertSame(11, $component->store(false)->id);
         $this->assertSame('division-one', $component->divisionForm->division['uuid']);
@@ -787,7 +787,7 @@ class DivisionTenantIsolationTest extends TestCase
             'workingHours' => [], 'phones' => [], 'addresses' => [],
         ];
         $this->mock(DivisionRepository::class)->shouldReceive('saveMappedDivision')->once()
-            ->with(Mockery::on(fn (DivisionData $data): bool => $data->uuid === 'division-one' && $data->status === 'UNSYNCED'), $division, $entity)
+            ->with(Mockery::on(fn(DivisionData $data): bool => $data->uuid === 'division-one' && $data->status === 'UNSYNCED'), $division, $entity)
             ->andReturn($division);
 
         (new ReflectionMethod(DivisionComponent::class, 'saveToDB'))->invoke($component, $division);

@@ -45,15 +45,15 @@ class HealthcareServiceStatusTest extends TestCase
                 ['status' => Status::ACTIVE, 'is_active' => true],
                 Status::INACTIVE,
                 false,
-                'healthcare-services.success.deactivated'
+                'healthcare-services.success.deactivated',
             ],
             'activate' => [
                 'activate',
                 ['status' => Status::INACTIVE, 'is_active' => false],
                 Status::ACTIVE,
                 true,
-                'healthcare-services.success.activated'
-            ]
+                'healthcare-services.success.activated',
+            ],
         ];
     }
 
@@ -74,7 +74,7 @@ class HealthcareServiceStatusTest extends TestCase
         array $storedService,
         Status $returnedStatus,
         bool $returnedIsActive,
-        string $successMessage
+        string $successMessage,
     ): void {
         $legalEntity = LegalEntity::factory()->create();
         $division = Division::factory()->for($legalEntity)->create();
@@ -84,8 +84,8 @@ class HealthcareServiceStatusTest extends TestCase
             'data' => $this->ehealthHealthcareService($legalEntity, $division, [
                 'id' => $healthcareService->uuid,
                 'status' => $returnedStatus->value,
-                'is_active' => $returnedIsActive
-            ])
+                'is_active' => $returnedIsActive,
+            ]),
         ]);
 
         $listPage = Livewire::actingAs($this->userWithRole($legalEntity, Role::OWNER))
@@ -99,7 +99,7 @@ class HealthcareServiceStatusTest extends TestCase
         $this->assertSame('PATCH', $eHealth->receivedRequests[0]->method());
         $this->assertStringEndsWith(
             "/api/healthcare_services/$healthcareService->uuid/actions/$action",
-            $eHealth->receivedRequests[0]->url()
+            $eHealth->receivedRequests[0]->url(),
         );
 
         $healthcareService->refresh();

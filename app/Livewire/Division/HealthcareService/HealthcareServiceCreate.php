@@ -44,11 +44,11 @@ class HealthcareServiceCreate extends HealthcareServiceComponent
 
             Repository::healthcareService()->save(
                 $healthcareServiceData,
-                new HealthcareService(['division_id' => $this->divisionId, 'legal_entity_id' => legalEntity()->id])
+                new HealthcareService(['division_id' => $this->divisionId, 'legal_entity_id' => legalEntity()->id]),
             );
 
             Session::flash('success', __('healthcare-services.success.draft_created'));
-            $this->redirectRoute('healthcare-service.index', [legalEntity(), 'division' => $this->divisionId], navigate: true);
+            $this->redirectRoute('healthcare-services.index', [legalEntity(), 'division' => $this->divisionId], navigate: true);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to store healthcare service');
 
@@ -78,11 +78,11 @@ class HealthcareServiceCreate extends HealthcareServiceComponent
 
             Repository::healthcareService()->save(
                 $healthcareServiceData,
-                new HealthcareService(['division_id' => $this->divisionId, 'legal_entity_id' => legalEntity()->id])
+                new HealthcareService(['division_id' => $this->divisionId, 'legal_entity_id' => legalEntity()->id]),
             );
 
             Session::flash('success', __('healthcare-services.success.created'));
-            $this->redirectRoute('healthcare-service.index', [legalEntity(), 'division' => $this->divisionId], navigate: true);
+            $this->redirectRoute('healthcare-services.index', [legalEntity(), 'division' => $this->divisionId], navigate: true);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to store healthcare service');
 

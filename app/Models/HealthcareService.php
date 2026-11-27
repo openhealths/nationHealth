@@ -19,9 +19,9 @@ use Illuminate\Support\Carbon;
 
 class HealthcareService extends Model
 {
+    use HasCamelCasing;
     /** @use HasFactory<HealthcareServiceFactory> */
     use HasFactory;
-    use HasCamelCasing;
 
     protected $fillable = [
         'uuid',
@@ -42,7 +42,7 @@ class HealthcareService extends Model
         'legal_entity_id',
         'licensed_healthcare_service',
         'ehealth_updated_at',
-        'ehealth_updated_by'
+        'ehealth_updated_by',
     ];
 
     protected $casts = [
@@ -53,7 +53,7 @@ class HealthcareService extends Model
         'status' => Status::class,
         'ehealth_inserted_at' => UtcDateTimeCast::class,
         'ehealth_updated_at' => UtcDateTimeCast::class,
-        'created_at' => 'datetime'
+        'created_at' => 'datetime',
     ];
 
     protected function notAvailable(): Attribute
@@ -77,7 +77,7 @@ class HealthcareService extends Model
                                 'startDate' => $start->format(config('app.date_format')),
                                 'startTime' => $start->format('H:i'),
                                 'endDate' => $end->format(config('app.date_format')),
-                                'endTime' => $end->format('H:i')
+                                'endTime' => $end->format('H:i'),
                             ];
                         }
 
@@ -124,15 +124,44 @@ class HealthcareService extends Model
                 'uuid',
                 'legal_entity_id',
                 'division_id',
+                'category_id',
+                'type_id',
                 'speciality_type',
                 'providing_condition',
+                'licensed_healthcare_service',
                 'ehealth_inserted_at',
                 'status',
-                'created_at'
+                'created_at',
             ])
-            ->with('division:id,name,status')
+            ->with(['division:id,name,status', 'category.coding', 'type.coding'])
             ->orderByRaw('COALESCE(ehealth_inserted_at, created_at) DESC')
             ->orderByDesc('created_at');
+    }
+
+    /**
+     * Healthcare services of the category with the given code.
+     *
+     * @param  Builder  $query
+     * @param  string  $categoryCode
+     * @return Builder
+     */
+    #[Scope]
+    protected function forCategory(Builder $query, string $categoryCode): Builder
+    {
+        return $query->whereHas('category.coding', static fn(Builder $coding): Builder => $coding->where('code', $categoryCode));
+    }
+
+    /**
+     * Healthcare services of the type with the given code.
+     *
+     * @param  Builder  $query
+     * @param  string  $typeCode
+     * @return Builder
+     */
+    #[Scope]
+    protected function forType(Builder $query, string $typeCode): Builder
+    {
+        return $query->whereHas('type.coding', static fn(Builder $coding): Builder => $coding->where('code', $typeCode));
     }
 
     #[Scope]

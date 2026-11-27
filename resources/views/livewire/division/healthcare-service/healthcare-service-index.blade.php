@@ -66,7 +66,7 @@
                             @foreach ($divisions as $division)
                                 @if ($division['status'] === DivisionStatus::ACTIVE->value)
                                     <a
-                                        href="{{ route('healthcare-service.create', [legalEntity(), $division['id']]) }}"
+                                        href="{{ route('healthcare-services.create', [legalEntity(), $division['id']]) }}"
                                         x-show="'{{ addslashes($division['name']) }}'.toLowerCase().includes(search.toLowerCase())"
                                         class="block px-5 py-3 text-sm wrap-break-word whitespace-normal text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
                                     >
@@ -114,7 +114,7 @@
             <div class="form-row-3">
                 <x-forms.combobox
                     :options="$specialityTypes"
-                    bind="typeFilter"
+                    bind="filterSpecialityType"
                     bindValue="code"
                     bindParam="name"
                     :label="__('healthcare-services.specialisation')"
@@ -200,11 +200,11 @@
                                     <td class="index-table-td">
                                         <span
                                             class="{{
-                                                match($service->status) {
+                                                match ($service->status) {
                                                     Status::DRAFT => 'badge-dark',
                                                     Status::ACTIVE => 'badge-green',
                                                     Status::INACTIVE => 'badge-red',
-                                                    default => ''
+                                                    default => '',
                                                 }
                                             }}"
                                         >
@@ -213,133 +213,141 @@
                                     </td>
 
                                     <td class="index-table-td-actions">
-                                        @if ($service->division->status === DivisionStatus::ACTIVE)
-                                            <div class="relative flex justify-center">
-                                                <div
-                                                    x-data="{
-                                                        open: false,
-                                                        toggle() {
-                                                            this.open
-                                                                ? this.close()
-                                                                : (this.$refs.button.focus(), (this.open = true));
-                                                        },
-                                                        close(focusAfter) {
-                                                            if (! this.open) return;
-                                                            this.open = false;
-                                                            focusAfter && focusAfter.focus();
-                                                        },
-                                                    }"
-                                                    @keydown.escape.prevent.stop="close($refs.button)"
-                                                    @focusin.window="! $refs.panel.contains($event.target) && close()"
-                                                    x-id="['dropdown-button']"
-                                                    class="relative"
+                                        <div class="relative flex justify-center">
+                                            <div
+                                                x-data="{
+                                                    open: false,
+                                                    toggle() {
+                                                        this.open
+                                                            ? this.close()
+                                                            : (this.$refs.button.focus(), (this.open = true));
+                                                    },
+                                                    close(focusAfter) {
+                                                        if (! this.open) return;
+                                                        this.open = false;
+                                                        focusAfter && focusAfter.focus();
+                                                    },
+                                                }"
+                                                @keydown.escape.prevent.stop="close($refs.button)"
+                                                @focusin.window="! $refs.panel.contains($event.target) && close()"
+                                                x-id="['dropdown-button']"
+                                                class="relative"
+                                            >
+                                                <button
+                                                    @click="toggle()"
+                                                    x-ref="button"
+                                                    :aria-expanded="open"
+                                                    :aria-controls="$id('dropdown-button')"
+                                                    type="button"
+                                                    class="hover:text-primary cursor-pointer"
                                                 >
-                                                    <button
-                                                        @click="toggle()"
-                                                        x-ref="button"
-                                                        :aria-expanded="open"
-                                                        :aria-controls="$id('dropdown-button')"
-                                                        type="button"
-                                                        class="hover:text-primary cursor-pointer"
-                                                    >
-                                                        @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
-                                                    </button>
+                                                    @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
+                                                </button>
 
-                                                    <div
-                                                        x-show="open"
-                                                        wire:key="dropdown-{{ $service->id }}-{{ $service->status->value }}"
-                                                        x-cloak
-                                                        x-ref="panel"
-                                                        x-transition.origin.top.left
-                                                        @click.outside="close($refs.button)"
-                                                        :id="$id('dropdown-button')"
-                                                        class="absolute right-0 z-50 mt-2 w-auto max-w-[20rem] min-w-40 rounded-md border border-gray-200 bg-white shadow-md dark:border-gray-600 dark:bg-gray-700"
-                                                    >
-                                                        @if ($service->status === Status::ACTIVE)
-                                                            @can('view', $service)
-                                                                <a
-                                                                    href="{{ route('healthcare-service.view', [legalEntity(), $service->division, $service->id]) }}"
-                                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                                >
-                                                                    @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300')
-                                                                    {{ __('forms.view') }}
-                                                                </a>
-                                                            @endcan
+                                                <div
+                                                    x-show="open"
+                                                    wire:key="dropdown-{{ $service->id }}-{{ $service->status->value }}"
+                                                    x-cloak
+                                                    x-ref="panel"
+                                                    x-transition.origin.top.left
+                                                    @click.outside="close($refs.button)"
+                                                    :id="$id('dropdown-button')"
+                                                    class="absolute right-0 z-50 mt-2 w-auto max-w-[20rem] min-w-40 rounded-md border border-gray-200 bg-white shadow-md dark:border-gray-600 dark:bg-gray-700"
+                                                >
+                                                    @if ($service->status === Status::ACTIVE)
+                                                        @can('view', $service)
+                                                            <a
+                                                                href="{{ route('healthcare-services.show', [legalEntity(), $service->division, $service->id]) }}"
+                                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                            >
+                                                                @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300')
+                                                                {{ __('forms.view') }}
+                                                            </a>
+                                                        @endcan
 
-                                                            @can('update', $service)
-                                                                <a
-                                                                    href="{{ route('healthcare-service.update', [legalEntity(), $service->division, $service->id]) }}"
-                                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                                >
-                                                                    @icon('edit', 'w-5 h-5 text-gray-600 dark:text-gray-300')
-                                                                    {{ __('forms.update') }}
-                                                                </a>
-                                                            @endcan
+                                                        @can('update', $service)
+                                                            <a
+                                                                href="{{ route('healthcare-services.update', [legalEntity(), $service->division, $service->id]) }}"
+                                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                            >
+                                                                @icon('edit', 'w-5 h-5 text-gray-600 dark:text-gray-300')
+                                                                {{ __('forms.update') }}
+                                                            </a>
+                                                        @endcan
 
-                                                            @can('deactivate', $service)
-                                                                <button
-                                                                    type="button"
-                                                                    wire:key="deactivate-{{ $service->id }}"
-                                                                    @click.prevent="
-                                                                        serviceId= {{ $service->getKey() }};
-                                                                        textConfirmation = @js(__('healthcare-services.modals.deactivate.confirmation_text'));
-                                                                        actionType = 'deactivate';
-                                                                        actionTitle = @js(__('healthcare-services.modals.deactivate.title'));
-                                                                        actionButtonText = @js(__('forms.deactivate'));
-                                                                        open = ! open;
-                                                                    "
-                                                                    class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 last-of-type:rounded-b-md hover:bg-red-50 dark:text-red-400 dark:hover:bg-gray-600"
-                                                                >
-                                                                    @icon('delete', 'w-5 h-5 text-red-600 dark:text-red-400')
-                                                                    {{ __('forms.deactivate') }}
-                                                                </button>
-                                                            @endcan
-                                                        @elseif ($service->status === Status::DRAFT)
-                                                            @can('edit', $service)
-                                                                <a
-                                                                    href="{{ route('healthcare-service.edit', [legalEntity(), $service->division->id, $service->id]) }}"
-                                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                                >
-                                                                    @icon('edit', 'w-5 h-5 text-gray-600 dark:text-gray-300')
-                                                                    {{ __('healthcare-services.continue') }}
-                                                                </a>
-                                                            @endcan
+                                                        @can('deactivate', $service)
+                                                            <button
+                                                                type="button"
+                                                                wire:key="deactivate-{{ $service->id }}"
+                                                                @click.prevent="
+                                                                    serviceId= {{ $service->getKey() }};
+                                                                    textConfirmation = @js(__('healthcare-services.modals.deactivate.confirmation_text'));
+                                                                    actionType = 'deactivate';
+                                                                    actionTitle = @js(__('healthcare-services.modals.deactivate.title'));
+                                                                    actionButtonText = @js(__('forms.deactivate'));
+                                                                    open = ! open;
+                                                                "
+                                                                class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 last-of-type:rounded-b-md hover:bg-red-50 dark:text-red-400 dark:hover:bg-gray-600"
+                                                            >
+                                                                @icon('delete', 'w-5 h-5 text-red-600 dark:text-red-400')
+                                                                {{ __('forms.deactivate') }}
+                                                            </button>
+                                                        @endcan
+                                                    @elseif ($service->status === Status::DRAFT)
+                                                        @can('edit', $service)
+                                                            <a
+                                                                href="{{ route('healthcare-services.edit', [legalEntity(), $service->division->id, $service->id]) }}"
+                                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                            >
+                                                                @icon('edit', 'w-5 h-5 text-gray-600 dark:text-gray-300')
+                                                                {{ __('healthcare-services.continue') }}
+                                                            </a>
+                                                        @endcan
 
-                                                            @can('delete', $service)
-                                                                <button
-                                                                    wire:click="delete({{ $service->getKey() }}); toggle()"
-                                                                    @click="openDropdown = false"
-                                                                    type="button"
-                                                                    class="flex cursor-pointer items-center gap-3 py-2 pr-5 pl-4 text-nowrap text-red-500 hover:bg-gray-50 dark:text-red-400 dark:hover:bg-gray-600"
-                                                                >
-                                                                    @icon('delete', 'w-5 h-5 text-red-600 dark:text-red-400')
-                                                                    {{ __('healthcare-services.delete') }}
-                                                                </button>
-                                                            @endcan
-                                                        @else
-                                                            @can('activate', $service)
-                                                                <button
-                                                                    type="button"
-                                                                    wire:key="activate-{{ $service->id }}"
-                                                                    @click.prevent="
-                                                                        serviceId= {{ $service->getKey() }};
-                                                                        textConfirmation = @js(__('healthcare-services.modals.activate.confirmation_text'));
-                                                                        actionType = 'activate';
-                                                                        actionTitle = @js(__('healthcare-services.modals.activate.title'));
-                                                                        actionButtonText = @js(__('forms.activate'));
-                                                                        open = ! open;
-                                                                    "
-                                                                    class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-600 first-of-type:rounded-t-md last-of-type:rounded-b-md hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
-                                                                >
-                                                                    @icon('check-circle', 'w-5 h-5 text-gray-600 dark:text-gray-300')
-                                                                    {{ __('forms.activate') }}
-                                                                </button>
-                                                            @endcan
-                                                        @endif
-                                                    </div>
+                                                        @can('delete', $service)
+                                                            <button
+                                                                wire:click="delete({{ $service->getKey() }}); toggle()"
+                                                                @click="openDropdown = false"
+                                                                type="button"
+                                                                class="flex cursor-pointer items-center gap-3 py-2 pr-5 pl-4 text-nowrap text-red-500 hover:bg-gray-50 dark:text-red-400 dark:hover:bg-gray-600"
+                                                            >
+                                                                @icon('delete', 'w-5 h-5 text-red-600 dark:text-red-400')
+                                                                {{ __('healthcare-services.delete') }}
+                                                            </button>
+                                                        @endcan
+                                                    @else
+                                                        @can('view', $service)
+                                                            <a
+                                                                href="{{ route('healthcare-services.show', [legalEntity(), $service->division, $service->id]) }}"
+                                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-600 first-of-type:rounded-t-md hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                            >
+                                                                @icon('eye', 'w-5 h-5 text-gray-600 dark:text-gray-300')
+                                                                {{ __('forms.view') }}
+                                                            </a>
+                                                        @endcan
+
+                                                        @can('activate', $service)
+                                                            <button
+                                                                type="button"
+                                                                wire:key="activate-{{ $service->id }}"
+                                                                @click.prevent="
+                                                                    serviceId= {{ $service->getKey() }};
+                                                                    textConfirmation = @js(__('healthcare-services.modals.activate.confirmation_text'));
+                                                                    actionType = 'activate';
+                                                                    actionTitle = @js(__('healthcare-services.modals.activate.title'));
+                                                                    actionButtonText = @js(__('forms.activate'));
+                                                                    open = ! open;
+                                                                "
+                                                                class="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-600 first-of-type:rounded-t-md last-of-type:rounded-b-md hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
+                                                            >
+                                                                @icon('check-circle', 'w-5 h-5 text-gray-600 dark:text-gray-300')
+                                                                {{ __('forms.activate') }}
+                                                            </button>
+                                                        @endcan
+                                                    @endif
                                                 </div>
                                             </div>
-                                        @endif
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach

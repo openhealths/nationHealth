@@ -142,7 +142,7 @@
                     </div>
 
                     <x-forms.listbox
-                        :options="$licenses->mapWithKeys(static fn ($license) => [$license->uuid => $license->type->label()])->all()"
+                        :options="$licenses->mapWithKeys(static fn($license) => [$license->uuid => $license->type->label()])->all()"
                         bind="form.licenseId"
                         :label="__('healthcare-services.license')"
                         is-disabled="isDisabled || !isRequired('license')"

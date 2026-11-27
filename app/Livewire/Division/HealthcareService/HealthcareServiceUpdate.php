@@ -95,7 +95,11 @@ class HealthcareServiceUpdate extends Component
             Repository::healthcareService()->save($healthcareServiceData, $this->healthcareService);
 
             Session::flash('success', __('healthcare-services.success.updated'));
-            $this->redirectRoute('healthcare-service.index', [legalEntity()], navigate: true);
+            $this->redirectRoute(
+                'healthcare-services.show',
+                [legalEntity(), $this->healthcareService->divisionId, $this->healthcareService->id],
+                navigate: true,
+            );
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to update healthcare service');
 

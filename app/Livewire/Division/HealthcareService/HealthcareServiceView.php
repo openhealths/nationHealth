@@ -9,6 +9,7 @@ use App\Dto\HealthcareService\Form as FormData;
 use App\Dto\HealthcareService\Model as HealthcareServiceData;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Livewire\Division\HealthcareService\Traits\ChangesStatus;
 use App\Models\Division;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;
@@ -20,6 +21,8 @@ use Throwable;
 
 class HealthcareServiceView extends HealthcareServiceComponent
 {
+    use ChangesStatus;
+
     public function mount(LegalEntity $legalEntity, Division $division, HealthcareService $healthcareService): void
     {
         $this->isDisabled = true;

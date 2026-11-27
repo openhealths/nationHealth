@@ -173,6 +173,12 @@ class HealthcareService extends Request implements EHealthApi
     protected function validateHealthcareService(array $healthcareService): array
     {
         $categoryCode = data_get($healthcareService, 'category.coding.0.code');
+
+        // A code that isn't a string is left to the validator, which rejects it by the category rules
+        if (!is_string($categoryCode)) {
+            $categoryCode = null;
+        }
+
         $validator = Validator::make($healthcareService, $this->validationRules($categoryCode));
 
         if ($validator->fails()) {
@@ -202,7 +208,7 @@ class HealthcareService extends Request implements EHealthApi
             'category.coding.*.code' => [
                 'required_with:category.coding',
                 'string',
-                new InDictionary('HEALTHCARE_SERVICE_CATEGORIES')
+                new InDictionary('HEALTHCARE_SERVICE_CATEGORIES'),
             ],
             'category.coding.*.system' => 'required_with:category.coding|string',
             'category.text' => 'nullable|string',
@@ -234,11 +240,11 @@ class HealthcareService extends Request implements EHealthApi
             'type.coding.*.code' => [
                 'required_with:type.coding.*',
                 'string',
-                new InDictionary("HEALTHCARE_SERVICE_{$categoryCode}_TYPES")
+                new InDictionary("HEALTHCARE_SERVICE_{$categoryCode}_TYPES"),
             ],
             'type.text' => 'nullable|string',
             'updated_at' => 'required|date',
-            'updated_by' => 'required|uuid'
+            'updated_by' => 'required|uuid',
         ];
     }
 }

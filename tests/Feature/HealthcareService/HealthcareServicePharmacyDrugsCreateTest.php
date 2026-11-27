@@ -29,10 +29,10 @@ use Tests\TestCase;
 class HealthcareServicePharmacyDrugsCreateTest extends TestCase
 {
     use MocksBasicDictionaries;
+    use MocksBasicDictionaries;
     use PreparesHealthcareServiceTests;
     use RefreshInstalledDatabase;
     use WithFaker;
-    use MocksBasicDictionaries;
 
     /**
      * Outpatient legal entity the user works in.
@@ -73,7 +73,7 @@ class HealthcareServicePharmacyDrugsCreateTest extends TestCase
             'expired' => [['expiry_date' => '2020-01-01']],
             'inactive' => [['is_active' => false]],
             'of another type' => [['type' => LicenseType::MSP]],
-            'of another legal entity' => [['legal_entity_id' => static fn (): int => LegalEntity::factory()->create()->id]]
+            'of another legal entity' => [['legal_entity_id' => static fn(): int => LegalEntity::factory()->create()->id]],
         ];
     }
 
@@ -93,14 +93,14 @@ class HealthcareServicePharmacyDrugsCreateTest extends TestCase
                 'type' => ['coding' => [['system' => 'HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES', 'code' => 'SALE']]],
                 'speciality_type' => null,
                 'providing_condition' => null,
-                'license_id' => $this->license->uuid
-            ])
+                'license_id' => $this->license->uuid,
+            ]),
         ]);
 
         $this->filledForm()
             ->call('create')
             ->assertHasNoErrors()
-            ->assertRedirectToRoute('healthcare-service.index', [$this->legalEntity, 'division' => $this->division->id]);
+            ->assertRedirectToRoute('healthcare-services.index', [$this->legalEntity, 'division' => $this->division->id]);
 
         $this->assertCount(1, $eHealth->receivedRequests);
         $payload = $eHealth->receivedRequests[0]->data();
