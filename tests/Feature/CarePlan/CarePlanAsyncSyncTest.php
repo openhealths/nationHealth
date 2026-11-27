@@ -87,11 +87,14 @@ class CarePlanAsyncSyncTest extends TestCase
 
     public function test_index_fetches_one_page_for_the_first_patient_and_queues_other_patients_with_their_context(): void
     {
-        ['person' => $person, 'legalEntity' => $legalEntity] = $this->compositionFixture(scopes: ['care_plan:read']);
+        ['person' => $person, 'legalEntity' => $legalEntity, 'user' => $user] = $this->compositionFixture(scopes: ['care_plan:read']);
         $other = Person::create(['uuid' => (string) Str::uuid(), 'birth_date' => '2000-01-01', 'gender' => 'MALE']);
         foreach ([$person, $other] as $patient) {
             CarePlan::forceCreate(['uuid' => (string) Str::uuid(), 'personId' => $patient->id, 'legalEntityId' => $legalEntity->id, 'status' => 'active', 'title' => 'Existing plan']);
         }
+        $repository = Mockery::mock(CarePlanRepository::class)->makePartial();
+        $repository->shouldReceive('patientsForSync')->once()->with($legalEntity->id, $user)->andReturn(new Collection([$person, $other]));
+        $this->instance(CarePlanRepository::class, $repository);
         $summary = $this->summary();
         $this->firstPage($person, [$summary], true);
 

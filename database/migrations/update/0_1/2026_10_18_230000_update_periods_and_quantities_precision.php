@@ -14,7 +14,8 @@ return new class extends Migration
             $table->timestampTz('start', 6)->nullable()->change();
             $table->timestampTz('end', 6)->nullable()->change();
         });
-        Schema::table('quantities', static fn (Blueprint $table) => $table->decimal('value', 24, 10)->change());
+        Schema::table('quantities', static fn (Blueprint $table) => $table->decimal('value', 24, 10)
+            ->comment('Numerical value (with implicit precision)')->change());
     }
 
     public function down(): void

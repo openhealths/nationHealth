@@ -55,8 +55,16 @@ return new class extends Migration
      * @param  array  $values
      * @return void
      */
-    private function setStatusConstraint(array $values): void
+    protected function setStatusConstraint(array $values): void
     {
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            Schema::table('specimens', static function (Blueprint $table) use ($values): void {
+                $table->enum('status', $values)->change();
+            });
+
+            return;
+        }
+
         DB::statement('ALTER TABLE specimens DROP CONSTRAINT IF EXISTS specimens_status_check');
 
         $list = implode("', '", $values);

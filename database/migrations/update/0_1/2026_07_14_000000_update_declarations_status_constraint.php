@@ -23,6 +23,19 @@ return new class extends Migration
             return;
         }
 
+        if (DB::table('declarations')->whereNotIn('status', [...Status::values(), 'REJECTED', 'CANCELLED'])->exists()) {
+            throw new RuntimeException('Unsupported legacy declaration statuses; resolve them before updating the status constraint.');
+        }
+
+        // The old constraint rejects the normalized values. Preserve the strings while converting them.
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            Schema::table('declarations', static function (Blueprint $table): void {
+                $table->string('status')->change();
+            });
+        } else {
+            DB::statement('ALTER TABLE declarations DROP CONSTRAINT IF EXISTS declarations_status_check');
+        }
+
         DB::table('declarations')->where('status', 'REJECTED')->update(['status' => Status::REJECTED->value]);
         DB::table('declarations')->where('status', 'CANCELLED')->update(['status' => Status::CLOSED->value]);
 
@@ -50,11 +63,17 @@ return new class extends Migration
      * @param  array<int, string>  $values
      * @return void
      */
-    private function setStatusConstraint(array $values): void
+    protected function setStatusConstraint(array $values): void
     {
-        Schema::table('declarations', static function (Blueprint $table): void {
-            $table->dropForeign('declarations_status_check');
-        });
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            Schema::table('declarations', static function (Blueprint $table) use ($values): void {
+                $table->enum('status', $values)->change();
+            });
+
+            return;
+        }
+
+        DB::statement('ALTER TABLE declarations DROP CONSTRAINT IF EXISTS declarations_status_check');
 
         $list = implode("', '", $values);
 

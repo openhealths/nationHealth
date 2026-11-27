@@ -33,6 +33,8 @@ return new class extends Migration
             $table->string('explanatory_letter')->nullable();
             $table->foreignId('site_id')->nullable()->constrained('codeable_concepts');
             $table->foreignId('route_id')->nullable()->constrained('codeable_concepts');
+            $table->timestamp('ehealth_inserted_at')->nullable();
+            $table->timestamp('ehealth_updated_at')->nullable();
             $table->timestamps();
         });
 

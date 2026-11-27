@@ -44,8 +44,16 @@ return new class extends Migration
      * @param  array<int, string>  $values
      * @return void
      */
-    private function setStatusConstraint(array $values): void
+    protected function setStatusConstraint(array $values): void
     {
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            Schema::table('prepersons', static function (Blueprint $table) use ($values): void {
+                $table->enum('status', $values)->nullable()->change();
+            });
+
+            return;
+        }
+
         Schema::table('prepersons', static function (Blueprint $table): void {
             $table->dropForeign('prepersons_status_check');
         });
