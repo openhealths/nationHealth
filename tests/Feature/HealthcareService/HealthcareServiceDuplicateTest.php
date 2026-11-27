@@ -14,9 +14,9 @@ use App\Models\LegalEntity;
 use App\Models\License;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\Concerns\MocksBasicDictionaries;
+use Tests\Concerns\RefreshInstalledDatabase;
 use Tests\TestCase;
 
 /**
@@ -28,8 +28,9 @@ use Tests\TestCase;
  */
 class HealthcareServiceDuplicateTest extends TestCase
 {
-    use RefreshDatabase;
     use MocksBasicDictionaries;
+    use PreparesHealthcareServiceTests;
+    use RefreshInstalledDatabase;
 
     /**
      * Outpatient legal entity the user works in.
@@ -123,26 +124,8 @@ class HealthcareServiceDuplicateTest extends TestCase
         $this->legalEntity = LegalEntity::factory()->ofType(LegalEntity::TYPE_OUTPATIENT)->create();
         $this->division = Division::factory()->for($this->legalEntity)->create(['type' => DivisionType::TYPE_LICENSED_UNIT->value]);
 
-        $this->app->instance('legalEntity', $this->legalEntity);
-        setPermissionsTeamId($this->legalEntity->id);
-
-        $this->owner = User::factory()->create();
-        $this->owner->assignRole(Role::OWNER);
+        $this->owner = $this->userWithRole($this->legalEntity, Role::OWNER);
 
         $this->mockBasicDictionaries();
-    }
-
-    /**
-     * Build the schema the way a fresh installation does: install migrations hold the full current schema, update
-     * migrations are only for upgrading existing databases.
-     *
-     * @return array
-     */
-    protected function migrateFreshUsing(): array
-    {
-        return [
-            '--path' => database_path('migrations/install'),
-            '--realpath' => true
-        ];
     }
 }

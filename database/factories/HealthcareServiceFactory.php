@@ -37,4 +37,35 @@ class HealthcareServiceFactory extends Factory
             'ehealth_updated_by' => $this->faker->uuid()
         ];
     }
+
+    /**
+     * Service deactivated in eHealth.
+     *
+     * @return static
+     */
+    public function inactive(): static
+    {
+        return $this->state([
+            'status' => Status::INACTIVE,
+            'is_active' => false
+        ]);
+    }
+
+    /**
+     * Draft saved locally and not sent to eHealth yet, so it has no eHealth ID and no eHealth history.
+     *
+     * @return static
+     */
+    public function draft(): static
+    {
+        return $this->state([
+            'uuid' => null,
+            'status' => Status::DRAFT,
+            'is_active' => false,
+            'ehealth_inserted_at' => null,
+            'ehealth_inserted_by' => null,
+            'ehealth_updated_at' => null,
+            'ehealth_updated_by' => null
+        ]);
+    }
 }

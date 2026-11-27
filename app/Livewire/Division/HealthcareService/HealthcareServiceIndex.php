@@ -261,7 +261,10 @@ class HealthcareServiceIndex extends Component
         }
 
         try {
-            $query = $this->divisionUuid ? ['division_id' => $this->divisionUuid] : [];
+            // The sync ends as completed for the whole legal entity, so only a completed one can be narrowed to the division
+            $query = $this->divisionUuid && $this->syncStatus === JobStatus::COMPLETED->value
+                ? ['division_id' => $this->divisionUuid]
+                : [];
 
             $response = EHealth::healthcareService()->getMany($query);
         } catch (EHealthException|EHealthConnectionException $exception) {
@@ -286,7 +289,7 @@ class HealthcareServiceIndex extends Component
         if ($response->isNotLast()) {
             try {
                 $user->notify(new SyncNotification('hcs', 'started'));
-                $this->dispatchNextSyncJobs($user, $token);
+                $this->dispatchNextSyncJobs($user, $token, $query);
                 Session::flash('success', __('healthcare-services.success.sync_started'));
             } catch (Throwable $exception) {
                 Log::error('Failed to dispatch HealthcareServiceSync batch', ['exception' => $exception]);
@@ -366,10 +369,11 @@ class HealthcareServiceIndex extends Component
      *
      * @param  User  $user
      * @param  string  $token
+     * @param  array  $query  The filter of the first page, which the next pages keep
      * @return void
      * @throws Throwable
      */
-    protected function dispatchNextSyncJobs(User $user, string $token): void
+    protected function dispatchNextSyncJobs(User $user, string $token, array $query): void
     {
         // Laravel restores the callback on every batch read. Resolve its recipient only if a job fails.
         $userId = $user->getKey();
@@ -379,6 +383,7 @@ class HealthcareServiceIndex extends Component
             ->withOption('token', Crypt::encryptString($token))
             ->withOption('user', $user->withoutRelations())
             ->withOption('sync_entity', LegalEntity::ENTITY_HEALTHCARE_SERVICE)
+            ->withOption('query', $query)
             ->catch(static function (Batch $batch, Throwable $exception) use ($userId): void {
                 Log::error('Healthcare Service sync batch failed.', [
                     'batch_id' => $batch->id,

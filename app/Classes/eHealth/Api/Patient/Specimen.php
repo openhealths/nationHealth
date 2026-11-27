@@ -24,7 +24,7 @@ class Specimen extends PatientApiBase
      *
      * @param  string  $patientId
      * @param array{
-     *     status?: string,
+     *     status?: value-of<Status>,
      *     type?: string,
      *     registered_by?: string,
      *     collected_from?: string,

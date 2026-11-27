@@ -15,6 +15,7 @@ use App\Enums\Person\ConfidantPersonRelationshipRequestAction;
 use App\Enums\Person\ConfidantPersonRelationshipRequestStatus;
 use App\Enums\Person\MergedPersonStatus;
 use App\Enums\Person\RelationType;
+use App\Enums\Person\Status;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
@@ -91,7 +92,7 @@ class Person extends Request
      * Also, this endpoint shows all the persons who enter the whole chain of merges to this person.
      *
      * @param  string  $uuid
-     * @param  array{id: string, status?: MergedPersonStatus, page?: int, page_size?: int}  $query
+     * @param  array{id: string, status?: value-of<Status>, page?: int, page_size?: int}  $query
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
@@ -274,7 +275,7 @@ class Person extends Request
      * Get list of previously created Confidant Person relationship requests.
      *
      * @param  string  $id
-     * @param  array{status?: ConfidantPersonRelationshipRequestStatus::class, page?: int, page_size?: int}  $query
+     * @param  array{status?: value-of<ConfidantPersonRelationshipRequestStatus>, page?: int, page_size?: int}  $query
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *
@@ -294,7 +295,7 @@ class Person extends Request
      *
      * @param  string  $id
      * @param  string  $confidantPersonRelationshipRequestId
-     * @param  array{status?: ConfidantPersonRelationshipRequestStatus::class, page?: int, page_size?: int}  $query
+     * @param  array{status?: value-of<ConfidantPersonRelationshipRequestStatus>, page?: int, page_size?: int}  $query
      * @return PromiseInterface|EHealthResponse
      * @throws EHealthConnectionException|EHealthValidationException|EHealthResponseException
      *

@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
-use App\Core\Arr;
 use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\DeclarationErrorTranslator;
 use App\Contracts\ApiErrorTranslator;
+use App\Core\Arr;
+use App\Enums\Declaration\Status;
+use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
 use GuzzleHttp\Promise\PromiseInterface;
-use App\Exceptions\EHealth\EHealthConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
@@ -32,7 +33,7 @@ class Declaration extends Request
      *     employee_id?: string,
      *     legal_entity_id?: string,
      *     declaration_number?: string,
-     *     status: string,
+     *     status: value-of<Status>,
      *     reason?: string,
      *     page?: int,
      *     page_size?: int

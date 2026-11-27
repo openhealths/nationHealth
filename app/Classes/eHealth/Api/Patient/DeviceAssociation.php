@@ -28,7 +28,7 @@ class DeviceAssociation extends PatientApiBase
      *     body_site?: string,
      *     encounter_id?: string,
      *     episode_id?: string,
-     *     status?: string,
+     *     status?: value-of<Status>,
      *     recorder?: string,
      *     recorder_legal_entity_id?: string,
      *     association_date_from?: string,

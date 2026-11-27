@@ -110,7 +110,7 @@ class Episode extends PatientApiBase
      *     period_from?: string,
      *     period_to?: string,
      *     code?: string,
-     *     status?: string,
+     *     status?: value-of<Status>,
      *     managing_organization_id?: string,
      *     page?: int,
      *     page_size?: int

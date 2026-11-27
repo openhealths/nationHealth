@@ -19,6 +19,7 @@ use App\Rules\InDictionary;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class HealthcareService extends Request implements EHealthApi
 {
@@ -139,46 +140,55 @@ class HealthcareService extends Request implements EHealthApi
 
     /**
      * Validate healthcare service response (get by id, create, update, activate, deactivate).
+     *
+     * @param  EHealthResponse  $response
+     * @return HealthcareServiceDetails
+     * @throws ValidationException
      */
     protected function validateResponse(EHealthResponse $response): HealthcareServiceDetails
     {
-        $validator = Validator::make($response->getData(), $this->validationRules());
-
-        if ($validator->fails()) {
-            Log::channel('e_health_errors')->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
-        }
-
-        return new HealthcareServiceDetails($validator->validate());
+        return new HealthcareServiceDetails($this->validateHealthcareService($response->getData()));
     }
 
     /**
-     * Validate list of healthcare services; each item has the same shape as a single healthcare service response.
+     * Validate list of healthcare services. Each item is validated as a single healthcare service, so the rules
+     * that depend on other fields of the item compare it with its own fields.
      *
      * @param  EHealthResponse  $response
      * @return HealthcareServiceGetMany
+     * @throws ValidationException
      */
     protected function validateMany(EHealthResponse $response): HealthcareServiceGetMany
     {
-        // Add *. to every rule
-        $rules = collect($this->validationRules())
-            ->mapWithKeys(static fn (string|array $rule, string $key) => ["*.$key" => $rule])
-            ->toArray();
+        return new HealthcareServiceGetMany(array_map($this->validateHealthcareService(...), $response->getData()));
+    }
 
-        $validator = Validator::make($response->getData(), $rules);
+    /**
+     * Validate a healthcare service, checking its type against the types dictionary of its category.
+     *
+     * @param  array  $healthcareService
+     * @return array
+     * @throws ValidationException
+     */
+    protected function validateHealthcareService(array $healthcareService): array
+    {
+        $categoryCode = data_get($healthcareService, 'category.coding.0.code');
+        $validator = Validator::make($healthcareService, $this->validationRules($categoryCode));
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
         }
 
-        return new HealthcareServiceGetMany($validator->validate());
+        return $validator->validate();
     }
 
     /**
      * List of validation rules for healthcare service.
      *
+     * @param  string|null  $categoryCode  Category of the healthcare service, which sets the dictionary of its type
      * @return array
      */
-    protected function validationRules(): array
+    protected function validationRules(?string $categoryCode): array
     {
         return [
             'available_time' => 'array',
@@ -224,7 +234,7 @@ class HealthcareService extends Request implements EHealthApi
             'type.coding.*.code' => [
                 'required_with:type.coding.*',
                 'string',
-                new InDictionary('HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES')
+                new InDictionary("HEALTHCARE_SERVICE_{$categoryCode}_TYPES")
             ],
             'type.text' => 'nullable|string',
             'updated_at' => 'required|date',

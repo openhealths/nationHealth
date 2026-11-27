@@ -12,11 +12,11 @@ use App\Models\HealthcareService;
 use App\Models\LegalEntity;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\Concerns\MocksBasicDictionaries;
+use Tests\Concerns\RefreshInstalledDatabase;
 use Tests\TestCase;
 
 /**
@@ -28,7 +28,9 @@ use Tests\TestCase;
  */
 class HealthcareServiceCreateTest extends TestCase
 {
-    use RefreshDatabase;
+    use MocksBasicDictionaries;
+    use PreparesHealthcareServiceTests;
+    use RefreshInstalledDatabase;
     use WithFaker;
     use MocksBasicDictionaries;
 
@@ -61,12 +63,12 @@ class HealthcareServiceCreateTest extends TestCase
     public function test_service_is_sent_to_ehealth_and_stored_as_returned(): void
     {
         $uuid = $this->faker->uuid();
-        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService(['id' => $uuid])]);
+        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService($this->legalEntity, $this->division, ['id' => $uuid])]);
 
         $this->filledForm()
             ->call('create')
             ->assertHasNoErrors()
-            ->assertRedirectToRoute('healthcare-service.index', [$this->legalEntity, $this->division->id]);
+            ->assertRedirectToRoute('healthcare-service.index', [$this->legalEntity, 'division' => $this->division->id]);
 
         $this->assertCount(1, $eHealth->receivedRequests);
         $request = $eHealth->receivedRequests[0];
@@ -134,7 +136,7 @@ class HealthcareServiceCreateTest extends TestCase
      */
     public function test_invalid_ehealth_response_stores_nothing(): void
     {
-        $invalidHealthcareService = $this->ehealthHealthcareService();
+        $invalidHealthcareService = $this->ehealthHealthcareService($this->legalEntity, $this->division);
         unset($invalidHealthcareService['status']);
 
         HealthcareServiceApiFake::respond(201, ['data' => $invalidHealthcareService]);
@@ -156,7 +158,7 @@ class HealthcareServiceCreateTest extends TestCase
      */
     public function test_invalid_form_is_not_sent_to_ehealth(): void
     {
-        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService()]);
+        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService($this->legalEntity, $this->division)]);
 
         Livewire::actingAs($this->owner)
             ->test(HealthcareServiceCreate::class, ['legalEntity' => $this->legalEntity, 'division' => $this->division])
@@ -176,7 +178,7 @@ class HealthcareServiceCreateTest extends TestCase
      */
     public function test_service_without_speciality_and_providing_condition_is_not_sent(): void
     {
-        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService()]);
+        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService($this->legalEntity, $this->division)]);
 
         Livewire::actingAs($this->owner)
             ->test(HealthcareServiceCreate::class, ['legalEntity' => $this->legalEntity, 'division' => $this->division])
@@ -196,11 +198,10 @@ class HealthcareServiceCreateTest extends TestCase
      */
     public function test_user_without_permission_cannot_create_service(): void
     {
-        $doctor = User::factory()->create();
-        $doctor->assignRole(Role::DOCTOR);
+        $doctor = $this->userWithRole($this->legalEntity, Role::DOCTOR);
         $this->assertFalse($doctor->can('healthcare_service:write'));
 
-        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService()]);
+        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService($this->legalEntity, $this->division)]);
 
         $createPage = $this->filledForm($doctor);
         $this->travel(1)->seconds();
@@ -215,8 +216,7 @@ class HealthcareServiceCreateTest extends TestCase
 
     /**
      * The schedules and the comment go to eHealth in its format: snake_case keys, no empty times for an all day entry,
-     * not available periods in UTC. The service is stored with them, and the periods read back in local time as
-     * the user entered them.
+     * not available periods in UTC. The service is stored with them as eHealth returns them.
      *
      * @return void
      */
@@ -250,7 +250,7 @@ class HealthcareServiceCreateTest extends TestCase
         ];
 
         $eHealth = HealthcareServiceApiFake::respond(201, [
-            'data' => $this->ehealthHealthcareService([
+            'data' => $this->ehealthHealthcareService($this->legalEntity, $this->division, [
                 'id' => $uuid,
                 'comment' => $comment,
                 'available_time' => $ehealthAvailableTime,
@@ -290,7 +290,7 @@ class HealthcareServiceCreateTest extends TestCase
     public function test_not_available_period_ending_before_it_starts_is_not_sent(): void
     {
         $periodDate = CarbonImmutable::create(2026, 12, 1)->format(config('app.date_format'));
-        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService()]);
+        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService($this->legalEntity, $this->division)]);
 
         $this->filledForm()
             ->set('form.notAvailable', [
@@ -316,13 +316,13 @@ class HealthcareServiceCreateTest extends TestCase
     public function test_draft_is_stored_locally_without_sending_to_ehealth(): void
     {
         $comment = $this->faker->sentence();
-        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService()]);
+        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService($this->legalEntity, $this->division)]);
 
         $this->filledForm()
             ->set('form.comment', $comment)
             ->call('createLocally')
             ->assertHasNoErrors()
-            ->assertRedirectToRoute('healthcare-service.index', [$this->legalEntity, $this->division->id]);
+            ->assertRedirectToRoute('healthcare-service.index', [$this->legalEntity, 'division' => $this->division->id]);
 
         $this->assertSame([], $eHealth->receivedRequests);
 
@@ -363,8 +363,7 @@ class HealthcareServiceCreateTest extends TestCase
      */
     public function test_user_without_permission_cannot_save_draft(): void
     {
-        $doctor = User::factory()->create();
-        $doctor->assignRole(Role::DOCTOR);
+        $doctor = $this->userWithRole($this->legalEntity, Role::DOCTOR);
         $this->assertFalse($doctor->can('healthcare_service:write'));
 
         $createPage = $this->filledForm($doctor);
@@ -389,27 +388,9 @@ class HealthcareServiceCreateTest extends TestCase
         $this->legalEntity = LegalEntity::factory()->create();
         $this->division = Division::factory()->for($this->legalEntity)->create();
 
-        $this->app->instance('legalEntity', $this->legalEntity);
-        setPermissionsTeamId($this->legalEntity->id);
-
-        $this->owner = User::factory()->create();
-        $this->owner->assignRole(Role::OWNER);
+        $this->owner = $this->userWithRole($this->legalEntity, Role::OWNER);
 
         $this->mockBasicDictionaries();
-    }
-
-    /**
-     * Build the schema the way a fresh installation does: install migrations hold the full current schema, update
-     * migrations are only for upgrading existing databases.
-     *
-     * @return array
-     */
-    protected function migrateFreshUsing(): array
-    {
-        return [
-            '--path' => database_path('migrations/install'),
-            '--realpath' => true
-        ];
     }
 
     /**
@@ -426,31 +407,5 @@ class HealthcareServiceCreateTest extends TestCase
             ->set('form.category.coding.0.code', 'MSP')
             ->set('form.specialityType', 'FAMILY_DOCTOR')
             ->set('form.providingCondition', 'OUTPATIENT');
-    }
-
-    /**
-     * Healthcare service in the shape the eHealth "create healthcare service" endpoint returns it.
-     *
-     * @param  array  $overrides
-     * @return array
-     */
-    private function ehealthHealthcareService(array $overrides = []): array
-    {
-        return array_replace([
-            'id' => $this->faker->uuid(),
-            'division_id' => $this->division->uuid,
-            'legal_entity_id' => $this->legalEntity->uuid,
-            'category' => ['coding' => [['system' => 'HEALTHCARE_SERVICE_CATEGORIES', 'code' => 'MSP']]],
-            'speciality_type' => 'FAMILY_DOCTOR',
-            'providing_condition' => 'OUTPATIENT',
-            'status' => Status::ACTIVE->value,
-            'is_active' => true,
-            'available_time' => [],
-            'not_available' => [],
-            'inserted_at' => '2026-10-30T10:00:00.000000Z',
-            'inserted_by' => $this->faker->uuid(),
-            'updated_at' => '2026-10-30T10:00:00.000000Z',
-            'updated_by' => $this->faker->uuid()
-        ], $overrides);
     }
 }

@@ -50,7 +50,7 @@ class HealthcareServiceEdit extends HealthcareServiceComponent
             Repository::healthcareService()->save($healthcareServiceData, $this->healthcareService);
 
             Session::flash('success', __('healthcare-services.success.created'));
-            $this->redirectRoute('healthcare-service.index', [legalEntity(), $this->divisionId], navigate: true);
+            $this->redirectRoute('healthcare-service.index', [legalEntity(), 'division' => $this->divisionId], navigate: true);
         } catch (Throwable $exception) {
             $this->handleDatabaseErrors($exception, 'Failed to store healthcare service');
 

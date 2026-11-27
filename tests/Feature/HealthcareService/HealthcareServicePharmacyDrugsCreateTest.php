@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\HealthcareService;
 
 use App\Enums\Division\Type as DivisionType;
-use App\Enums\HealthcareService\Status;
 use App\Enums\License\Type as LicenseType;
 use App\Enums\User\Role;
 use App\Livewire\Division\HealthcareService\HealthcareServiceCreate;
@@ -14,12 +13,12 @@ use App\Models\HealthcareService;
 use App\Models\LegalEntity;
 use App\Models\License;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\MocksBasicDictionaries;
+use Tests\Concerns\RefreshInstalledDatabase;
 use Tests\TestCase;
 
 /**
@@ -29,7 +28,9 @@ use Tests\TestCase;
  */
 class HealthcareServicePharmacyDrugsCreateTest extends TestCase
 {
-    use RefreshDatabase;
+    use MocksBasicDictionaries;
+    use PreparesHealthcareServiceTests;
+    use RefreshInstalledDatabase;
     use WithFaker;
     use MocksBasicDictionaries;
 
@@ -85,12 +86,21 @@ class HealthcareServicePharmacyDrugsCreateTest extends TestCase
     public function test_service_is_sent_with_type_and_license_and_stored(): void
     {
         $uuid = $this->faker->uuid();
-        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService(['id' => $uuid])]);
+        $eHealth = HealthcareServiceApiFake::respond(201, [
+            'data' => $this->ehealthHealthcareService($this->legalEntity, $this->division, [
+                'id' => $uuid,
+                'category' => ['coding' => [['system' => 'HEALTHCARE_SERVICE_CATEGORIES', 'code' => 'PHARMACY_DRUGS']]],
+                'type' => ['coding' => [['system' => 'HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES', 'code' => 'SALE']]],
+                'speciality_type' => null,
+                'providing_condition' => null,
+                'license_id' => $this->license->uuid
+            ])
+        ]);
 
         $this->filledForm()
             ->call('create')
             ->assertHasNoErrors()
-            ->assertRedirectToRoute('healthcare-service.index', [$this->legalEntity, $this->division->id]);
+            ->assertRedirectToRoute('healthcare-service.index', [$this->legalEntity, 'division' => $this->division->id]);
 
         $this->assertCount(1, $eHealth->receivedRequests);
         $payload = $eHealth->receivedRequests[0]->data();
@@ -115,7 +125,7 @@ class HealthcareServicePharmacyDrugsCreateTest extends TestCase
      */
     public function test_service_without_type_and_license_is_not_sent(): void
     {
-        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService()]);
+        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService($this->legalEntity, $this->division)]);
 
         Livewire::actingAs($this->owner)
             ->test(HealthcareServiceCreate::class, ['legalEntity' => $this->legalEntity, 'division' => $this->division])
@@ -141,7 +151,7 @@ class HealthcareServicePharmacyDrugsCreateTest extends TestCase
             ->for($this->legalEntity)
             ->create(['type' => LicenseType::PHARMACY_DRUGS, ...$licenseAttributes]);
 
-        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService()]);
+        $eHealth = HealthcareServiceApiFake::respond(201, ['data' => $this->ehealthHealthcareService($this->legalEntity, $this->division)]);
 
         $this->filledForm()
             ->set('form.licenseId', $license->uuid)
@@ -167,27 +177,9 @@ class HealthcareServicePharmacyDrugsCreateTest extends TestCase
         $this->division = Division::factory()->for($this->legalEntity)->create(['type' => DivisionType::TYPE_LICENSED_UNIT->value]);
         $this->license = License::factory()->for($this->legalEntity)->create(['type' => LicenseType::PHARMACY_DRUGS]);
 
-        $this->app->instance('legalEntity', $this->legalEntity);
-        setPermissionsTeamId($this->legalEntity->id);
-
-        $this->owner = User::factory()->create();
-        $this->owner->assignRole(Role::OWNER);
+        $this->owner = $this->userWithRole($this->legalEntity, Role::OWNER);
 
         $this->mockBasicDictionaries();
-    }
-
-    /**
-     * Build the schema the way a fresh installation does: install migrations hold the full current schema, update
-     * migrations are only for upgrading existing databases.
-     *
-     * @return array
-     */
-    protected function migrateFreshUsing(): array
-    {
-        return [
-            '--path' => database_path('migrations/install'),
-            '--realpath' => true
-        ];
     }
 
     /**
@@ -202,31 +194,5 @@ class HealthcareServicePharmacyDrugsCreateTest extends TestCase
             ->set('form.category.coding.0.code', 'PHARMACY_DRUGS')
             ->set('form.type.coding.0.code', 'SALE')
             ->set('form.licenseId', $this->license->uuid);
-    }
-
-    /**
-     * Pharmacy drugs healthcare service in the shape the eHealth "create healthcare service" endpoint returns it.
-     *
-     * @param  array  $overrides
-     * @return array
-     */
-    private function ehealthHealthcareService(array $overrides = []): array
-    {
-        return array_replace([
-            'id' => $this->faker->uuid(),
-            'division_id' => $this->division->uuid,
-            'legal_entity_id' => $this->legalEntity->uuid,
-            'category' => ['coding' => [['system' => 'HEALTHCARE_SERVICE_CATEGORIES', 'code' => 'PHARMACY_DRUGS']]],
-            'type' => ['coding' => [['system' => 'HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES', 'code' => 'SALE']]],
-            'license_id' => $this->license->uuid,
-            'status' => Status::ACTIVE->value,
-            'is_active' => true,
-            'available_time' => [],
-            'not_available' => [],
-            'inserted_at' => '2026-10-30T10:00:00.000000Z',
-            'inserted_by' => $this->faker->uuid(),
-            'updated_at' => '2026-10-30T10:00:00.000000Z',
-            'updated_by' => $this->faker->uuid()
-        ], $overrides);
     }
 }

@@ -4,38 +4,38 @@ declare(strict_types=1);
 
 namespace App\Traits;
 
-use stdClass;
-use Closure;
-use Exception;
-use App\Models\User;
 use App\Core\EHealthJob;
 use App\Enums\JobStatus;
-use App\Models\LegalEntity;
-use App\Models\EhealthLink;
-use App\Models\Declaration;
-use App\Models\Relations\Party;
 use App\Jobs\ConfidantPersonSync;
-use App\Models\Employee\Employee;
 use App\Jobs\ConnectionClientSync;
-use App\Models\DeclarationRequest;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Collection;
-use App\Jobs\PersonAuthMethodSync;
-use Illuminate\Support\Facades\Bus;
-use App\Jobs\EmployeeDetailsUpsert;
-use Illuminate\Bus\BatchRepository;
-use App\Jobs\DeclarationDetailsSync;
-use App\Models\Employee\EmployeeRequest;
-use App\Models\Contracts\ContractRequest;
-use App\Models\Relations\ConfidantPerson;
 use App\Jobs\ContractRequestDetailsUpsert;
-use App\Jobs\EmployeeRequestDetailsUpsert;
-use App\Jobs\RemoteEHealthLinksProcessing;
+use App\Jobs\DeclarationDetailsSync;
 use App\Jobs\DeclarationRequestDetailsSync;
+use App\Jobs\EmployeeDetailsUpsert;
+use App\Jobs\EmployeeRequestDetailsUpsert;
 use App\Jobs\PartyVerificationDetailsUpsert;
+use App\Jobs\PersonAuthMethodSync;
+use App\Jobs\RemoteEHealthLinksProcessing;
 use App\Models\Connection as ConnectionModel;
+use App\Models\Contracts\ContractRequest;
+use App\Models\Declaration;
+use App\Models\DeclarationRequest;
 use App\Models\EhealthJob as EHealthJobModel;
+use App\Models\EhealthLink;
+use App\Models\Employee\Employee;
+use App\Models\Employee\EmployeeRequest;
+use App\Models\LegalEntity;
 use App\Models\Relations\AuthenticationMethod;
+use App\Models\Relations\ConfidantPerson;
+use App\Models\Relations\Party;
+use App\Models\User;
+use Closure;
+use Exception;
+use Illuminate\Bus\BatchRepository;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
+use stdClass;
 
 /**
  * Trait for querying batches by legal_entity_id
@@ -230,8 +230,8 @@ trait BatchLegalEntityQueries
 
         $oldOptions = app(BatchRepository::class)->find($batch->id)?->options ?? [];
 
-        // The patient context is read by the patient jobs from the batch options, so it must survive the restart
-        foreach (['sync_entity', 'patient_uuid', 'person_id', 'preperson_id', 'has_patient_access'] as $option) {
+        // The jobs read the list filter and the patient context from the batch options, so they must survive the restart
+        foreach (['sync_entity', 'query', 'patient_uuid', 'person_id', 'preperson_id', 'has_patient_access'] as $option) {
             if (($oldOptions[$option] ?? null) !== null) {
                 $batchOptions->withOption($option, $oldOptions[$option]);
             }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\JobStatus;
 use App\Enums\Status;
 use App\Models\LegalEntity;
 use App\Models\LegalEntityType;
@@ -42,6 +43,20 @@ class LegalEntityFactory extends Factory
     {
         return $this->state([
             'legal_entity_type_id' => static fn (): int => LegalEntityType::whereName($typeName)->value('id')
+        ]);
+    }
+
+    /**
+     * Legal entity whose first synchronization with eHealth and the synchronization of its divisions are completed,
+     * so the synchronization of its healthcare services may start.
+     *
+     * @return static
+     */
+    public function synced(): static
+    {
+        return $this->state([
+            'sync_status' => JobStatus::COMPLETED->value,
+            'division_sync_status' => JobStatus::COMPLETED->value
         ]);
     }
 }

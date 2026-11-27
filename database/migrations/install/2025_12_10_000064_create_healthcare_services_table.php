@@ -31,9 +31,9 @@ return new class extends Migration
             $table->jsonb('not_available')->nullable();
             $table->boolean('is_active')->default(false);
             $table->jsonb('licensed_healthcare_service')->nullable();
-            $table->date('ehealth_inserted_at')->nullable();
+            $table->timestamp('ehealth_inserted_at')->nullable();
             $table->string('ehealth_inserted_by')->nullable();
-            $table->date('ehealth_updated_at')->nullable();
+            $table->timestamp('ehealth_updated_at')->nullable();
             $table->string('ehealth_updated_by')->nullable();
             $table->timestamps();
         });

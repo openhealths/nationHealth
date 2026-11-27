@@ -167,7 +167,7 @@ class DivisionTenantIsolationTest extends TestCase
             'hr edit' => ['division.edit', ['division:write'], Role::HR, 200],
             'admin edit' => ['division.edit', ['division:write'], Role::ADMIN, 200],
             'edit requires write' => ['division.edit', ['division:read'], Role::OWNER, 404],
-            'own healthcare service' => ['healthcare-service.view', ['division:details', 'healthcare_service:read'], Role::HR, 200],
+            'own healthcare service' => ['healthcare-service.view', ['division:details', 'healthcare_service:read'], Role::OWNER, 200],
         ];
     }
 
