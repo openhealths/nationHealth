@@ -277,6 +277,7 @@ Route::prefix('persons')->whereNumber('person')
         Route::prefix('{person}')->name('persons.encounters.')->group(function () {
             Route::get('/encounters/{encounter}/care-plans/create', CarePlanCreate::class)
                 ->can('create', CarePlan::class)
+                ->can('view', ['encounter', 'person'])
                 ->whereNumber('encounter')
                 ->name('care-plans.create');
             Route::get('/encounters/{encounter}/eprescriptions/create', EncounterEPrescriptionCreate::class)
