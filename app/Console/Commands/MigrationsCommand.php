@@ -68,13 +68,11 @@ abstract class MigrationsCommand extends Command
         }
 
         if ($this->hasOption('scopes') && $this->option('scopes')) {
-            $this->call('config:clear');
+            $this->syncScopes();
 
             $this->call('config:cache');
 
             $this->info('Config cache updated');
-
-            $this->syncScopes();
 
             return;
         }
@@ -221,7 +219,9 @@ abstract class MigrationsCommand extends Command
     {
         $this->warn("\nUpdating scopes...\n");
 
-        //  See help about source file in PHPDocs for each functions below.
+        // Read role eligibility from the current file before generating scopes.
+        config()->set('ehealth', require config_path('ehealth.php'));
+
         $this->updateLegalEntityTypeScopesConfig();
         $this->updateRoleScopesConfig();
 
