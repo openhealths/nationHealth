@@ -1,8 +1,6 @@
-@php
-    use App\Enums\Episode\Status;
-    use App\Models\MedicalEvents\Sql\Encounter;
-    use App\Models\MedicalEvents\Sql\Episode;
-@endphp
+@use('App\Enums\Episode\Status')
+@use('App\Models\MedicalEvents\Sql\Encounter')
+@use('App\Models\MedicalEvents\Sql\Episode')
 
 <x-layouts.patient :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
     <x-slot name="headerActions">
@@ -69,27 +67,38 @@
                     <div
                         x-show="dictionary === 'icd10'"
                         x-data="icd10Search"
+                        @click.outside="cancelSearch()"
                         data-icd10-search-url="{{ route('icd10.lookup', [legalEntity()]) }}"
                         class="relative"
                     >
                         <input
+                            x-ref="trigger"
                             type="text"
                             :value="selectedIcd10?.code === filterCode
                                 ? selectedIcd10.code + ' - ' + selectedIcd10.description
                                 : filterCode"
-                            @input.debounce.600ms="
+                            @input="
                                 filterCode = $event.target.value;
-                                search($event.target.value);
+                                queueSearch($event.target.value);
                             "
-                            @click.away="showResults = false"
+                            @keydown.escape="
+                                if (showResults) {
+                                    $event.stopPropagation();
+                                    cancelSearch();
+                                }
+                            "
                             id="filterCodeIcd10"
-                            class="input-select peer w-full"
+                            class="dropdown-field input-select peer w-full"
                             placeholder="{{ __('forms.type_to_search') }}"
                             autocomplete="off"
                         />
+                        <x-forms.dropdown-actions
+                            visible="!!filterCode"
+                            clear="filterCode = ''; selectedIcd10 = null; cancelSearch()"
+                        />
                         <div
                             x-show="showResults && results.length > 0"
-                            class="absolute top-full left-0 z-10 max-h-60 w-full overflow-auto rounded-lg border bg-white p-1.5 shadow-lg dark:bg-gray-800"
+                            class="form-dropdown-menu"
                         >
                             <template x-for="result in results" :key="result.code">
                                 <div
@@ -98,7 +107,10 @@
                                         filterCode = result.code;
                                         showResults = false;
                                     "
-                                    class="cursor-pointer rounded-md px-2 py-1.5 text-sm hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
+                                    class="dropdown-option"
+                                    tabindex="0"
+                                    @keydown.enter.prevent="$el.click()"
+                                    @keydown.space.prevent="$el.click()"
                                     x-text="result.code + ' - ' + result.description"
                                 ></div>
                             </template>

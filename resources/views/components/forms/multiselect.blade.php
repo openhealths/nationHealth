@@ -14,6 +14,7 @@
 
 @php
     $elementId = $id ?? $bind;
+    $fieldAttributes = ['disabled', ':disabled', 'x-bind:disabled'];
 @endphp
 
 {{--
@@ -21,7 +22,8 @@
   which can RPC-call missing toJSON on the $wire proxy and crash the page.
 --}}
 <div
-    {{ $attributes->merge(['class' => 'relative w-full']) }}
+    {{ $attributes->except($fieldAttributes)->merge(['class' => 'relative w-full']) }}
+    x-id="['choices']"
     @if ($alpineModel)
         x-modelable="selected"
         x-model="{{ $alpineModel }}"
@@ -83,6 +85,10 @@
             });
         @endif
         @if (!$alpineModel)
+        $watch(() => $wire.get('{{ $bind }}'), (value) => {
+            const next = Array.isArray(value) ? [...value] : [];
+            if (JSON.stringify(next) !== JSON.stringify(selected)) selected = next;
+        });
         $watch('selected', (val) => {
             const next = Array.isArray(val) ? [...val] : val;
             if (JSON.stringify(next) === JSON.stringify($wire.get('{{ $bind }}'))) {
@@ -94,29 +100,41 @@
     "
     x-effect="$dispatch('open-changed', { open })"
     @click.outside="open = false"
+    @focusout="if (!$el.contains($event.relatedTarget)) open = false;"
+    @keydown.escape="
+        if (open && !$event.isComposing) {
+            $event.stopPropagation();
+            open = false;
+            $refs.trigger.focus();
+        }
+    "
 >
     @if ($label)
         <label for="{{ $elementId }}" class="label mb-1">{{ $label }}</label>
     @endif
     <div class="relative">
-        <input
-            type="text"
+        <button
+            type="button"
             id="{{ $elementId }}"
-            class="input peer w-full cursor-pointer truncate pr-10 pl-1 text-gray-900 dark:text-white"
-            :placeholder="'{{ $placeholder ?? __('forms.select') }}'"
-            @click="open = ! open"
-            :value="displayText"
-            readonly
+            x-ref="trigger"
+            {{ $attributes->only($fieldAttributes) }}
+            class="dropdown-field input peer w-full cursor-pointer truncate pl-1 text-start text-gray-900 dark:text-white"
+            :aria-expanded="open"
+            :aria-controls="$id('choices')"
+            @click="
+                $refs.trigger.focus();
+                open = !open;
+            "
+            @keydown.arrow-down.prevent="
+                open = true;
+                $nextTick(() => $refs.menu.querySelector('input:not(:disabled)')?.focus());
+            "
+            x-text="displayText"
+        ></button>
+        <x-forms.dropdown-actions
+            visible="selected.length > 0 || searchValue !== ''"
+            clear="selected = []; searchValue = ''; open = false"
         />
-        <svg
-            class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-gray-500 dark:text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-        >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
-        </svg>
 
         <div
             x-show="open"
@@ -127,7 +145,9 @@
             x-transition:leave="transition ease-in duration-75"
             x-transition:leave-start="transform opacity-100 scale-100"
             x-transition:leave-end="transform opacity-0 scale-95"
-            class="multiselect-dropdown absolute z-30 mt-2 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 shadow-lg dark:border-gray-600"
+            x-ref="menu"
+            :id="$id('choices')"
+            class="form-dropdown-menu multiselect-dropdown"
         >
             {{-- Search input for filtering options --}}
             @if ($searchable || $allowCustom)
@@ -157,10 +177,10 @@
                 </div>
             @endif
 
-            <ul class="space-y-2 !bg-white px-3 py-2 text-sm text-gray-700 dark:!bg-gray-800 dark:text-gray-200">
+            <ul>
                 <template x-for="(optLabel, optValue) in filteredOptions" :key="optValue">
                     <li>
-                        <label class="flex cursor-pointer items-center space-x-2 rounded p-1 hover:bg-gray-50 dark:hover:bg-gray-600">
+                        <label class="dropdown-option flex items-center gap-2">
                             <input
                                 type="checkbox"
                                 :value="optValue"
@@ -171,6 +191,9 @@
                         </label>
                     </li>
                 </template>
+            <li x-show="!Object.keys(filteredOptions).length" class="px-3 py-2 text-sm text-gray-500">
+                    {{ __('forms.nothing_found') }}
+                </li>
             </ul>
         </div>
     </div>

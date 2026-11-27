@@ -307,70 +307,26 @@
                                     </div>
 
                                     <div
-                                        class="form-row-2"
-                                        x-data="{
-                                   open: false,
-                                   selectedType: $wire.entangle('medicalRecordType'),
-                                   types: {
-                                   'CONDITION': '{{ __('care-plan.conditions/diagnoses') }}',
-                                   'OBSERVATION': '{{ __('care-plan.observations') }}'
-                                   }
-                                   }"
-                                    >
+                                        class="form-row-2">
                                         <div class="relative">
-                                            <input
-                                                type="text"
+                                            <select
                                                 id="recordTypeFilter"
-                                                class="input peer w-full cursor-pointer text-gray-500 dark:text-gray-400"
-                                                x-on:click="open = ! open"
-                                                :value="types[selectedType] || '{{ __('forms.select_type') }}'"
-                                                readonly
-                                            />
-
-                                            <svg
-                                                class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-gray-500 dark:text-gray-400"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                viewBox="0 0 24 24"
+                                                wire:model="medicalRecordType"
+                                                class="input-select"
+                                                aria-label="{{ __('forms.select_type') }}"
                                             >
-                                                <path d="M19 9l-7 7-7-7"></path>
-                                            </svg>
-
-                                            <div
-                                                x-show="open"
-                                                x-on:click.away="open = false"
-                                                x-transition:enter="transition ease-out duration-100"
-                                                x-transition:enter-start="transform opacity-0 scale-95"
-                                                x-transition:enter-end="transform opacity-100 scale-100"
-                                                x-transition:leave="transition ease-in duration-75"
-                                                x-transition:leave-start="transform opacity-100 scale-100"
-                                                x-transition:leave-end="transform opacity-0 scale-95"
-                                                class="absolute z-10 mt-2 w-full rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-700"
-                                                x-cloak
-                                            >
-                                                <ul class="py-2 text-sm text-gray-700 dark:text-gray-200">
-                                                    <li
-                                                        class="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600"
-                                                        @click="
-                                                            selectedType = 'CONDITION';
-                                                            open = false;
-                                                        "
+                                                <option value="">
+                                                    {{ __('forms.select_type') }}
+                                                </option>
+                                                <option value="CONDITION"
                                                     >
                                                         {{ __('care-plan.conditions/diagnoses') }}
-                                                    </li>
-
-                                                    <li
-                                                        class="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600"
-                                                        @click="
-                                                            selectedType = 'OBSERVATION';
-                                                            open = false;
-                                                        "
+                                                    </option>
+                                                <option value="OBSERVATION"
                                                     >
                                                         {{ __('care-plan.observations') }}
-                                                    </li>
-                                                </ul>
-                                            </div>
+                                                    </option>
+                                            </select>
                                         </div>
                                         <div class="form-group group">
                                             <select id="episode" name="episode" class="input-select peer">

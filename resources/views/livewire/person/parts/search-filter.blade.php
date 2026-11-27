@@ -45,7 +45,7 @@
                 </label>
                 <input
                     wire:model="form.noLastName"
-                    x-on:change="if ($event.target.checked) $wire.set('form.lastName', '', false)"
+                    x-on:change="if ($event.target.checked) $wire.set('form.lastName', '', false);"
                     type="checkbox"
                     name="filterNoLastName"
                     id="filterNoLastName"
@@ -235,67 +235,28 @@
                 </div>
 
                 @if($context === 'index')
-                    <div class="form-group group" x-data="{ open: false }">
+                    <div class="form-group group">
+                        <select
+                            id="filterDropdown"
+                            class="input-select peer"
+                            :value="$wire.activeFilter === 'all' ? '' : $wire.activeFilter"
+                            @change="$wire.activeFilter = $el.value || 'all'"
+                        >
+                            <option value="">
+                                {{ __('forms.all') }}
+                            </option>
+                            <option value="local">
+                                {{ __('patients.source.local') }}
+                            </option>
+                            <option value="ehealth">
+                                {{ __('patients.source.ehealth') }}
+                            </option>
+                            <option value="request">
+                                {{ __('patients.applications') }}
+                            </option>
+                        </select>
                         <label for="filterDropdown" class="label">{{ __('forms.type_drafts_patients') }}</label>
-                        <div class="relative">
-                            <input
-                                type="text"
-                                id="filterDropdown"
-                                class="input peer w-full cursor-pointer text-gray-500 dark:text-gray-400"
-                                placeholder="{{ __('forms.select_filter') }}"
-                                @click="open = !open"
-                                :value="
-                                    $wire.activeFilter === 'all' ? '{{ __('forms.all') }}' :
-                                    $wire.activeFilter === 'ehealth' ? '{{ __('patients.source.ehealth') }}' :
-                                    $wire.activeFilter === 'local' ? '{{ __('patients.source.local') }}' :
-                                    $wire.activeFilter === 'request' ? '{{ __('patients.applications') }}'
-                                    : ''
-                                "
-                                readonly
-                            />
-                            <div
-                                x-show="open"
-                                @click.away="open = false"
-                                x-transition:enter="transition ease-out duration-100"
-                                x-transition:enter-start="transform opacity-0 scale-95"
-                                x-transition:enter-end="transform opacity-100 scale-100"
-                                x-transition:leave="transition ease-in duration-75"
-                                x-transition:leave-start="transform opacity-100 scale-100"
-                                x-transition:leave-end="transform opacity-0 scale-95"
-                                class="absolute z-10 mt-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg"
-                            >
-                                @php
-                                    $filters = [
-                                        'all' => __('forms.all'),
-                                        'local' => __('patients.source.local'),
-                                        'ehealth' => __('patients.source.ehealth'),
-                                        'request' => __('patients.applications')
-                                    ];
-                                @endphp
-                                <ul class="py-2 px-3 space-y-2 text-sm text-gray-700 dark:text-gray-200">
-                                    @foreach ($filters as $value => $label)
-                                        <li>
-                                            <label
-                                                class="flex items-center space-x-2 cursor-pointer"
-                                                @click="open = false"
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    value="{{ $value }}"
-                                                    wire:model="activeFilter"
-                                                    class="sr-only"
-                                                />
-
-                                                <span class="{{ $activeFilter === $value ? 'text-blue-600' : '' }}">
-                                                    {{ $label }}
-                                                </span>
-                                            </label>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            </div>
                         </div>
-                    </div>
                 @endif
             </div>
         </div>

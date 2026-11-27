@@ -6,7 +6,7 @@
     x-data="{
         visible: $wire.entangle('open'),
         groupSearch: '',
-        groupExpanded: false
+        groupExpanded: false,
     }"
 >
     @if($carePlansOnly)
@@ -101,14 +101,15 @@
                             </p>
                         @enderror
                     @endif
-                    
+
                     @if($step === PatientApproval::STEP_FORM)
                         <div class="mt-8 max-w-md space-y-6">
                             @if(!$carePlansOnly)
                                 <div class="form-group group max-w-xl">
                                     <select
                                         wire:model.live="mode"
-                                        @change="groupSearch = ''; groupExpanded = false"
+                                        @change="groupSearch = ''; groupExpanded = false;
+                                "
                                         class="input-select peer w-full"
                                     >
                                         <option value="" disabled>
@@ -229,7 +230,7 @@
                                 @if($mode === 'service_request')
                                     <div
                                         x-data="{ referralExpanded: false }"
-                                        @click.outside="if (!$wire.previewSection) referralExpanded = false"
+                                        @click.outside="if (!$wire.previewSection) referralExpanded = false;"
                                         @keydown.escape.stop="referralExpanded = false"
                                         class="max-w-xl space-y-4"
                                     >
@@ -344,35 +345,36 @@
                                         @keydown.escape.stop="recordExpanded = false"
                                         class="relative max-w-xl"
                                     >
-                                        <label class="mb-2 block text-sm text-gray-500 dark:text-gray-400">
+                                        <label
+                                    for="approval-record-input"
+                                    class="mb-2 block text-sm text-gray-500 dark:text-gray-400">
                                             {{ __('approval.create.select_record') }}
                                         </label>
 
-                                        <div class="relative">
-                                            <input
-                                                x-ref="recordInput"
-                                                type="search"
+                                        <div class="relative" x-data>
+                                    <input
+                                        id="approval-record-input"
+                                                x-ref="trigger"
+                                        type="text"
                                                 wire:model.live.debounce.1000ms="search"
                                                 @focus="recordExpanded = true"
+                                        @click="recordExpanded = true"
                                                 @input="recordExpanded = true"
                                                 autocomplete="off"
                                                 placeholder="{{ __('approval.create.search_record') }}"
-                                                class="input w-full pr-9"
-                                            >
+                                                class="dropdown-field input"
+                                    >
 
-                                            <button
-                                                type="button"
-                                                class="absolute inset-y-0 right-0 px-3"
-                                                @click="recordExpanded = !recordExpanded"
-                                            >
-                                                <span class="text-gray-500">⌄</span>
-                                            </button>
+                                    <x-forms.dropdown-actions
+                                        visible="!!$wire.search || (!$wire.carePlansOnly && ($wire.mode === 'child' ? !!$wire.childUuid : $wire.resourceIds.length > 0))"
+                                        clear="$wire.search = ''; if (!$wire.carePlansOnly) { if ($wire.mode === 'child') $wire.childUuid = ''; else $wire.resourceIds = []; } recordExpanded = false"
+                                    />
                                         </div>
 
                                         <div
                                             x-show="recordExpanded"
                                             x-cloak
-                                            class="absolute left-0 right-0 z-50 mt-2 max-h-80 space-y-2 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+                                            class="form-dropdown-menu"
                                         >
                                             @forelse($this->availableRecords as $record)
                                                 @php
@@ -388,7 +390,7 @@
                                                     @click="recordExpanded = {{ $mode === 'resource' ? 'true' : 'false' }}"
                                                     @disabled(!$record['selectable'])
                                                     @class([
-                                                        'flex w-full items-center gap-3 rounded-lg p-2 text-left',
+                                                        'dropdown-option flex items-center gap-3',
                                                         'bg-blue-500/10' => $selected,
                                                         'hover:bg-gray-100 dark:hover:bg-gray-700' => !$selected,
                                                         'cursor-not-allowed opacity-50' => !$record['selectable'],
@@ -480,23 +482,27 @@
                                 @enderror
 
                             @endif
-                                                     
+
                             @if(in_array($mode, ['service_group', 'diagnoses_group', 'forbidden_group'], true))
                                 <div
                                     class="relative max-w-xl"
                                     @click.outside="groupExpanded = false"
                                     @keydown.escape.stop="groupExpanded = false"
                                 >
-                                    <label class="mb-2 block text-sm text-gray-500 dark:text-gray-400">
+                                    <label
+                                for="approval-group-input"
+                                class="mb-2 block text-sm text-gray-500 dark:text-gray-400">
                                         {{ __('approval.create.catalog_group') }}
                                     </label>
 
-                                    <div class="relative">
-                                        <input
-                                            x-ref="groupInput"
-                                            type="search"
+                                    <div class="relative" x-data>
+                                <input
+                                    id="approval-group-input"
+                                            x-ref="trigger"
+                                    type="text"
                                             x-model="groupSearch"
                                             @focus="groupExpanded = true"
+                                    @click="groupExpanded = true"
                                             @input="
                                                 groupExpanded = true;
 
@@ -510,40 +516,20 @@
                                             aria-autocomplete="list"
                                             aria-controls="approval-group-options"
                                             :aria-expanded="groupExpanded.toString()"
-                                            class="input w-full pr-10 placeholder-gray-500 dark:placeholder-gray-400"
-                                        >
+                                            class="dropdown-field input"
+                                >
 
-                                        <button
-                                            type="button"
-                                            tabindex="-1"
-                                            class="absolute inset-y-0 right-0 flex items-center justify-center px-3 text-gray-500 dark:text-gray-400"
-                                            @click="
-                                                groupExpanded = !groupExpanded;
-
-                                                if (groupExpanded) {
-                                                    $nextTick(() => $refs.groupInput.focus());
-                                                }
-                                            "
-                                            aria-label="{{ __('forms.select') }}"
-                                        >
-                                            <svg
-                                                class="h-4 w-4"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                aria-hidden="true"
-                                            >
-                                                <path d="m6 9 6 6 6-6" />
-                                            </svg>
-                                        </button>
+                                <x-forms.dropdown-actions
+                                    visible="!!groupSearch || !!$wire.groupId"
+                                    clear="groupSearch = ''; $wire.groupId = ''; groupExpanded = false"
+                                />
                                     </div>
 
                                     <div
                                         id="approval-group-options"
                                         x-show="groupExpanded"
                                         x-cloak
-                                        class="absolute left-0 right-0 z-50 mt-3 rounded-xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+                                        class="form-dropdown-menu"
                                     >
                                         <div
                                             x-ref="groupOptions"
@@ -564,7 +550,7 @@
                                                             groupSearch = $el.dataset.label;
                                                             groupExpanded = false;
                                                         "
-                                                        class="block w-full text-left text-base font-normal text-gray-900 hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
+                                                        class="dropdown-option"
                                                     >
                                                         @if(!empty($group['code']))
                                                             <span class="mr-1">
@@ -612,7 +598,9 @@
 
                                         @if($this->selectableGroups !== [])
                                             <p
-                                                x-show="!Array.from($refs.groupOptions.querySelectorAll('[data-search]')).some(item => item.dataset.search.toLocaleLowerCase().includes(groupSearch.trim().toLocaleLowerCase()))"
+                                                x-show="!Array.from($refs.groupOptions.querySelectorAll('[data-search]')).some(
+                                                (item) => item.dataset.search.toLocaleLowerCase().includes(groupSearch.trim().toLocaleLowerCase()),
+                                            )"
                                                 x-cloak
                                                 class="p-2 text-sm text-gray-500 dark:text-gray-400"
                                             >
@@ -626,7 +614,7 @@
                                     @enderror
                                 </div>
                             @endif
-                     
+
                             @if($mode === 'resource_types')
                                 <p class="text-sm text-gray-700 dark:text-gray-300">
                                     {{ __('approval.create.device_types_notice') }}
@@ -769,7 +757,8 @@
                                             <button
                                                 type="button"
                                                 class="text-blue-600 text-sm hover:underline"
-                                                @click="visible = false; $wire.$parent.openAuthMethodModal()"
+                                                @click="visible = false; $wire.$parent.openAuthMethodModal();
+                                        "
                                             >
                                                 {{ __('patients.change') }}
                                             </button>
@@ -793,7 +782,8 @@
                             <button
                                 type="button"
                                 class="text-blue-600 hover:underline text-sm"
-                                @click="visible = false; $wire.$parent.openAuthMethodModal()"
+                                @click="visible = false; $wire.$parent.openAuthMethodModal();
+                        "
                             >
                                 {{ __('approval.create.manage_auth_methods') }}
                             </button>
@@ -875,7 +865,7 @@
         <div
             wire:key="approval-preview-backdrop"
             class="fixed inset-0 bg-gray-900/30"
-            style="z-index: 47;"
+            style="z-index: 47"
             wire:click="closePreview"
             @click.stop="groupExpanded = true"
         ></div>
@@ -883,7 +873,7 @@
         <div
             wire:key="approval-preview-drawer"
             class="fixed top-0 right-0 h-screen overflow-y-auto bg-white p-4 pt-20 shadow-2xl dark:bg-gray-800"
-            style="width: 74%; z-index: 48;"
+            style="width: 74%; z-index: 48"
             role="dialog"
             aria-modal="true"
             aria-label="{{ $previewTitle }}"

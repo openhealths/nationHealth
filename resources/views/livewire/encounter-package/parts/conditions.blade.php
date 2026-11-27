@@ -610,6 +610,7 @@
                                 <div
                                     x-show="modalCondition.codeSystem === 'eHealth/ICD10_AM/condition_codes'"
                                     x-data="icd10Search"
+                                    @click.outside="cancelSearch()"
                                     data-icd10-search-url="{{ route('icd10.search', [legalEntity()]) }}"
                                     class="relative"
                                 >
@@ -619,33 +620,49 @@
                                     >
                                         {{ __('medical-events.icd_10') }} *
                                     </label>
-                                    <input
+                                    <div class="relative">
+                                        <input
+                                            x-ref="trigger"
                                         type="text"
-                                        @input.debounce.600ms="
+                                        @input="
                                             modalCondition.codeCode = $event.target.value;
-                                            search($event.target.value);
+                                                queueSearch($event.target.value);
                                         "
                                         @focus="if ((modalCondition.codeCode?.length ?? 0) >= 1) showResults = true;"
-                                        @click.away="showResults = false"
+                                        @keydown.escape="
+                                                if (showResults) {
+                                                    $event.stopPropagation();
+                                                    cancelSearch();
+                                                }
+                                            "
                                         :value="modalCondition.codeCode && icd10Descriptions[modalCondition.codeCode]
                                             ? modalCondition.codeCode +
                                               ' - ' +
                                               icd10Descriptions[modalCondition.codeCode]
                                             : modalCondition.codeCode"
                                         id="icd10Code"
-                                        class="input w-full"
+                                        class="dropdown-field input w-full"
                                         placeholder="{{ __('forms.select') }}"
                                         autocomplete="off"
                                     />
 
+                                    <x-forms.dropdown-actions
+                                            visible="!!modalCondition.codeCode"
+                                            clear="modalCondition.codeCode = ''; cancelSearch()"
+                                        />
+                                    </div>
+
                                     <div
                                         x-show="showResults && results.length > 0"
-                                        class="absolute top-full left-0 z-10 max-h-80 w-full overflow-auto overscroll-contain rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg dark:bg-gray-800"
+                                        class="form-dropdown-menu"
                                     >
                                         <ul>
                                             <template x-for="(result, index) in results" :key="index">
                                                 <li
-                                                    class="group flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 transition-colors dark:bg-gray-800 dark:text-white"
+                                                    class="dropdown-option"
+                                                    tabindex="0"
+                                                    @keydown.enter.prevent="$el.click()"
+                                                    @keydown.space.prevent="$el.click()"
                                                     @click="
                                                         modalCondition.codeCode = result.code;
                                                         icd10Descriptions[result.code] = result.description;
