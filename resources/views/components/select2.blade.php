@@ -1,10 +1,13 @@
 @props(['modelPath', 'dictionaryName', 'options' => null])
 
 <div
+    class="relative"
+    x-id="['listbox']"
     x-data="selectComponent('{{ $dictionaryName }}', '{{ $modelPath }}', {{ $options ? '() => ('.$options.')' : 'null' }})"
     x-modelable="selected"
     x-model="{{ $modelPath }}"
     @click.away.capture="hideOptions"
+    @focusout="if (!$el.contains($event.relatedTarget)) hideOptions();"
     @keydown.escape="
         if (optionsVisible && ! $event.isComposing && $event.keyCode !== 229) {
             $event.preventDefault();
@@ -15,49 +18,60 @@
     x-cloak
 >
     <input
-        class="{{ $attributes->get('class', 'input-modal') }}"
+        class="dropdown-field {{ $attributes->get('class', 'input-modal') }}"
         {{ $attributes->except('class') }}
-        type="search"
+        x-ref="trigger"
+        type="text"
         placeholder="{{ __('forms.type_to_search') }}"
         x-model="search"
-        @click="showOptions"
-        @keydown.arrow-down.prevent="showOptions"
-        @input.debounce.150ms="showOptions"
-        @input="if (! $event.target.value.trim()) selected = '';"
-        id="{{ $attributes['id'] ?? '' }}"
+        @click="if (!$el.readOnly) showOptions();"
+        @keydown.arrow-down.prevent="move(1)"
+        @keydown.arrow-up.prevent="move(-1)"
+        @keydown.enter="
+            if (optionsVisible && active >= 0 && paginatedOptions[active] && !$event.isComposing) {
+                $event.preventDefault();
+                selectOption(paginatedOptions[active]);
+            }
+        "
+        @input="if (! $event.target.value.trim()) selected = '';
+            showOptions();
+            active = -1;
+        "
         autocomplete="off"
         role="combobox"
+        aria-autocomplete="list"
+        :aria-expanded="optionsVisible"
+        :aria-controls="$id('listbox')"
+        :aria-activedescendant="optionsVisible && active >= 0 ? $id('listbox') + '-' + active : null"
     />
-
-    <div class="relative w-full">
+    <x-forms.dropdown-actions visible="search !== '' || (selected != null && selected !== '')" clear="clear()" />
         <div
             x-show="optionsVisible"
-            x-transition:enter="transition ease-out duration-100"
-            x-transition:enter-start="opacity-0 scale-95"
-            x-transition:enter-end="opacity-100 scale-100"
-            x-transition:leave="transition ease-in duration-75"
-            x-transition:leave-start="opacity-100 scale-100"
-            x-transition:leave-end="opacity-0 scale-95"
-            class="absolute z-50 grid max-h-60 w-full overflow-y-auto rounded-md border bg-white p-2 shadow-lg dark:bg-gray-800 dark:text-white"
+            x-cloak class="form-dropdown-menu">
+        <div role="listbox" :id="$id('listbox')"
         >
             <template x-for="(option, index) in paginatedOptions" :key="`${option.value}-${index}`">
-                <a
+                <div
+                    role="option"
+                    :id="$id('listbox') + '-' + index"
+                    :aria-selected="option.value === selected"
+                    :data-active="index === active"
+                    @mousedown.prevent
                     @click="selectOption(option)"
                     x-html="highlightedText(option)"
-                    class="cursor-pointer rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-                ></a>
+                    class="dropdown-option"
+                ></div>
             </template>
+        </div>
 
             <div
-                x-show="filteredOptions.length === 0 && search.length >= 3 && ! isLoading"
-                class="px-2 py-1 text-gray-500"
+                x-show="filteredOptions.length === 0 && ! isLoading"
+                class="px-3 py-2 text-sm text-gray-500"
             >
                 {{ __('forms.nothing_found') }}
             </div>
 
-            <div x-show="isLoading" class="px-2 py-1 text-gray-500">{{ __('general.loading') }}...</div>
-
-            {{-- Show the 'Show more' button if there are more options --}}
+            <div x-show="isLoading" class="px-3 py-2 text-sm text-gray-500">{{ __('general.loading') }}...</div>
             <div x-show="canLoadMore()" class="px-2 py-1 text-center">
                 <button type="button" @click.prevent="loadMore" class="text-sm text-blue-500 hover:text-blue-700">
                     {{ __('general.show_more') }} (<span x-text="remainingCount()"></span> {{ __('general.remain') }})
@@ -65,14 +79,13 @@
             </div>
         </div>
     </div>
-</div>
-
 <script>
     function selectComponent(dictionaryKey, modelPath, optionsSource = null) {
         return {
             search: '',
             selected: '',
             optionsVisible: false,
+            active: -1,
             options: [],
             optionsMap: new Map(),
             filteredOptions: [],
@@ -281,10 +294,15 @@
 
             filterOptions() {
                 const searchTerm = this.search.toLowerCase().trim();
+                this.active = -1;
                 this.currentPage = 0;
                 this.clearHighlightCache();
 
-                if (!searchTerm || searchTerm.length < 3) {
+                const selectedOption = this.optionsMap.get(this.selected);
+
+                if (!searchTerm || searchTerm.length < 3 ||
+                    (selectedOption && this.search === this.getDisplayText(selectedOption))
+                ) {
                     this.filteredOptions = this.options;
                     this.updatePaginatedOptions();
                     return;
@@ -323,10 +341,35 @@
             },
 
             showOptions() {
+                if (!this.optionsVisible) this.filterOptions();
                 this.optionsVisible = true;
             },
 
+            move(step) {
+                if (this.$refs.trigger.readOnly) return;
+                this.showOptions();
+                if (this.lastSearchTerm !== this.search) this.filterOptions();
+                if (!this.paginatedOptions.length) return;
+                if (step > 0 && this.active === this.paginatedOptions.length - 1 && this.canLoadMore()) {
+                    this.loadMore();
+                }
+                const count = this.paginatedOptions.length;
+                this.active = this.active < 0 ? (step > 0 ? 0 : count - 1) : (this.active + step + count) % count;
+                this.$nextTick(() =>
+                    document
+                        .getElementById(this.$id('listbox') + '-' + this.active)
+                        ?.scrollIntoView({ block: 'nearest' }),
+                );
+            },
+
+            clear() {
+                this.search = '';
+                this.selected = '';
+                this.hideOptions();
+            },
+
             hideOptions() {
+                this.active = -1;
                 this.optionsVisible = false;
                 this.currentPage = 0;
             },
@@ -339,6 +382,8 @@
 
             highlightedText(option) {
                 const text = this.getDisplayText(option);
+                const selectedOption = this.optionsMap.get(this.selected);
+                if (selectedOption && this.search === this.getDisplayText(selectedOption)) return text;
                 const searchTerm = this.search.toLowerCase().trim();
 
                 if (!searchTerm) return text;

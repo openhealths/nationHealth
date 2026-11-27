@@ -3,7 +3,6 @@
 @import "flowbite/src/themes/default.css";
 @import "./svg-icons.css";
 @import "./responsive.css";
-
 @config "../../tailwind.config.js"; /* imports old configuration from transition form v3 to v4 */
 @source "../../node_modules/flowbite-datepicker/js";
 
@@ -321,11 +320,6 @@ input:-webkit-autofill ~ .label {
 /* Dropdown panel */
 .dropdown-panel {
     @apply absolute left-0 rounded-lg shadow-sm mt-2 z-10 origin-top-left bg-white dark:bg-gray-700 outline-none border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200
-}
-
-.multiselect-dropdown,
-.multiselect-dropdown :is(ul, li, label) {
-    @apply bg-white! dark:bg-gray-800!;
 }
 
 /* Open multiselect must stack above following .form-group siblings (they use z-0). */
@@ -1034,4 +1028,178 @@ body .flatpickr-day.nextMonthDay {
 
 body .flatpickr-day.disabled {
     @apply text-gray-200 dark:text-gray-700 cursor-not-allowed;
+}
+
+/* Shared dropdowns use the application Tailwind palette; fields retain their existing styles. */
+.dropdown-control {
+    @apply relative w-full min-w-0;
+}
+
+.dropdown-field {
+    @apply pe-16! bg-none! appearance-none text-start cursor-pointer;
+}
+
+input.dropdown-field:not([readonly]) {
+    @apply cursor-text;
+}
+
+.dropdown-field:disabled,
+fieldset:disabled .dropdown-field {
+    @apply cursor-not-allowed;
+}
+
+.dropdown-placeholder {
+    @apply text-gray-500 dark:text-gray-400;
+}
+
+.dropdown-native {
+    @apply sr-only p-0! m-0! border-0!;
+}
+
+.dropdown-value {
+    @apply block truncate;
+}
+
+.dropdown-field::-webkit-search-cancel-button,
+.dropdown-field::-webkit-search-decoration {
+    @apply appearance-none;
+}
+
+.dropdown-clear,
+.dropdown-chevron {
+    @apply absolute box-border top-1.75 size-7 text-gray-500 dark:text-gray-400;
+}
+
+.dropdown-clear {
+    @apply end-7.75 flex items-center justify-center border-0 rounded-sm p-1.5 bg-transparent cursor-pointer;
+}
+
+.dropdown-clear[hidden] {
+    @apply hidden;
+}
+
+.dropdown-clear:hover {
+    @apply bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-gray-100;
+}
+
+.dropdown-clear:focus-visible {
+    @apply outline-2 outline-solid outline-blue-600 -outline-offset-2;
+}
+
+.dropdown-clear svg {
+    @apply size-4;
+}
+
+.dropdown-chevron {
+    @apply end-1.25 p-1.5 pointer-events-none;
+}
+
+.dropdown-field:disabled ~ .dropdown-clear,
+fieldset:disabled .dropdown-clear {
+    @apply hidden!;
+}
+
+.form-dropdown-menu {
+    @apply box-border z-100 mt-1 p-1! max-h-[min(20rem,50vh)] overflow-y-auto overscroll-contain border! border-solid! border-gray-300! rounded-md! bg-white! text-gray-900! text-sm leading-5 shadow-lg dark:border-gray-600! dark:bg-gray-800! dark:text-gray-100!;
+}
+
+.form-dropdown-menu[hidden] {
+    @apply hidden;
+}
+
+.form-dropdown-menu.dropdown-portal {
+    @apply fixed inset-auto m-0 z-1000;
+}
+
+.dropdown-option {
+    @apply block box-border w-full py-2! px-3! border-0 rounded-sm bg-transparent text-gray-900! font-normal text-sm leading-5 text-start cursor-pointer whitespace-normal wrap-anywhere dark:text-gray-100!;
+}
+
+.dropdown-option:hover,
+.dropdown-option:focus-visible,
+.dropdown-option[data-active="true"] {
+    @apply bg-gray-100! outline-none dark:bg-gray-700!;
+}
+
+.dropdown-option[aria-selected="true"],
+.dropdown-option[aria-pressed="true"],
+.dropdown-option:has(input:checked) {
+    @apply bg-blue-50! dark:bg-blue-900/50!;
+}
+
+.dropdown-option input[type="checkbox"] {
+    @apply appearance-none shrink-0 size-4 m-0 border border-solid border-gray-300 rounded-xs bg-white text-blue-600 dark:border-gray-600 dark:bg-gray-800;
+}
+
+.dropdown-option input[type="checkbox"]:checked {
+    @apply border-transparent bg-blue-600;
+}
+
+.dropdown-option input[type="checkbox"]:focus-visible {
+    @apply outline-2 outline-solid outline-blue-600 outline-offset-2;
+}
+
+.dropdown-option:disabled,
+.dropdown-option[aria-disabled="true"] {
+    @apply opacity-50 cursor-not-allowed;
+}
+
+.form-dropdown-menu :is(ul, li) {
+    @apply list-none;
+}
+
+.dropdown-search {
+    @apply block box-border w-full py-2 px-2.5 mb-1 border border-solid border-gray-300 rounded-sm bg-white text-gray-900 font-normal text-sm leading-5 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100;
+}
+
+.dropdown-search:focus {
+    @apply outline-2 outline-solid outline-blue-600 -outline-offset-1;
+}
+
+.dropdown-group,
+.dropdown-empty {
+    @apply py-2 px-3 text-gray-500 text-xs leading-5 dark:text-gray-400;
+}
+
+.dropdown-group {
+    @apply font-semibold;
+}
+
+.dropdown-validation {
+    @apply mt-1.5 text-red-600 text-xs;
+}
+
+.form-group:has(.dropdown-control > .dropdown-field:focus) > .label {
+    @apply text-blue-600 font-medium dark:text-blue-500;
+}
+
+.form-group:has(.form-dropdown-menu:not([style*="display: none"]):not([hidden])) {
+    @apply z-50;
+}
+
+.form-dropdown-menu:not(.dropdown-portal) {
+    @apply absolute inset-x-0 top-full w-full;
+}
+
+label.dropdown-option {
+    @apply flex gap-2 items-center;
+}
+
+.dropdown-field[readonly] ~ .dropdown-clear {
+    @apply hidden!;
+}
+
+.dropdown-search::-webkit-search-cancel-button,
+.dropdown-search::-webkit-search-decoration {
+    @apply appearance-none;
+}
+
+.dropdown-field:is(:disabled, [readonly]) ~ .form-dropdown-menu,
+fieldset:disabled .form-dropdown-menu {
+    @apply hidden!;
+}
+
+/* Hide the old decorative arrow only where a shared control already renders its own. */
+.relative:has(> :is(.relative, .dropdown-control) > .dropdown-chevron) > svg.pointer-events-none[class~="right-3"] {
+    @apply hidden;
 }

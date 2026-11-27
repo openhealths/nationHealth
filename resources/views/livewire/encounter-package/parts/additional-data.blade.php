@@ -399,26 +399,40 @@
             <template x-for="(service, index) in services" :key="index">
                 <div class="relative pr-10" :class="{ 'z-30': serviceDropdowns[index] }">
                     <div class="flex items-center gap-6">
-                        <div class="form-group group relative flex-1" @click.away="serviceDropdowns[index] = false">
+                        <div class="form-group group relative flex-1"
+                            x-data
+                            @click.away="serviceDropdowns[index] = false"
+                            @keydown.escape="
+                                if (serviceDropdowns[index]) {
+                                    $event.stopPropagation();
+                                    serviceDropdowns[index] = false;
+                                }
+                            "
+                        >
                             <input
+                                x-ref="trigger"
                                 type="text"
-                                class="input peer @error('form.encounter.actionReferences.0') input-error @enderror"
+                                class="dropdown-field input peer @error('form.encounter.actionReferences.0') input-error @enderror"
                                 :id="'service_' + index"
                                 x-model="serviceSearches[index]"
                                 @input.debounce.150ms="
                                     services[index] = { uuid: '' };
-                                    serviceDropdowns[index] = true;
+                                    serviceDropdowns[index] = !!serviceSearches[index];
                                     updateFilteredOptions(index);
                                 "
                                 placeholder=" "
                                 autocomplete="off"
+                            />
+                            <x-forms.dropdown-actions
+                                visible="!!serviceSearches[index] || !!services[index]?.uuid"
+                                clear="services[index] = { uuid: '' }; serviceSearches[index] = ''; serviceFilteredOptions[index] = []; serviceDropdowns[index] = false"
                             />
                             <label :for="'service_' + index" class="label">{{ __('encounters.services') }}</label>
 
                             <div
                                 x-show="serviceDropdowns[index]"
                                 x-cloak
-                                class="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                                class="form-dropdown-menu"
                             >
                                 <template x-if="! serviceSearches[index]">
                                     <div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
@@ -438,7 +452,7 @@
                                 >
                                     <button
                                         type="button"
-                                        class="block w-full cursor-pointer px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                                        class="dropdown-option"
                                         @click="selectService(index, serviceOption)"
                                     >
                                         <span x-text="serviceLabel(serviceOption)"></span>

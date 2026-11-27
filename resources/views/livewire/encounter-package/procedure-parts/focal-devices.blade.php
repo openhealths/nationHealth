@@ -28,8 +28,10 @@
                             <button
                                 type="button"
                                 :id="`procedureFocalDevice${index}`"
+                                x-ref="trigger"
+                                :aria-expanded="open"
                                 @click="open = ! open"
-                                class="input-select peer w-full appearance-none bg-none text-left"
+                                class="dropdown-field input-select peer"
                             >
                                 <span
                                     class="block truncate"
@@ -37,7 +39,10 @@
                                 ></span>
                             </button>
 
-                            @icon('chevron-down', 'pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500')
+                            <x-forms.dropdown-actions
+                                visible="!!focalDevice.manipulatedId"
+                                clear="focalDevice.manipulatedId = ''; open = false"
+                            />
 
                             <label :for="`procedureFocalDevice${index}`" class="label">
                                 {{ __('procedures.medical_device') }} *
@@ -46,7 +51,7 @@
                             <div
                                 x-show="open"
                                 x-cloak
-                                class="absolute top-full left-0 z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-600 dark:bg-gray-700"
+                                class="form-dropdown-menu"
                             >
                                 <template x-if="focalDeviceOptions().length === 0">
                                     <div class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
@@ -61,7 +66,7 @@
                                             focalDevice.manipulatedId = device.uuid;
                                             open = false;
                                         "
-                                        class="w-full cursor-pointer rounded-md px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-600"
+                                        class="dropdown-option"
                                         :class="{
                                             'bg-gray-100 dark:bg-gray-600': focalDevice.manipulatedId === device.uuid,
                                         }"

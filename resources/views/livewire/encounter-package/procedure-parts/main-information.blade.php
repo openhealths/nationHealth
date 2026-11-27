@@ -184,7 +184,9 @@
                         >
                             <div class="relative">
                                 <input
+                                    x-ref="trigger"
                                     x-model="referralNumber"
+                                    @readonly($isReadonly ?? false)
                                     @unless ($isReadonly ?? false)
                                         @focus="if (referrals.length > 0) showReferrals = true;"
                                         @input.debounce.1000ms="
@@ -195,7 +197,7 @@
                                     type="text"
                                     name="basedOnIdentifier"
                                     id="procedureBasedOnIdentifier"
-                                    class="input peer pr-7! uppercase"
+                                    class="dropdown-field input peer pr-7! uppercase"
                                     placeholder=" "
                                     autocomplete="off"
                                     x-mask="****-****-****-****"
@@ -206,20 +208,12 @@
                                     {{ __('medical-events.referral.number') }}
                                 </label>
 
-                                <div class="absolute inset-y-0 end-0 flex items-center">
-                                    <button
-                                        type="button"
-                                        @click="clearReferral()"
-                                        class="text-gray-400 hover:text-gray-600"
-                                    >
-                                        @icon('close', 'w-4 h-4')
-                                    </button>
-                                </div>
+                                <x-forms.dropdown-actions visible="!!referralNumber" clear="clearReferral()" />
 
                                 <div
                                     x-show="showReferrals && {{ ($isReadonly ?? false) ? 'false' : 'true' }}"
                                     x-cloak
-                                    class="absolute top-full left-0 z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                                    class="form-dropdown-menu"
                                 >
                                     <template x-for="referral in filteredReferrals" :key="referral.id">
                                         <button
@@ -229,7 +223,7 @@
                                             :class="! referral.isExhausted && referral.isProcedureAllowed
                                                 ? 'hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 : 'cursor-not-allowed'"
-                                            class="w-full rounded-md px-3 py-2 text-left"
+                                            class="dropdown-option"
                                         >
                                             <div
                                                 :class="! referral.isExhausted && referral.isProcedureAllowed

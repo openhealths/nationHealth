@@ -291,7 +291,9 @@
                             >
                                 <div class="relative">
                                     <input
+                                        x-ref="trigger"
                                         x-model="referralNumber"
+                                        @readonly($isReadonly ?? false)
                                         @unless ($isReadonly ?? false)
                                             @focus="if (referrals.length > 0) showReferrals = true;"
                                             @input.debounce.1000ms="
@@ -301,7 +303,7 @@
                                         @endunless
                                         type="text"
                                         id="diagnosticReportBasedOnIdentifier"
-                                        class="input peer pr-7! uppercase"
+                                        class="dropdown-field input peer pr-7! uppercase"
                                         placeholder=" "
                                         autocomplete="off"
                                         x-mask="****-****-****-****"
@@ -312,20 +314,12 @@
                                         {{ __('medical-events.referral.number') }}
                                     </label>
 
-                                    <div class="absolute inset-y-0 end-0 flex items-center">
-                                        <button
-                                            type="button"
-                                            @click="clearReferral()"
-                                            class="text-gray-400 hover:text-gray-600"
-                                        >
-                                            @icon('close', 'w-4 h-4')
-                                        </button>
-                                    </div>
+                                    <x-forms.dropdown-actions visible="!!referralNumber" clear="clearReferral()" />
 
                                     <div
                                         x-show="showReferrals && {{ ($isReadonly ?? false) ? 'false' : 'true' }}"
                                         x-cloak
-                                        class="absolute top-full left-0 z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                                        class="form-dropdown-menu"
                                     >
                                         <template x-for="referral in filteredReferrals" :key="referral.id">
                                             <button
@@ -335,7 +329,7 @@
                                                 :class="! referral.isExhausted && referral.isDiagnosticReportAllowed
                                                     ? 'hover:bg-gray-100 dark:hover:bg-gray-700'
                                                     : 'cursor-not-allowed'"
-                                                class="w-full rounded-md px-3 py-2 text-left"
+                                                class="dropdown-option"
                                             >
                                                 <div
                                                     :class="! referral.isExhausted && referral.isDiagnosticReportAllowed
@@ -513,20 +507,31 @@
         >
             <div
                 x-data="icd10Search"
+                @click.outside="cancelSearch()"
                 data-icd10-search-url="{{ $context === 'encounter' ? route('icd10.search', [legalEntity()]) : route('icd10.lookup', [legalEntity()]) }}"
                 class="form-group group"
             >
                 <input
+                    x-ref="trigger"
                     type="text"
-                    @input.debounce.600ms="search($event.target.value)"
+                    @input="queueSearch($event.target.value)"
                     @focus="if (conclusionCodeLabel.length >= 1) showResults = true;"
-                    @click.away="showResults = false"
+                    @keydown.escape="
+                        if (showResults) {
+                            $event.stopPropagation();
+                            cancelSearch();
+                        }
+                    "
                     x-model="conclusionCodeLabel"
                     id="conclusionCode"
                     name="conclusionCode"
-                    class="input-select peer"
+                    class="dropdown-field input-select peer"
                     placeholder=""
                     autocomplete="off"
+                />
+                <x-forms.dropdown-actions
+                    visible="!!conclusionCodeLabel"
+                    clear="conclusionCodeLabel = ''; modalDiagnosticReport.conclusionCode = ''; modalDiagnosticReport.conclusionCodeLabel = ''; cancelSearch()"
                 />
                 <label for="conclusionCode" class="label"> {{ __('diagnostic-reports.conclusion_code') }} * </label>
 
@@ -536,12 +541,15 @@
 
                 <div
                     x-show="showResults && results.length > 0"
-                    class="absolute top-full left-0 z-10 max-h-80 w-full overflow-auto overscroll-contain rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg dark:bg-gray-800"
+                    class="form-dropdown-menu"
                 >
                     <ul>
                         <template x-for="(result, index) in results" :key="index">
                             <li
-                                class="group flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 transition-colors dark:bg-gray-800 dark:text-white"
+                                class="dropdown-option"
+                                tabindex="0"
+                                @keydown.enter.prevent="$el.click()"
+                                @keydown.space.prevent="$el.click()"
                                 @click="
                                     conclusionCodeLabel = result.code + ' - ' + result.description;
                                     modalDiagnosticReport.conclusionCode = result.code;

@@ -58,8 +58,9 @@
                             get filteredReferrals() {
                                 const value = (this.referralNumber || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
 
-                                return this.referrals.filter(referral =>
-                                    !value || referral.requisition.replace(/[^A-Z0-9]/gi, '').toUpperCase().includes(value)
+                                return this.referrals.filter(
+                                        (referral) =>
+                                    !value || referral.requisition.replace(/[^A-Z0-9]/gi, '').toUpperCase().includes(value),
                                 );
                             },
 
@@ -81,7 +82,8 @@
                                 this.preparing = true;
 
                                 try {
-                                    this.applySelectionResult(await $wire.selectElectronicReferralByNumber(this.referralNumber));
+                                    this.applySelectionResult(await $wire.selectElectronicReferralByNumber(this.referralNumber),
+                                        );
                                 } finally {
                                     this.preparing = false;
                                 }
@@ -119,17 +121,18 @@
 
                             destroy() {
                                 clearTimeout(this.timer);
-                            }
+                            },
                         }"
                         x-init="$wire.loadAvailableReferrals()"
                         @click.outside="showReferrals = false"
                     >
                         <div class="relative">
                             <input
-                                x-model="referralNumber"
+                                x-ref="trigger"
+                                    x-model="referralNumber"
                                 type="text"
                                 id="requisitionNumber"
-                                class="input pr-7! peer @error('form.encounter.referralNumber') input-error @enderror uppercase"
+                                class="dropdown-field input pr-7! peer @error('form.encounter.referralNumber') input-error @enderror uppercase"
                                 placeholder=" "
                                 autocomplete="off"
                                 @focus="showReferrals = true"
@@ -144,27 +147,21 @@
                                 {{ __('encounters.referral_number') }}
                             </label>
 
-                            <div class="absolute inset-y-0 end-0 flex items-center">
-                                <button
-                                    type="button"
-                                    @click="updateNumber('')"
-                                    :disabled="preparing || pending"
-                                    class="text-gray-400 hover:text-gray-600"
-                                >
-                                    @icon('close', 'w-4 h-4')
-                                </button>
-                            </div>
+                            <x-forms.dropdown-actions
+                                    visible="!!referralNumber"
+                                    clear="updateNumber(''); showReferrals = false"
+                                />
 
                             <div
                                 x-show="showReferrals && !preparing && !pending"
                                 x-cloak
-                                class="absolute top-full left-0 z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                                class="form-dropdown-menu"
                             >
                                 <template x-for="referral in filteredReferrals" :key="referral.id">
                                     <button
                                         type="button"
                                         @click="selectReferral(referral)"
-                                        class="w-full rounded-md px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700"
+                                        class="dropdown-option"
                                     >
                                         <div
                                             class="font-medium text-gray-900 dark:text-white"
@@ -173,7 +170,8 @@
 
                                         <div
                                             class="text-sm text-gray-500 dark:text-gray-400"
-                                            x-text="[referral.serviceName, referral.category, referral.priority, referral.status].filter(Boolean).join(' · ')"
+                                            x-text="[referral.serviceName, referral.category, referral.priority, referral.status,
+                                                    ].filter(Boolean).join(' · ')"
                                         ></div>
 
                                         <div class="text-sm text-gray-500 dark:text-gray-400" x-text="[referral.programName, referral.period].filter(Boolean).join(' · ')"></div>

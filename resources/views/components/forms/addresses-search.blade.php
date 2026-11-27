@@ -221,7 +221,7 @@
                         return;
                     }
 
-                    $wire.call('updateRegion', '{{ $property }}', 'districts{{ $suggestionsSuffix }}', value).then(() => this.showTo = true);
+                    $wire.call('updateRegion', '{{ $property }}', 'districts{{ $suggestionsSuffix }}', value).then(() => this.showTo = this.address.region === value && !this.selecting);
                 });
 
                 // when Livewire returned districts — decide to show dropdown or not
@@ -230,13 +230,14 @@
                         return;
                     }
 
-                    this.showTo = Array.isArray(value) && value.length > 0;
+                    this.showTo = (this.address.region?.length ?? 0) >= this.searchStartLength && Array.isArray(value) && value.length > 0;
                 });
             }
         }"
         x-init="init()"
     >
         <input
+            x-ref="trigger"
             x-model.debounce.400ms="address.region"
             @keydown.escape="showTo = false"
             @change="showTo = false"
@@ -249,16 +250,21 @@
             id="addressRegion{{ $uid }}"
             autocomplete="off"
             aria-describedby="@error($property . '.region') addressRegionErrorHelp{{ $uid }} @enderror"
-            class="input @error($property . '.region') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
+            class="dropdown-field input @error($property . '.region') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
             {{-- The registry holds no districts for Kyiv, so the field is filled by hand there instead of being closed --}}
             :disabled="! address.area || readonly"
+        />
+
+        <x-forms.dropdown-actions
+            visible="!!address.region"
+            clear="address.region = ''; clearRegion(); districts = []; showTo = false; $refs.trigger.value = ''"
         />
 
         <div x-show="showTo" x-cloak>
             <div
                 x-on:click.away="showTo = false"
                 x-transition
-                class="absolute top-full right-0 left-0 rounded-br-md rounded-bl-md border border-gray-300 bg-white shadow-lg dark:border-gray-500 dark:bg-gray-800"
+                class="form-dropdown-menu"
             >
                 <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownHoverButton">
                     <template x-for="district in districts" :key="district.id">
@@ -269,7 +275,7 @@
 
                                 address.region = district.name.replace(/'/g, '\'');
                             "
-                            class="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:hover:bg-blue-800 dark:hover:text-gray-200"
+                            class="dropdown-option"
                         >
                             <span x-text="district.name"></span>
                         </li>
@@ -357,7 +363,7 @@
                         return;
                     }
 
-                    $wire.call('updateSettlement', '{{ $property }}', 'settlements{{ $suggestionsSuffix }}', value).then(() =>  this.showTo = true);
+                    $wire.call('updateSettlement', '{{ $property }}', 'settlements{{ $suggestionsSuffix }}', value).then(() =>  this.showTo = this.address.settlement === value && !this.selecting);
                 });
 
                 // when Livewire returned settlements — decide to show dropdown or not
@@ -366,7 +372,7 @@
                         return;
                     }
 
-                    this.showTo = Array.isArray(value) && value.length > 0;
+                    this.showTo = (this.address.settlement?.length ?? 0) >= this.searchStartLength && Array.isArray(value) && value.length > 0;
                 });
             }
         }"
@@ -374,6 +380,7 @@
     >
         <div class="relative">
             <input
+                x-ref="trigger"
                 x-model.debounce.400ms="address.settlement"
                 @keydown.escape="showTo = false"
                 @change="
@@ -387,15 +394,20 @@
                 id="addressSettlement{{ $uid }}"
                 autocomplete="off"
                 aria-describedby="@error($property . '.settlement') addressSettlementErrorHelp{{ $uid }} @enderror"
-                class="input @error($property . '.settlement') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
+                class="dropdown-field input @error($property . '.settlement') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
                 :disabled="! address.settlementType || address.area === 'М.КИЇВ' || readonly"
+            />
+
+            <x-forms.dropdown-actions
+                visible="!!address.settlement"
+                clear="address.settlement = ''; address.settlementId = ''; clearSettlement(); settlements = []; showTo = false; $refs.trigger.value = ''"
             />
 
             <div x-show="showTo && address.area !== 'М.КИЇВ'" x-cloak>
                 <div
                     @click.away="showTo = false"
                     x-transition
-                    class="absolute top-full right-0 left-0 !z-[25] origin-top rounded-br-md rounded-bl-md border border-gray-300 bg-white shadow-lg dark:border-gray-500 dark:bg-gray-800"
+                    class="form-dropdown-menu"
                 >
                     <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownHoverButton">
                         <template x-for="settlement in settlements" :key="settlement.id">
@@ -407,7 +419,7 @@
                                     address.settlement = settlement.name.replace(/'/g, '\'');
                                     address.settlementId = settlement.id;
                                 "
-                                class="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:hover:bg-blue-800 dark:hover:text-gray-200"
+                                class="dropdown-option"
                             >
                                 <span x-text="settlement.name"></span>
                             </li>
@@ -512,7 +524,7 @@
                         return;
                     }
 
-                    $wire.call('updateStreet', '{{ $property }}', 'streets{{ $suggestionsSuffix }}', value).then(() => this.showTo = true);
+                    $wire.call('updateStreet', '{{ $property }}', 'streets{{ $suggestionsSuffix }}', value).then(() => this.showTo = this.address.street === value && !this.selecting);
                 });
 
                 // when Livewire returned streets — decide to show dropdown or not
@@ -521,13 +533,14 @@
                         return;
                     }
 
-                    this.showTo = Array.isArray(value) && value.length > 0;
+                    this.showTo = (this.address.street?.length ?? 0) >= this.searchStartLength && Array.isArray(value) && value.length > 0;
                 });
             }
         }"
         x-init="init()"
     >
         <input
+            x-ref="trigger"
             x-model.debounce.400ms="address.street"
             @keydown.escape="showTo = false"
             @change="
@@ -540,8 +553,13 @@
             id="addressStreet{{ $uid }}"
             autocomplete="off"
             aria-describedby="@error($property . '.street') addressStreetErrorHelp{{ $uid }} @enderror"
-            class="input @error($property . '.street') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
+            class="dropdown-field input @error($property . '.street') input-error border-red-500 focus:border-red-500 scroll-to-error @enderror peer"
             :disabled="(! address.settlementType && ! selecting) || readonly"
+        />
+
+        <x-forms.dropdown-actions
+            visible="!!address.street"
+            clear="address.street = ''; clearStreet(); streets = []; showTo = false; $refs.trigger.value = ''"
         />
 
         <div
@@ -549,7 +567,7 @@
             x-show="showTo"
             @click.away="showTo = false"
             x-transition
-            class="absolute top-full right-0 left-0 origin-top rounded-br-md rounded-bl-md border border-gray-300 bg-white shadow-lg dark:border-gray-500 dark:bg-gray-800"
+            class="form-dropdown-menu"
         >
             <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownHoverButton">
                 <template x-for="street in streets" :key="street.id">
@@ -559,7 +577,7 @@
                             showTo = false;
                             address.street = street.name.replace(/'/g, '\'');
                         "
-                        class="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:hover:bg-blue-800 dark:hover:text-gray-200"
+                        class="dropdown-option"
                     >
                         <span x-text="street.name"></span>
                     </li>

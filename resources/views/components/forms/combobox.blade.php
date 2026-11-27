@@ -63,9 +63,8 @@
         Example: isRequired=false (default)
 
     - allowCustom (boolean, optional):
-        Allow adding a typed identifier to the bound value without a local option.
-        The dropdown still supports selecting local records by label or identifier.
-        Example: allow-custom
+        Allow adding a typed identifier without a local option using Enter or the add button.
+        Local choices remain searchable by their label and identifier.
 
     Example usage:
         <x-forms.combobox
@@ -97,96 +96,114 @@
 
 @php
     $hasSearchError = $errors->has($bind);
+    $fieldAttributes = ['disabled', ':disabled', 'x-bind:disabled', 'readonly', ':readonly', 'x-bind:readonly'];
 @endphp
 
-<div {{ $attributes->merge(['class' => "form-group group"]) }}
-     :class="{ '!z-30': open }"
-     x-id="['input', 'listbox']"
-     x-data="combobox({
-         options: @js($options),
-         entangled: @if($bind !== '')$wire.entangle('{{ $bind }}')@else null @endif,
-         model: @if($model !== null && $model !== '') {{ $model }} @else null @endif,
-         modelKey: '{{ $modelKey }}',
-         value: '{{ $bindValue }}',
-         param: '{{ $bindParam }}',
-         limit: {{ (int) $limit }},
-         allowCustom: @js((bool) $allowCustom)
-     })"
-     @reset-comboboxes.window="reset()"
+<div
+    {{ $attributes->except($fieldAttributes)->merge(['class' => 'form-group group']) }}
+    :class="{ '!z-30': open }"
+    x-id="['input', 'listbox', 'error']"
+    x-data="combobox({
+        options: @js($options),
+        entangled: @if($bind !== '')$wire.entangle('{{ $bind }}')@else null @endif,
+        model: @if($model !== null && $model !== '') {{ $model }} @else null @endif,
+        modelKey: '{{ $modelKey }}',
+        value: '{{ $bindValue }}',
+        param: '{{ $bindParam }}',
+        limit: {{ (int) $limit }},
+        allowCustom: @js((bool) $allowCustom)
+    })"
+    @reset-comboboxes.window="reset()"
+    @click.outside="close()"
+    @focusout="if (!$el.contains($event.relatedTarget)) close();"
 >
-    <input :id="$id('input')"
-           :required="{{ $isRequired ?: 'false' }}"
-           :name="{{ $isRequired ? "'$bind'" : 'null' }}"
-           type="text"
-           placeholder=" "
-           x-model="search"
-           autocomplete="off"
-           aria-describedby="{{ $hasSearchError ? 'hasSearchErrorHelp' : '' }}"
-           class="input {{ $hasSearchError  ? 'input-error border-red-500 focus:border-red-500' : ''}} peer"
-           @focus="open = true"
-           @input="typing = true; value = ''"
-           @if ($allowCustom)
-               @keydown.enter.prevent="addCustomValue()"
-           @endif
-           @mousedown="open = !open"
-           @keydown.escape.window="open = false;"
-           @blur="typing = false; setTimeout(() => open = false, 100)"
-           x-init="if (search) $el.classList.add('not-empty')"
-           x-effect="$el.classList.toggle('not-empty', !!search)"
-    />
+    <div class="relative">
+        <input
+            :id="$id('input')"
+            x-ref="trigger"
+            {{ $attributes->only($fieldAttributes) }}
+            :required="{{ $isRequired ?: 'false' }}"
+            :name="{{ $isRequired ? "'$bind'" : 'null' }}"
+            type="text"
+            placeholder=" "
+            x-model="search"
+            autocomplete="off"
+            role="combobox"
+            aria-autocomplete="list"
+            :aria-expanded="open"
+            :aria-controls="$id('listbox')"
+            :aria-activedescendant="open && active >= 0 ? $id('listbox') + '-' + active : null"
+            @if($hasSearchError) :aria-describedby="$id('error')" aria-invalid="true" @endif
+            class="dropdown-field input peer {{ $hasSearchError  ? 'input-error' : ''}}"
+            @focus="open = !$el.readOnly"
+            @click="open = !$el.readOnly"
+            @input="
+                typing = true;
+                value = '';
+                active = -1;
+                open = true;
+            "
+            @keydown.arrow-down.prevent="move(1)"
+            @keydown.arrow-up.prevent="move(-1)"
+            @keydown.enter="
+                if (open && active >= 0 && !$event.isComposing) {
+                    $event.preventDefault();
+                    select(filtered[active].label, filtered[active].index);
+                } else if (allowCustom && !$event.isComposing) {
+                    $event.preventDefault();
+                    addCustomValue();
+                }
+            "
+            @keydown.escape="
+                if (open && !$event.isComposing) {
+                    $event.stopPropagation();
+                    close();
+                }
+            "
+            x-effect="$el.classList.toggle('not-empty', !!search)"
+        />
+        <x-forms.dropdown-actions visible="search !== '' || (value != null && value !== '')" clear="reset()" />
+        <label :for="$id('input')" class="label z-10">
+            {{ $label }}
+        </label>
+        {{-- Keep Alpine's x-for scope intact when a parent Livewire component morphs. --}}
+        <ul x-show="open" x-cloak wire:ignore role="listbox" :id="$id('listbox')" class="form-dropdown-menu">
+            @if ($allowCustom)
+                <li role="presentation" class="px-3 py-2">
+                    <button
+                        type="button"
+                        @mousedown.prevent
+                        @click="addCustomValue()"
+                        :disabled="!search.trim() || $refs.trigger.readOnly || $refs.trigger.matches(':disabled')"
+                        class="button-primary px-4! py-2! text-xs!"
+                    >
+                        {{ __('forms.add_to_search') }}
+                    </button>
+                </li>
+            @endif
 
-    {{-- wire:ignore keeps Livewire from morphing the Alpine x-for items; otherwise a parent re-render
-         (e.g. resetFilters) re-evaluates "option" after its loop scope is gone → "option is not defined". --}}
-    <ul x-show="open"
-        x-cloak
-        wire:ignore
-        :id="$id('listbox')"
-        class="py-2 text-sm text-gray-700 dark:text-gray-200 absolute z-50 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-400 dark:border-gray-600 rounded shadow max-h-60 overflow-auto"
-    >
-        @if ($allowCustom)
-            <li class="px-4 py-2">
-                <button
-                    type="button"
+            <template x-for="(option, position) in filtered" :key="option.index">
+                <li
+                    role="option"
+                    :id="$id('listbox') + '-' + position"
+                    :aria-selected="value === options[option.index][valueName]"
+                    :data-active="active === position"
                     @mousedown.prevent
-                    @click="addCustomValue()"
-                    :disabled="! search.trim()"
-                    class="button-primary px-4! py-2! text-xs!"
-                >
-                    {{ __('forms.add_to_search') }}
-                </button>
-            </li>
-        @endif
-
-        <template x-if="filtered.length > 0">
-            <template x-for="option in filtered" :key="option.index">
-                <li @mousedown.prevent="select(option.label, option.index)"
+                    @click="select(option.label, option.index)"
                     x-text="option.label"
-                    tabindex=0
-                    :id="`option-${option.index}`"
-                    class="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-blue-800"
+                    class="dropdown-option"
                 ></li>
             </template>
-        </template>
-
-        <template x-if="filtered.length === 0">
-            <li class="px-4 py-2 text-red-400 cursor-not-allowed">
-                {{ __('Співпадінь не знайдено') }}
-            </li>
-        </template>
-    </ul>
+            <li x-show="!filtered.length" class="px-3 py-2 text-sm text-gray-500">{{ __('forms.nothing_found') }}</li>
+        </ul>
+    </div>
 
     @if($hasSearchError)
-        <p id="hasSearchErrorHelp" class="text-error">
-            {{ $errors->first($bind) }}
-        </p>
+        <p :id="$id('error')" class="text-error">{{ $errors->first($bind) }}</p>
     @endif
-
-    <label :for="$id('input')" class="label z-10">
-        {{ $label }}
-    </label>
 </div>
 
-@push('scripts')
+@pushOnce('scripts')
     <script>
         function combobox({ options, entangled, model, modelKey, value, param, limit, allowCustom = false }) {
             const usesModel = model !== null && model !== undefined;
@@ -204,9 +221,10 @@
                 allowCustom: allowCustom,
                 open: false,
                 typing: false,
+                active: -1,
 
                 init() {
-                    if (this.value) {
+                    if (this.value !== null && this.value !== undefined && this.value !== '') {
                         const selected = this.options.find((option) => option[this.valueName] === this.value);
 
                         if (selected) {
@@ -216,19 +234,29 @@
                         }
                     }
 
+                    if (this.usesModel) {
+                        this.$watch(() => this.model[this.modelKey], (value) => {
+                            if (value !== this.value) {
+                                this.typing = false;
+                                this.value = value;
+                            }
+                        });
+                    }
+
                     this.$watch('value', (newValue) => {
                         if (this.usesModel) {
                             this.model[this.modelKey] = newValue ?? '';
                         }
 
-                        if (!newValue && !this.typing) {
-                            this.search = '';
+                        if (!this.typing) {
+                            const selected = this.options.find((option) => option[this.valueName] === newValue);
+                            this.search = selected?.[this.param] ?? (this.allowCustom ? String(newValue ?? '') : '');
                         }
                     });
                 },
 
                 get filtered() {
-                    if (!this.search) {
+                    if (!this.typing || !this.search) {
                         return this.options.slice(0, this.limit).map((option, index) => ({ label: option[this.param], index }));
                     }
 
@@ -242,14 +270,20 @@
                                 || (this.allowCustom && String(option[this.valueName] ?? '').toLowerCase().includes(search));
                         });
 
-                    if (matches.length === 0 && !this.allowCustom) {
-                        this.value = '';
-                    }
-
                     return matches.slice(0, this.limit);
                 },
 
+                move(step) {
+                    if (this.$refs.trigger.readOnly || this.$refs.trigger.matches(':disabled')) return;
+                    this.open = true;
+                    const count = this.filtered.length;
+                    if (!count) return;
+                    this.active = this.active < 0 ? (step > 0 ? 0 : count - 1) : (this.active + step + count) % count;
+                    this.$nextTick(() => document.getElementById(this.$id('listbox') + '-' + this.active)?.scrollIntoView({ block: 'nearest' }));
+                },
+
                 select(label, index) {
+                    if (this.$refs.trigger.readOnly || this.$refs.trigger.matches(':disabled')) return;
                     this.search = label;
                     this.value = this.options.find((option, currentIndex) => currentIndex === index && option[this.param] === label)[this.valueName];
                     this.open = false;
@@ -259,7 +293,7 @@
                 addCustomValue() {
                     const value = this.search.trim();
 
-                    if (!this.allowCustom || !value) {
+                    if (!this.allowCustom || !value || this.$refs.trigger.readOnly || this.$refs.trigger.matches(':disabled')) {
                         return;
                     }
 
@@ -273,13 +307,20 @@
                     this.typing = false;
                 },
 
+                close() {
+                    this.open = false;
+                    this.typing = false;
+                    this.active = -1;
+                },
+
                 reset() {
                     this.search = '';
                     this.value = '';
+                    this.active = -1;
                     this.open = false;
                     this.typing = false;
                 }
             }
         }
     </script>
-@endpush
+@endPushOnce
