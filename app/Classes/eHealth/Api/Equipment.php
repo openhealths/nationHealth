@@ -4,21 +4,23 @@ declare(strict_types=1);
 
 namespace App\Classes\eHealth\Api;
 
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthResponseException;
-use App\Exceptions\EHealth\EHealthValidationException;
-use App\Models\LegalEntity as LegalEntityModel;
-use App\Models\Division as DivisionModel;
-use App\Models\Equipment as EquipmentModel;
-use App\Models\Employee\Employee as EmployeeModel;
-use App\Rules\InDictionary;
-use Illuminate\Support\Facades\Log;
+use App\Classes\eHealth\EHealthRequest as Request;
 use App\Classes\eHealth\EHealthResponse;
 use App\Classes\eHealth\Errors\EquipmentErrorTranslator;
 use App\Contracts\ApiErrorTranslator;
+use App\Enums\Equipment\AvailabilityStatus;
+use App\Enums\Equipment\Status;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthResponseException;
+use App\Exceptions\EHealth\EHealthValidationException;
+use App\Models\Division as DivisionModel;
+use App\Models\Employee\Employee as EmployeeModel;
+use App\Models\Equipment as EquipmentModel;
+use App\Models\LegalEntity as LegalEntityModel;
+use App\Rules\InDictionary;
 use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use App\Classes\eHealth\EHealthRequest as Request;
 use Illuminate\Validation\Rule;
 
 class Equipment extends Request
@@ -37,10 +39,10 @@ class Equipment extends Request
      *     division_id?: string,
      *     device_definition_id?: string,
      *     type?: string, // Code from dictionary device_definition_classification_type
-     *     status?: \App\Enums\Equipment\Status::class,
+     *     status?: value-of<Status>,
      *     model_number?: string,
      *     manufacturer?: string,
-     *     availability_status?: \App\Enums\Equipment\AvailabilityStatus::class,
+     *     availability_status?: value-of<AvailabilityStatus>,
      *     recorder?: string,
      *     inventory_number?: string,
      *     serial_number?: string,

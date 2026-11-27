@@ -9,10 +9,10 @@ use App\Enums\EmployeeRole\Status;
 use App\Livewire\EmployeeRole\EmployeeRoleView;
 use App\Models\EmployeeRole;
 use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
+use Tests\Concerns\RefreshInstalledDatabase;
 use Tests\TestCase;
 
 /**
@@ -23,7 +23,7 @@ use Tests\TestCase;
  */
 class EmployeeRoleViewSyncTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshInstalledDatabase;
     use WithFaker;
 
     /**
@@ -121,20 +121,6 @@ class EmployeeRoleViewSyncTest extends TestCase
             'is_active' => true,
             'end_date' => null
         ]);
-    }
-
-    /**
-     * Build the schema the way a fresh installation does: install migrations hold the full current schema, update
-     * migrations are only for upgrading existing databases.
-     *
-     * @return array
-     */
-    protected function migrateFreshUsing(): array
-    {
-        return [
-            '--path' => database_path('migrations/install'),
-            '--realpath' => true
-        ];
     }
 
     /**

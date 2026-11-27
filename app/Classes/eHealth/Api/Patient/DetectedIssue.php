@@ -26,7 +26,7 @@ class DetectedIssue extends PatientApiBase
      * @param array{
      *     encounter_id?: string,
      *     episode_id?: string,
-     *     status?: string,
+     *     status?: value-of<Status>,
      *     recorder?: string,
      *     recorder_legal_entity_id?: string,
      *     device_id?: string,

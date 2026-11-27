@@ -37,7 +37,7 @@ class DeviceDispense extends PatientApiBase
      *     based_on?: string,
      *     location?: string,
      *     performer?: string,
-     *     status?: string,
+     *     status?: value-of<Status>,
      *     when_handed_over_from?: string,
      *     when_handed_over_to?: string,
      *     part_of?: string,

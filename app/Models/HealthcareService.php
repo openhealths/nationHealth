@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\UtcDateTimeCast;
 use App\Enums\HealthcareService\Status;
 use App\Models\MedicalEvents\Sql\CodeableConcept;
 use Database\Factories\HealthcareServiceFactory;
@@ -50,8 +51,8 @@ class HealthcareService extends Model
         'coverage_area' => 'json',
         'licensed_healthcare_service' => 'json',
         'status' => Status::class,
-        'ehealth_inserted_at' => 'datetime',
-        'ehealth_updated_at' => 'datetime',
+        'ehealth_inserted_at' => UtcDateTimeCast::class,
+        'ehealth_updated_at' => UtcDateTimeCast::class,
         'created_at' => 'datetime'
     ];
 

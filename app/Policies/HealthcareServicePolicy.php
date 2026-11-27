@@ -6,6 +6,7 @@ namespace App\Policies;
 
 use App\Enums\HealthcareService\Status;
 use App\Enums\Status as DivisionStatus;
+use App\Enums\User\Role;
 use App\Models\HealthcareService;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
@@ -13,11 +14,19 @@ use Illuminate\Auth\Access\Response;
 class HealthcareServicePolicy
 {
     /**
+     * Roles allowed to view, register, update and change the status of healthcare services. Other roles may hold
+     * the healthcare service scopes, but don't get these actions in the application.
+     *
+     * @var array
+     */
+    protected const array ALLOWED_ROLES = [Role::OWNER, Role::ADMIN, Role::PHARMACY_OWNER];
+
+    /**
      * User allowed to view the list of healthcare services
      */
     public function viewAny(User $user): Response
     {
-        if ($user->cannot('healthcare_service:read')) {
+        if ($user->cannot('healthcare_service:read') || !$user->hasAllowedRole(self::ALLOWED_ROLES)) {
             return Response::denyWithStatus(404);
         }
 
@@ -26,10 +35,11 @@ class HealthcareServicePolicy
 
     /**
      * User allowed to synchronize healthcare services, or exactly that one when it is given.
+     * Synchronizing reads the services from eHealth and writes them to the database, so it needs both scopes.
      */
     public function sync(User $user, ?HealthcareService $healthcareService = null): Response
     {
-        if ($user->cannot('healthcare_service:write') && $user->cannot('healthcare_service:read')) {
+        if ($user->cannot('healthcare_service:read') || $user->cannot('healthcare_service:write')) {
             return Response::denyWithStatus(404);
         }
 
@@ -55,7 +65,7 @@ class HealthcareServicePolicy
      */
     public function view(User $user, HealthcareService $healthcareService): Response
     {
-        if ($user->cannot('healthcare_service:read')) {
+        if ($user->cannot('healthcare_service:read') || !$user->hasAllowedRole(self::ALLOWED_ROLES)) {
             return Response::denyWithStatus(404);
         }
 
@@ -72,7 +82,7 @@ class HealthcareServicePolicy
      */
     public function create(User $user): Response
     {
-        if ($user->cannot('healthcare_service:write')) {
+        if ($user->cannot('healthcare_service:write') || !$user->hasAllowedRole(self::ALLOWED_ROLES)) {
             return Response::denyWithStatus(404);
         }
 
@@ -95,7 +105,7 @@ class HealthcareServicePolicy
      */
     public function delete(User $user, HealthcareService $healthcareService): Response
     {
-        if ($user->cannot('healthcare_service:write')) {
+        if ($user->cannot('healthcare_service:write') || !$user->hasAllowedRole(self::ALLOWED_ROLES)) {
             return Response::denyWithStatus(404);
         }
 
@@ -117,7 +127,7 @@ class HealthcareServicePolicy
      */
     public function edit(User $user, HealthcareService $healthcareService): Response
     {
-        if ($user->cannot('healthcare_service:write')) {
+        if ($user->cannot('healthcare_service:write') || !$user->hasAllowedRole(self::ALLOWED_ROLES)) {
             return Response::denyWithStatus(404);
         }
 
@@ -139,7 +149,7 @@ class HealthcareServicePolicy
      */
     public function update(User $user, HealthcareService $healthcareService): Response
     {
-        if ($user->cannot('healthcare_service:write')) {
+        if ($user->cannot('healthcare_service:write') || !$user->hasAllowedRole(self::ALLOWED_ROLES)) {
             return Response::denyWithStatus(404);
         }
 
@@ -166,7 +176,7 @@ class HealthcareServicePolicy
      */
     public function activate(User $user, HealthcareService $healthcareService): Response
     {
-        if ($user->cannot('healthcare_service:write')) {
+        if ($user->cannot('healthcare_service:write') || !$user->hasAllowedRole(self::ALLOWED_ROLES)) {
             return Response::denyWithStatus(404);
         }
 
@@ -198,7 +208,7 @@ class HealthcareServicePolicy
      */
     public function deactivate(User $user, HealthcareService $healthcareService): Response
     {
-        if ($user->cannot('healthcare_service:write')) {
+        if ($user->cannot('healthcare_service:write') || !$user->hasAllowedRole(self::ALLOWED_ROLES)) {
             return Response::denyWithStatus(404);
         }
 

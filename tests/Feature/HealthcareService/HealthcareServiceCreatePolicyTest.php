@@ -7,23 +7,26 @@ namespace Tests\Feature\HealthcareService;
 use App\Enums\User\Role;
 use App\Models\HealthcareService;
 use App\Models\LegalEntity;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Concerns\RefreshInstalledDatabase;
 use Tests\TestCase;
 
 /**
  * Who may create healthcare services: the role of the user, the type and the status of the legal entity.
  *
  * The expected roles are written out here on purpose instead of being read from the configuration, so an accidental
- * change of the role scopes or of the roles allowed for a legal entity type fails this test.
+ * change of the allowed roles, of the legal entity types allowed to create services, or a write scope lost by an
+ * allowed role fails this test. Each case checks a different rule, so a role is listed once and a legal entity type
+ * is checked with the owner.
  */
 class HealthcareServiceCreatePolicyTest extends TestCase
 {
-    use RefreshDatabase;
+    use PreparesHealthcareServiceTests;
+    use RefreshInstalledDatabase;
 
     /**
-     * Roles with the healthcare service write scope in the legal entity types allowed to create services.
+     * The owner in each legal entity type allowed to create services, and each other allowed role once, in a legal
+     * entity type that holds it.
      *
      * @return array
      */
@@ -31,51 +34,35 @@ class HealthcareServiceCreatePolicyTest extends TestCase
     {
         return [
             'primary care owner' => [LegalEntity::TYPE_PRIMARY_CARE, Role::OWNER],
-            'primary care admin' => [LegalEntity::TYPE_PRIMARY_CARE, Role::ADMIN],
             'outpatient owner' => [LegalEntity::TYPE_OUTPATIENT, Role::OWNER],
-            'outpatient admin' => [LegalEntity::TYPE_OUTPATIENT, Role::ADMIN],
             'emergency owner' => [LegalEntity::TYPE_EMERGENCY, Role::OWNER],
-            'emergency admin' => [LegalEntity::TYPE_EMERGENCY, Role::ADMIN],
-            'pharmacy pharmacy owner' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACY_OWNER],
-            'pharmacy owner' => [LegalEntity::TYPE_PHARMACY, Role::OWNER]
+            'pharmacy owner' => [LegalEntity::TYPE_PHARMACY, Role::OWNER],
+            'admin' => [LegalEntity::TYPE_PRIMARY_CARE, Role::ADMIN],
+            'pharmacy owner role' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACY_OWNER]
         ];
     }
 
     /**
-     * Roles without the write scope, and roles of the legal entity types not allowed to create services.
-     * Only roles that can be held in the legal entity type are listed.
+     * Each role not allowed to create services once, in a legal entity type that holds it, and the owner in each
+     * legal entity type not allowed to create them.
      *
      * @return array
      */
     public static function rolesDeniedToCreate(): array
     {
         return [
-            'primary care reorganization owner' => [LegalEntity::TYPE_PRIMARY_CARE, Role::REORGANIZATION_OWNER],
-            'primary care hr' => [LegalEntity::TYPE_PRIMARY_CARE, Role::HR],
-            'primary care doctor' => [LegalEntity::TYPE_PRIMARY_CARE, Role::DOCTOR],
-            'primary care assistant' => [LegalEntity::TYPE_PRIMARY_CARE, Role::ASSISTANT],
-            'primary care receptionist' => [LegalEntity::TYPE_PRIMARY_CARE, Role::RECEPTIONIST],
-            'primary care med admin' => [LegalEntity::TYPE_PRIMARY_CARE, Role::MED_ADMIN],
-            'primary care laborant' => [LegalEntity::TYPE_PRIMARY_CARE, Role::LABORANT],
-            'outpatient reorganization owner' => [LegalEntity::TYPE_OUTPATIENT, Role::REORGANIZATION_OWNER],
-            'outpatient hr' => [LegalEntity::TYPE_OUTPATIENT, Role::HR],
-            'outpatient assistant' => [LegalEntity::TYPE_OUTPATIENT, Role::ASSISTANT],
-            'outpatient specialist' => [LegalEntity::TYPE_OUTPATIENT, Role::SPECIALIST],
-            'outpatient receptionist' => [LegalEntity::TYPE_OUTPATIENT, Role::RECEPTIONIST],
-            'outpatient med admin' => [LegalEntity::TYPE_OUTPATIENT, Role::MED_ADMIN],
-            'outpatient laborant' => [LegalEntity::TYPE_OUTPATIENT, Role::LABORANT],
-            'outpatient med coordinator' => [LegalEntity::TYPE_OUTPATIENT, Role::MED_COORDINATOR],
-            'emergency reorganization owner' => [LegalEntity::TYPE_EMERGENCY, Role::REORGANIZATION_OWNER],
-            'emergency hr' => [LegalEntity::TYPE_EMERGENCY, Role::HR],
-            'emergency specialist' => [LegalEntity::TYPE_EMERGENCY, Role::SPECIALIST],
-            'emergency assistant' => [LegalEntity::TYPE_EMERGENCY, Role::ASSISTANT],
-            'pharmacy pharmacist' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACIST],
-            'pharmacy hr' => [LegalEntity::TYPE_PHARMACY, Role::HR],
+            'reorganization owner' => [LegalEntity::TYPE_PRIMARY_CARE, Role::REORGANIZATION_OWNER],
+            'hr' => [LegalEntity::TYPE_PRIMARY_CARE, Role::HR],
+            'doctor' => [LegalEntity::TYPE_PRIMARY_CARE, Role::DOCTOR],
+            'assistant' => [LegalEntity::TYPE_PRIMARY_CARE, Role::ASSISTANT],
+            'receptionist' => [LegalEntity::TYPE_PRIMARY_CARE, Role::RECEPTIONIST],
+            'med admin' => [LegalEntity::TYPE_PRIMARY_CARE, Role::MED_ADMIN],
+            'laborant' => [LegalEntity::TYPE_PRIMARY_CARE, Role::LABORANT],
+            'specialist' => [LegalEntity::TYPE_OUTPATIENT, Role::SPECIALIST],
+            'med coordinator' => [LegalEntity::TYPE_OUTPATIENT, Role::MED_COORDINATOR],
+            'pharmacist' => [LegalEntity::TYPE_PHARMACY, Role::PHARMACIST],
             'msp owner' => [LegalEntity::TYPE_MSP, Role::OWNER],
-            'msp admin' => [LegalEntity::TYPE_MSP, Role::ADMIN],
-            'msp hr' => [LegalEntity::TYPE_MSP, Role::HR],
-            'msp limited owner' => [LegalEntity::TYPE_MSP_LIMITED, Role::OWNER],
-            'msp limited admin' => [LegalEntity::TYPE_MSP_LIMITED, Role::ADMIN]
+            'msp limited owner' => [LegalEntity::TYPE_MSP_LIMITED, Role::OWNER]
         ];
     }
 
@@ -131,40 +118,5 @@ class HealthcareServiceCreatePolicyTest extends TestCase
         $user = $this->userWithRole(LegalEntity::factory()->create(['status' => 'CLOSED']), Role::OWNER);
 
         $this->assertFalse($user->can('create', HealthcareService::class));
-    }
-
-    /**
-     * Build the schema the way a fresh installation does: install migrations hold the full current schema, update
-     * migrations are only for upgrading existing databases.
-     *
-     * @return array
-     */
-    protected function migrateFreshUsing(): array
-    {
-        return [
-            '--path' => database_path('migrations/install'),
-            '--realpath' => true
-        ];
-    }
-
-    /**
-     * User working in the legal entity with the role, in the context the application sets for the legal entity's
-     * pages. Fails when the role is not assigned, so a denied case can't pass only because the role is missing.
-     *
-     * @param  LegalEntity  $legalEntity
-     * @param  Role  $role
-     * @return User
-     */
-    private function userWithRole(LegalEntity $legalEntity, Role $role): User
-    {
-        $this->app->instance('legalEntity', $legalEntity);
-        setPermissionsTeamId($legalEntity->id);
-
-        $user = User::factory()->create();
-        $user->assignRole($role);
-
-        $this->assertTrue($user->hasRole($role->value), "Role $role->value is not assigned");
-
-        return $user;
     }
 }

@@ -60,7 +60,7 @@ class ClinicalImpression extends PatientApiBase
      * @param  string  $patientId
      * @param  array{
      *     code?: string,
-     *     status?: string,
+     *     status?: value-of<Status>,
      *     encounter_id?: string,
      *     episode_id?: string,
      *     effective_date_from?: string,

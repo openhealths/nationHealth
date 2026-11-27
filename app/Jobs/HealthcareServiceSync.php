@@ -34,9 +34,10 @@ class HealthcareServiceSync extends EHealthJob
      */
     protected function sendRequest(string $token): PromiseInterface|EHealthResponse
     {
+        // The next pages keep the filter of the first page, which the list page passes in the batch options
         return EHealth::healthcareService()
             ->withToken($token)
-            ->getMany(['page' => $this->page]);
+            ->getMany([...($this->batch()->options['query'] ?? []), 'page' => $this->page]);
     }
 
     /**

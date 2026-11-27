@@ -60,7 +60,7 @@ class Device extends PatientApiBase
      *     name?: string,
      *     recorder?: string,
      *     recorder_legal_entity_id?: string,
-     *     status?: string,
+     *     status?: value-of<Status>,
      *     serial_number?: string,
      *     inserted_at_from?: string,
      *     inserted_at_to?: string,

@@ -101,6 +101,9 @@ class HealthcareServiceRepository
                 ->whereIn('uuid', $items->pluck('divisionUuid')->unique())
                 ->pluck('id', 'uuid');
 
+            // A service of a division created after the last division sync waits for the next one instead of failing the whole page
+            $items = $items->filter(static fn (HealthcareServiceData $data): bool => $divisionIds->has($data->divisionUuid));
+
             // Lock in a consistent order so overlapping sync pages read the latest category and type codings.
             /** @var Collection<string, HealthcareService> $existingServices */
             $existingServices = HealthcareService::with(['category.coding', 'type.coding'])
