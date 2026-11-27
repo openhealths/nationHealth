@@ -5,7 +5,7 @@
 
 <x-layouts.patient :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
     <x-slot name="headerActions">
-        @can('create', Encounter::class)
+        @if ($this->canCreateMedicalEvents && Auth::user()->can('create', Encounter::class))
             <a
                 href="{{
                     $prepersonId
@@ -17,7 +17,7 @@
                 @icon('plus', 'w-4 h-4')
                 {{ __('procedures.new') }}
             </a>
-        @endcan
+        @endif
 
         <button type="button" class="button-primary-outline px-5 py-2 text-sm whitespace-nowrap">
             {{ __('patients.data_access') }}
@@ -45,7 +45,7 @@
             x-data="{
                 showAdditionalParams: $wire.entangle('showAdditionalParams'),
                 category: $wire.entangle('filterCategory'),
-                allProcedureServices: []
+                allProcedureServices: [],
             }"
         >
             <div class="mb-4 flex items-center gap-1 font-semibold text-gray-900 dark:text-gray-100">
@@ -85,7 +85,11 @@
                     allow-custom
                     :label="__('procedures.code')"
                     x-init="allProcedureServices = options"
-                    x-effect="options = category ? allProcedureServices.filter(service => service.category === category) : allProcedureServices"
+                    x-effect="
+                        options = category
+                            ? allProcedureServices.filter((service) => service.category === category)
+                            : allProcedureServices
+                    "
                     @procedure-category-changed.window="reset()"
                 />
             </div>
@@ -351,7 +355,7 @@
                                                     data_get(
                                                         $this->dictionaries,
                                                         'eHealth/procedure_categories.' . $categoryCode,
-                                                        data_get($procedure, 'category.text', data_get($procedure, 'category.0.text', $categoryCode ?: '—'))
+                                                        data_get($procedure, 'category.text', data_get($procedure, 'category.0.text', $categoryCode ?: '—')),
                                                     )
                                                 }}
                                             </div>

@@ -1,10 +1,17 @@
+@use('App\Models\MedicalEvents\Sql\Composition')
+
 {{-- Both ids are forwarded: the layout switches its whole navigation between the person
      and preperson route families based on which one is set. --}}
-<x-layouts.patient :showLegacyMessages="false" :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
+<x-layouts.patient
+    :showLegacyMessages="false"
+    :personId="$personId"
+    :prepersonId="$prepersonId"
+    :patientFullName="$patientFullName"
+>
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <x-slot name="headerActions">
         <div class="flex flex-wrap gap-2">
-            @can('viewAny', \App\Models\MedicalEvents\Sql\Composition::class)
+            @can('viewAny', Composition::class)
                 <button
                     type="button"
                     wire:click="sync"
@@ -21,7 +28,7 @@
                     {{ __('forms.synchronise_with_eHealth') }}
                 </button>
             @endcan
-            @can('createNewborn', \App\Models\MedicalEvents\Sql\Composition::class)
+            @if ($this->canCreateMedicalEvents && Auth::user()->can('createNewborn', Composition::class))
                 <a
                     href="{{ $this->createNewbornUrl }}"
                     class="button-primary-outline flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
@@ -29,8 +36,8 @@
                     @icon('plus', 'w-4 h-4')
                     {{ __('compositions.actions.create_newborn') }}
                 </a>
-            @endcan
-            @can('createTempDisability', \App\Models\MedicalEvents\Sql\Composition::class)
+            @endif
+            @if ($this->canCreateMedicalEvents && Auth::user()->can('createTempDisability', Composition::class))
                 <a
                     href="{{ $this->createTempDisabilityUrl }}"
                     class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
@@ -38,7 +45,7 @@
                     @icon('plus', 'w-4 h-4')
                     {{ __('compositions.actions.create_temp_disability') }}
                 </a>
-            @endcan
+            @endif
         </div>
     </x-slot>
 
@@ -215,7 +222,7 @@
                                             $composition->isTempDisability
                                                                                                                                                                     && $composition->status->isCancellable()
                                                                                                                                                                     && $personId
-)
+                                        )
                                             <a
                                                 href="{{ $this->refineUrl($composition) }}"
                                                 class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"

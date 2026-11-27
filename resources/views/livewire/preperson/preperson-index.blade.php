@@ -1,4 +1,5 @@
 @use('App\Enums\Preperson\Status')
+@use('App\Models\MedicalEvents\Sql\Encounter')
 @use('App\Models\MedicalEvents\Sql\Episode')
 @use('App\Models\Preperson')
 @use('Illuminate\Support\Carbon')
@@ -146,13 +147,15 @@
 
                     <div class="flex items-center space-x-6">
                         @if ($preperson->status === Status::DRAFT)
-                            <a
-                                href="{{ route('prepersons.edit', [legalEntity(), $preperson]) }}"
-                                class="flex cursor-pointer items-center gap-1.5 font-medium text-blue-600 hover:text-blue-800"
-                            >
-                                @icon('file-lines', 'w-4 h-4')
-                                <span class="text-sm">{{ __('patients.continue_registration') }}</span>
-                            </a>
+                            @can('edit', $preperson)
+                                <a
+                                    href="{{ route('prepersons.edit', [legalEntity(), $preperson]) }}"
+                                    class="flex cursor-pointer items-center gap-1.5 font-medium text-blue-600 hover:text-blue-800"
+                                >
+                                    @icon('file-lines', 'w-4 h-4')
+                                    <span class="text-sm">{{ __('patients.continue_registration') }}</span>
+                                </a>
+                            @endcan
                         @else
                             <a
                                 href="{{ route('prepersons.patient-data', [legalEntity(), $preperson->id]) }}"
@@ -161,14 +164,16 @@
                                 @icon('file-lines', 'w-4 h-4')
                                 <span class="text-sm">{{ __('patients.view_record') }}</span>
                             </a>
-                            <a
-                                href="{{ route('prepersons.encounters.create', [legalEntity(), $preperson->id]) }}"
-                                class="flex cursor-pointer items-center gap-1.5 font-medium text-blue-600 hover:text-blue-800"
-                            >
-                                @icon('plus', 'w-4 h-4')
-                                <span class="text-sm">{{ __('encounters.start') }}</span>
-                            </a>
-                            @can('create', Episode::class)
+                            @if (Auth::user()->can('createMedicalEvents', Preperson::class) && Auth::user()->can('create', Encounter::class))
+                                <a
+                                    href="{{ route('prepersons.encounters.create', [legalEntity(), $preperson->id]) }}"
+                                    class="flex cursor-pointer items-center gap-1.5 font-medium text-blue-600 hover:text-blue-800"
+                                >
+                                    @icon('plus', 'w-4 h-4')
+                                    <span class="text-sm">{{ __('encounters.start') }}</span>
+                                </a>
+                            @endif
+                            @if (Auth::user()->can('createMedicalEvents', Preperson::class) && Auth::user()->can('create', Episode::class))
                                 <a
                                     href="{{ route('prepersons.episodes.create', [legalEntity(), $preperson->id]) }}"
                                     class="flex cursor-pointer items-center gap-1.5 font-medium text-blue-600 hover:text-blue-800"
@@ -176,7 +181,7 @@
                                     @icon('book', 'w-4 h-4')
                                     <span class="text-sm">{{ __('episodes.create') }}</span>
                                 </a>
-                            @endcan
+                            @endif
                         @endif
                     </div>
                 </div>
@@ -293,9 +298,9 @@
 
     @if ($this->certificatePreperson)
         @include('livewire.person.records.partials.information-certificate', [
-                    'preperson' => $this->certificatePreperson,
-                    'emergencyContact' => (array) $this->certificatePreperson->emergencyContact
-                ])
+            'preperson' => $this->certificatePreperson,
+            'emergencyContact' => (array) $this->certificatePreperson->emergencyContact,
+        ])
     @endif
 
     @if ($editingId)

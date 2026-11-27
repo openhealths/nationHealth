@@ -1,4 +1,5 @@
 @use('App\Models\MedicalEvents\Sql\Encounter')
+@use('App\Models\Preperson')
 
 <div
     x-data="{
@@ -40,7 +41,7 @@
         :activeTab="'patient-data'"
     >
         <x-slot name="headerActions">
-            @can('create', Encounter::class)
+            @if (Auth::user()->can('createMedicalEvents', Preperson::class) && Auth::user()->can('create', Encounter::class))
                 <a
                     href="{{ route('prepersons.encounters.create', [legalEntity(), 'preperson' => $preperson->id]) }}"
                     class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
@@ -89,7 +90,7 @@
                         </div>
                     </div>
                 </div>
-            @endcan
+            @endif
 
             <livewire:preperson.preperson-merge :preperson="$preperson" />
 

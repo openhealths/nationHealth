@@ -25,8 +25,8 @@ use Throwable;
 
 class PrepersonIndex extends Component
 {
-    use WithPagination;
     use LogsExceptions;
+    use WithPagination;
 
     public Form $form;
 
@@ -96,7 +96,7 @@ class PrepersonIndex extends Component
 
         $person = Arr::only(
             Arr::toCamelCase($preperson->toArray()),
-            ['uuid', 'firstName', 'lastName', 'secondName', 'birthDate', 'gender', 'emergencyContact']
+            ['uuid', 'firstName', 'lastName', 'secondName', 'birthDate', 'gender', 'emergencyContact'],
         );
 
         if (!empty($person['birthDate'])) {
@@ -317,7 +317,7 @@ class PrepersonIndex extends Component
         }
 
         return new LengthAwarePaginator(collect($prepersons), count($prepersons), config('pagination.per_page'), 1, [
-            'path' => LengthAwarePaginator::resolveCurrentPath()
+            'path' => LengthAwarePaginator::resolveCurrentPath(),
         ]);
     }
 

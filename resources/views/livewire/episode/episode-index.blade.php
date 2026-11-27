@@ -6,7 +6,7 @@
 
 <x-layouts.patient :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
     <x-slot name="headerActions">
-        @can('create', Encounter::class)
+        @if ($this->canCreateMedicalEvents && Auth::user()->can('create', Encounter::class))
             <a
                 href="{{
                     $prepersonId
@@ -18,7 +18,7 @@
                 @icon('plus', 'w-4 h-4')
                 {{ __('encounters.start') }}
             </a>
-        @endcan
+        @endif
 
         <button type="button" class="button-primary-outline px-5 py-2 text-sm whitespace-nowrap">
             {{ __('patients.data_access') }}
@@ -162,7 +162,7 @@
                 </div>
 
                 <div class="flex items-center gap-3">
-                    @can('create', Episode::class)
+                    @if ($this->canCreateMedicalEvents && Auth::user()->can('create', Episode::class))
                         <a
                             href="{{
                                 $prepersonId
@@ -175,7 +175,7 @@
                             @icon('plus', 'w-4 h-4')
                             <span>{{ __('episodes.create') ?? 'Створити епізод' }}</span>
                         </a>
-                    @endcan
+                    @endif
 
                     <div
                         class="relative"
@@ -242,7 +242,7 @@
                 @if (count($this->paginatedEpisodes->items()) > 0)
                     @include('livewire.person.records.parts.episodes', [
                         'episodes' => $this->paginatedEpisodes->items(),
-                        'showStatusActions' => true
+                        'showStatusActions' => true,
                     ])
                 @else
                     <x-nothing-found :description="null" />

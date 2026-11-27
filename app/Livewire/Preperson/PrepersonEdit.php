@@ -37,7 +37,7 @@ class PrepersonEdit extends PrepersonComponent
 
         $person = Arr::only(
             Arr::toCamelCase($preperson->toArray()),
-            ['firstName', 'lastName', 'secondName', 'birthDate', 'gender', 'emergencyContact']
+            ['firstName', 'lastName', 'secondName', 'birthDate', 'gender', 'emergencyContact'],
         );
 
         // keep the phones row the emergency-contact partial binds to even when no contact was stored
@@ -48,7 +48,7 @@ class PrepersonEdit extends PrepersonComponent
 
         $this->form->reasonContext = array_merge(
             $this->form->reasonContext,
-            Arr::toCamelCase($preperson->reasonContext ?? [])
+            Arr::toCamelCase($preperson->reasonContext ?? []),
         );
     }
 

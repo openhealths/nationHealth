@@ -3,7 +3,7 @@
 
 <x-layouts.patient :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
     <x-slot name="headerActions">
-        @can('create', Encounter::class)
+        @if ($this->canCreateMedicalEvents && Auth::user()->can('create', Encounter::class))
             <a
                 href="{{
                     $prepersonId
@@ -15,7 +15,7 @@
                 @icon('plus', 'w-4 h-4')
                 {{ __('encounters.start') }}
             </a>
-        @endcan
+        @endif
 
         <button type="button" class="button-primary-outline px-5 py-2 text-sm whitespace-nowrap">
             {{ __('patients.data_access') }}

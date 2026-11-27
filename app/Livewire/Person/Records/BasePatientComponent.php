@@ -9,6 +9,7 @@ use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Traits\FormTrait;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -94,6 +95,18 @@ abstract class BasePatientComponent extends Component
     }
 
     /**
+     * Whether the user can create medical events for this patient. For a preperson they are created only by the roles
+     * that create and update prepersons.
+     *
+     * @return bool
+     */
+    #[Computed]
+    public function canCreateMedicalEvents(): bool
+    {
+        return $this->prepersonId === null || Auth::user()->can('createMedicalEvents', Preperson::class);
+    }
+
+    /**
      * Resolve a human-readable dictionary label for a coding within a record.
      * Supports both a CodeableConcept (reads the first entry of `coding[]`) and a bare Coding located directly at the given path.
      *
@@ -113,7 +126,7 @@ abstract class BasePatientComponent extends Component
         return data_get(
             $this->dictionaries,
             data_get($coding, 'system') . '.' . data_get($coding, 'code'),
-            '-'
+            '-',
         );
     }
 
@@ -138,7 +151,7 @@ abstract class BasePatientComponent extends Component
         $patient = $this->patientModel = Person::whereId($this->personId)
             ->with([
                 'names',
-                'declarations' => fn (HasMany $declaration) => $declaration->active()->latest()->take(1)
+                'declarations' => fn(HasMany $declaration) => $declaration->active()->latest()->take(1),
             ])
             ->firstOrFail();
 
@@ -152,7 +165,5 @@ abstract class BasePatientComponent extends Component
      *
      * @return void
      */
-    protected function initializeComponent(): void
-    {
-    }
+    protected function initializeComponent(): void {}
 }

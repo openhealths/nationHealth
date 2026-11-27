@@ -5,7 +5,7 @@
 
 <x-layouts.patient :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
     <x-slot name="headerActions">
-        @can('create', DiagnosticReport::class)
+        @if ($this->canCreateMedicalEvents && Auth::user()->can('create', DiagnosticReport::class))
             <a
                 href="{{
                     $prepersonId
@@ -17,7 +17,7 @@
                 @icon('plus', 'w-4 h-4')
                 {{ __('diagnostic-reports.new') }}
             </a>
-        @endcan
+        @endif
 
         <button type="button" class="button-primary-outline px-5 py-2 text-sm whitespace-nowrap">
             {{ __('patients.data_access') }}
@@ -368,7 +368,7 @@
                                                     data_get(
                                                         $this->dictionaries,
                                                         'eHealth/diagnostic_report_categories.' . data_get($diagnosticReport, 'category.0.coding.0.code'),
-                                                        data_get($diagnosticReport, 'category.0.text', data_get($diagnosticReport, 'category.0.coding.0.code', '—'))
+                                                        data_get($diagnosticReport, 'category.0.text', data_get($diagnosticReport, 'category.0.coding.0.code', '—')),
                                                     )
                                                 }}
                                             </div>

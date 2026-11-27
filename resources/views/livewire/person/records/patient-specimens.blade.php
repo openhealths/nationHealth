@@ -8,7 +8,7 @@
     activeTab="specimens"
 >
     <x-slot name="headerActions">
-        @can('create', Specimen::class)
+        @if ($this->canCreateMedicalEvents && Auth::user()->can('create', Specimen::class))
             <a
                 href="{{ $prepersonId ? route('prepersons.specimens.create', [legalEntity(), 'preperson' => $prepersonId]) : route('persons.specimens.create', [legalEntity(), 'person' => $personId]) }}"
                 class="button-primary"
@@ -16,7 +16,7 @@
             >
                 {{ __('specimens.new_specimen') }}
             </a>
-        @endcan
+        @endif
         <button type="button" class="button-primary-outline px-5 py-2 text-sm whitespace-nowrap">
             {{ __('patients.data_access') }}
         </button>

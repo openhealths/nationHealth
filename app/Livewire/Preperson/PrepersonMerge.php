@@ -9,9 +9,9 @@ use App\Core\Arr;
 use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\MergeRequest\Status as MergeRequestStatus;
 use App\Enums\Preperson\Status;
-use App\Exceptions\Signature\SignatureException;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
+use App\Exceptions\Signature\SignatureException;
 use App\Livewire\Person\Forms\PersonForm as Form;
 use App\Models\MedicalEvents\Sql\Episode;
 use App\Models\MergeRequest;
@@ -191,7 +191,7 @@ class PrepersonMerge extends Component
 
         try {
             $this->mergeSearchPatients = Arr::toCamelCase(
-                EHealth::person()->searchForPersonByParams(removeEmptyKeys($validated))->validate()
+                EHealth::person()->searchForPersonByParams(removeEmptyKeys($validated))->validate(),
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when searching for person to merge');
@@ -218,7 +218,7 @@ class PrepersonMerge extends Component
 
         try {
             $this->authMethods = Arr::toCamelCase(
-                EHealth::person()->getAuthMethods($personId)->validate()
+                EHealth::person()->getAuthMethods($personId)->validate(),
             );
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when getting person authentication methods');
@@ -275,7 +275,7 @@ class PrepersonMerge extends Component
         $payload = [
             'master_person_id' => $this->selectedPersonId,
             'merge_person_id' => $this->prepersonUuid,
-            'authorize_with' => $authMethodId
+            'authorize_with' => $authMethodId,
         ];
 
         try {
@@ -297,13 +297,13 @@ class PrepersonMerge extends Component
                 ->whereIn('status', [MergeRequestStatus::NEW->value, MergeRequestStatus::APPROVED->value])
                 ->update([
                     'status' => MergeRequestStatus::CANCELLED->value,
-                    'data_to_be_signed' => null
+                    'data_to_be_signed' => null,
                 ]);
 
             MergeRequest::create([
                 ...$mergeRequest,
                 'master_person_id' => $masterPersonId,
-                'merge_person_id' => $this->prepersonId
+                'merge_person_id' => $this->prepersonId,
             ]);
         } catch (Throwable $exception) {
             Session::flash('error', __('messages.database_error'));
@@ -337,7 +337,7 @@ class PrepersonMerge extends Component
         try {
             Validator::make(
                 ['verificationCode' => $verificationCode],
-                ['verificationCode' => ['required', 'integer']]
+                ['verificationCode' => ['required', 'integer']],
             )->validate();
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
@@ -442,7 +442,7 @@ class PrepersonMerge extends Component
                 'status' => $validated['status'],
                 'data_to_be_signed' => null,
                 'ehealth_updated_at' => $validated['ehealth_updated_at'],
-                'ehealth_updated_by' => $validated['ehealth_updated_by']
+                'ehealth_updated_by' => $validated['ehealth_updated_by'],
             ]);
         } catch (Throwable $exception) {
             Session::flash('error', __('messages.database_error'));
@@ -494,7 +494,7 @@ class PrepersonMerge extends Component
                 $validated['knedp'],
                 $validated['keyContainer'],
                 $validated['password'],
-                Auth::user()->party->taxId
+                Auth::user()->party->taxId,
             );
         } catch (SignatureException $exception) {
             $exception->handle('Error when signing merge request data');
@@ -507,7 +507,7 @@ class PrepersonMerge extends Component
                 ->withHeaders(['msp_drfo' => Auth::user()->party->taxId])
                 ->sign($this->mergeRequest['uuid'], [
                     'signed_content' => $signedContent,
-                    'signed_content_encoding' => 'base64'
+                    'signed_content_encoding' => 'base64',
                 ]);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when signing a merge request');
@@ -523,7 +523,7 @@ class PrepersonMerge extends Component
                     'status' => $validated['status'],
                     'data_to_be_signed' => null,
                     'ehealth_updated_at' => $validated['ehealth_updated_at'],
-                    'ehealth_updated_by' => $validated['ehealth_updated_by']
+                    'ehealth_updated_by' => $validated['ehealth_updated_by'],
                 ]);
 
                 // Deactivate the preperson once its records are merged into the identified patient.
@@ -651,7 +651,7 @@ class PrepersonMerge extends Component
                 'status' => $validated['status'],
                 'data_to_be_signed' => $this->dataToBeSigned,
                 'ehealth_updated_at' => $validated['ehealth_updated_at'],
-                'ehealth_updated_by' => $validated['ehealth_updated_by']
+                'ehealth_updated_by' => $validated['ehealth_updated_by'],
             ]);
         } catch (Throwable $exception) {
             Session::flash('error', __('messages.database_error'));

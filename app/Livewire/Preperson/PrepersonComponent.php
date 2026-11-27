@@ -39,7 +39,7 @@ abstract class PrepersonComponent extends Component
 
     public array $dictionaryNames = [
         'GENDER',
-        'PHONE_TYPE'
+        'PHONE_TYPE',
     ];
 
     /**

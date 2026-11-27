@@ -1,12 +1,17 @@
 @use('App\Enums\Person\MedicationRequestStatus')
 @use('App\Models\MedicalEvents\Sql\Encounter')
 
-<x-layouts.patient :showLegacyMessages="false" :personId="$personId" :prepersonId="$prepersonId" :patientFullName="$patientFullName">
+<x-layouts.patient
+    :showLegacyMessages="false"
+    :personId="$personId"
+    :prepersonId="$prepersonId"
+    :patientFullName="$patientFullName"
+>
     <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
 
     <x-slot name="headerActions">
         <div class="flex w-full flex-wrap items-center gap-2">
-            @can('create', Encounter::class)
+            @if ($this->canCreateMedicalEvents && Auth::user()->can('create', Encounter::class))
                 <a
                     href="{{
                         $prepersonId
@@ -18,10 +23,13 @@
                     @icon('plus', 'w-4 h-4')
                     {{ __('encounters.new') }}
                 </a>
-            @endcan
+            @endif
 
             @if ($personId)
-                <livewire:person.records.patient-approval :person-id="$personId" :key="'prescriptions-patient-approval-'.$personId" />
+                <livewire:person.records.patient-approval
+                    :person-id="$personId"
+                    :key="'prescriptions-patient-approval-' . $personId"
+                />
             @endif
 
             <button
@@ -61,7 +69,9 @@
 
             <div class="mb-4 flex items-center gap-1 font-semibold text-gray-900 dark:text-gray-100">
                 @icon('search-outline', 'w-4.5 h-4.5')
-                <p>{{ $activeTab === 'requests' ? __('medication-requests.poshuk_zaiavok_na_retsepti') : __('medication-requests.poshuk_retseptiv') }}</p>
+                <p>
+                    {{ $activeTab === 'requests' ? __('medication-requests.poshuk_zaiavok_na_retsepti') : __('medication-requests.poshuk_retseptiv') }}
+                </p>
             </div>
 
             <form wire:submit="applyFilters">
@@ -112,7 +122,12 @@
                         <button
                             type="button"
                             wire:click="resetFilters"
-                            @click="$el.form.querySelectorAll('[data-referral-date-range]').forEach(input => { input._flatpickr?.clear(false); input.setCustomValidity(''); });"
+                            @click="
+                                $el.form.querySelectorAll('[data-referral-date-range]').forEach((input) => {
+                                    input._flatpickr?.clear(false);
+                                    input.setCustomValidity('');
+                                })
+                            "
                             class="button-primary-outline-red px-5 py-2.5 text-sm"
                         >
                             {{ __('forms.reset_all_filters') }}
@@ -129,7 +144,11 @@
                                 <span>{{ __('forms.additional_search_parameters') }}</span>
                             </button>
                         @else
-                            <button type="button" wire:click="resetSearch" class="button-minor flex items-center gap-2 px-5 py-2.5 text-sm">
+                            <button
+                                type="button"
+                                wire:click="resetSearch"
+                                class="button-minor flex items-center gap-2 px-5 py-2.5 text-sm"
+                            >
                                 @icon('arrow-left', 'w-4 h-4')
                                 <span>{{ __('Локальні дані') }}</span>
                             </button>
@@ -139,14 +158,25 @@
 
                 @if (!$isSearchMode)
                     <div id="prescriptionPeriodFilters" x-show="showAdditionalParams" x-transition x-cloak>
-                        <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">{{ __('Період лікування в картці пацієнта') }}</p>
+                        <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
+                            {{ __('Період лікування в картці пацієнта') }}
+                        </p>
                         <div class="form-row-3 mb-9">
                             @foreach ([
                                 ['id' => 'filterStartedAtRange', 'from' => 'filterStartedAtFrom', 'to' => 'filterStartedAtTo', 'label' => __('forms.filter_period_start_range')],
                                 ['id' => 'filterEndedAtRange', 'from' => 'filterEndedAtFrom', 'to' => 'filterEndedAtTo', 'label' => __('forms.filter_period_end_range')],
                             ] as $dateRange)
                                 <div class="form-group group">
-                                    <div class="datepicker-wrapper" x-data="{ from: $wire.entangle('{{ $dateRange['from'] }}'), to: $wire.entangle('{{ $dateRange['to'] }}') }" x-effect="if (! from && ! to) { $refs.input?._flatpickr?.clear(false); $refs.input?.setCustomValidity(''); }">
+                                    <div
+                                        class="datepicker-wrapper"
+                                        x-data="{ from: $wire.entangle('{{ $dateRange['from'] }}'), to: $wire.entangle('{{ $dateRange['to'] }}') }"
+                                        x-effect="
+                                            if (! from && ! to) {
+                                                $refs.input?._flatpickr?.clear(false);
+                                                $refs.input?.setCustomValidity('');
+                                            }
+                                        "
+                                    >
                                         <input
                                             x-ref="input"
                                             id="{{ $dateRange['id'] }}"
@@ -155,17 +185,38 @@
                                             class="daterangepicker-uk with-leading-icon input peer w-full @error($dateRange['from']) input-error @enderror @error($dateRange['to']) input-error @enderror"
                                             placeholder=" "
                                             autocomplete="off"
-                                            :value="[from, to].filter(Boolean).map(date => /^\d{4}-\d{2}-\d{2}$/.test(date) ? date.split('-').reverse().join('.') : date).join(' — ')"
+                                            :value="[from, to]
+                                                .filter(Boolean)
+                                                .map((date) =>
+                                                    /^\d{4}-\d{2}-\d{2}$/.test(date)
+                                                        ? date.split('-').reverse().join('.')
+                                                        : date,
+                                                )
+                                                .join(' — ')"
                                             @date-range-change="
-                                                const valid = ! $event.detail.from || /^\d{4}-\d{2}-\d{2}$/.test($event.detail.from);
-                                                $refs.input.setCustomValidity(valid ? '' : 'Вкажіть коректну дату у форматі дд.мм.рррр.');
-                                                if (valid) { from = $event.detail.from; to = $event.detail.to; }
+                                                const valid =
+                                                    ! $event.detail.from ||
+                                                    /^\d{4}-\d{2}-\d{2}$/.test($event.detail.from);
+                                                $refs.input.setCustomValidity(
+                                                    valid ? '' : 'Вкажіть коректну дату у форматі дд.мм.рррр.',
+                                                );
+                                                if (valid) {
+                                                    from = $event.detail.from;
+                                                    to = $event.detail.to;
+                                                }
                                             "
                                         />
-                                        <label for="{{ $dateRange['id'] }}" class="wrapped-label">{{ $dateRange['label'] }}</label>
+                                        <label
+                                            for="{{ $dateRange['id'] }}"
+                                            class="wrapped-label"
+                                        >{{ $dateRange['label'] }}</label>
                                     </div>
-                                    @error($dateRange['from']) <p class="text-error">{{ $message }}</p> @enderror
-                                    @error($dateRange['to']) <p class="text-error">{{ $message }}</p> @enderror
+                                    @error($dateRange['from'])
+                                        <p class="text-error">{{ $message }}</p>
+                                    @enderror
+                                    @error($dateRange['to'])
+                                        <p class="text-error">{{ $message }}</p>
+                                    @enderror
                                 </div>
                             @endforeach
                         </div>
@@ -174,7 +225,10 @@
             </form>
 
             @if ($searchError)
-                <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-900/20 dark:text-red-300" role="alert">
+                <div
+                    class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-900/20 dark:text-red-300"
+                    role="alert"
+                >
                     {{ $searchError }}
                 </div>
             @endif
@@ -200,11 +254,16 @@
                         $importId = $record['id'] ?? $record['uuid'] ?? '';
                         $status = MedicationRequestStatus::resolve($record['status'] ?? '');
                     @endphp
-                    <div class="record-inner-card" wire:key="medication-{{ $activeTab }}-{{ (int) $isSearchMode }}-{{ $recordUuid }}">
+                    <div
+                        class="record-inner-card"
+                        wire:key="medication-{{ $activeTab }}-{{ (int) $isSearchMode }}-{{ $recordUuid }}"
+                    >
                         <div class="record-inner-header">
                             <div class="record-inner-column min-w-0 flex-1">
                                 <div class="record-inner-label">{{ __('Номер') }}</div>
-                                <div class="record-inner-value text-[16px] break-words">{{ $record['requestNumber'] ?? $record['request_number'] ?? '—' }}</div>
+                                <div class="record-inner-value text-[16px] break-words">
+                                    {{ $record['requestNumber'] ?? $record['request_number'] ?? '—' }}
+                                </div>
                                 @if (!empty($record['categoryLabel']))
                                     <div class="record-inner-subvalue mt-1">{{ $record['categoryLabel'] }}</div>
                                 @endif
@@ -217,44 +276,75 @@
                                     </span>
                                 </div>
                             </div>
-                                <div class="record-inner-action-col">
-                                    <div class="relative" x-data="{ open: false }" x-id="['medication-actions']" @click.outside="open = false" @keydown.escape.prevent.stop="open = false; $refs.button.focus()">
+                            <div class="record-inner-action-col">
+                                <div
+                                    class="relative"
+                                    x-data="{ open: false }"
+                                    x-id="['medication-actions']"
+                                    @click.outside="open = false"
+                                    @keydown.escape.prevent.stop="
+                                        open = false;
+                                        $refs.button.focus();
+                                    "
+                                >
+                                    <button
+                                        type="button"
+                                        x-ref="button"
+                                        @click="open = ! open"
+                                        :aria-expanded="open"
+                                        :aria-controls="$id('medication-actions')"
+                                        aria-label="{{ __('forms.actions') }}"
+                                        class="record-inner-action-btn rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                                    >
+                                        @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
+                                    </button>
+                                    <div
+                                        x-show="open"
+                                        x-cloak
+                                        x-transition
+                                        :id="$id('medication-actions')"
+                                        class="dropdown-menu right-0 w-56"
+                                    >
                                         <button
                                             type="button"
-                                            x-ref="button"
-                                            @click="open = ! open"
-                                            :aria-expanded="open"
-                                            :aria-controls="$id('medication-actions')"
-                                            aria-label="{{ __('forms.actions') }}"
-                                            class="record-inner-action-btn rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                                            wire:click="toggleExpand('{{ $recordUuid }}')"
+                                            @click="open = false"
+                                            class="dropdown-item"
                                         >
-                                            @icon('edit-user-outline', 'svg-hover-action w-6 h-6')
+                                            @icon('eye', 'w-4 h-4 shrink-0')
+                                            {{ $expandedUuid === $recordUuid ? __('Приховати деталі') : __('forms.view_details') }}
                                         </button>
-                                        <div x-show="open" x-cloak x-transition :id="$id('medication-actions')" class="dropdown-menu right-0 w-56">
-                                            <button type="button" wire:click="toggleExpand('{{ $recordUuid }}')" @click="open = false" class="dropdown-item">
-                                                @icon('eye', 'w-4 h-4 shrink-0')
-                                                {{ $expandedUuid === $recordUuid ? __('Приховати деталі') : __('forms.view_details') }}
-                                            </button>
-                                            @if ($isSearchMode && $importId !== '')
-                                            <button type="button" wire:click="saveFromEHealth('{{ $importId }}')" wire:loading.attr="disabled" wire:target="saveFromEHealth" @click="open = false" class="dropdown-item">
+                                        @if ($isSearchMode && $importId !== '')
+                                            <button
+                                                type="button"
+                                                wire:click="saveFromEHealth('{{ $importId }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="saveFromEHealth"
+                                                @click="open = false"
+                                                class="dropdown-item"
+                                            >
                                                 @icon('download', 'w-4 h-4 shrink-0')
                                                 {{ __('Зберегти до картки') }}
                                             </button>
-                                            @endif
-                                        </div>
+                                        @endif
                                     </div>
                                 </div>
+                            </div>
                         </div>
                         <div class="record-inner-body">
                             <div class="record-inner-grid-container min-w-0">
                                 <div class="grid grid-cols-2 gap-4 xl:grid-cols-4">
                                     <div class="min-w-0">
                                         <div class="record-inner-label">{{ __('Медикамент') }}</div>
-                                        <div class="record-inner-value break-words">{{ $record['medicationName'] ?? data_get($record, 'medication_info.medication_name') ?? data_get($record, 'medication.name') ?? '—' }}</div>
+                                        <div class="record-inner-value break-words">
+                                            {{ $record['medicationName'] ?? data_get($record, 'medication_info.medication_name') ?? data_get($record, 'medication.name') ?? '—' }}
+                                        </div>
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label">{{ __('Кількість') }}</div>
-                                        <div class="record-inner-value">{{ $record['medicationQty'] ?? $record['medication_qty'] ?? '—' }}</div>
+                                        <div class="record-inner-value">
+                                            {{ $record['medicationQty'] ?? $record['medication_qty'] ?? '—' }}
+                                        </div>
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label">{{ __('Період') }}</div>
@@ -262,7 +352,9 @@
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label">{{ __('Програма') }}</div>
-                                        <div class="record-inner-value break-words">{{ $record['programName'] ?? data_get($record, 'medical_program.name') ?? '—' }}</div>
+                                        <div class="record-inner-value break-words">
+                                            {{ $record['programName'] ?? data_get($record, 'medical_program.name') ?? '—' }}
+                                        </div>
                                     </div>
                                     <div class="min-w-0">
                                         <div class="record-inner-label">{{ __('Підстава') }}</div>
@@ -280,7 +372,10 @@
                             </div>
                         </div>
                         @if ($expandedUuid === $recordUuid)
-                            <div class="border-t border-gray-200 p-4 dark:border-gray-700" wire:key="prescription-details-{{ $recordUuid }}">
+                            <div
+                                class="border-t border-gray-200 p-4 dark:border-gray-700"
+                                wire:key="prescription-details-{{ $recordUuid }}"
+                            >
                                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div>
                                         <div class="record-inner-label">{{ __('Підстава') }}</div>
