@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Dto\Transform\Ehealth;
 
+use App\Dto\Transform\LocalDateTime;
+
 /**
  * Healthcare service availability transforms for #[Map], referenced as [Availability::class, 'method'].
  * They convert the form values into the format of the eHealth API, which is also the format they are stored in.
@@ -46,8 +48,8 @@ class Availability
             ->map(static fn (array $item): array => [
                 'description' => $item['description'],
                 'during' => [
-                    'start' => convertToEHealthISO8601("{$item['during']['startDate']} {$item['during']['startTime']}"),
-                    'end' => convertToEHealthISO8601("{$item['during']['endDate']} {$item['during']['endTime']}")
+                    'start' => LocalDateTime::toUtc($item['during']['startDate'], $item['during']['startTime']),
+                    'end' => LocalDateTime::toUtc($item['during']['endDate'], $item['during']['endTime'])
                 ]
             ])
             ->values()

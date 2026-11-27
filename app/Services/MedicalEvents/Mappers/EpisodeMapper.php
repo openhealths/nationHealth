@@ -35,55 +35,6 @@ class EpisodeMapper implements FhirMapperContract
     }
 
     /**
-     * Build a FHIR structure out of the reason the episode is marked as entered in error.
-     *
-     * @param  array  $data  Flat episode cancellation form data
-     * @return array
-     */
-    public function toCancelFhir(array $data): array
-    {
-        $reasonCode = $data['cancellationReason'];
-
-        return [
-            'statusReason' => FhirResource::make()
-                ->coding('eHealth/cancellation_reasons', $reasonCode)
-                ->toCodeableConcept(
-                    dictionary()->basics()
-                        ->byName('eHealth/cancellation_reasons')
-                        ->asCodeDescription()
-                        ->get($reasonCode)
-                ),
-            'explanatoryLetter' => $data['explanatoryLetter'] ?: null
-        ];
-    }
-
-    /**
-     * Build a FHIR structure out of the reason and the summary the episode is closed with.
-     *
-     * @param  array  $data  Flat episode closure form data
-     * @return array
-     */
-    public function toCloseFhir(array $data): array
-    {
-        $reasonCode = $data['closingReason'];
-
-        return [
-            'period' => [
-                'end' => convertToEHealthISO8601($data['closingDate'] . ' ' . $data['closingTime'])
-            ],
-            'statusReason' => FhirResource::make()
-                ->coding('eHealth/episode_closing_reasons', $reasonCode)
-                ->toCodeableConcept(
-                    dictionary()->basics()
-                        ->byName('eHealth/episode_closing_reasons')
-                        ->asCodeDescription()
-                        ->get($reasonCode)
-                ),
-            'closingSummary' => $data['closingSummary'] ?: null
-        ];
-    }
-
-    /**
      * Build the flat episode form data out of a stored episode.
      *
      * @param  array  $data  Episode record with its type, care manager and period relations

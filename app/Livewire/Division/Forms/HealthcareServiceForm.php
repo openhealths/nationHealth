@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Division\Forms;
 
-use App\Core\Arr;
 use App\Enums\Division\Status;
 use App\Enums\License\Type;
 use App\Models\Division;
@@ -24,17 +23,13 @@ class HealthcareServiceForm extends Form
 {
     public string $divisionId;
 
-    public array $category = [
-        'coding' => [['system' => 'HEALTHCARE_SERVICE_CATEGORIES', 'code' => '']]
-    ];
+    public string $categoryCode = '';
 
     public ?string $specialityType = null;
 
     public ?string $providingCondition = null;
 
-    public ?array $type = [
-        'coding' => [['system' => 'HEALTHCARE_SERVICE_PHARMACY_DRUGS_TYPES', 'code' => '']]
-    ];
+    public ?string $typeCode = null;
 
     public ?string $licenseId = null;
 
@@ -52,7 +47,7 @@ class HealthcareServiceForm extends Form
     {
         $providingConditionConfigKey = 'legal_entity_' . strtolower(legalEntity()->type->name) . '_providing_conditions';
 
-        $categoryCode = Arr::get($this->category, 'coding.0.code');
+        $categoryCode = $this->categoryCode;
 
         $licenseType = $categoryCode
             ? config("ehealth.healthcare_service.license_type.$categoryCode")
@@ -87,10 +82,7 @@ class HealthcareServiceForm extends Form
                     ->where('id', $this->getComponent()->divisionId)
                     ->where('status', Status::ACTIVE)
             ],
-            'category' => ['array', 'required'],
-            'category.coding' => ['required', 'array'],
-            'category.coding.*.system' => ['required', 'string', Rule::in('HEALTHCARE_SERVICE_CATEGORIES')],
-            'category.coding.*.code' => [
+            'categoryCode' => [
                 'required',
                 'string',
                 new InDictionary('HEALTHCARE_SERVICE_CATEGORIES'),
@@ -109,11 +101,7 @@ class HealthcareServiceForm extends Form
                 Rule::in(config("ehealth.$providingConditionConfigKey", [])),
                 $isProvidingConditionRequiredForCategory ? 'required' : 'prohibited'
             ],
-            'type' => ['array', 'nullable'],
-            'type.coding.*.system' => $isTypeRequiredForCategory
-                ? ['required', 'string', Rule::in($typeDictionary)]
-                : ['nullable', 'string'],
-            'type.coding.*.code' => [
+            'typeCode' => [
                 'nullable',
                 'string',
                 $isTypeRequiredForCategory ? 'required' : 'prohibited',
@@ -180,6 +168,8 @@ class HealthcareServiceForm extends Form
     {
         return [
             'divisionId' => __('forms.division_name'),
+            'categoryCode' => mb_lcfirst(__('healthcare-services.category')),
+            'typeCode' => mb_lcfirst(__('healthcare-services.type')),
             'availableTime.*.availableStartTime' => __('healthcare-services.available_time_attributes.start_time'),
             'availableTime.*.availableEndTime' => __('healthcare-services.available_time_attributes.end_time'),
             'notAvailable.*.during.startDate' => __('healthcare-services.not_available_attributes.start_date'),
@@ -202,8 +192,8 @@ class HealthcareServiceForm extends Form
             'specialityType.prohibited' => __('healthcare-services.validation.speciality_type.prohibited_unless'),
             'providingCondition.required' => __('healthcare-services.validation.providing_condition.required_if'),
             'providingCondition.prohibited' => __('healthcare-services.validation.providing_condition.prohibited_unless'),
-            'type.coding.*.code.required' => __('healthcare-services.validation.type_coding.required_if'),
-            'type.coding.*.code.prohibited' => __('healthcare-services.validation.type_coding.prohibited_unless'),
+            'typeCode.required' => __('healthcare-services.validation.type_coding.required_if'),
+            'typeCode.prohibited' => __('healthcare-services.validation.type_coding.prohibited_unless'),
             'licenseId.required' => __('healthcare-services.validation.license_id.required_if'),
             'licenseId.prohibited' => __('healthcare-services.validation.license_id.prohibited_if'),
             'availableTime.*.availableEndTime.after' => __('healthcare-services.validation.available_time.end_after_start'),
@@ -304,8 +294,8 @@ class HealthcareServiceForm extends Form
     protected function validateConstraint(): void
     {
         $divisionId = Division::whereUuid($this->divisionId)->value('id');
-        $categoryCode = data_get($this->category, 'coding.0.code');
-        $typeCode = data_get($this->type, 'coding.0.code');
+        $categoryCode = $this->categoryCode;
+        $typeCode = $this->typeCode;
         $component = $this->getComponent();
 
         if (!empty($this->specialityType) && !empty($this->providingCondition)) {

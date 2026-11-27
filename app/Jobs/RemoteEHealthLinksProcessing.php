@@ -8,6 +8,9 @@ use App\Classes\eHealth\EHealth;
 use App\Classes\eHealth\EHealthResponse;
 use App\Contracts\SubmittedToEHealth;
 use App\Core\EHealthJob;
+use App\Dto\Episode\ModelCancel as EpisodeCancelData;
+use App\Dto\Episode\ModelClose as EpisodeCloseData;
+use App\Enums\Episode\Status as EpisodeStatus;
 use App\Enums\JobStatus;
 use App\Enums\ResponseStatus;
 use App\Exceptions\EHealth\EHealthResponseException;
@@ -175,9 +178,17 @@ class RemoteEHealthLinksProcessing extends EHealthJob
         ]);
 
         if ($status === 'processed') {
-            // A sync can store a newer status before the job is finished, so the signed one is set only while the stored record
-            // is still a draft, checked by the same query that writes it
-            $record->newQuery()->whereKey($record->getKey())->whereStatus('draft')->update(['status' => $signedStatus]);
+            // A closing or a cancellation changes an episode that is no draft, so it is stored as eHealth processed it.
+            // A closing finished after a sync already stored the episode as cancelled leaves it cancelled
+            if ($record instanceof Episode && $signedStatus === EpisodeStatus::CLOSED->value) {
+                Repository::episode()->markAsClosed($record, objectMapper()->map($link->job, EpisodeCloseData::class));
+            } elseif ($record instanceof Episode && $signedStatus === EpisodeStatus::ENTERED_IN_ERROR->value) {
+                Repository::episode()->markAsEnteredInError($record, objectMapper()->map($link->job, EpisodeCancelData::class));
+            } else {
+                // A sync can store a newer status before the job is finished, so the signed one is set only while the stored
+                // record is still a draft, checked by the same query that writes it
+                $record->newQuery()->whereKey($record->getKey())->whereStatus('draft')->update(['status' => $signedStatus]);
+            }
 
             // Marked only once the status is set, so a record eHealth accepted is never signed again as a draft
             $link->update(['status' => JobStatus::PROCESSED->value]);
@@ -500,11 +511,23 @@ class RemoteEHealthLinksProcessing extends EHealthJob
                 'diagnostic-reports.messages.create_processed',
                 'diagnostic-reports.messages.create_rejected'
             ],
-            Episode::class => [
-                $signedData['status'],
-                'episodes.messages.create_processed',
-                'episodes.messages.create_rejected'
-            ]
+            Episode::class => match ($signedData['status']) {
+                EpisodeStatus::CLOSED->value => [
+                    $signedData['status'],
+                    'episodes.messages.close_processed',
+                    'episodes.messages.close_rejected'
+                ],
+                EpisodeStatus::ENTERED_IN_ERROR->value => [
+                    $signedData['status'],
+                    'episodes.messages.cancel_processed',
+                    'episodes.messages.cancel_rejected'
+                ],
+                default => [
+                    $signedData['status'],
+                    'episodes.messages.create_processed',
+                    'episodes.messages.create_rejected'
+                ]
+            }
         };
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\HealthcareService;
 
+use App\Dto\HealthcareService\Form as FormData;
 use App\Enums\HealthcareService\Status;
 use App\Enums\User\Role;
 use App\Livewire\Division\HealthcareService\HealthcareServiceCreate;
@@ -28,9 +29,9 @@ use Tests\TestCase;
  */
 class HealthcareServiceCreateTest extends TestCase
 {
+    use MocksBasicDictionaries;
     use RefreshDatabase;
     use WithFaker;
-    use MocksBasicDictionaries;
 
     /**
      * Legal entity the user works in.
@@ -161,7 +162,7 @@ class HealthcareServiceCreateTest extends TestCase
         Livewire::actingAs($this->owner)
             ->test(HealthcareServiceCreate::class, ['legalEntity' => $this->legalEntity, 'division' => $this->division])
             ->call('create')
-            ->assertHasErrors('form.category.coding.0.code')
+            ->assertHasErrors('form.categoryCode')
             ->assertNoRedirect();
 
         $this->assertSame([], $eHealth->receivedRequests);
@@ -180,7 +181,7 @@ class HealthcareServiceCreateTest extends TestCase
 
         Livewire::actingAs($this->owner)
             ->test(HealthcareServiceCreate::class, ['legalEntity' => $this->legalEntity, 'division' => $this->division])
-            ->set('form.category.coding.0.code', 'MSP')
+            ->set('form.categoryCode', 'MSP')
             ->call('create')
             ->assertHasErrors(['form.specialityType', 'form.providingCondition'])
             ->assertNoRedirect();
@@ -278,7 +279,8 @@ class HealthcareServiceCreateTest extends TestCase
         $healthcareService = HealthcareService::whereUuid($uuid)->firstOrFail();
         $this->assertSame($comment, $healthcareService->comment);
         $this->assertEquals($ehealthAvailableTime, $healthcareService->availableTime);
-        $this->assertEquals($notAvailable, $healthcareService->notAvailable);
+        $this->assertEquals($ehealthNotAvailable, $healthcareService->notAvailable);
+        $this->assertEquals($notAvailable, FormData::notAvailable($healthcareService->notAvailable));
     }
 
     /**
@@ -350,7 +352,7 @@ class HealthcareServiceCreateTest extends TestCase
         Livewire::actingAs($this->owner)
             ->test(HealthcareServiceCreate::class, ['legalEntity' => $this->legalEntity, 'division' => $this->division])
             ->call('createLocally')
-            ->assertHasErrors('form.category.coding.0.code')
+            ->assertHasErrors('form.categoryCode')
             ->assertNoRedirect();
 
         $this->assertDatabaseCount('healthcare_services', 0);
@@ -423,7 +425,7 @@ class HealthcareServiceCreateTest extends TestCase
     {
         return Livewire::actingAs($user ?? $this->owner)
             ->test(HealthcareServiceCreate::class, ['legalEntity' => $this->legalEntity, 'division' => $this->division])
-            ->set('form.category.coding.0.code', 'MSP')
+            ->set('form.categoryCode', 'MSP')
             ->set('form.specialityType', 'FAMILY_DOCTOR')
             ->set('form.providingCondition', 'OUTPATIENT');
     }

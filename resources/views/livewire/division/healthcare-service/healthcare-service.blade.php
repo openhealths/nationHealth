@@ -12,10 +12,10 @@
             class="fieldset"
             x-data="{
                       isDisabled: $wire.entangle('isDisabled'),
-                      categoryCode: $wire.entangle('form.category.coding.0.code'),
+                      categoryCode: $wire.entangle('form.categoryCode'),
                       specialityType: $wire.entangle('form.specialityType'),
                       providingCondition: $wire.entangle('form.providingCondition'),
-                      typeCode: $wire.entangle('form.type.coding.0.code'),
+                      typeCode: $wire.entangle('form.typeCode'),
                       licenseId: $wire.entangle('form.licenseId'),
                       requiredCategories: @js($this->categoryRequiredFields),
                       isRequired(field) {
@@ -69,7 +69,7 @@
 
                 <x-forms.listbox
                     :options="$this->dictionaries['HEALTHCARE_SERVICE_CATEGORIES']"
-                    bind="form.category.coding.0.code"
+                    bind="form.categoryCode"
                     :label="__('healthcare-services.category')"
                     is-disabled="isDisabled"
                     :is-required="true"
@@ -120,11 +120,11 @@
                     <div class="form-group group" x-show="isRequired('type')" x-cloak>
                         <div class="relative">
                             <select
-                                wire:model="form.type.coding.0.code"
+                                wire:model="form.typeCode"
                                 type="text"
                                 name="type"
                                 id="type"
-                                class="input-select @error('form.type.coding.0.code') input-error @enderror"
+                                class="input-select @error('form.typeCode') input-error @enderror"
                                 x-bind:disabled="isDisabled"
                             >
                                 <option value="" selected>{{ __('forms.select') }}</option>
@@ -136,7 +136,7 @@
                             <label for="type" class="label">{{ __('healthcare-services.type') }}</label>
                         </div>
 
-                        @error('form.type.coding.0.code')
+                        @error('form.typeCode')
                             <p class="text-error">{{ $message }}</p>
                         @enderror
                     </div>

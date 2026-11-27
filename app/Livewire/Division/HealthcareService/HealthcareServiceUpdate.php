@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Division\HealthcareService;
 
 use App\Classes\eHealth\EHealth;
-use App\Core\Arr;
 use App\Dto\HealthcareService\EhealthUpdate as EhealthUpdateData;
+use App\Dto\HealthcareService\Form as FormData;
 use App\Dto\HealthcareService\Model as HealthcareServiceData;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use App\Exceptions\EHealth\EHealthException;
@@ -44,11 +44,16 @@ class HealthcareServiceUpdate extends Component
     {
         $this->healthcareServiceId = $healthcareService->id;
 
-        $this->form->fill($healthcareService->only(['comment', 'availableTime', 'notAvailable']));
+        $healthcareService->loadMissing(['category.coding', 'type.coding']);
 
-        if ($this->form->availableTime) {
-            $this->form->availableTime = Arr::toCamelCase($this->form->availableTime);
-        }
+        $formData = objectMapper()->map($healthcareService, FormData::class);
+
+        // Only the fields eHealth allows to change are filled
+        $this->form->fill([
+            'comment' => $formData->comment,
+            'availableTime' => $formData->availableTime,
+            'notAvailable' => $formData->notAvailable
+        ]);
     }
 
     /**

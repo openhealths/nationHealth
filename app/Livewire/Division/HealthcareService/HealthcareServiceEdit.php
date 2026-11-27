@@ -24,7 +24,7 @@ class HealthcareServiceEdit extends HealthcareServiceComponent
         $this->healthcareServiceId = $healthcareService->id;
         $healthcareService->loadMissing(['category.coding', 'type.coding']);
 
-        $this->form->fill(objectMapper()->map($healthcareService, FormData::class)->toArray());
+        $this->form->fill(objectMapper()->map($healthcareService, FormData::class));
     }
 
     public function create(): void
