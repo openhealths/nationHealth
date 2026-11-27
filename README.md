@@ -6,7 +6,7 @@ The software is distributed under [GPL version 3](https://www.gnu.org/licenses/g
 * PHP 8.5+
 * PostgreSQL 17.5+
     - Other SQL databases also supported, full list at [Laravel Documentation](https://laravel.com/docs/13.x/database)
-* Access to the [eHealth API](https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/oauth/login?console=1)
+* Access to the [eHealth API](https://docs-preprod.ehealth.gov.ua/medical-events/description/introduction)
 * [Composer](https://getcomposer.org), [npm](https://www.npmjs.com), [git](https://git-scm.com)
 ## Installation for development
 ### Git
