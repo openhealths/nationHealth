@@ -33,6 +33,14 @@ return new class extends Migration
             $table->foreignId('encounter_id')->nullable()->change();
         });
 
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            Schema::table('device_dispenses', static function (Blueprint $table): void {
+                $table->enum('status', Status::values())->change();
+            });
+
+            return;
+        }
+
         DB::statement('ALTER TABLE device_dispenses DROP CONSTRAINT IF EXISTS device_dispenses_status_check');
 
         $statuses = implode("','", Status::values());

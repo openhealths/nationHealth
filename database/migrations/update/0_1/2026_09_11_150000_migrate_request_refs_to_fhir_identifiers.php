@@ -24,7 +24,30 @@ return new class extends Migration
     public function up(): void
     {
         if (!DB::connection()->getSchemaGrammar()->supportsSchemaTransactions()) {
-            throw new RuntimeException('FHIR reference conversion requires transactional DDL. Run on the supported PostgreSQL database.');
+            foreach (['medication_request_requests', 'service_request_requests', 'device_request_requests'] as $table) {
+                $this->assertConvertible($table);
+                if (!Schema::hasTable($table)) {
+                    continue;
+                }
+                if (Schema::hasColumn($table, 'intent')) {
+                    throw new RuntimeException('Legacy FHIR reference conversion requires transactional DDL; no schema or data were changed.');
+                }
+                foreach (['intent_id' => 'codings', 'category_id' => 'codeable_concepts', 'priority_id' => 'codeable_concepts'] as $column => $target) {
+                    $foreign = collect(Schema::getForeignKeys($table))
+                        ->first(static fn (array $fk): bool => $fk['columns'] === [$column]);
+                    if (!Schema::hasColumn($table, $column) || ($foreign['foreign_table'] ?? null) !== $target) {
+                        throw new RuntimeException("Incomplete FHIR storage in {$table}.{$column}; no schema or data were changed.");
+                    }
+                }
+            }
+            if (Schema::hasTable('medication_request_requests')) {
+                $employee = collect(Schema::getColumns('medication_request_requests'))->firstWhere('name', 'employee_id');
+                if (!Schema::hasColumn('medication_request_requests', 'source') || $employee === null || !$employee['nullable']) {
+                    throw new RuntimeException('Medication FHIR storage requires transactional DDL; no schema or data were changed.');
+                }
+            }
+
+            return;
         }
 
         DB::transaction(function () {

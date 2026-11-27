@@ -21,7 +21,7 @@ return new class extends Migration
             }
 
             if (Schema::hasColumn('client_connections', 'uuid')) {
-                $table->uuid()->comment('Client UUID at the eHealth side')->change();
+                $table->uuid()->comment('Connection UUID at the eHealth side')->change();
             }
 
             if (!Schema::hasIndex('client_connections', 'client_connections_unique')) {

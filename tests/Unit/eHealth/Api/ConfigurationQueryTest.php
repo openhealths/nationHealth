@@ -33,8 +33,10 @@ class ConfigurationQueryTest extends TestCase
     #[DataProvider('activeFilters')]
     public function test_active_filter_is_encoded_as_api_boolean_literal(string $apiClass, string $method, string $path, bool|string|null $input, ?string $expected): void
     {
-        config(['ehealth.api.domain' => 'https://ehealth.example']);
-        Http::fake(['*' => Http::response(['data' => []], 200)]);
+        $baseUrl = rtrim(config('ehealth.api.domain'), '/');
+        $this->assertNotFalse(filter_var($baseUrl, FILTER_VALIDATE_URL));
+        Http::preventStrayRequests();
+        Http::fake([$baseUrl.'/*' => Http::response(['data' => []], 200)]);
         $factory = Http::getFacadeRoot();
         $api = new $apiClass($factory);
         $api->stub((function () {

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Enums\JobStatus;
 use App\Enums\Declaration\Status;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
+use App\Enums\JobStatus;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -26,7 +26,7 @@ return new class extends Migration
             $table->foreignId('person_id')->constrained('persons');
             $table->date('end_date');
             $table->dateTime('inserted_at');
-            $table->boolean('is_active')->default(false);
+            $table->boolean('is_active')->nullable()->default(false);
             $table->string('reason')->nullable();
             $table->string('reason_description')->nullable();
             $table->dateTime('signed_at');

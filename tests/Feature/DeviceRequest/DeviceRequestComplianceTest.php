@@ -12,26 +12,27 @@ use App\Classes\eHealth\Api\Patient\DeviceRequest as DeviceRequestApi;
 use App\Classes\eHealth\EHealthResponse;
 use App\Models\Employee\Employee;
 use App\Models\LegalEntity;
-use App\Models\Person\Person;
+use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\MedicalEvents\Sql\Coding;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Identifier;
-use App\Models\MedicalEvents\Sql\Coding;
-use App\Models\MedicalEvents\Sql\CodeableConcept;
+use App\Models\Person\Person;
 use App\Repositories\MedicalEvents\PeriodRepository;
 use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use Carbon\CarbonImmutable;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Concerns\UsesUtcDatabaseTimeZone;
 use Tests\TestCase;
 
 class DeviceRequestComplianceTest extends TestCase
 {
     use DatabaseTransactions;
+    use UsesUtcDatabaseTimeZone;
 
     private Person $person;
     private LegalEntity $legalEntity;
@@ -40,7 +41,7 @@ class DeviceRequestComplianceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        DB::statement("SET LOCAL TIME ZONE 'UTC'");
+        $this->useUtcDatabaseTimeZone();
         $this->travelTo(CarbonImmutable::parse('2026-10-29 23:30:00', (string) config('app.timezone')));
         $this->person = Person::create(['uuid' => (string) Str::uuid(), 'gender' => 'MALE']);
         $this->legalEntity = new LegalEntity(['uuid' => (string) Str::uuid()]);
@@ -152,9 +153,9 @@ class DeviceRequestComplianceTest extends TestCase
         $user = Mockery::mock(\App\Models\User::class);
         $user->shouldReceive('can')->once()->with('view', $plan)->andReturnFalse();
         \Illuminate\Support\Facades\Auth::shouldReceive('user')->once()->andReturn($user);
-        $service = Mockery::mock(\App\Classes\eHealth\Api\CarePlan::class);
+        $service = Mockery::mock(CarePlan::class);
         $service->shouldNotReceive('getDetails');
-        $this->instance(\App\Classes\eHealth\Api\CarePlan::class, $service);
+        $this->instance(CarePlan::class, $service);
         $component = new \App\Livewire\CarePlan\CarePlanShow();
         $component->carePlan = $plan;
         $component->remotePlanDetails = ['requisition' => 'stale'];

@@ -3,12 +3,14 @@
 # Auth · Employee · Party · Declaration · Equipment · Care Plan · Care Plan Activity · ePrescription · Service Request · Device Request · Healthcare Service
 set -euo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/assert-not-production.sh"
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 mkdir -p storage/ci
 
-php artisan config:clear --no-interaction
+php scripts/dev/testing-artisan.php config:clear
 
 # Paths kept explicit so CI can expand gradually without running the full suite.
 DOMAIN_PATHS=(
@@ -21,6 +23,8 @@ DOMAIN_PATHS=(
   tests/Unit/Models/CodingSerializationTest.php
   tests/Unit/Models/EmployeeDisplayLabelsTest.php
   tests/Unit/Employee
+  tests/Unit/Config/DatabaseIsolationTest.php
+  tests/Unit/Config/TestingScriptsEnvironmentTest.php
   tests/Unit/Config/PartyVerificationScopesTest.php
   tests/Unit/Config/PrepersonPolicyConfigurationTest.php
   tests/Unit/Enums/Party

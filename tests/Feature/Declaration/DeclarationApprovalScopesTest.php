@@ -61,11 +61,22 @@ class DeclarationApprovalScopesTest extends TestCase
         return $cases;
     }
 
-    public function test_legacy_approve_scope_does_not_replace_write_scope(): void
+    public function test_write_scope_allows_standard_approval_without_approve_scope(): void
     {
         [$user, $legalEntity, $employee] = $this->loginWithRole();
-        $legacyPermission = Permission::findByName('declaration_request:approve', 'ehealth');
-        $user->permissions()->sync([$legacyPermission->id => ['legal_entity_id' => $legalEntity->id]]);
+        $user->revokePermissionTo('declaration_request:approve');
+        $user = $user->fresh();
+        $this->actingAs($user, 'ehealth');
+
+        $this->assertFalse($user->can('declaration_request:approve'));
+        $this->assertTrue($user->can('approve', $this->newRequest($legalEntity, $employee)));
+    }
+
+    public function test_approve_scope_does_not_replace_write_scope(): void
+    {
+        [$user, $legalEntity, $employee] = $this->loginWithRole();
+        $approvePermission = Permission::findByName('declaration_request:approve', 'ehealth');
+        $user->permissions()->sync([$approvePermission->id => ['legal_entity_id' => $legalEntity->id]]);
         $user = $user->fresh();
         $this->actingAs($user, 'ehealth');
 
