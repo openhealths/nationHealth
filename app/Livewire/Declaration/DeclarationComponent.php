@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Declaration;
 
 use App\Classes\eHealth\EHealth;
-use App\Core\Arr;
 use App\Enums\Declaration\RequestStatus;
 use App\Enums\Declaration\Status;
 use App\Enums\JobStatus;
@@ -26,6 +25,9 @@ use App\Notifications\DivisionUpdated;
 use App\Notifications\LegalEntityUpdated;
 use App\Repositories\Repository;
 use App\Traits\FormTrait;
+use App\Dto\Declaration\Model as DeclarationData;
+use App\Dto\DeclarationRequest\Ehealth as EhealthData;
+use App\Dto\DeclarationRequest\Model as DeclarationRequestData;
 use Carbon\CarbonImmutable;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
@@ -234,7 +236,7 @@ abstract class DeclarationComponent extends Component
         $this->setDivisionId();
 
         try {
-            $validated = $this->form->validate($this->form->rulesForCreating());
+            $this->form->validate($this->form->rulesForCreating());
         } catch (ValidationException $exception) {
             Session::flash('error', $exception->validator->errors()->first());
             $this->setErrorBag($exception->validator->getMessageBag());
@@ -243,7 +245,11 @@ abstract class DeclarationComponent extends Component
         }
 
         try {
-            $response = EHealth::declarationRequest()->create(removeEmptyKeys(Arr::toSnakeCase($validated)));
+            $payload = objectMapper()
+                ->map($this->form, EhealthData::class)
+                ->toArray();
+
+            $response = EHealth::declarationRequest()->create($payload);
         } catch (EHealthException|EHealthConnectionException $exception) {
             $exception->handle('Error when creating a declaration');
 
@@ -258,9 +264,17 @@ abstract class DeclarationComponent extends Component
 
             // The user continues a locally saved draft, otherwise the request is stored from scratch
             if ($this->declarationRequestId) {
-                $declarationRequest = DeclarationRequest::findOrFail($this->declarationRequestId);
+                $declarationRequest = DeclarationRequest::findOrFail(
+                    $this->declarationRequestId
+                );
             } else {
-                $declarationRequest = Repository::declarationRequest()->store(Arr::toSnakeCase($validated));
+                $declarationRequest = Repository::declarationRequest()->store(
+                    objectMapper()->map(
+                        $this->form,
+                        DeclarationRequestData::class
+                    )
+                );
+
                 $this->declarationRequestId = $declarationRequest->id;
             }
 
@@ -613,10 +627,8 @@ abstract class DeclarationComponent extends Component
         $oldDeclaration = null;
 
         if (!$this->isNeedToResign) {
-            $oldDeclaration = Declaration::where('person_id', $declarationRequest->person_id)
-                ->where('division_id', $declarationRequest->division_id)
-                ->where('employee_id', $declarationRequest->employee_id)
-                ->where('status', Status::ACTIVE)
+            $oldDeclaration = Declaration::forRequestAssignment($declarationRequest)
+                ->whereStatus(Status::ACTIVE)
                 ->filterByLegalEntityId(legalEntity()->id)
                 ->first();
         }
@@ -638,7 +650,7 @@ abstract class DeclarationComponent extends Component
                 Repository::declarationRequest()->updateStatus($this->declarationRequestId, RequestStatus::SIGNED->value);
 
                 $context = 'creating declaration';
-                Repository::declaration()->store($response->validate());
+                Repository::declaration()->store(objectMapper()->map($response->validate(), DeclarationData::class));
 
                 $context = 'updating the previous/parent declaration';
                 $parentDeclaration = $this->isNeedToResign

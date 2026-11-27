@@ -11,6 +11,7 @@ use App\Contracts\ApiErrorTranslator;
 use App\Enums\Declaration\Status;
 use App\Exceptions\EHealth\EHealthResponseException;
 use App\Exceptions\EHealth\EHealthValidationException;
+use App\Classes\eHealth\Api\Responses\Collections\DeclarationRequestSign;
 use GuzzleHttp\Promise\PromiseInterface;
 use App\Exceptions\EHealth\EHealthConnectionException;
 use Illuminate\Http\Client\Response;
@@ -220,7 +221,7 @@ class DeclarationRequest extends Request
      * @param  EHealthResponse  $response  The response from the eHealth API.
      * @return array The validated data.
      */
-    protected function validateSigned(EHealthResponse $response): array
+    protected function validateSigned(EHealthResponse $response): DeclarationRequestSign
     {
         $validator = Validator::make($response->getData(), [
             'id' => ['required', 'uuid'],
@@ -249,7 +250,7 @@ class DeclarationRequest extends Request
             );
         }
 
-        return $validator->validated();
+        return new DeclarationRequestSign($validator->validated());
     }
 
     /**

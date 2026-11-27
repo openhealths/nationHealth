@@ -8,6 +8,7 @@ use App\Enums\Declaration\Channel;
 use App\Models\LegalEntity;
 use App\Models\DeclarationRequest;
 use App\Models\Person\Person;
+use App\Dto\DeclarationRequest\Form as FormData;
 
 class DeclarationEdit extends DeclarationComponent
 {
@@ -30,8 +31,11 @@ class DeclarationEdit extends DeclarationComponent
         $this->uploadedDocuments = $declarationRequest->documents ?? [];
 
         // Set form data
-        $this->form->employeeId = $declarationRequest->load('employee:id,uuid')->employee->uuid;
-        $this->form->authorizeWith = $declarationRequest->authorizeWith;
+        $declarationRequest->loadMissing('employee:id,uuid');
+
+        $mapper = objectMapper();
+
+        $mapper->map($mapper->map($declarationRequest, FormData::class), $this->form);
 
         $this->declarationRequestUuid = $declarationRequest->uuid ?? '';
 
