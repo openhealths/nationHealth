@@ -52,6 +52,10 @@ return [
         ]
     ],
 
+    // Guards whose roles, permissions and links are removed by update --scopes.
+    // Remove 'api' from this list to enable its scope synchronization.
+    'scope_sync_excluded_guards' => ['api'],
+
     /*
     |--------------------------------------------------------------------------
     | User Providers

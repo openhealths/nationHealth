@@ -4,27 +4,30 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use Exception;
+use RuntimeException;
+use JsonException;
 use App\Core\Arr;
 use App\Models\Role;
 use App\Models\Permission;
-use App\Models\LegalEntity;
 use Illuminate\Support\Carbon;
 use App\Models\LegalEntityType;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Spatie\Permission\PermissionRegistrar;
 use Illuminate\Database\Migrations\Migrator;
 
 abstract class MigrationsCommand extends Command
 {
+    // Source paths for scopes and configuration files
     protected const string LE_TYPES_SCOPE_PATH = 'scopes/legal_entity_types.json';
     protected const string LE_ROLES_SCOPE_PATH = 'scopes/roles.json';
 
-    protected const string CONFIG_TYPES_SCOPE_PATH = 'config/scopes/legal_entity_types.php';
-    protected const string CONFIG_ROLES_SCOPE_PATH = 'config/scopes/roles.php';
+    // Configuration paths for scopes and settings
+    protected const string CONFIG_TYPES_SCOPE_PATH = 'scopes/legal_entity_types.php';
+    protected const string CONFIG_ROLES_SCOPE_PATH = 'scopes/roles.php';
 
     protected const int CHUNK_SIZE = 1000;
 
@@ -70,9 +73,13 @@ abstract class MigrationsCommand extends Command
         if ($this->hasOption('scopes') && $this->option('scopes')) {
             $this->syncScopes();
 
-            $this->call('config:cache');
+            DB::afterCommit(function (): void {
+                if ($this->call('config:cache') !== self::SUCCESS) {
+                    throw new RuntimeException(__('Could not rebuild the configuration cache.'));
+                }
 
-            $this->info('Config cache updated');
+                $this->info(__('Config cache updated'));
+            });
 
             return;
         }
@@ -219,16 +226,37 @@ abstract class MigrationsCommand extends Command
     {
         $this->warn("\nUpdating scopes...\n");
 
-        // Read role eligibility from the current file before generating scopes.
-        config()->set('ehealth', require config_path('ehealth.php'));
+        // Refresh guards and legal entity settings before synchronizing from scope sources.
+        $auth = require config_path('auth.php');
+        $ehealth = require config_path('ehealth.php');
 
-        $this->updateLegalEntityTypeScopesConfig();
-        $this->updateRoleScopesConfig();
+        // Load guards, sync exclusions, eligible employee roles and localized entity type names into memory from the config files.
+        config([
+            'auth.guards' => $auth['guards'],
+            'auth.scope_sync_excluded_guards' => $auth['scope_sync_excluded_guards'] ?? [],
+            'ehealth.legal_entity_employee_types' => $ehealth['legal_entity_employee_types'],
+            'ehealth.legal_entity_localized_names' => $ehealth['legal_entity_localized_names'],
+        ]);
 
-        // Reread the config
-        config()->set('ehealth', require config_path('ehealth.php'));
+        $excludedGuards = array_intersect(array_keys($auth['guards']), config('auth.scope_sync_excluded_guards'));
 
-        DB::transaction(function () {
+        // Just inform the user about the guards that are excluded from scope synchronization.
+        if ($excludedGuards !== []) {
+            $this->info(__('Guards excluded from scope synchronization: :guards', [
+                'guards' => implode(', ', $excludedGuards),
+            ]));
+        }
+
+        $typeScopes = $this->readLegalEntityTypeScopes(); // Scopes by legal entity type from legal_entity_types.json, or null.
+        $roleScopes = $this->readRoleScopes(); // Scopes by eligible role from roles.json, or null.
+
+        // Set scopes in memory for database sync, using the existing PHP config if a JSON source is missing.
+        config([
+            'ehealth.legal_entity_types' => $typeScopes ?? $ehealth['legal_entity_types'],
+            'ehealth.roles' => $roleScopes ?? $ehealth['roles'],
+        ]);
+
+        DB::transaction(function () use ($typeScopes, $roleScopes): void {
             $this->syncLegalEntityTypes();
             $this->syncLegalEntityRoles();
             $this->syncLegalEntityTypeRoles();
@@ -236,9 +264,35 @@ abstract class MigrationsCommand extends Command
             $this->syncLegalEntityTypePermissions();
             $this->syncRolePermissions();
 
-            // Wait for the new permission pivots to be committed before dropping the cached whitelist.
-            DB::afterCommit($this->invalidatePermissionCaches(...));
+            // Save generated scope files and clear permission caches only after the database transaction commits.
+            DB::afterCommit(function () use ($typeScopes, $roleScopes): void {
+                try {
+                    if ($typeScopes !== null) {
+                        $this->saveScopesToFile(config_path(self::CONFIG_TYPES_SCOPE_PATH), $typeScopes);
+                    }
+
+                    if ($roleScopes !== null) {
+                        $this->saveScopesToFile(config_path(self::CONFIG_ROLES_SCOPE_PATH), $roleScopes);
+                    }
+                } finally {
+                    // The committed permissions must take effect even when publishing a scope file fails.
+                    $this->invalidatePermissionCaches();
+                }
+            });
         });
+    }
+
+    /**
+     * Guards whose roles and permissions must match the scope sources.
+     *
+     * @return list<string>
+     */
+    protected function scopeSyncGuards(): array
+    {
+        return array_values(array_diff(
+            array_keys(config('auth.guards', [])),
+            config('auth.scope_sync_excluded_guards', [])
+        ));
     }
 
     /**
@@ -249,14 +303,23 @@ abstract class MigrationsCommand extends Command
     protected function invalidatePermissionCaches(): void
     {
         $cache = cache()->memo();
+
         $guards = array_keys(config('auth.guards', []));
 
-        foreach (LegalEntity::query()->select('id')->lazyById(self::CHUNK_SIZE) as $legalEntity) {
+        $legalEntities = DB::table('legal_entities')
+            ->select('id')
+            ->lazyById(self::CHUNK_SIZE);
+
+        foreach ($legalEntities as $legalEntity) {
+            $legalEntityId = $legalEntity->id;
+
             // Forget through memo() to clear both the shared store and this process's copy.
-            $cache->forget('le_type:' . $legalEntity->id);
+            $cache->forget('le_type:' . $legalEntityId);
 
             foreach ($guards as $guard) {
-                $cache->forget('allowed_permissions:' . $legalEntity->id . ':' . $guard);
+                // User::allowedPermissionNamesForCurrentTeam() caches this list.
+                // Clearing it forces the next read to fetch updated scopes from the DB.
+                $cache->forget('allowed_permissions:' . $legalEntityId . ':' . $guard);
             }
         }
 
@@ -283,12 +346,14 @@ abstract class MigrationsCommand extends Command
         $configuredTypes = array_keys(config('ehealth.legal_entity_types', []));
 
         $configuredTypes = array_filter(array_keys($availableTypes), function ($typeName) use ($configuredTypes) {
-            if (in_array($typeName, $configuredTypes, true)) {
+            if (\in_array($typeName, $configuredTypes, true)) {
                 return $typeName;
             }
         });
 
-        $storedTypes = DB::table('legal_entity_types')->pluck('name')->all();
+        $storedTypes = DB::table('legal_entity_types')
+            ->pluck('name')
+            ->all();
 
         // Missing (need to add): types that are in config but not in DB
         $missingTypes = array_diff($configuredTypes, $storedTypes);
@@ -335,56 +400,63 @@ abstract class MigrationsCommand extends Command
 
         $now = Carbon::now()->format('Y-m-d H:i:s');
 
+        $guards = $this->scopeSyncGuards();
+
+        $roleNames = array_keys(config('ehealth.roles'));
+
+        $storedRoles = Role::whereIn('guard_name', $guards)
+            ->get(['name', 'guard_name'])
+            ->groupBy('guard_name');
+
         $rolesToInsert = [];
 
-        // Get all specified guards from section 'guards' from file config/auth.php
-        $guards = collect(array_keys((array) config('auth.guards')))
-            ->values();
+        foreach ($guards as $guard) {
+            $storedNames = $storedRoles->get($guard, collect())
+                ->pluck('name')
+                ->all();
 
-        $roleList = array_keys(config('ehealth.roles'));
+            $missingRoles = array_diff($roleNames, $storedNames);
 
-        $availableRoles = Role::get(['id', 'name'])
-            ->groupBy('name')
-            ->map(fn ($group) => $group->pluck('id')->values()->all())
-            ->toArray();
-
-        $availableRoleNames = array_keys($availableRoles);
-
-        // Missing (need to add): roles that are in config but not in DB
-        $missingRoles = array_diff($roleList, $availableRoleNames);
-        // Extra (in DB but not in config): roles that are in DB but not in config
-        $extraRoles = array_diff($availableRoleNames, $roleList);
-
-        if (!empty($missingRoles)) {
-            $this->warn("\nFound roles missing in the database: " . json_encode(array_values($missingRoles)) . "\n");
-
-            // Prepare Role's and Permission's data to insert into DB
-            foreach ($guards as $guard) {
-                foreach ($missingRoles as $roleName) {
-                    $rolesToInsert[] = [
-                        'name' => $roleName,
-                        'guard_name' => $guard,
-                        'created_at' => $now,
-                        'updated_at' => $now
-                    ];
-                }
+            foreach ($missingRoles as $roleName) {
+                $rolesToInsert[] = [
+                    'name' => $roleName,
+                    'guard_name' => $guard,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
             }
+        }
 
+        if ($rolesToInsert !== []) {
             DB::table('roles')->insert($rolesToInsert);
-        } else {
-            $this->info("\nAll roles from config are present in the database.");
         }
 
-        if (!empty($extraRoles)) {
-            $this->warn("\nFound roles are not defined in the config: " . json_encode(array_values($extraRoles)) . "\n");
+        $insertedRolesByGuard = collect($rolesToInsert)->groupBy('guard_name');
 
-            DB::table('roles')
-                ->whereIn('name', $extraRoles)
-                ->whereIn('guard_name', $guards)
-                ->delete();
-        } else {
-            $this->info("\nNo extra roles found in the database that are not defined in the config.\n");
+        foreach ($insertedRolesByGuard as $guard => $roles) {
+            $this->warn(__('Added roles for guard :guard: :names', [
+                'guard' => $guard,
+                'names' => $roles->pluck('name')->unique()->implode(', '),
+            ]));
         }
+
+        $rolesToRemove = DB::table('roles')
+            ->whereNotIn('guard_name', $guards)
+            ->orWhereNotIn('name', $roleNames)
+            ->get(['id', 'name', 'guard_name']);
+
+        DB::table('roles')
+            ->whereIn('id', $rolesToRemove->pluck('id'))
+            ->delete();
+
+        foreach ($rolesToRemove->groupBy('guard_name') as $guard => $roles) {
+            $this->warn(__('Removed roles for guard :guard: :names', [
+                'guard' => $guard,
+                'names' => $roles->pluck('name')->unique()->implode(', '),
+            ]));
+        }
+
+        $this->info(__('Roles synchronized for participating guards.'));
     }
 
     /**
@@ -396,76 +468,32 @@ abstract class MigrationsCommand extends Command
     {
         $this->info("\n-- Synchronize Legal Entity Type and Roles --\n");
 
-        $now = Carbon::now()->format('Y-m-d H:i:s');
+        $availableRoles = Role::whereIn('guard_name', $this->scopeSyncGuards())->get(['id', 'name']);
 
-        $availableRoles = Role::get(['id', 'name'])
-            ->groupBy('name')
-            ->map(fn ($group) => $group->pluck('id')->values()->all())
-            ->toArray();
+        foreach (LegalEntityType::all() as $legalEntityType) {
+            $roleNames = config('ehealth.legal_entity_employee_types.' . $legalEntityType->name, []);
 
-        $legalEntityTypes = LegalEntityType::all();
+            $roleIds = $availableRoles
+                ->whereIn('name', $roleNames)
+                ->pluck('id')
+                ->all();
 
-        $rolesToAdd = [];
-        $rolesToRemove = [];
+            // Compare pivot IDs so an existing role for one guard cannot hide a missing link for another.
+            $changes = $legalEntityType
+                ->roles()
+                ->withTimestamps()
+                ->sync($roleIds);
 
-        foreach ($legalEntityTypes as $legalEntityType) {
-            $legalEntityTypeName = $legalEntityType->name;
-            $legalEntityTypeRoles = $legalEntityType->roles()->get(['name'])->pluck('name')->unique()->toArray();
-
-            if (isset(config('ehealth.legal_entity_employee_types')[$legalEntityTypeName])) {
-                $roles = config('ehealth.legal_entity_employee_types')[$legalEntityTypeName];
-
-                // Missing (need to add): types and roles relation that are in config but not in DB
-                $missingRoles = array_values((array_diff($roles, $legalEntityTypeRoles)));
-                // Extra (in DB but not in config): types and roles relation that are in DB but not in config
-                $extraRoles = array_values((array_diff($legalEntityTypeRoles, $roles)));
-
-                if (!empty($missingRoles)) {
-                    foreach ($missingRoles as $missingRole) {
-                        foreach ($availableRoles[$missingRole] as $roleId) {
-                            $rolesToAdd[] = [
-                                'legal_entity_type_id' => $legalEntityType->id,
-                                'role_id' => $roleId,
-                                'created_at' => $now,
-                                'updated_at' => $now
-                            ];
-                        }
-                    }
-                }
-
-                if (!empty($extraRoles)) {
-                    foreach ($extraRoles as $extraRole) {
-                        foreach ($availableRoles[$extraRole] as $roleId) {
-                            $rolesToRemove[$legalEntityType->id][] = $roleId;
-                        }
-                    }
-                }
-
-            } else {
-                echo "WARNING: No roles defined for legal entity type '{$legalEntityTypeName}' in the configuration.";
+            if ($changes['attached'] !== [] || $changes['detached'] !== []) {
+                $this->warn(__('Roles for legal entity type :type: added :added, removed :removed.', [
+                    'type' => $legalEntityType->name,
+                    'added' => count($changes['attached']),
+                    'removed' => count($changes['detached']),
+                ]));
             }
         }
 
-        if (!empty($rolesToAdd)) {
-            $this->warn("\nFound roles missing in the database\n");
-
-            DB::table('legal_entity_type_roles')->insert($rolesToAdd);
-        } else {
-            $this->info("\nAll roles for legal entity types from config are present in the database.");
-        }
-
-        if (!empty($rolesToRemove)) {
-            $this->warn("\nFound roles for legal entity types are not defined in the config\n");
-
-            foreach ($rolesToRemove as $legalEntityTypeId => $roleIds) {
-                DB::table('legal_entity_type_roles')
-                    ->where('legal_entity_type_id', $legalEntityTypeId)
-                    ->whereIn('role_id', $roleIds)
-                    ->delete();
-            }
-        } else {
-            $this->info("\nNo extra roles for legal entity types found in the database that are not defined in the config.\n");
-        }
+        $this->info(__('Legal entity type roles synchronized for enabled guards.'));
     }
 
     /**
@@ -478,76 +506,74 @@ abstract class MigrationsCommand extends Command
         $this->info("\n-- Synchronize Permissions --\n");
 
         $now = Carbon::now()->format('Y-m-d H:i:s');
-
-        // Ensure that no cached permission state during seeding
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        // Collect all types permissions from config source
-        $typePermissions = collect((array) config('ehealth.legal_entity_types'))
-            ->flatMap(fn ($arr) => (array) $arr);
-
-        // Collect all roles permissions from config source
-        $rolePermissions = collect((array) config('ehealth.roles'))
-            ->flatMap(fn ($arr) => (array) $arr);
-
-        // Combine and deduplicate permission names
-        $configPermissions = $typePermissions
-            ->merge($rolePermissions)
-            ->filter(fn ($v) => is_string($v) && trim($v) !== '')
-            ->map(fn ($v) => trim($v))
+        // Unique scope names from all legal entity types and roles, used as the shared permissions catalog for each enabled guard.
+        $permissionNames = collect(config('ehealth.legal_entity_types'))
+            ->concat(config('ehealth.roles'))
+            ->flatten()
+            ->filter(fn ($scope) => \is_string($scope) && trim($scope) !== '')
+            ->map(fn ($scope) => trim($scope))
             ->unique()
             ->values()
-            ->toArray();
+            ->all();
 
-        // Get available guards
-        $guards = collect(array_keys((array) config('auth.guards')))
-            ->values();
-
-        $currentPermissions = Permission::get()
-            ->pluck('name')
-            ->unique()
-            ->values()
-            ->toArray();
-
-        // Missing (need to add): permissions that are in config but not in DB
-        $missingPermissions = array_diff($configPermissions, $currentPermissions);
-        // Extra (in DB but not in config): permissions that are in DB but not in config
-        $extraPermissions = array_values(array_diff($currentPermissions, $configPermissions));
-
+        $guards = $this->scopeSyncGuards();
+        $storedPermissions = Permission::whereIn('guard_name', $guards)
+            ->get(['name', 'guard_name'])
+            ->groupBy('guard_name');
         $permissionsToInsert = [];
 
-        if (!empty($missingPermissions)) {
-            $this->warn("\nFound permissions missing in the database: " . json_encode(array_values($missingPermissions)) . "\n");
+        foreach ($guards as $guard) {
+            $storedNames = $storedPermissions
+                ->get($guard, collect())
+                ->pluck('name')
+                ->all();
 
-            foreach ($missingPermissions as $permission) {
-                foreach ($guards as $guard) {
-                    $permissionsToInsert[] = [
-                        'name' => $permission,
-                        'guard_name' => $guard,
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ];
-                }
+            foreach (array_diff($permissionNames, $storedNames) as $permissionName) {
+                $permissionsToInsert[] = [
+                    'name' => $permissionName,
+                    'guard_name' => $guard,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
             }
-
-            DB::table('permissions')->insert($permissionsToInsert);
-        } else {
-            $this->info("\nAll permissions from config are present in the database.");
         }
 
-        if (!empty($extraPermissions)) {
-            $this->warn("\nFound permissions are not defined in the config: " . json_encode(array_values($extraPermissions)) . "\n");
-
-            DB::table('permissions')
-                ->whereIn('name', $extraPermissions)
-                ->whereIn('guard_name', $guards)
-                ->delete();
-        } else {
-            $this->info("\nNo extra permissions found in the database that are not defined in the config.\n");
+        foreach (array_chunk($permissionsToInsert, self::CHUNK_SIZE) as $chunk) {
+            DB::table('permissions')->insert($chunk);
         }
 
-        // Clear cached permissions once more again
+        $insertedPermissionsByGuard = collect($permissionsToInsert)->groupBy('guard_name');
+
+        foreach ($insertedPermissionsByGuard as $guard => $permissions) {
+            $this->warn(__('Added permissions for guard :guard: :names', [
+                'guard' => $guard,
+                'names' => $permissions->pluck('name')->unique()->implode(', '),
+            ]));
+        }
+
+        $permissionsToRemove = DB::table('permissions')
+            ->whereNotIn('guard_name', $guards)
+            ->orWhereNotIn('name', $permissionNames)
+            ->get(['id', 'name', 'guard_name']);
+
+        DB::table('permissions')
+            ->whereIn('id', $permissionsToRemove->pluck('id'))
+            ->delete();
+
+        $removedPermissionsByGuard = $permissionsToRemove->groupBy('guard_name');
+
+        foreach ($removedPermissionsByGuard as $guard => $permissions) {
+            $this->warn(__('Removed permissions for guard :guard: :names', [
+                'guard' => $guard,
+                'names' => $permissions->pluck('name')->unique()->implode(', '),
+            ]));
+        }
+
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $this->info(__('Permissions synchronized for enabled guards.'));
     }
 
     /**
@@ -559,76 +585,32 @@ abstract class MigrationsCommand extends Command
     {
         $this->info("\n-- Synchronize Legal Entity Type and Permissions --\n");
 
-        $now = Carbon::now()->format('Y-m-d H:i:s');
+        $availablePermissions = Permission::whereIn('guard_name', $this->scopeSyncGuards())->get(['id', 'name']);
 
-        $availablePermissions = Permission::get(['id', 'name'])
-            ->groupBy('name')
-            ->map(fn ($group) => $group->pluck('id')->values()->all())
-            ->toArray();
+        foreach (LegalEntityType::all() as $legalEntityType) {
+            $permissionNames = config('ehealth.legal_entity_types.' . $legalEntityType->name, []);
 
-        $legalEntityTypes = LegalEntityType::all();
+            $permissionIds = $availablePermissions
+                ->whereIn('name', $permissionNames)
+                ->pluck('id')
+                ->all();
 
-        $permissionsToAdd = [];
-        $permissionsToRemove = [];
+            // Include each configured guard's permission ID, even when the same scope already exists for another guard.
+            $changes = $legalEntityType
+                ->permissions()
+                ->withTimestamps()
+                ->sync($permissionIds);
 
-        foreach ($legalEntityTypes as $legalEntityType) {
-            $legalEntityTypeName = $legalEntityType->name;
-            $legalEntityTypePermissions = $legalEntityType->permissions()->get(['name'])->pluck('name')->unique()->toArray();
-
-            if (isset(config('ehealth.legal_entity_types')[$legalEntityTypeName])) {
-                $permissions = config('ehealth.legal_entity_types')[$legalEntityTypeName];
-
-                // Missing (need to add): types and permissions relation that are in config but not in DB
-                $missingPermissions = array_values((array_diff($permissions, $legalEntityTypePermissions)));
-                // Extra (in DB but not in config): types and permissions relation that are in DB but not in config
-                $extraPermissions = array_values((array_diff($legalEntityTypePermissions, $permissions)));
-
-                if (!empty($missingPermissions)) {
-                    foreach ($missingPermissions as $missingPermission) {
-                        foreach ($availablePermissions[$missingPermission] as $permissionId) {
-                            $permissionsToAdd[] = [
-                                'legal_entity_type_id' => $legalEntityType->id,
-                                'permission_id' => $permissionId,
-                                'created_at' => $now,
-                                'updated_at' => $now
-                            ];
-                        }
-                    }
-                }
-
-                if (!empty($extraPermissions)) {
-                    foreach ($extraPermissions as $extraPermission) {
-                        foreach ($availablePermissions[$extraPermission] as $permissionId) {
-                            $permissionsToRemove[$legalEntityType->id][] = $permissionId;
-                        }
-                    }
-                }
-
-            } else {
-                $this->warn("\nWARNING: No permissions defined for legal entity type '{$legalEntityTypeName}' in the configuration.");
+            if ($changes['attached'] !== [] || $changes['detached'] !== []) {
+                $this->warn(__('Permissions for legal entity type :type: added :added, removed :removed.', [
+                    'type' => $legalEntityType->name,
+                    'added' => \count($changes['attached']),
+                    'removed' => \count($changes['detached']),
+                ]));
             }
         }
 
-        if (!empty($permissionsToAdd)) {
-            $this->warn("\nFound permissions for legal entity types missing in the database\n");
-
-            DB::table('legal_entity_type_permissions')->insert($permissionsToAdd);
-        } else {
-            $this->info("\nAll permissions for legal entity types from config are present in the database.");
-        }
-
-        if (!empty($permissionsToRemove)) {
-            $this->warn("\nFound permissions for legal entity types are not defined in the config\n");
-
-            foreach ($permissionsToRemove as $legalEntityTypeId => $permissionIds) {
-                DB::table('legal_entity_type_permissions')
-                    ->where('legal_entity_type_id', $legalEntityTypeId)
-                    ->whereIn('permission_id', $permissionIds)
-                    ->delete();
-            }
-        } else {
-            $this->info("\nNo extra permissions for legal entity types found in the database that are not defined in the config.\n");
-        }
+        $this->info(__('Legal entity type permissions synchronized for enabled guards.'));
     }
 
     /**
@@ -642,90 +624,43 @@ abstract class MigrationsCommand extends Command
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        $availablePermissions = Permission::get(['id', 'name', 'guard_name'])
-            ->groupBy('name')
-            ->map(fn ($group) => $group->pluck('id', 'guard_name')->all())
-            ->toArray();
+        $guards = $this->scopeSyncGuards();
 
-        $roles = Role::get(['id', 'name', 'guard_name'])
-            ->groupBy('name')
-            ->map(fn ($group) => $group->pluck('id', 'guard_name')->all())
-            ->toArray();
+        $availablePermissions = Permission::whereIn('guard_name', $guards)
+            ->get(['id', 'name', 'guard_name'])
+            ->groupBy('guard_name');
 
-        $currentRolePermissions = Role::with('permissions')->get()->mapWithKeys(function ($role) {
-            return [$role->name => $role->permissions->pluck('name')->unique()->toArray()];
-        })->toArray();
+        $roles = Role::whereIn('guard_name', $guards)->get();
 
-        $permissionsToAdd = [];
-        $permissionsToRemove = [];
+        foreach ($roles as $role) {
+            $permissionNames = config('ehealth.roles.' . $role->name, []);
 
-        foreach ($roles as $roleName => $roleIds) {
-            foreach ($roleIds as $guardName => $roleId) {
-                $rolePermissions = $currentRolePermissions[$roleName] ?? [];
+            $permissionIds = $availablePermissions
+                ->get($role->guard_name, collect())
+                ->whereIn('name', $permissionNames)
+                ->pluck('id')
+                ->all();
 
-                $rolesFromConfig = config('ehealth.roles', []);
+            // Synchronize each role record separately and remove links to permissions from other guards.
+            $changes = $role->permissions()->sync($permissionIds);
 
-                if (isset($rolesFromConfig[$roleName])) {
-                    $permissions = $rolesFromConfig[$roleName];
-
-                    // Missing (need to add): types and permissions relation that are in config but not in DB
-                    $missingPermissions = array_values((array_diff($permissions, $rolePermissions)));
-                    // Extra (in DB but not in config): types and permissions relation that are in DB but not in config
-                    $extraPermissions = array_values((array_diff($rolePermissions, $permissions)));
-
-                    if (!empty($missingPermissions)) {
-                        foreach ($missingPermissions as $missingPermission) {
-                            $permissionsToAdd[] = [
-                                'role_id' => $roleId,
-                                'permission_id' => $availablePermissions[$missingPermission][$guardName]
-                            ];
-                        }
-                    }
-
-                    if (!empty($extraPermissions)) {
-
-                        foreach ($extraPermissions as $extraPermission) {
-                            $permissionsToRemove[$roleId][] = $availablePermissions[$extraPermission][$guardName];
-                        }
-                    }
-
-                } else {
-                    $this->warn("\nWARNING: No permissions defined for role '{$roleName}' in the configuration.");
-                }
+            if ($changes['attached'] !== [] || $changes['detached'] !== []) {
+                $this->warn(__('Permissions for role :role and guard :guard: added :added, removed :removed.', [
+                    'role' => $role->name,
+                    'guard' => $role->guard_name,
+                    'added' => count($changes['attached']),
+                    'removed' => count($changes['detached']),
+                ]));
             }
         }
 
-        if (!empty($permissionsToAdd)) {
-            $this->warn("\nFound permissions for roles missing in the database...");
-
-            DB::table('role_has_permissions')->insert($permissionsToAdd);
-
-            $this->warn("Synced succesfully\n");
-        } else {
-            $this->info("\nAll permissions for roles from config are present in the database.");
-        }
-
-        if (!empty($permissionsToRemove)) {
-            $this->warn("\nFound permissions for roles are not defined in the config...");
-
-            foreach ($permissionsToRemove as $roleId => $permissionIds) {
-                DB::table('role_has_permissions')
-                    ->where('role_id', $roleId)
-                    ->whereIn('permission_id', $permissionIds)
-                    ->delete();
-            }
-
-            $this->warn("Synced succesfully\n");
-        } else {
-            $this->info("\nNo extra permissions for roles found in the database that are not defined in the config.\n");
-        }
-
-        // Clear permission cache
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $this->info(__('Role permissions synchronized for enabled guards.'));
     }
 
     /**
-     * Update the legal entity types scopes configuration from the source scopes file.
+     * Read legal entity type scopes from the source file, or return null when absent.
         *
         * Base source structure for scopes/legal_entity_types.json:
         * {
@@ -750,44 +685,45 @@ abstract class MigrationsCommand extends Command
         * - "extra" also adds scopes to the final set.
         * - "missed" and "extra" are optional and may be ommitted.
      *
-     * @return void
+     * @return array<string, list<string>>|null
      */
-    protected function updateLegalEntityTypeScopesConfig(): void
+    protected function readLegalEntityTypeScopes(): ?array
     {
         if (!Storage::exists(self::LE_TYPES_SCOPE_PATH)) {
             $this->warn("\nNo source scopes file for legal entity types found. Skipping update config...\n");
 
-            return;
-        };
+            return null;
+        }
 
-        $config['OPEN'] = '<?php' . PHP_EOL . PHP_EOL. 'return [';
-
-        $data = Arr::get(Storage::json(self::LE_TYPES_SCOPE_PATH), 'data', []);
+        $config = [];
+        $data = $this->readScopesSource(self::LE_TYPES_SCOPE_PATH);
 
         foreach ($data as $item) {
             $typeName = Arr::get($item, 'name');
+
+            if (!array_key_exists($typeName, config('ehealth.legal_entity_localized_names'))) {
+                throw new RuntimeException(__('Unknown legal entity type :name in scopes file :path.', [
+                    'name' => $typeName,
+                    'path' => self::LE_TYPES_SCOPE_PATH,
+                ]));
+            }
 
             $scopes = explode(" ", Arr::get($item, 'scope', ""));
             $missed = explode(" ", Arr::get($item, 'missed', ""));
             $extra = explode(" ", Arr::get($item, 'extra', ""));
 
-            $scopes = collect([...$scopes, ...$missed, ...$extra])
+            $config[$typeName] = collect([...$scopes, ...$missed, ...$extra])
                 ->filter(fn ($scope) => !empty($scope))
-                ->map(fn ($scope) => "'$scope'")
                 ->unique()
                 ->values()
                 ->toArray();
-
-            $config[$typeName] = $scopes;
         }
 
-        $config['CLOSE'] = "];";
-
-        $this->saveScopesToFile(self::CONFIG_TYPES_SCOPE_PATH, $config);
+        return $config;
     }
 
     /**
-     * Update the legal entity roles scopes configuration from the source scopes file.
+     * Read role scopes from the source file, or return null when absent.
         *
         * Base source structure for scopes/roles.json:
         * {
@@ -808,21 +744,20 @@ abstract class MigrationsCommand extends Command
         * - "name" must match a role from ehealth.legal_entity_employee_types.
         * - "scope" is a space-delimited list.
      *
-     * @return void
+     * @return array<string, list<string>>|null
      */
-    protected function updateRoleScopesConfig(): void
+    protected function readRoleScopes(): ?array
     {
         if (!Storage::exists(self::LE_ROLES_SCOPE_PATH)) {
             $this->warn("\nNo source scopes file for legal entity roles found. Skipping update config...\n");
 
-            return;
+            return null;
         }
 
         $roles = collect(array_values(config('ehealth.legal_entity_employee_types')))->flatten()->unique();
 
-        $config['OPEN'] = '<?php' . PHP_EOL . PHP_EOL. 'return [';
-
-        $data = Arr::get(Storage::json(self::LE_ROLES_SCOPE_PATH), 'data', []);
+        $config = [];
+        $data = $this->readScopesSource(self::LE_ROLES_SCOPE_PATH);
 
         foreach ($data as $item) {
             $roleName = Arr::get($item, 'name');
@@ -833,64 +768,75 @@ abstract class MigrationsCommand extends Command
 
             $scopes = explode(" ", Arr::get($item, 'scope', ""));
 
-            $scopes = collect([...$scopes])
+            $config[$roleName] = collect($scopes)
                 ->filter(fn ($scope) => !empty($scope))
-                ->map(fn ($scope) => "'$scope'")
                 ->unique()
                 ->values()
                 ->toArray();
-
-            $config[$roleName] = $scopes;
         }
 
-        $config['CLOSE'] = "];";
+        if ($config === []) {
+            throw new RuntimeException(__('No eligible roles found in scopes file :path.', [
+                'path' => self::LE_ROLES_SCOPE_PATH,
+            ]));
+        }
 
-        $this->saveScopesToFile(self::CONFIG_ROLES_SCOPE_PATH, $config);
+        return $config;
     }
 
     /**
-     * Persist generated scopes configuration to a PHP config file.
+     * Read and validate a nonempty list of scope records before any database changes.
      *
-     * @param  string  $path  Target config file path.
-     * @param  array<string, mixed>  $config  Prepared scopes configuration data.
-     * @return void
-     * @throws Exception
+     * @return list<array{name: string, scope: string, missed?: string, extra?: string}>
      */
-    protected function saveScopesToFile(string $path, array $config = []): void
+    protected function readScopesSource(string $path): array
     {
-        if (empty($config)) {
-            $this->warn("\nNo scopes received to save to file: {$path}\n");
-
-            return;
-        }
-
-        $tmpPath = $path . '.tmp';
-
         try {
-            File::put($tmpPath, '');
-
-            foreach ($config as $typeName => $data) {
-                if ($typeName === 'OPEN' || $typeName === 'CLOSE') {
-                    File::append($tmpPath, $data . PHP_EOL);
-
-                    continue;
-                }
-
-                File::append($tmpPath, "\t'$typeName' => [". PHP_EOL ."\t\t");
-
-                foreach ($data as $scope) {
-                    File::append($tmpPath, "$scope, ");
-                }
-
-                File::append($tmpPath, PHP_EOL . "\t]," . PHP_EOL);
-            }
-
-            if (File::exists($tmpPath) && filesize($tmpPath) > 0) {
-                File::move($tmpPath, $path);
-            }
-        } catch (Exception $err) {
-            $this->error("Error writing to file: {$path}. Error: " . $err->getMessage());
+            $source = Storage::json($path, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new RuntimeException(__('Invalid JSON in scopes file :path.', ['path' => $path]), 0, $exception);
         }
+
+        $validator = Validator::make(['data' => $source['data'] ?? null], [
+            'data' => ['required', 'array', 'list', 'min:1'],
+            'data.*' => ['required', 'array'],
+            'data.*.name' => ['required', 'string', 'distinct:strict'],
+            'data.*.scope' => ['required', 'string'],
+            'data.*.missed' => ['sometimes', 'string'],
+            'data.*.extra' => ['sometimes', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            throw new RuntimeException(__('Invalid scopes file :path. :error', [
+                'path' => $path,
+                'error' => $validator->errors()->first(),
+            ]));
+        }
+
+        return $source['data'];
+    }
+
+    /**
+     * Save generated scopes as a PHP configuration file.
+     *
+     * @param  array<string, list<string>>  $config
+     */
+    protected function saveScopesToFile(string $path, array $config): void
+    {
+        $contents = '<?php' . PHP_EOL . PHP_EOL . 'return [' . PHP_EOL;
+
+        foreach ($config as $name => $scopes) {
+            $name = var_export($name, true);
+            $contents .= "\t{$name} => [" . PHP_EOL . "\t\t";
+
+            foreach ($scopes as $scope) {
+                $contents .= var_export($scope, true) . ', ';
+            }
+
+            $contents = rtrim($contents) . PHP_EOL . "\t]," . PHP_EOL;
+        }
+
+        File::replace($path, $contents . '];' . PHP_EOL);
     }
 
     /**
