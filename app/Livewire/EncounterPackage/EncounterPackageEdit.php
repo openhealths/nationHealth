@@ -7,16 +7,24 @@ namespace App\Livewire\EncounterPackage;
 use App\Classes\eHealth\EHealth;
 use App\Core\Arr;
 use App\Enums\Episode\Status as EpisodeStatus;
+use App\Enums\JobStatus;
 use App\Enums\Person\EncounterStatus;
-use App\Livewire\EncounterPackage\Forms\EncounterCancellationForm;
+use App\Exceptions\EHealth\EHealthConnectionException;
+use App\Exceptions\EHealth\EHealthException;
+use App\Livewire\EncounterPackage\Concerns\ManagesEncounterEPrescription;
+use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
 use App\Livewire\EncounterPackage\Concerns\ManagesIncomingReferralCompletion;
+use App\Livewire\EncounterPackage\Concerns\ResolvesEncounterStandaloneContext;
+use App\Livewire\EncounterPackage\Forms\EncounterCancellationForm;
 use App\Models\LegalEntity;
 use App\Models\MedicalEvents\Sql\ClinicalImpression;
+use App\Models\MedicalEvents\Sql\Composition;
 use App\Models\MedicalEvents\Sql\Condition;
 use App\Models\MedicalEvents\Sql\DetectedIssue;
 use App\Models\MedicalEvents\Sql\Device;
 use App\Models\MedicalEvents\Sql\DeviceAssociation;
 use App\Models\MedicalEvents\Sql\DeviceDispense;
+use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use App\Models\MedicalEvents\Sql\DiagnosticReport;
 use App\Models\MedicalEvents\Sql\Encounter;
 use App\Models\MedicalEvents\Sql\Episode;
@@ -27,34 +35,26 @@ use App\Models\MedicalEvents\Sql\Specimen;
 use App\Models\Person\Person;
 use App\Models\Preperson;
 use App\Repositories\MedicalEvents\Repository;
+use App\Services\MedicalEvents\DeviceRequestLifecycleService;
 use App\Services\MedicalEvents\Fhir;
 use App\Traits\HandlesEncounterCancellation;
-use App\Exceptions\EHealth\EHealthConnectionException;
-use App\Exceptions\EHealth\EHealthException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
-use App\Livewire\EncounterPackage\Concerns\ManagesEncounterEPrescription;
-use App\Livewire\EncounterPackage\Concerns\ManagesEncounterReferrals;
-use App\Livewire\EncounterPackage\Concerns\ResolvesEncounterStandaloneContext;
-use App\Models\MedicalEvents\Sql\Composition;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
-use App\Services\MedicalEvents\DeviceRequestLifecycleService;
-use App\Models\MedicalEvents\Sql\DeviceRequestRequest;
 use Throwable;
-use App\Enums\JobStatus;
 
 class EncounterPackageEdit extends EncounterPackageComponent
 {
     use HandlesEncounterCancellation;
-    use ManagesIncomingReferralCompletion;
-    use ResolvesEncounterStandaloneContext;
     use ManagesEncounterEPrescription;
     use ManagesEncounterReferrals;
+    use ManagesIncomingReferralCompletion;
+    use ResolvesEncounterStandaloneContext;
 
     #[Locked]
     public int $encounterId;
@@ -71,7 +71,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
      * @var string
      */
     #[Locked]
-    public string $episodeType = 'new';
+    public string $episodeType;
 
     /**
      * Whether the encounter may be marked as entered in error by the current user.
@@ -583,7 +583,7 @@ class EncounterPackageEdit extends EncounterPackageComponent
             return null;
         }
 
-        // Sections with no records stay out of the package, the same way the create flow signs it
+        // Sections with no records stay out of the package, the same way the creation flow signs it
         return array_filter([
             'encounter' => $fhirEncounter,
             'episode' => $fhirEpisode,
@@ -615,10 +615,11 @@ class EncounterPackageEdit extends EncounterPackageComponent
     protected function selectedCancellationRecords(): array
     {
         // The picks arrive from the browser, so only known sections holding record ids survive
-        return array_filter(array_map(
-            static fn (mixed $recordIds): array => array_filter((array)$recordIds, 'is_string'),
-            array_intersect_key($this->selectedRecords, self::NO_RECORDS_SELECTED)
-        ));
+        return collect($this->selectedRecords)
+            ->intersectByKeys(self::NO_RECORDS_SELECTED)
+            ->map(static fn (mixed $recordIds): array => array_filter((array)$recordIds, 'is_string'))
+            ->filter()
+            ->all();
     }
 
     /**
