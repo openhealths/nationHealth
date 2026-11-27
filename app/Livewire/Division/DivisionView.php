@@ -8,14 +8,12 @@ use Auth;
 use Exception;
 use Throwable;
 use App\Models\Division;
+use App\Repositories\Repository;
 use App\Models\LegalEntity;
 use App\Enums\Status;
 use Livewire\Attributes\Locked;
 use App\Classes\eHealth\EHealth;
-use App\Repositories\Repository;
 use App\Dto\Division\Model as DivisionData;
-use Symfony\Component\ObjectMapper\ObjectMapper;
-use Symfony\Component\PropertyAccess\PropertyAccess;
 use App\Traits\WorkTimeUtilities;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\RedirectResponse;
@@ -108,9 +106,7 @@ class DivisionView extends DivisionComponent
         }
 
         try {
-            $divisionModelMapped = new ObjectMapper(propertyAccessor: PropertyAccess::createPropertyAccessorBuilder()
-                ->disableExceptionOnInvalidPropertyPath()
-                ->getPropertyAccessor())
+            $divisionModelMapped = propertyObjectMapper()
                 ->map($divisionData, DivisionData::class);
 
             Repository::division()->saveMappedDivision($divisionModelMapped, $division, legalEntity());

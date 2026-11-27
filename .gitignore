@@ -8,6 +8,7 @@
 /vendor
 .env
 .env.backup
+.env.testing
 .env.production
 .phpunit.result.cache
 .php-cs-fixer.cache
@@ -27,6 +28,7 @@ storage/debugbar
 boost.json
 AGENTS.md
 GEMINI.md
+.ai/
 .cursor/
 .agents/
 .github/copilot-instructions.md
