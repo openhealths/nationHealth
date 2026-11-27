@@ -6,6 +6,7 @@ namespace App\Livewire\Employee;
 
 use AllowDynamicProperties;
 use App\Core\Arr;
+use App\Livewire\Employee\Forms\EmployeeForm;
 use App\Models\Employee\Employee;
 use App\Models\Employee\EmployeeRequest;
 use App\Models\LegalEntity;
@@ -18,6 +19,13 @@ class EmployeeEdit extends AbstractEmployeeFormManager
 {
     #[Locked]
     public ?int $employeeId = null;
+
+    #[Locked]
+    public bool $isPersonalDataLocked = true;
+
+    #[Locked]
+    public bool $isDocumentDetailsEditable = false;
+
     public bool $isLockedDueToSignedRequest = false;
 
     public function mount(LegalEntity $legalEntity, Employee $employee): void
@@ -29,7 +37,6 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         $this->employee = $employee;
         $this->employeeId = $employee->id;
 
-        // Keep position-specific fields editable and lock party data except document issuance details.
         $this->isPositionDataLocked = false;
         $this->loadDivisions($legalEntity);
 
@@ -58,6 +65,34 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         if ($this->employeeId) {
             $this->employee = Employee::findOrFail($this->employeeId);
         }
+    }
+
+    protected function applyEmployeeTypeBusinessRules(): void
+    {
+        // Preserve personal data already saved in the shared draft by the personal-data editor.
+        $source = $this->localDraft() ?? $this->employee;
+        $storedForm = new EmployeeForm($this, 'form');
+        $storedForm->hydrate($source);
+        $storedForm->fillPartyIdentity($this->employee->party);
+
+        $this->form->party = $storedForm->party;
+        $this->form->documents = $storedForm->documents;
+        $this->form->existingPartyId = $storedForm->existingPartyId;
+
+        parent::applyEmployeeTypeBusinessRules();
+    }
+
+    protected function localDraft(): ?EmployeeRequest
+    {
+        if ($this->employeeRequestId === null) {
+            return null;
+        }
+
+        $draft = EmployeeRequest::with('revision')->find($this->employeeRequestId);
+
+        return $draft?->isLocalDraft() && Repository::employee()->requestMatchesEmployee($draft, $this->employee)
+            ? $draft
+            : null;
     }
 
     protected function handleDraftPersistence(): EmployeeRequest
@@ -100,26 +135,21 @@ class EmployeeEdit extends AbstractEmployeeFormManager
         $nestedDataForRevision = $this->mapRevisionData($preparedData);
         $nestedDataForRevision['employee_uuid'] = $this->employee->uuid;
 
-        // Since we check for draft in mount(), $this->employeeRequestId is likely set if a draft existed.
-        // We reuse the logic to update it.
-
         $employeeRequestData = Arr::only($preparedData, ['position', 'start_date', 'end_date', 'employee_type', 'division_id', 'email']);
         $employeeRequestData['user_id'] = $this->employee->party?->users()->first()?->id;
         $employeeRequestData['party_id'] = $this->employee->party->id;
         $employeeRequestData['employee_id'] = $this->employee->id;
 
-        if ($this->employeeRequestId) {
-            $existingRequest = EmployeeRequest::find($this->employeeRequestId);
+        if ($existingRequest = $this->localDraft()) {
+            $existingRequest->fill($employeeRequestData)->save();
 
-            if ($existingRequest && is_null($existingRequest->uuid)) {
-                $existingRequest->fill($employeeRequestData)->save();
-
-                // Merge revision data carefully (though mapRevisionData usually has everything needed from form)
-                // Since form was hydrated from draft, getPreparedData contains previous draft values + new edits.
-                $existingRequest->revision?->update(['data' => $nestedDataForRevision]);
-
-                return $existingRequest;
+            if ($existingRequest->revision) {
+                $existingRequest->revision->update(['data' => $nestedDataForRevision]);
+            } else {
+                $this->saveRevisionForRequest($existingRequest, $nestedDataForRevision);
             }
+
+            return $existingRequest;
         }
 
         // Create new if really nothing exists
