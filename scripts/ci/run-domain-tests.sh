@@ -56,6 +56,8 @@ DOMAIN_PATHS=(
   tests/Unit/Services/MedicalEvents/EncounterReferralDisplayTest.php
   tests/Unit/eHealth/Api/Patient/MedicationRequestRejectPayloadTest.php
   tests/Unit/eHealth/Api/ConfigurationQueryTest.php
+  tests/Unit/eHealth/LegalEntityErrorTranslationTest.php
+  tests/Unit/eHealth/LegacyRequestErrorHandlingTest.php
   tests/Feature/Employee
   tests/Feature/Party
   tests/Feature/Declaration

@@ -95,6 +95,8 @@ class BaseErrorTranslator implements ApiErrorTranslator
             'Invalid drfo' => __('errors.ehealth.messages.invalid_drfo'),
             'Signed content does not match the previously created content' => __('errors.ehealth.messages.signed_content_mismatch'),
             'Does not match the signer drfo' => __('errors.ehealth.messages.signer_drfo_mismatch'),
+            'Does not match the signer last name' => __('errors.ehealth.messages.signer_last_name_mismatch'),
+            'has invalid format' => __('errors.ehealth.messages.invalid_format'),
             'retrieving a timestamp of data from an envelope with signed data failed' => __('errors.ehealth.messages.signature_timestamp_retrieving_failed'),
             'loading information about the response with a timestamp failed' => __('errors.ehealth.messages.signature_timestamp_loading_failed'),
             'retrieving certificate from signed data container failed' => __('errors.ehealth.messages.signature_certificate_retrieving_failed'),
