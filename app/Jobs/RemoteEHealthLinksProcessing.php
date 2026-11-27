@@ -30,6 +30,7 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Queue\Middleware\RateLimited;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
@@ -545,7 +546,8 @@ class RemoteEHealthLinksProcessing extends EHealthJob
             }
             throw $exception;
         }
-        $data = $response->validate();
+        $result = $response->validate();
+        $data = $result instanceof Collection ? $result->toArray() : $result;
         $status = strtolower((string) ($data['status'] ?? ''));
         if (isset($data['error']) || in_array($status, ['failed', 'rejected', 'error'], true)) {
             self::markSubmissionFailed($link);

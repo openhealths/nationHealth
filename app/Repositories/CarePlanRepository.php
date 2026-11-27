@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Repositories\Repository;
+use App\Dto\CarePlan\Model as CarePlanData;
+use App\Dto\Identifier\Model as IdentifierData;
+use App\Enums\Episode\Status as EpisodeStatus;
+use App\Enums\Person\ProcedureStatus;
+use App\Models\MedicalEvents\Sql\Procedure;
 use App\Enums\CarePlanStatusFilter;
 use App\Enums\CarePlanCompletenessFilter;
 use Illuminate\Validation\ValidationException;
@@ -65,6 +70,112 @@ class CarePlanRepository extends MedicalEventsBaseRepository
     private function uiRelations(): array
     {
         return [...self::FHIR_RELATIONS, 'person.names', 'author.party', 'encounter.episode', 'encounter.diagnoses.condition.type.coding', 'approvals.grantedTo.type.coding', ...array_map(static fn (string $relation): string => 'activities.'.$relation, CarePlanActivityRepository::FHIR_RELATIONS), 'activities.author.party'];
+    }
+
+    /**
+     * Insert the mapped draft and its relations atomically. Retried submissions use the same UUID.
+     */
+    public function save(CarePlanData $data, CarePlan $draft): CarePlan
+    {
+        return $this->storageTransaction(function () use ($data, $draft): CarePlan {
+            // Serialize requests for this patient before the draft row exists.
+            Person::whereKey($draft->personId)->lockForUpdate()->firstOrFail();
+            $existing = CarePlan::whereUuid($draft->uuid)->lockForUpdate()->first();
+            if ($existing !== null) {
+                if ((int) $existing->personId !== (int) $draft->personId
+                    || (int) $existing->legalEntityId !== (int) $draft->legalEntityId
+                    || (int) $existing->authorId !== (int) $draft->authorId) {
+                    throw ValidationException::withMessages(['form.title' => __('care-plan.document_context_unavailable')]);
+                }
+
+                return $existing;
+            }
+
+            objectMapper()->map($data, $draft);
+            $concepts = MedicalEventsRepository::codeableConcept();
+            $identifiers = MedicalEventsRepository::identifier();
+            foreach (['categoryConcept', 'termsOfServiceConcept'] as $relation) {
+                $draft->{$relation}()->associate($concepts->store($data->{$relation}));
+            }
+            foreach (['authorReference', 'subjectReference', 'encounterIdentifier', 'managingOrganization'] as $relation) {
+                $draft->{$relation}()->associate($identifiers->store($data->{$relation}));
+            }
+
+            // Mark the normalized local draft as complete for readers that require the FHIR backfill marker.
+            $draft->detailsSyncedAt = now();
+            $draft->saveOrFail();
+            MedicalEventsRepository::period()->sync(
+                $draft,
+                ['start' => $data->periodStart, 'end' => $data->periodEnd ?: null],
+                'effectivePeriod'
+            );
+
+            $supportingIds = $data->supportingInfoReferences->map(function (IdentifierData $reference) use ($data, $identifiers): int {
+                $identifier = $identifiers->store($reference);
+                $key = $reference->type->coding[0]->code.':'.$reference->value;
+                if (isset($data->medicalRecordLabels[$key])) {
+                    $identifier->displayValue = $data->medicalRecordLabels[$key];
+                    $identifier->saveOrFail();
+                }
+
+                return $identifier->id;
+            });
+            $this->syncPivot($draft, 'supportingInfoReferences', $supportingIds->all());
+            $contributorIds = $data->contributors->map(fn (IdentifierData $reference): int => $identifiers->store($reference)->id);
+            $this->syncPivot($draft, 'contributors', $contributorIds->all());
+
+            return $draft;
+        });
+    }
+
+    /** Resolve a finished encounter in the current facility that the clinician may read. */
+    public function draftEncounter(string $uuid, Person $person, User $user, LegalEntity $legalEntity): ?Encounter
+    {
+        if (!Str::isUuid($uuid)) {
+            return null;
+        }
+        $encounter = $this->findEncounter($uuid, $person->id);
+        if ($encounter === null || $encounter->status !== EncounterStatus::FINISHED
+            || $user->cannot('view', [$encounter, $person])) {
+            return null;
+        }
+
+        $episode = $person->filterRecordsWithMerged(Episode::query())
+            ->whereUuid($encounter->episode?->value)
+            ->whereHas('managingOrganization', fn (Builder $query) => $query->whereValue($legalEntity->uuid))
+            ->exists();
+
+        return $episode ? $encounter : null;
+    }
+
+    /** @return list<string> */
+    public function draftEpisodeUuids(Person $person, Encounter $encounter, User $user): array
+    {
+        return $person->filterRecordsWithMerged(Episode::query())
+            ->where(fn (Builder $query) => $query->whereStatus(EpisodeStatus::ACTIVE)->orWhere('uuid', $encounter->episode?->value))
+            ->get()
+            ->filter(fn (Episode $episode): bool => $user->can('view', [$episode, $person]))
+            ->pluck('uuid')->values()->all();
+    }
+
+    /** @return array<string, string> */
+    public function draftMedicalRecordLabels(Person $person, Encounter $encounter, User $user): array
+    {
+        $procedures = $person->filterRecordsWithMerged(Procedure::forEncounter($encounter->uuid))
+            ->whereStatus(ProcedureStatus::COMPLETED)
+            ->with('code')->get()->toBase();
+        $reports = $person->filterRecordsWithMerged(DiagnosticReport::forEncounter($encounter->uuid))
+            ->final()
+            ->with('code')->get()->toBase();
+
+        return $procedures->concat($reports)
+            ->filter(fn (Procedure|DiagnosticReport $record): bool => $user->can('view', [$record, $person]))
+            ->mapWithKeys(function (Procedure|DiagnosticReport $record): array {
+                $type = $record instanceof Procedure ? 'procedure' : 'diagnostic_report';
+                $label = $record->code?->displayValue ?: ($record->code?->value ?: $record->uuid);
+
+                return [$type.':'.$record->uuid => __('care-plan.emz_type.'.$type).' — '.$label];
+            })->all();
     }
 
     public function formContext(array $form, ?int $localId = null): array
