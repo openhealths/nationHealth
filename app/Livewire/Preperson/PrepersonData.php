@@ -58,7 +58,7 @@ class PrepersonData extends Component
 
         $person = Arr::only(
             Arr::toCamelCase($preperson->toArray()),
-            ['uuid', 'firstName', 'lastName', 'secondName', 'birthDate', 'gender', 'emergencyContact']
+            ['uuid', 'firstName', 'lastName', 'secondName', 'birthDate', 'gender', 'emergencyContact'],
         );
 
         if (!empty($person['birthDate'])) {
@@ -242,8 +242,8 @@ class PrepersonData extends Component
                 'preperson' => Preperson::with([
                     'insertedByUser.party',
                     'updatedByUser.party',
-                    'mergeRequests.masterPerson.names'
-                ])->findOrFail($this->prepersonId)
+                    'mergeRequests.masterPerson.names',
+                ])->findOrFail($this->prepersonId),
             ]);
     }
 }

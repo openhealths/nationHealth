@@ -6,12 +6,34 @@ namespace App\Policies;
 
 use App\Enums\Preperson\Status as PrepersonStatus;
 use App\Enums\Status;
+use App\Enums\User\Role;
+use App\Models\LegalEntity;
 use App\Models\Preperson;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
 class PrepersonPolicy
 {
+    /**
+     * Roles that create and update prepersons, by legal entity type. Other roles and legal entity types may hold the
+     * preperson scopes, but don't get these actions in the application.
+     *
+     * @var array
+     */
+    protected const array WRITE_ROLES = [
+        LegalEntity::TYPE_OUTPATIENT => [Role::SPECIALIST, Role::ASSISTANT, Role::RECEPTIONIST],
+    ];
+
+    /**
+     * Roles that view prepersons, by legal entity type.
+     *
+     * @var array
+     */
+    protected const array READ_ROLES = [
+        LegalEntity::TYPE_OUTPATIENT => [Role::SPECIALIST, Role::ASSISTANT, Role::RECEPTIONIST],
+        LegalEntity::TYPE_PRIMARY_CARE => [Role::DOCTOR],
+    ];
+
     /**
      * Deny every ability when the current legal entity cannot operate with prepersons.
      * Prepersons are available only for the legal entity types listed in PREPERSON_LEGAL_ENTITIES_ALLOWED_TYPES.
@@ -30,7 +52,7 @@ class PrepersonPolicy
      */
     public function viewAny(User $user): Response
     {
-        if ($user->cannot('preperson:read')) {
+        if ($user->cannot('preperson:read') || !$this->hasReadRole($user)) {
             return Response::denyWithStatus(404);
         }
 
@@ -42,7 +64,7 @@ class PrepersonPolicy
      */
     public function view(User $user, Preperson $preperson): Response
     {
-        if ($user->cannot('preperson:read')) {
+        if ($user->cannot('preperson:read') || !$this->hasReadRole($user)) {
             return Response::denyWithStatus(404);
         }
 
@@ -59,7 +81,7 @@ class PrepersonPolicy
      */
     public function viewSummary(User $user, Preperson $preperson): Response
     {
-        if ($user->cannot('patient_summary:read')) {
+        if ($user->cannot('patient_summary:read') || !$this->hasReadRole($user)) {
             return Response::denyWithStatus(404);
         }
 
@@ -71,7 +93,7 @@ class PrepersonPolicy
      */
     public function create(User $user): Response
     {
-        if ($user->cannot('preperson:write')) {
+        if ($user->cannot('preperson:write') || !$this->hasWriteRole($user)) {
             return Response::denyWithStatus(404);
         }
 
@@ -103,7 +125,7 @@ class PrepersonPolicy
      */
     public function edit(User $user, Preperson $preperson): Response
     {
-        if ($user->cannot('preperson:write')) {
+        if ($user->cannot('preperson:write') || !$this->hasWriteRole($user)) {
             return Response::denyWithStatus(404);
         }
 
@@ -120,7 +142,7 @@ class PrepersonPolicy
      */
     public function delete(User $user, Preperson $preperson): Response
     {
-        if ($user->cannot('preperson:write')) {
+        if ($user->cannot('preperson:write') || !$this->hasWriteRole($user)) {
             return Response::denyWithStatus(404);
         }
 
@@ -137,7 +159,7 @@ class PrepersonPolicy
      */
     public function update(User $user, Preperson $preperson): Response
     {
-        if ($user->cannot('preperson:write')) {
+        if ($user->cannot('preperson:write') || !$this->hasWriteRole($user)) {
             return Response::denyWithStatus(404);
         }
 
@@ -152,5 +174,40 @@ class PrepersonPolicy
         }
 
         return Response::allow();
+    }
+
+    /**
+     * Determine whether the user can create medical events for prepersons. Only the roles that create and update
+     * prepersons create them, others only view the medical events.
+     */
+    public function createMedicalEvents(User $user): Response
+    {
+        if (!$this->hasWriteRole($user)) {
+            return Response::denyWithStatus(404);
+        }
+
+        return Response::allow();
+    }
+
+    /**
+     * Whether the user holds a role that creates and updates prepersons in the current legal entity.
+     *
+     * @param  User  $user
+     * @return bool
+     */
+    protected function hasWriteRole(User $user): bool
+    {
+        return $user->hasAllowedRole(self::WRITE_ROLES[legalEntity()->type->name] ?? []);
+    }
+
+    /**
+     * Whether the user holds a role that views prepersons in the current legal entity.
+     *
+     * @param  User  $user
+     * @return bool
+     */
+    protected function hasReadRole(User $user): bool
+    {
+        return $user->hasAllowedRole(self::READ_ROLES[legalEntity()->type->name] ?? []);
     }
 }

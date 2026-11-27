@@ -1,7 +1,7 @@
 @php
     use App\Enums\JobStatus;
-    use App\Models\MedicalEvents\Sql\Encounter;
     use App\Livewire\Person\Records\PatientSummary;
+    use App\Models\MedicalEvents\Sql\Encounter;
     use App\View\PatientSummaryCards;
 @endphp
 
@@ -11,12 +11,9 @@
     :patientFullName="$patientFullName"
     :showLegacyMessages="false"
 >
-    <livewire:components.x-message
-        :consume-messages="true"
-        :key="(string) str()->uuid()"
-    />
+    <livewire:components.x-message :consume-messages="true" :key="(string) str()->uuid()" />
     <x-slot name="headerActions">
-        @can ('create', Encounter::class)
+        @if ($this->canCreateMedicalEvents && Auth::user()->can('create', Encounter::class))
             <a
                 href="{{
                     $prepersonId
@@ -25,10 +22,10 @@
                 }}"
                 class="button-primary flex items-center gap-2 px-5 py-2 text-sm shadow-sm"
             >
-                @icon ('plus', 'w-4 h-4')
+                @icon('plus', 'w-4 h-4')
                 {{ __('encounters.new') }}
             </a>
-        @endcan
+        @endif
     </x-slot>
 
     <div class="breadcrumb-form shift-content space-y-6 p-4">
@@ -41,21 +38,13 @@
                         id="selectedMergedPerson"
                         class="input-select peer w-full"
                     >
-                        <option value="" selected>
-                            {{ __('forms.select') }}
-                        </option>
+                        <option value="" selected>{{ __('forms.select') }}</option>
                         @foreach ($mergedPersons as $mergedPerson)
-                            <option value="{{ $mergedPerson['uuid'] }}">
-                                {{ $mergedPerson['name'] }}
-                            </option>
+                            <option value="{{ $mergedPerson['uuid'] }}">{{ $mergedPerson['name'] }}</option>
                         @endforeach
                     </select>
 
-                    <label
-                        for="selectedMergedPerson"
-                        class="label"
-                        >{{ __('preperson.merged_persons') }}</label
-                    >
+                    <label for="selectedMergedPerson" class="label">{{ __('preperson.merged_persons') }}</label>
                 </div>
 
                 <div class="form-group group flex items-center">
@@ -64,7 +53,7 @@
                         wire:click="searchMergedPersons"
                         class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400"
                     >
-                        @icon ('refresh', 'w-4 h-4')
+                        @icon('refresh', 'w-4 h-4')
                         <span>{{ __('forms.synchronise_with_eHealth') }}</span>
                     </button>
                 </div>
@@ -116,7 +105,7 @@
                     const sections = @js($actionSections);
                     this.stopWatching = this.$wire.intercept(({ action, onSend, onError, onFailure }) => {
                         const id = action.name === 'loadMore' ? action.params[0] : sections[action.name];
-                        if (!id) return;
+                        if (! id) return;
 
                         onSend(() => delete this.failedRequests[id]);
                         const fail = () => { this.failedRequests[id] = action.name; };
@@ -155,16 +144,16 @@
                                 aria-controls="summary-content-{{ $id }}"
                                 class="flex min-w-0 flex-1 items-center gap-4 p-5 text-left text-[17px] font-semibold text-gray-900 dark:text-gray-100"
                             >
-                                @icon ($item['icon'], 'h-6 w-6 shrink-0')
+                                @icon($item['icon'], 'h-6 w-6 shrink-0')
                                 <span class="min-w-0 flex-1 break-words">{{ __($item['label']) }}</span>
                                 <span
                                     class="shrink-0 text-gray-400 transition-transform duration-300 dark:text-gray-500"
                                     :class="activeSection === '{{ $id }}' ? '' : '-rotate-90'"
                                 >
-                                    @icon ('chevron-down', 'w-5 h-5')
+                                    @icon('chevron-down', 'w-5 h-5')
                                 </span>
                             </button>
-                            @isset ($item['sync'])
+                            @isset($item['sync'])
                                 @php
                                     $entity = $item['entity'] ?? null;
                                     $syncing = $entity && $this->isEntitySyncing($entity);
@@ -184,7 +173,7 @@
                                     title="{{ $syncLabel }}"
                                     class="flex shrink-0 items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-gray-400 dark:text-blue-400"
                                 >
-                                    @icon ('refresh', 'w-4 h-4')
+                                    @icon('refresh', 'w-4 h-4')
                                     <span class="hidden sm:inline">{{ $syncLabel }}</span>
                                 </button>
                             @endisset
@@ -196,27 +185,46 @@
                             style="display: none"
                             class="px-5 pb-5"
                         >
-                            @isset ($item['load'])
+                            @isset($item['load'])
                                 @php
                                     $sectionRecords = $this->{$id};
-                                    $loadingActions = $item['load'].','.$item['sync'].",loadMore('$id')";
+                                    $loadingActions = $item['load'] . ',' . $item['sync'] . ",loadMore('$id')";
                                 @endphp
-                                <p wire:loading wire:target="{{ $loadingActions }}" style="display: none" role="status" class="text-sm text-gray-500 dark:text-gray-400">{{ __('forms.loading') }}</p>
-                                <div x-cloak x-show="failedRequests['{{ $id }}']" role="alert" class="mb-3 text-sm text-gray-700 dark:text-gray-300">
+                                <p
+                                    wire:loading
+                                    wire:target="{{ $loadingActions }}"
+                                    style="display: none"
+                                    role="status"
+                                    class="text-sm text-gray-500 dark:text-gray-400"
+                                >
+                                    {{ __('forms.loading') }}
+                                </p>
+                                <div
+                                    x-cloak
+                                    x-show="failedRequests['{{ $id }}']"
+                                    role="alert"
+                                    class="mb-3 text-sm text-gray-700 dark:text-gray-300"
+                                >
                                     {{ __('patient-summary.request_failed') }}
                                     <button
                                         x-show="failedRequests['{{ $id }}'] === '{{ $item['load'] }}'"
                                         type="button"
                                         wire:click="{{ $item['load'] }}"
                                         class="ml-2 text-blue-600 underline dark:text-blue-400"
-                                    >{{ __('patient-summary.retry') }}</button>
+                                    >
+                                        {{ __('patient-summary.retry') }}
+                                    </button>
                                 </div>
                                 @if ($sectionRecords === [])
-                                    <div x-show="!failedRequests['{{ $id }}']" wire:loading.remove wire:target="{{ $loadingActions }}">
+                                    <div
+                                        x-show="! failedRequests['{{ $id }}']"
+                                        wire:loading.remove
+                                        wire:target="{{ $loadingActions }}"
+                                    >
                                         <x-patient.empty-records />
                                     </div>
                                 @else
-                                    @include ($id === 'episodes' ? 'livewire.person.records.parts.episodes' : 'livewire.person.records.parts.summary-records', [
+                                    @include($id === 'episodes' ? 'livewire.person.records.parts.episodes' : 'livewire.person.records.parts.summary-records', [
                                         'summaryCards' => $cardFormatter->collection($id, $sectionRecords, $personId, $prepersonId),
                                     ])
                                 @endif
@@ -252,7 +260,7 @@
                         type="button"
                         :class="activeSection === '{{ $id }}' ? 'summary-sidebar-btn-active' : 'summary-sidebar-btn-inactive'"
                     >
-                        @icon ($item['icon'], 'h-5 w-5 shrink-0')
+                        @icon($item['icon'], 'h-5 w-5 shrink-0')
                         <span class="min-w-0 break-words">{{ __($item['label']) }}</span>
                     </button>
                 @endforeach
@@ -265,14 +273,8 @@
                 onCloseClick="showSummaryDetails = false"
                 zIndex="50"
             >
-                <x-slot name="title">
-                    {{ __('forms.view_details') }}
-                </x-slot>
-                <button
-                    type="button"
-                    @click="showSummaryDetails = false"
-                    class="button-primary-outline mb-4"
-                >
+                <x-slot name="title">{{ __('forms.view_details') }}</x-slot>
+                <button type="button" @click="showSummaryDetails = false" class="button-primary-outline mb-4">
                     {{ __('forms.close') }}
                 </button>
                 <template x-if="viewedRecord">
@@ -283,28 +285,15 @@
                         ></h3>
                         <p
                             class="mb-4 text-sm text-gray-700 dark:text-gray-300"
-                            x-text="
-                                viewedRecord.statusLabel +
-                                ': ' +
-                                viewedRecord.status
-                            "
+                            x-text="viewedRecord.statusLabel + ': ' + viewedRecord.status"
                         ></p>
                         <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <template
-                                x-for="
-                                    (field, index) in
-                                    [
-                                        ...viewedRecord.fields,
-                                        ...viewedRecord.ids,
-                                    ]
-                                "
+                                x-for="(field, index) in [...viewedRecord.fields, ...viewedRecord.ids]"
                                 :key="index"
                             >
                                 <div class="min-w-0">
-                                    <dt
-                                        class="record-inner-label"
-                                        x-text="field.label"
-                                    ></dt>
+                                    <dt class="record-inner-label" x-text="field.label"></dt>
                                     <dd
                                         class="record-inner-subvalue break-words whitespace-pre-line"
                                         x-text="field.value"
@@ -312,31 +301,13 @@
                                 </div>
                             </template>
                         </dl>
-                        <template
-                            x-for="(group, index) in viewedRecord.groups"
-                            :key="index"
-                        >
-                            <section
-                                class="mt-5 border-t border-gray-200 pt-4 dark:border-gray-700"
-                            >
-                                <h4
-                                    class="record-inner-label mb-3"
-                                    x-text="group.label"
-                                ></h4>
-                                <dl
-                                    class="grid grid-cols-1 gap-4 sm:grid-cols-2"
-                                >
-                                    <template
-                                        x-for="
-                                            (field, fieldIndex) in group.fields
-                                        "
-                                        :key="fieldIndex"
-                                    >
+                        <template x-for="(group, index) in viewedRecord.groups" :key="index">
+                            <section class="mt-5 border-t border-gray-200 pt-4 dark:border-gray-700">
+                                <h4 class="record-inner-label mb-3" x-text="group.label"></h4>
+                                <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <template x-for="(field, fieldIndex) in group.fields" :key="fieldIndex">
                                         <div class="min-w-0">
-                                            <dt
-                                                class="record-inner-label"
-                                                x-text="field.label"
-                                            ></dt>
+                                            <dt class="record-inner-label" x-text="field.label"></dt>
                                             <dd
                                                 class="record-inner-subvalue break-words whitespace-pre-line"
                                                 x-text="field.value"

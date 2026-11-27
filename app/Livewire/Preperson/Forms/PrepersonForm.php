@@ -15,8 +15,8 @@ class PrepersonForm extends BaseForm
 {
     public array $person = [
         'emergencyContact' => [
-            'phones' => [['type' => null, 'number' => null]]
-        ]
+            'phones' => [['type' => null, 'number' => null]],
+        ],
     ];
 
     public array $reasonContext = [
@@ -25,7 +25,7 @@ class PrepersonForm extends BaseForm
         'policeReportId' => '',
         'policeReportDate' => '',
         'childBirthTime' => '',
-        'otherReason' => ''
+        'otherReason' => '',
     ];
 
     public ?string $deathDate = null;
@@ -48,25 +48,25 @@ class PrepersonForm extends BaseForm
             'person.gender' => ['required', 'string', new InDictionary('GENDER')],
             'person.emergencyContact.firstName' => [
                 Rule::requiredIf($emergencyContactRequired),
-                new NameFields()
+                new NameFields(),
             ],
             'person.emergencyContact.lastName' => [
                 Rule::requiredIf($emergencyContactRequired),
-                new NameFields()
+                new NameFields(),
             ],
             'person.emergencyContact.secondName' => ['nullable', new NameFields()],
             'person.emergencyContact.phones.*.type' => [
                 'nullable',
                 Rule::requiredIf($emergencyContactRequired),
                 'string',
-                'distinct'
+                'distinct',
             ],
             'person.emergencyContact.phones.*.number' => [
                 'nullable',
                 Rule::requiredIf($emergencyContactRequired),
                 'string',
                 new PhoneNumber(),
-                'distinct'
+                'distinct',
             ],
 
             // The note eHealth receives is built from the reason, so it is always filled in
@@ -75,7 +75,7 @@ class PrepersonForm extends BaseForm
                 'nullable',
                 'required_if:reasonContext.reason,' . Reason::EMERGENCY_HOSPITALIZATION->value,
                 'string',
-                'max:255'
+                'max:255',
             ],
             // Filled in only when the police has actually been appealed to
             'reasonContext.policeReportId' => ['nullable', 'string', 'max:255'],
@@ -83,14 +83,14 @@ class PrepersonForm extends BaseForm
             'reasonContext.childBirthTime' => [
                 'nullable',
                 'required_if:reasonContext.reason,' . Reason::NEWBORN_WITHOUT_CERTIFICATE->value,
-                'date_format:H:i'
+                'date_format:H:i',
             ],
             'reasonContext.otherReason' => [
                 'nullable',
                 'required_if:reasonContext.reason,' . Reason::OTHER_HOSPITALIZATION->value,
                 'string',
-                'max:255'
-            ]
+                'max:255',
+            ],
         ];
     }
 
@@ -113,26 +113,26 @@ class PrepersonForm extends BaseForm
             'person.gender' => ['required', 'string', new InDictionary('GENDER')],
             'person.emergencyContact.firstName' => [
                 Rule::requiredIf($emergencyContactRequired),
-                new NameFields()
+                new NameFields(),
             ],
             'person.emergencyContact.lastName' => [
                 Rule::requiredIf($emergencyContactRequired),
-                new NameFields()
+                new NameFields(),
             ],
             'person.emergencyContact.secondName' => ['nullable', new NameFields()],
             'person.emergencyContact.phones.*.type' => [
                 'nullable',
                 Rule::requiredIf($emergencyContactRequired),
                 'string',
-                'distinct'
+                'distinct',
             ],
             'person.emergencyContact.phones.*.number' => [
                 'nullable',
                 Rule::requiredIf($emergencyContactRequired),
                 'string',
                 new PhoneNumber(),
-                'distinct'
-            ]
+                'distinct',
+            ],
         ];
     }
 
@@ -144,7 +144,7 @@ class PrepersonForm extends BaseForm
     public function rulesForDeath(): array
     {
         return [
-            'deathDate' => ['required', 'date_format:' . config('app.date_format'), 'before_or_equal:today']
+            'deathDate' => ['required', 'date_format:' . config('app.date_format'), 'before_or_equal:today'],
         ];
     }
 
@@ -178,7 +178,7 @@ class PrepersonForm extends BaseForm
 
         return match ($reason) {
             Reason::EMERGENCY_HOSPITALIZATION => __('preperson.notes.ambulance', [
-                'number' => $this->reasonContext['ambulanceCardNumber']
+                'number' => $this->reasonContext['ambulanceCardNumber'],
             ]),
             // Without an appeal to the police the reason itself is the note
             Reason::POLICE_HOSPITALIZATION => implode('; ', array_filter([
@@ -187,12 +187,12 @@ class PrepersonForm extends BaseForm
                     : null,
                 filled($this->reasonContext['policeReportDate'])
                     ? __('preperson.notes.police_report_date', ['date' => $this->reasonContext['policeReportDate']])
-                    : null
+                    : null,
             ])) ?: $reason->label(),
             Reason::NEWBORN_WITHOUT_CERTIFICATE => __('preperson.notes.newborn', [
-                'time' => $this->reasonContext['childBirthTime']
+                'time' => $this->reasonContext['childBirthTime'],
             ]),
-            Reason::OTHER_HOSPITALIZATION => $this->reasonContext['otherReason']
+            Reason::OTHER_HOSPITALIZATION => $this->reasonContext['otherReason'],
         };
     }
 }

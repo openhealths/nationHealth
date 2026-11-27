@@ -359,6 +359,7 @@ Route::middleware(['auth:ehealth', 'verified'])->group(function () {
                 ->can('viewAny', Declaration::class);
 
             require __DIR__ . '/persons.php';
+            require __DIR__ . '/prepersons.php';
         });
 });
 
